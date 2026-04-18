@@ -56,11 +56,16 @@ Comptes-rendus, Publications, Nominations, Agenda, Communiqués.
    git push -u origin main
    ```
 
-### 3.2. API PISTE (Légifrance / JORF)
+### 3.2. Journal officiel (JORF)
 
-1. Crée un compte sur https://piste.gouv.fr.
-2. Crée une application avec l'accès `DILA - Légifrance` (gratuit, quotas généreux).
-3. Récupère `client_id` et `client_secret`.
+**Aucune action requise.** Le pipeline récupère le JORF via le dump DILA OPENDATA
+public (`https://echanges.dila.gouv.fr/OPENDATA/JORF/`), qui ne demande aucun credential.
+
+Si tu souhaites doubler la source via l'API PISTE (Légifrance) plus tard : crée un
+compte sur https://piste.gouv.fr, demande l'accès à Légifrance via Démarches
+Simplifiées, récupère `client_id` / `client_secret` et ajoute-les en secrets
+GitHub `PISTE_CLIENT_ID` / `PISTE_CLIENT_SECRET`. Décommente les 2 lignes
+correspondantes dans `.github/workflows/daily.yml`. Le connecteur est prêt.
 
 ### 3.3. SMTP (OVH Pro ou autre)
 
@@ -77,18 +82,18 @@ Le fichier `site/static/CNAME` est déjà présent.
 
 ### 3.5. Secrets GitHub Actions
 
-Dans `Settings ▸ Secrets and variables ▸ Actions`, crée les secrets suivants :
+Dans `Settings ▸ Secrets and variables ▸ Actions`, crée les 6 secrets suivants :
 
 | Secret              | Valeur                                                  |
 |---------------------|---------------------------------------------------------|
-| `PISTE_CLIENT_ID`   | fourni par PISTE                                        |
-| `PISTE_CLIENT_SECRET` | fourni par PISTE                                      |
 | `SMTP_HOST`         | ex. `ssl0.ovh.net`                                      |
 | `SMTP_PORT`         | `587`                                                   |
 | `SMTP_USER`         | `veille@sideline-conseil.fr`                            |
 | `SMTP_PASS`         | mot de passe SMTP                                       |
 | `SMTP_FROM`         | `Sideline Veille <veille@sideline-conseil.fr>`          |
 | `DIGEST_TO`         | `cyrilmourin@sideline-conseil.fr`                       |
+
+Optionnels (seulement si tu actives PISTE) : `PISTE_CLIENT_ID`, `PISTE_CLIENT_SECRET`.
 
 ### 3.6. Activer GitHub Pages
 

@@ -14,7 +14,7 @@ from typing import Callable
 import yaml
 
 from .models import Item
-from .sources import assemblee, elysee, html_generic, piste, senat
+from .sources import assemblee, dila_jorf, elysee, html_generic, piste, senat  # noqa: F401
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +24,9 @@ ROUTER: list[tuple[Callable[[dict, dict], bool], Callable[[dict], list[Item]]]] 
     (lambda group, src: group == "assemblee_nationale", assemblee.fetch_source),
     # Sénat — CSV/ZIP/RSS
     (lambda group, src: group == "senat", senat.fetch_source),
-    # PISTE — Légifrance / JORF
+    # DILA OPENDATA — dump JORF quotidien (remplace PISTE, sans credentials)
+    (lambda group, src: group == "dila", dila_jorf.fetch_source),
+    # PISTE — Légifrance / JORF via OAuth2 (gardé en réserve, non actif par défaut)
     (lambda group, src: group == "piste", piste.fetch_source),
     # Élysée — sitemap / html dédiés
     (

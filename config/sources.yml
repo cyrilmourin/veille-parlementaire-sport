@@ -91,28 +91,17 @@ senat:
       url: https://data.senat.fr/feed/actualites-rss.xml
       format: rss
 
-# Légifrance / JORF via API PISTE — nécessite des credentials OAuth2 dans .env :
-#   PISTE_CLIENT_ID=...  PISTE_CLIENT_SECRET=...
-# Doc : https://developer.aife.economie.gouv.fr/, https://piste.gouv.fr/
-piste:
-  token_url: https://oauth.piste.gouv.fr/api/oauth/token
-  api_base: https://api.piste.gouv.fr/dila/legifrance/lf-engine-app
+# Journal officiel (JORF) — dump DILA OPENDATA (aucun credential nécessaire).
+# L'API PISTE/Légifrance est contournée : le dump XML quotidien DILA contient
+# les mêmes textes et est accessible sans authentification.
+# Doc : https://echanges.dila.gouv.fr/OPENDATA/JORF/
+dila:
   sources:
-    - id: jorf
+    - id: dila_jorf
       category: jorf
-      path: /consult/jorfCont
-      format: api
-
-    - id: jorf_nominations
-      category: nominations
-      path: /consult/jorfSearch
-      format: api
-      filter: nomination
-
-    - id: constit
-      category: publications
-      path: /consult/searchConstit
-      format: api
+      url: https://echanges.dila.gouv.fr/OPENDATA/JORF/
+      format: dila_jorf
+      days_back: 8      # fenêtre d'agrégation (en jours)
 
 # Exécutif — flux RSS quand disponibles, sinon scraping structuré
 executif:

@@ -54,8 +54,10 @@ jobs:
 
       - name: Run pipeline (fetch + match + email + export)
         env:
-          PISTE_CLIENT_ID: ${{ secrets.PISTE_CLIENT_ID }}
-          PISTE_CLIENT_SECRET: ${{ secrets.PISTE_CLIENT_SECRET }}
+          # PISTE (Légifrance OAuth2) — non utilisé par défaut, JORF passe via DILA OPENDATA.
+          # Décommenter si tu obtiens un accès PISTE et veux doubler les sources.
+          # PISTE_CLIENT_ID: ${{ secrets.PISTE_CLIENT_ID }}
+          # PISTE_CLIENT_SECRET: ${{ secrets.PISTE_CLIENT_SECRET }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
