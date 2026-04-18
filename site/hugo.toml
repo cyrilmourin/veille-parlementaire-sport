@@ -1,7 +1,6 @@
 baseURL = "https://veille.sideline-conseil.fr/"
 languageCode = "fr-fr"
 title = "Veille parlementaire sport — Sideline Conseil"
-theme = ""
 enableRobotsTXT = true
 
 [params]

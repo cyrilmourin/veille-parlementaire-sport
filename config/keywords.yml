@@ -35,6 +35,28 @@ acteur:
   - COJOP
   - Solideo
   - Cyril Mourin               # demandé par l'utilisateur (veille nominative)
+  - Direction des sports
+  - DS ministère sports
+  - DDCS sport
+  - DDCSPP sport
+  - DTN                         # directeur technique national
+  - délégué interministériel aux Jeux
+  - delegue interministeriel aux Jeux
+  - délégation interministérielle JOP
+  - commission sport Assemblée
+  - commission sport Sénat
+  - groupe d'études sport
+  - groupe parlementaire sport
+  - AMA sport                   # Agence mondiale antidopage
+  - Agence mondiale antidopage
+  - CIO
+  - Comité international olympique
+  - Comite international olympique
+  - IPC                         # Comité paralympique international
+  - ARJEL                       # ancien ANJ — pour archives
+  - opérateurs sport
+  - operateurs sport
+  - fonds de dotation sport
 
 federation:
   - fédération sportive
@@ -54,8 +76,6 @@ federation:
   - FFHB                        # handball
   - FFA                         # athlétisme
   - FFN                         # natation
-  - FFC                         # cyclisme
-  - FFE                         # équitation / escrime (ambigu — on précise)
   - FFEscrime
   - FFJDA                       # judo
   - FFVoile
@@ -66,10 +86,36 @@ federation:
   - Ligue de football professionnel
   - LFP
   - LNR
-  - LNB
   - LNH
-  - équitation
-  - equitation
+  - FFTri                       # triathlon
+  - FFGym
+  - fédération française de gymnastique
+  - federation francaise de gymnastique
+  - FFBoxe
+  - FFBadminton
+  - FFVolley
+  - FFSki
+  - fédération française de ski
+  - federation francaise de ski
+  - FFSurf
+  - FFRugby à XIII
+  - FFAviron
+  - FFEsports
+  - Fédération Française de Football
+  - Federation Francaise de Football
+  - fédération française de rugby
+  - federation francaise de rugby
+  - fédération française de tennis
+  - federation francaise de tennis
+  - Ligue nationale de rugby
+  - Ligue nationale de basket
+  - Ligue nationale de handball
+  - Paris FC
+  - Paris Saint-Germain
+  - PSG sport
+  - OM sport                    # veille contentieuse
+  - OL sport
+  - clubs professionnels
 
 dispositif:
   - Pass'Sport
@@ -87,7 +133,6 @@ dispositif:
   - Generation 2024
   - sport de haut niveau
   - sportifs de haut niveau
-  - haut niveau
   - liste des sportifs de haut niveau
   - conventions d'insertion professionnelle
   - CIP sport
@@ -100,6 +145,51 @@ dispositif:
   - heritage des Jeux
   - héritage Paris 2024
   - heritage Paris 2024
+  - stratégie nationale sport-santé
+  - strategie nationale sport sante
+  - sport sur ordonnance
+  - contrat d'engagement sport
+  - plan aisance aquatique
+  - savoir nager
+  - savoir rouler à vélo
+  - savoir rouler a velo
+  - plan vélo sport
+  - plan velo sport
+  - sport en entreprise
+  - sport au travail
+  - sport en milieu professionnel
+  - bénévolat sportif
+  - benevolat sportif
+  - crédit d'impôt sport
+  - credit d'impot sport
+  - mécénat sportif
+  - mecenat sportif
+  - TVA billetterie sportive
+  - PSF                         # projets sportifs fédéraux
+  - projets sportifs fédéraux
+  - projets sportifs federaux
+  - fonds national pour le développement du sport
+  - fonds national pour le developpement du sport
+  - conférence régionale du sport
+  - conference regionale du sport
+  - conférence des financeurs sport
+  - conference des financeurs sport
+  - gouvernance du sport
+  - loi sport
+  - proposition de loi sport
+  - projet de loi sport
+  - loi démocratiser le sport
+  - loi democratiser le sport
+  - plan équipements sportifs
+  - plan equipements sportifs
+  - 5000 équipements sportifs
+  - 5000 equipements sportifs
+  - 1000 dojos
+  - 500 terrains de padel
+  - CQP sport
+  - formation arbitres
+  - formation entraîneurs
+  - formation entraineurs
 
 evenement:
   - jeux olympiques
@@ -113,16 +203,14 @@ evenement:
   - Alpes francaises 2030
   - Coupe du monde de rugby
   - Coupe du monde de ski
-  - Tour de France
+  - Tour de France cycliste
   - Roland-Garros
 
 theme:
-  - dans le sport
-  - victimes de violences
-  - violences sexuelles
-  - violences sexistes
   - violences dans le sport
-  - violences sexuelles et sexistes
+  - violences sexuelles et sexistes dans le sport
+  - violences sexuelles dans le sport
+  - violences sexistes dans le sport
   - VSS sport
   - dopage
   - intégrité des compétitions
@@ -131,7 +219,8 @@ theme:
   - matchs truques
   - manipulation de compétitions
   - manipulation de competitions
-  - supporters
+  - supporters sportifs
+  - supporters de match
   - supporterisme
   - Instance nationale du supporterisme
   - paris sportifs
@@ -150,12 +239,10 @@ theme:
   - sport adapté
   - sport adapte
   - parasport
-  - EPS
   - éducation physique et sportive
   - education physique et sportive
   - sport à l'école
   - sport a l'ecole
   - sport scolaire
-  - compétitions
-  - competitions
-  - concours                 # utilisé dans le doc utilisateur (recrutement public)
+  - compétitions sportives
+  - competitions sportives
