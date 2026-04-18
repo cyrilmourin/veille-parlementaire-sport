@@ -1,0 +1,270 @@
+# Inventaire des sources — veille parlementaire sport
+# Validé en live sur data.assemblee-nationale.fr, data.senat.fr et les portails officiels
+# en avril 2026. À auditer régulièrement via scripts/audit_sources.py.
+
+# Catégories Follaw.sv :
+#   dossiers_legislatifs | jorf | amendements | questions | comptes_rendus
+#   publications        | nominations | agenda | communiques
+
+assemblee_nationale:
+  base: https://data.assemblee-nationale.fr/static/openData/repository/17
+  sources:
+    - id: an_dossiers_legislatifs
+      category: dossiers_legislatifs
+      url: https://data.assemblee-nationale.fr/static/openData/repository/17/loi/dossiers_legislatifs/Dossiers_Legislatifs.json.zip
+      format: json_zip
+
+    - id: an_amendements
+      category: amendements
+      url: https://data.assemblee-nationale.fr/static/openData/repository/17/loi/amendements_div_legis/Amendements.json.zip
+      format: json_zip
+
+    - id: an_questions_ecrites
+      category: questions
+      url: https://data.assemblee-nationale.fr/static/openData/repository/17/questions/questions_ecrites/Questions_ecrites.json.zip
+      format: json_zip
+
+    - id: an_questions_gouvernement
+      category: questions
+      url: https://data.assemblee-nationale.fr/static/openData/repository/17/questions/questions_gouvernement/Questions_gouvernement.json.zip
+      format: json_zip
+
+    - id: an_agenda
+      category: agenda
+      url: https://data.assemblee-nationale.fr/static/openData/repository/17/vp/reunions/Agenda.json.zip
+      format: json_zip
+
+senat:
+  sources:
+    - id: senat_dosleg
+      category: dossiers_legislatifs
+      url: https://data.senat.fr/data/dosleg/dosleg.zip
+      format: csv_zip
+
+    - id: senat_ppl
+      category: dossiers_legislatifs
+      url: https://data.senat.fr/data/dosleg/ppl.csv
+      format: csv
+
+    - id: senat_rapports
+      category: publications
+      url: https://data.senat.fr/data/dosleg/rapports.csv
+      format: csv
+
+    - id: senat_promulguees
+      category: dossiers_legislatifs
+      url: https://data.senat.fr/data/dosleg/promulguees.csv
+      format: csv
+
+    - id: senat_ameli
+      category: amendements
+      url: https://data.senat.fr/data/ameli/ameli.zip
+      format: csv_zip
+
+    - id: senat_questions
+      category: questions
+      url: https://data.senat.fr/data/questions/questions.zip
+      format: csv_zip
+
+    - id: senat_qg
+      category: questions
+      url: https://data.senat.fr/data/questions/qg.csv
+      format: csv
+
+    - id: senat_questions_1an
+      category: questions
+      url: https://data.senat.fr/data/questions/questions-depuis-un-an.csv
+      format: csv
+
+    - id: senat_debats
+      category: comptes_rendus
+      url: https://data.senat.fr/data/debats/debats.zip
+      format: csv_zip
+
+    - id: senat_cri
+      category: comptes_rendus
+      url: https://data.senat.fr/data/debats/cri.zip
+      format: csv_zip
+
+    - id: senat_rss
+      category: communiques
+      url: https://data.senat.fr/feed/actualites-rss.xml
+      format: rss
+
+# Légifrance / JORF via API PISTE — nécessite des credentials OAuth2 dans .env :
+#   PISTE_CLIENT_ID=...  PISTE_CLIENT_SECRET=...
+# Doc : https://developer.aife.economie.gouv.fr/, https://piste.gouv.fr/
+piste:
+  token_url: https://oauth.piste.gouv.fr/api/oauth/token
+  api_base: https://api.piste.gouv.fr/dila/legifrance/lf-engine-app
+  sources:
+    - id: jorf
+      category: jorf
+      path: /consult/jorfCont
+      format: api
+
+    - id: jorf_nominations
+      category: nominations
+      path: /consult/jorfSearch
+      format: api
+      filter: nomination
+
+    - id: constit
+      category: publications
+      path: /consult/searchConstit
+      format: api
+
+# Exécutif — flux RSS quand disponibles, sinon scraping structuré
+executif:
+  sources:
+    - id: elysee_sitemap
+      category: communiques
+      url: https://www.elysee.fr/sitemap.static.xml
+      format: sitemap
+      rubriques:
+        - communique-de-presse
+        - declaration
+        - conseil-des-ministres
+        - discours
+
+    - id: elysee_agenda
+      category: agenda
+      url: https://www.elysee.fr/agenda
+      format: html
+
+    - id: matignon_actualites
+      category: communiques
+      url: https://www.gouvernement.fr/actualite
+      format: html
+
+    - id: matignon_agenda
+      category: agenda
+      url: https://www.gouvernement.fr/agenda
+      format: html
+
+    - id: info_gouv_actualites
+      category: communiques
+      url: https://www.info.gouv.fr/actualite
+      format: html
+
+ministeres:
+  # Scraping des espaces presse / listings actualités (RSS non disponible partout)
+  sources:
+    - id: min_sports_presse
+      category: communiques
+      url: https://www.sports.gouv.fr/espace-presse
+      format: html
+      poids: 3           # priorité maximale (ministère cœur de cible)
+
+    - id: min_sports_actualites
+      category: communiques
+      url: https://www.sports.gouv.fr/actualites-et-evenements
+      format: html
+      poids: 3
+
+    - id: min_education
+      category: communiques
+      url: https://www.education.gouv.fr/presse
+      format: html
+
+    - id: min_interieur
+      category: communiques
+      url: https://www.interieur.gouv.fr/actualites/presse
+      format: html
+
+    - id: min_economie
+      category: communiques
+      url: https://www.economie.gouv.fr/espace-presse
+      format: html
+
+    - id: min_justice
+      category: communiques
+      url: https://www.justice.gouv.fr/presse
+      format: html
+
+    - id: min_sante
+      category: communiques
+      url: https://sante.gouv.fr/actualites/presse
+      format: html
+
+    - id: min_travail
+      category: communiques
+      url: https://travail-emploi.gouv.fr/actualites/presse
+      format: html
+
+    - id: min_culture
+      category: communiques
+      url: https://www.culture.gouv.fr/Presse
+      format: html
+
+    - id: min_affaires_etrangeres
+      category: communiques
+      url: https://www.diplomatie.gouv.fr/fr/salle-de-presse/
+      format: html
+
+    - id: min_transition_ecologique
+      category: communiques
+      url: https://www.ecologie.gouv.fr/presse
+      format: html
+
+    - id: min_armees
+      category: communiques
+      url: https://www.defense.gouv.fr/actualites
+      format: html
+
+    - id: min_ruralite
+      category: communiques
+      url: https://www.cohesion-territoires.gouv.fr/presse
+      format: html
+
+    - id: min_enseignement_sup
+      category: communiques
+      url: https://www.enseignementsup-recherche.gouv.fr/fr/presse
+      format: html
+
+autorites:
+  sources:
+    - id: ans
+      category: publications
+      url: https://www.agencedusport.fr/actualites
+      format: html
+
+    - id: afld
+      category: publications
+      url: https://www.afld.fr/actualites/
+      format: html
+
+    - id: arcom
+      category: publications
+      url: https://www.arcom.fr/actualites
+      format: html
+
+    - id: anj
+      category: publications
+      url: https://anj.fr/actualites
+      format: html
+
+    - id: cour_comptes
+      category: publications
+      url: https://www.ccomptes.fr/fr/publications
+      format: html
+
+    - id: defenseur_droits
+      category: publications
+      url: https://www.defenseurdesdroits.fr/fr/actualites
+      format: html
+
+    - id: cnosf
+      category: communiques
+      url: https://cnosf.franceolympique.com/cnosf/actus/
+      format: html
+
+    - id: france_paralympique
+      category: communiques
+      url: https://france-paralympique.fr/actualites/
+      format: html
+
+    - id: alpes_2030
+      category: communiques
+      url: https://cojop.fr/
+      format: html

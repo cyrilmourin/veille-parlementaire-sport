@@ -1,0 +1,21 @@
+baseURL = "https://veille.sideline-conseil.fr/"
+languageCode = "fr-fr"
+title = "Veille parlementaire sport — Sideline Conseil"
+theme = ""
+enableRobotsTXT = true
+
+[params]
+  description = "Veille institutionnelle du sport — Parlement, Gouvernement, JORF, autorités."
+  author = "Sideline Conseil"
+  accent = "#1F3A8C"
+  mailto = "cyrilmourin@sideline-conseil.fr"
+
+[markup.goldmark.renderer]
+  unsafe = true
+
+[outputs]
+  home = ["HTML", "RSS", "JSON"]
+  section = ["HTML", "RSS"]
+
+[permalinks]
+  items = "/:section/:slug/"

@@ -1,0 +1,20 @@
+{{ define "main" }}
+<article class="item">
+  <nav class="breadcrumb">
+    <a href="/">Accueil</a> &rsaquo; <a href="/items/{{ .Params.category }}/">{{ .Params.category }}</a>
+  </nav>
+  <h1>{{ .Title }}</h1>
+  <p class="meta">
+    {{ with .Params.chamber }}<span class="chamber">{{ . }}</span>{{ end }}
+    {{ with .Date }}<time datetime="{{ .Format "2006-01-02" }}">{{ .Format "02/01/2006" }}</time>{{ end }}
+    {{ with .Params.source }}<span class="source">{{ . }}</span>{{ end }}
+  </p>
+  {{ with .Params.keywords }}
+    <ul class="tags">{{ range . }}<li>{{ . }}</li>{{ end }}</ul>
+  {{ end }}
+  <div class="content">{{ .Content }}</div>
+  {{ with .Params.url }}
+    <p><a class="btn" href="{{ . }}" rel="noopener" target="_blank">Consulter la source officielle &rarr;</a></p>
+  {{ end }}
+</article>
+{{ end }}

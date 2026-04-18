@@ -1,0 +1,161 @@
+# Dictionnaire de mots-clés — veille sport Sideline Conseil
+# Matching insensible à la casse et aux accents (voir src/keywords.py).
+# Chaque terme peut contenir des espaces et des chiffres. Les variantes orthographiques
+# sont listées explicitement (on ne fait pas de stemming — on préfère la précision).
+# Famille : acteur | dispositif | evenement | federation | theme
+
+acteur:
+  - ministre des sports
+  - ministère des sports
+  - ministere des sports
+  - ministère des sport        # variante observée dans le doc utilisateur
+  - mouvement sportif
+  - CNOSF
+  - comité national olympique
+  - comite national olympique
+  - CPSF
+  - comité paralympique et sportif
+  - comite paralympique et sportif
+  - CNSE                        # comité national du sport de haut niveau
+  - ANS                         # Agence nationale du sport
+  - Agence nationale du sport
+  - AFLD
+  - Agence française de lutte contre le dopage
+  - Agence francaise de lutte contre le dopage
+  - ARCOM                       # droits audiovisuels / paris sportifs
+  - ANJ                         # Autorité nationale des jeux
+  - Autorité nationale des jeux
+  - INSEP
+  - CREPS
+  - Grand INSEP
+  - Tony Estanguet
+  - Edgar Grospiron
+  - DIJOP
+  - COOJOP
+  - COJOP
+  - Solideo
+  - Cyril Mourin               # demandé par l'utilisateur (veille nominative)
+
+federation:
+  - fédération sportive
+  - federation sportive
+  - fédérations sportives
+  - federations sportives
+  - club sportif
+  - clubs sportifs
+  - association sportive
+  - associations sportives
+  - compétition fédération
+  - competition federation
+  - FFF                         # football
+  - FFR                         # rugby
+  - FFT                         # tennis
+  - FFBB                        # basket
+  - FFHB                        # handball
+  - FFA                         # athlétisme
+  - FFN                         # natation
+  - FFC                         # cyclisme
+  - FFE                         # équitation / escrime (ambigu — on précise)
+  - FFEscrime
+  - FFJDA                       # judo
+  - FFVoile
+  - FFHandisport
+  - FFSport Adapté
+  - FFSport Adapte
+  - FFSU                        # sport universitaire
+  - Ligue de football professionnel
+  - LFP
+  - LNR
+  - LNB
+  - LNH
+  - équitation
+  - equitation
+
+dispositif:
+  - Pass'Sport
+  - Pass Sport
+  - maison sport-santé
+  - maison sport santé
+  - sport-santé
+  - sport santé
+  - activité physique adaptée
+  - activite physique adaptee
+  - APA sport
+  - 2h de sport
+  - 30 minutes d'activité physique
+  - Génération 2024
+  - Generation 2024
+  - sport de haut niveau
+  - sportifs de haut niveau
+  - haut niveau
+  - liste des sportifs de haut niveau
+  - conventions d'insertion professionnelle
+  - CIP sport
+  - emploi sportif
+  - aide à l'emploi sportif
+  - plan 5000 équipements
+  - plan 5 000 équipements
+  - plan 5000 terrains
+  - héritage des Jeux
+  - heritage des Jeux
+  - héritage Paris 2024
+  - heritage Paris 2024
+
+evenement:
+  - jeux olympiques
+  - jeux paralympiques
+  - JO d'hiver
+  - JO d'hiver 2030
+  - Jeux d'hiver 2030
+  - Paris 2024
+  - Alpes 2030
+  - Alpes françaises 2030
+  - Alpes francaises 2030
+  - Coupe du monde de rugby
+  - Coupe du monde de ski
+  - Tour de France
+  - Roland-Garros
+
+theme:
+  - dans le sport
+  - victimes de violences
+  - violences sexuelles
+  - violences sexistes
+  - violences dans le sport
+  - violences sexuelles et sexistes
+  - VSS sport
+  - dopage
+  - intégrité des compétitions
+  - integrite des competitions
+  - matchs truqués
+  - matchs truques
+  - manipulation de compétitions
+  - manipulation de competitions
+  - supporters
+  - supporterisme
+  - Instance nationale du supporterisme
+  - paris sportifs
+  - droits audiovisuels sport
+  - droits TV sport
+  - esport
+  - e-sport
+  - sport électronique
+  - sport electronique
+  - sport féminin
+  - sport feminin
+  - féminisation du sport
+  - feminisation du sport
+  - parité fédération
+  - parite federation
+  - sport adapté
+  - sport adapte
+  - parasport
+  - EPS
+  - éducation physique et sportive
+  - education physique et sportive
+  - sport à l'école
+  - sport a l'ecole
+  - sport scolaire
+  - compétitions
+  - competitions
+  - concours                 # utilisé dans le doc utilisateur (recrutement public)

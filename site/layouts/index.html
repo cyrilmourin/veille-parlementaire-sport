@@ -1,0 +1,22 @@
+{{ define "main" }}
+<section class="home">
+  <h1>{{ .Site.Title }}</h1>
+  <p class="lede">{{ .Site.Params.description }}</p>
+  <div class="content">{{ .Content }}</div>
+
+  <h2>Dernières publications</h2>
+  <ul class="items">
+    {{ $recent := where .Site.RegularPages "Section" "items" }}
+    {{ range first 50 $recent.ByDate.Reverse }}
+      <li>
+        <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+        <span class="meta">
+          {{ with .Params.chamber }}{{ . }}{{ end }}
+          {{ with .Date }} — <time datetime="{{ .Format "2006-01-02" }}">{{ .Format "02/01/2006" }}</time>{{ end }}
+          {{ with .Params.category }} — <em>{{ . }}</em>{{ end }}
+        </span>
+      </li>
+    {{ end }}
+  </ul>
+</section>
+{{ end }}
