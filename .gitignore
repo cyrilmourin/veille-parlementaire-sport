@@ -19,3 +19,5 @@ site/data/index.json
 *.zip
 *.tmp
 .DS_Store
+_tmp_*.py
+site/content/_index.md

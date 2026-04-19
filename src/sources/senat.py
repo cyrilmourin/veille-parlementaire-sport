@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
+import re
 from datetime import datetime
 from typing import Iterable
 
@@ -13,6 +14,17 @@ from ..models import Item
 from ._common import fetch_bytes, fetch_text, parse_iso, unzip_members
 
 log = logging.getLogger(__name__)
+
+
+def _first_sentence(text: str, max_len: int = 140) -> str:
+    """Renvoie la 1re phrase du texte, tronquée à max_len."""
+    if not text:
+        return ""
+    clean = re.sub(r"\s+", " ", text).strip()
+    m = re.search(r"[\.\!\?]\s", clean[:max_len])
+    if m:
+        return clean[: m.end()].strip()
+    return clean[:max_len].rstrip() + ("…" if len(clean) > max_len else "")
 
 # --- mapping CSV ------------------------------------------------------------
 
@@ -104,15 +116,25 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
     elif sid in ("senat_questions", "senat_qg", "senat_questions_1an"):
         for r in rows:
             uid = r.get("numQuestion") or r.get("numero") or r.get("id") or ""
-            titre = r.get("titre") or r.get("objet") or r.get("texte") or ""
-            if not uid or not titre:
+            titre = r.get("titre") or r.get("objet") or ""
+            texte = r.get("texte") or r.get("texteQuestion") or ""
+            rubrique = r.get("rubrique") or r.get("theme") or ""
+            if not uid:
                 continue
+            # Construction d'un titre lisible :
+            # préférence rubrique > titre/objet > 1re phrase du texte
+            sujet = (titre or rubrique or _first_sentence(texte, 120) or "Question").strip()
+            qtype_label = {
+                "senat_questions": "Question écrite",
+                "senat_qg": "Question au gouvernement",
+                "senat_questions_1an": "Question de +1 an sans réponse",
+            }.get(sid, "Question")
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
-                title=titre[:220],
+                title=f"{qtype_label} n°{uid} — {sujet}"[:220],
                 url=r.get("url") or f"https://www.senat.fr/questions/base/{uid}.html",
                 published_at=parse_iso(r.get("date") or r.get("datePublication")),
-                summary=titre[:500], raw=r,
+                summary=(texte or titre)[:500], raw=r,
             )
 
     elif sid in ("senat_debats", "senat_cri"):

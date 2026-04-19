@@ -6,7 +6,9 @@ enableRobotsTXT = true
 [params]
   description = "Veille institutionnelle du sport — Parlement, Gouvernement, JORF, autorités."
   author = "Sideline Conseil"
-  accent = "#1F3A8C"
+  tagline = "Voir clair. Jouer juste."
+  accent = "#122549"
+  accent2 = "#DA4431"
   mailto = "cyrilmourin@sideline-conseil.fr"
 
 [markup.goldmark.renderer]

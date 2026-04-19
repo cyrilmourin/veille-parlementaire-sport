@@ -9,10 +9,20 @@
     {{ with .Date }}<time datetime="{{ .Format "2006-01-02" }}">{{ .Format "02/01/2006" }}</time>{{ end }}
     {{ with .Params.source }}<span class="source">{{ . }}</span>{{ end }}
   </p>
-  {{ with .Params.keywords }}
-    <ul class="tags">{{ range . }}<li>{{ . }}</li>{{ end }}</ul>
+
+  {{ with .Params.snippet }}
+    <blockquote class="snippet">« {{ . }} »</blockquote>
   {{ end }}
+
+  {{ with .Params.keywords }}
+    <div class="kw-block">
+      <span class="kw-label">Mots-clés détectés :</span>
+      <ul class="tags">{{ range . }}<li>{{ . }}</li>{{ end }}</ul>
+    </div>
+  {{ end }}
+
   <div class="content">{{ .Content }}</div>
+
   {{ with .Params.source_url }}
     <p><a class="btn" href="{{ . }}" rel="noopener" target="_blank">Consulter la source officielle &rarr;</a></p>
   {{ end }}

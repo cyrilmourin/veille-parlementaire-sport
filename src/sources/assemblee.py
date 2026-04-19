@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
 from typing import Iterable
 
@@ -12,6 +13,33 @@ from ._common import fetch_bytes, parse_iso, unzip_members
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://data.assemblee-nationale.fr"
+
+# Parseur d'UID de question AN : "QANR5L17QE9340" → législature 17, type QE, num 9340
+_Q_UID_RE = re.compile(r"L(\d+)(QE|QG|QOSD|QST)(\d+)", re.IGNORECASE)
+
+
+def _first_sentence(text: str, max_len: int = 140) -> str:
+    """Renvoie la 1re phrase du texte, tronquée à max_len."""
+    if not text:
+        return ""
+    clean = re.sub(r"\s+", " ", text).strip()
+    # Coupe sur fin de phrase si trouvée dans la fenêtre
+    m = re.search(r"[\.\!\?]\s", clean[:max_len])
+    if m:
+        return clean[: m.end()].strip()
+    return clean[:max_len].rstrip() + ("…" if len(clean) > max_len else "")
+
+
+def _question_url(uid: str) -> str:
+    """URL canonique pour une question AN — format `<leg>-<num><type>.htm`."""
+    if not uid:
+        return "https://www.assemblee-nationale.fr/dyn/17/"
+    m = _Q_UID_RE.search(uid)
+    if m:
+        leg, qtype, num = m.group(1), m.group(2).upper(), m.group(3)
+        return f"https://questions.assemblee-nationale.fr/q{leg}/{leg}-{num}{qtype}.htm"
+    # Fallback : recherche générique
+    return f"https://www2.assemblee-nationale.fr/recherche/questions?q={uid}"
 
 
 def _flatten(obj, path=""):
@@ -164,21 +192,41 @@ def _normalize_question(obj, src, cat):
     uid = _text_of(_first(root, "uid", "indexQuestion", default=""))
     if not uid:
         return
-    titre = _text_of(_first(root, "textesReponses.texteReponse.texte", default=""))
-    sujet = _text_of(_first(root, "indexationAnalytique.analyses.analyse", default=""))
+    # Indicateurs de contenu :
+    # - rubrique / tête d'analyse = thème court (ex. "sports : nautiques")
+    # - texte question = corps de la question (1re phrase = bon résumé)
+    rubrique = _text_of(_first(root, "rubrique", "indexationAnalytique.rubrique", default=""))
+    tete_analyse = _text_of(_first(root, "teteAnalyse", "indexationAnalytique.teteAnalyse", default=""))
+    analyse = _text_of(_first(root, "indexationAnalytique.analyses.analyse", default=""))
     texte = _text_of(_first(root, "textesQuestion.texteQuestion.texte", default=""))
+    reponse = _text_of(_first(root, "textesReponses.texteReponse.texte", default=""))
     date_pub = parse_iso(_first(root, "questionDate", default=None))
-    # Chambre et auteur
     auteur = _text_of(_first(root, "auteur.identite.acteurRef", default=""))
+
+    # Construction d'un titre explicite : on préfère rubrique > teteAnalyse > analyse > 1re phrase texte
+    sujet_court = (rubrique or tete_analyse or analyse).strip()
+    if not sujet_court:
+        sujet_court = _first_sentence(texte, max_len=120)
+    sujet_court = sujet_court or "Question écrite"
+    # Identifiant lisible (numéro court si parsable)
+    m_uid = _Q_UID_RE.search(uid)
+    numero_court = m_uid.group(3) if m_uid else uid
+    qtype_label = {
+        "QE": "Question écrite",
+        "QG": "Question au gouvernement",
+        "QOSD": "Question orale",
+        "QST": "Question orale",
+    }.get((m_uid.group(2).upper() if m_uid else ""), "Question")
+
     yield Item(
         source_id=src["id"],
         uid=uid,
         category=cat,
         chamber="AN",
-        title=f"Question {uid} — {sujet or 'sans sujet'}",
-        url=f"https://questions.assemblee-nationale.fr/q17/17-{uid}.htm",
+        title=f"{qtype_label} n°{numero_court} — {sujet_court}",
+        url=_question_url(uid),
         published_at=date_pub,
-        summary=(texte or titre)[:500],
+        summary=(texte or reponse)[:500],
         raw={"auteur": auteur, "path": "assemblee:question"},
     )
 

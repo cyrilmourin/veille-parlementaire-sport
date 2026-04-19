@@ -39,6 +39,7 @@ class Item(BaseModel):
     # Matching
     matched_keywords: list[str] = Field(default_factory=list)
     keyword_families: list[str] = Field(default_factory=list)
+    snippet: str = ""           # extrait contextuel autour du 1er match (~160 chars)
 
     # Brut
     raw: dict = Field(default_factory=dict, repr=False)

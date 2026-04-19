@@ -54,10 +54,36 @@ class KeywordMatcher:
                 families.add(fam)
         return sorted(set(matched)), sorted(families)
 
+    def build_snippet(self, original_text: str, window: int = 80) -> str:
+        """Extrait ~window chars de part et d'autre du 1er mot-clé trouvé
+        dans le texte ORIGINAL (avec accents / casse) — utilisé pour la
+        page d'accueil du site et le digest email."""
+        if not original_text:
+            return ""
+        haystack_norm = _normalize(original_text)
+        m = self._pattern.search(haystack_norm)
+        if not m:
+            # Aucun mot-clé trouvé : renvoyer les premiers N chars
+            return original_text.strip()[: 2 * window].strip()
+        # Position approximative du match dans le texte original :
+        # on se base sur la position dans la version normalisée,
+        # qui est alignée char-for-char pour la plupart des cas
+        # (unidecode conserve la taille sauf exceptions rares).
+        pos = m.start()
+        end = m.end()
+        start_cut = max(0, pos - window)
+        end_cut = min(len(original_text), end + window)
+        snippet = original_text[start_cut:end_cut].strip()
+        prefix = "…" if start_cut > 0 else ""
+        suffix = "…" if end_cut < len(original_text) else ""
+        return (prefix + snippet + suffix).replace("\n", " ").strip()
+
     def apply(self, items: Iterable):
-        """Annote in-place une liste d'Item."""
+        """Annote in-place une liste d'Item (keywords + snippet)."""
         for item in items:
             kws, fams = self.match(item.title, item.summary)
             item.matched_keywords = kws
             item.keyword_families = fams
+            # Snippet : priorité au summary (plus riche), fallback sur le titre
+            item.snippet = self.build_snippet(item.summary or item.title or "")
         return items

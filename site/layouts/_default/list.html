@@ -1,15 +1,18 @@
 {{ define "main" }}
 <section class="listing">
+  <nav class="breadcrumb"><a href="/">Accueil</a> &rsaquo; {{ .Title }}</nav>
   <h1>{{ .Title }}</h1>
   {{ with .Content }}<div class="intro">{{ . }}</div>{{ end }}
   <ul class="items">
-    {{ range (.Paginate .Pages).Pages }}
+    {{ range (.Paginate .Pages.ByDate.Reverse).Pages }}
       <li>
-        <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+        <a href="{{ .RelPermalink }}" class="title">{{ .Title }}</a>
         <span class="meta">
           {{ with .Params.chamber }}{{ . }}{{ end }}
-          {{ with .Date }} — <time datetime="{{ .Format "2006-01-02" }}">{{ .Format "02/01/2006" }}</time>{{ end }}
+          {{ with .Date }} · <time datetime="{{ .Format "2006-01-02" }}">{{ .Format "02/01/2006" }}</time>{{ end }}
+          {{ with .Params.keywords }} · <em>{{ delimit (first 4 .) ", " }}</em>{{ end }}
         </span>
+        {{ with .Params.snippet }}<div class="snippet-inline">« {{ . }} »</div>{{ end }}
       </li>
     {{ end }}
   </ul>
