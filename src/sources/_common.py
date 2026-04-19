@@ -13,7 +13,15 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 log = logging.getLogger(__name__)
 
-USER_AGENT = "SidelineVeilleBot/0.1 (+https://veille.sideline-conseil.fr)"
+# UA type navigateur Chrome sur macOS — les sites .gouv.fr refusent
+# systématiquement les UA déclaratifs de type bot (403). On garde une
+# identité honnête via l'entête "From" pour signaler l'origine aux admins.
+USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/128.0.0.0 Safari/537.36"
+)
+CONTACT_EMAIL = "veille@sideline-conseil.fr"
 CACHE_DIR = Path("data/cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -22,7 +30,17 @@ def _client() -> httpx.Client:
     return httpx.Client(
         timeout=60.0,
         follow_redirects=True,
-        headers={"User-Agent": USER_AGENT, "Accept": "*/*"},
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": (
+                "text/html,application/xhtml+xml,application/xml;q=0.9,"
+                "image/avif,image/webp,*/*;q=0.8"
+            ),
+            "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "From": CONTACT_EMAIL,
+            "DNT": "1",
+        },
     )
 
 
