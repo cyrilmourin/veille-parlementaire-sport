@@ -17,12 +17,17 @@ acteur:
   - comité paralympique et sportif
   - comite paralympique et sportif
   - CNSE                        # comité national du sport de haut niveau
-  - ANS                         # Agence nationale du sport
+  # ANS seul retiré — faux positifs avec le mot "ans" (unidecode).
+  # On garde uniquement la forme longue.
   - Agence nationale du sport
   - AFLD
   - Agence française de lutte contre le dopage
   - Agence francaise de lutte contre le dopage
-  - ARCOM                       # droits audiovisuels / paris sportifs
+  # ARCOM seul retiré — faux positifs massifs (audiovisuel général).
+  # On garde uniquement les formes contextualisées au sport.
+  - ARCOM sport
+  - ARCOM droits audiovisuels sport
+  - ARCOM paris sportifs
   - ANJ                         # Autorité nationale des jeux
   - Autorité nationale des jeux
   - INSEP

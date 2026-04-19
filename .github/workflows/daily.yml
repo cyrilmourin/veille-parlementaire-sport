@@ -2,8 +2,8 @@ name: Veille parlementaire sport — daily
 
 on:
   schedule:
-    # 06:30 Europe/Paris (= 04:30 UTC en été, 05:30 en hiver — on planifie large)
-    - cron: "30 4 * * *"
+    # 08:00 Europe/Paris (= 06:00 UTC en été, 07:00 en hiver — on planifie à 06:00 UTC)
+    - cron: "0 6 * * *"
   workflow_dispatch:
     inputs:
       since_days:
@@ -12,6 +12,10 @@ on:
         default: "1"
       no_email:
         description: "Ne pas envoyer l'email (0/1)"
+        required: false
+        default: "0"
+      reset_db:
+        description: "Reset SQLite avant run (0/1) — purge l'historique et re-normalise tout"
         required: false
         default: "0"
 
@@ -46,11 +50,18 @@ jobs:
           pip install -e .
 
       - name: Restore SQLite cache
+        if: github.event.inputs.reset_db != '1'
         uses: actions/cache@v4
         with:
           path: data/veille.sqlite3
-          key: veille-sqlite-${{ github.run_id }}
-          restore-keys: veille-sqlite-
+          key: veille-sqlite-v2-${{ github.run_id }}
+          restore-keys: veille-sqlite-v2-
+
+      - name: Reset SQLite (si demandé)
+        if: github.event.inputs.reset_db == '1'
+        run: |
+          echo "reset_db=1 → purge de data/veille.sqlite3 pour re-normaliser l'historique"
+          rm -f data/veille.sqlite3
 
       - name: Run pipeline (fetch + match + email + export)
         env:
