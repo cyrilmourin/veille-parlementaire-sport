@@ -177,24 +177,77 @@ def _normalize_amendement(obj, src, cat):
     uid = _first(root, "identifiant.numero", "uid", default=None)
     if not uid:
         return
-    title = _text_of(
-        _first(root, "corps.contenuAuteur.auteurs.auteur.acteurRef", default="")
-    )
-    dispo = _text_of(_first(root, "corps.dispositif", default=""))
-    expose = _text_of(_first(root, "corps.exposeSommaire", default=""))
-    sort = _text_of(_first(root, "cycleDeVie.sort.sortEnSeance", default=""))
-    dossier_titre = _text_of(_first(root, "identifiant.numeroLong", default=""))
     num = _text_of(uid)
+
+    # Auteur : soit nom+prenom, soit acteurRef (identifiant PA….)
+    auteur_nom = _text_of(_first(root, "signataires.auteur.nom",
+                                   "auteurs.auteur.identite.nom", default=""))
+    auteur_prenom = _text_of(_first(root, "signataires.auteur.prenom",
+                                     "auteurs.auteur.identite.prenom", default=""))
+    auteur_ref = _text_of(_first(root, "signataires.auteur.acteurRef",
+                                  "corps.contenuAuteur.auteurs.auteur.acteurRef",
+                                  "auteurs.auteur.acteurRef", default=""))
+    auteur_groupe = _text_of(_first(root, "signataires.groupePolitiqueRef",
+                                     "auteurs.auteur.groupePolitiqueRef", default=""))
+    auteur_label = " ".join(x for x in [auteur_prenom, auteur_nom] if x).strip() or auteur_ref or "Auteur inconnu"
+
+    # Dispositif + exposé sommaire (matériel pertinent pour matching mots-clés)
+    dispo = _text_of(_first(root, "corps.dispositif", default=""))
+    expose = _text_of(_first(root, "corps.exposeSommaire", "exposeSommaire", default=""))
+
+    # Statut : sort en séance / en commission / "Irrecevable"
+    sort = _text_of(_first(
+        root,
+        "cycleDeVie.sort.sortEnSeance",
+        "cycleDeVie.etatDesTraitements.etat",
+        "cycleDeVie.sort.libelle",
+        default=""
+    ))
+    etat = _text_of(_first(root, "etat", "cycleDeVie.etat", default=""))
+    statut = sort or etat or ""
+
+    # Contexte dossier (article, division)
+    article = _text_of(_first(root, "pointeurFragmentTexte.division.articleDesignation",
+                               "pointeurFragmentTexte.article.numeroCorrection",
+                               default=""))
+    dossier_titre = _text_of(_first(root, "identifiant.numeroLong",
+                                     "examinentInfo.loi.intitule",
+                                     "dossierRef",
+                                     default=""))
+
+    # Summary enrichi : on concatène tout le texte utile pour que le
+    # matcher mots-clés puisse attaquer le contenu entier (pas juste
+    # le dispositif qui est souvent purement technique).
+    summary_parts = [
+        f"Auteur : {auteur_label}" if auteur_label else "",
+        f"Statut : {statut}" if statut else "",
+        f"Article : {article}" if article else "",
+        expose,
+        dispo,
+    ]
+    summary = " — ".join(p for p in summary_parts if p).strip()[:2000]
+
+    # Titre compact et informatif
+    title_bits = [f"Amendement n°{num}"]
+    if statut:
+        title_bits.append(f"[{statut}]")
+    title_bits.append(f"— {auteur_label}")
+    if article:
+        title_bits.append(f"· art. {article}")
+    title = " ".join(title_bits)[:220]
+
     yield Item(
         source_id=src["id"],
         uid=str(num),
         category=cat,
         chamber="AN",
-        title=f"Amendement {num} — {dossier_titre}",
+        title=title,
         url=f"https://www.assemblee-nationale.fr/dyn/17/amendements/{num}",
-        published_at=parse_iso(_first(root, "cycleDeVie.dateDepot", default=None)),
-        summary=(dispo or expose)[:500] + (f" — Sort : {sort}" if sort else ""),
-        raw={"path": "assemblee:amendement"},
+        published_at=parse_iso(_first(root, "cycleDeVie.dateDepot",
+                                       "cycleDeVie.dateSaisie", default=None)),
+        summary=summary,
+        raw={"path": "assemblee:amendement", "auteur_ref": auteur_ref,
+             "groupe": auteur_groupe, "dossier": dossier_titre, "statut": statut},
     )
 
 
@@ -250,17 +303,41 @@ def _normalize_question(obj, src, cat):
     rubrique = _text_of(_first(root, "rubrique", "indexationAnalytique.rubrique", default=""))
     tete_analyse = _text_of(_first(root, "teteAnalyse", "indexationAnalytique.teteAnalyse", default=""))
     analyse = _text_of(_first(root, "indexationAnalytique.analyses.analyse", default=""))
-    texte = _text_of(_first(root, "textesQuestion.texteQuestion.texte", default=""))
-    reponse = _text_of(_first(root, "textesReponses.texteReponse.texte", default=""))
-    date_pub = parse_iso(_first(root, "questionDate", default=None))
-    auteur = _text_of(_first(root, "auteur.identite.acteurRef", default=""))
+    texte = _text_of(_first(root, "textesQuestion.texteQuestion.texte",
+                             "texte", default=""))
+    reponse = _text_of(_first(root, "textesReponses.texteReponse.texte",
+                               "reponse", default=""))
+    date_pub = parse_iso(_first(root, "questionDate", "dateQuestion",
+                                 "dateDepot", default=None))
 
-    # Construction d'un titre explicite : on préfère rubrique > teteAnalyse > analyse > 1re phrase texte
+    # Auteur — on essaie nom/prénom explicites avant de tomber sur acteurRef.
+    auteur_nom = _text_of(_first(root,
+                                  "auteur.identite.nom",
+                                  "auteur.identite.nomFamille",
+                                  default=""))
+    auteur_prenom = _text_of(_first(root,
+                                     "auteur.identite.prenom",
+                                     default=""))
+    auteur_civilite = _text_of(_first(root, "auteur.identite.civ", default=""))
+    auteur_ref = _text_of(_first(root, "auteur.identite.acteurRef",
+                                  "auteur.acteurRef", default=""))
+    auteur_groupe = _text_of(_first(root, "auteur.groupe.abrege",
+                                     "auteur.groupePolitiqueRef",
+                                     default=""))
+    auteur_label = " ".join(x for x in [auteur_civilite, auteur_prenom, auteur_nom] if x).strip()
+    if not auteur_label:
+        auteur_label = auteur_ref or "Auteur"
+
+    ministere = _text_of(_first(root, "minInt.abrege",
+                                 "ministereAttributaire.intitule",
+                                 default=""))
+
+    # Construction du titre :
+    # "Question écrite n°9711 — Mme Hervieu (Groupe) → Min. Sports : <sujet>"
     sujet_court = (rubrique or tete_analyse or analyse).strip()
     if not sujet_court:
-        sujet_court = _first_sentence(texte, max_len=120)
-    sujet_court = sujet_court or "Question écrite"
-    # Identifiant lisible (numéro court si parsable)
+        sujet_court = _first_sentence(texte, max_len=100)
+    sujet_court = sujet_court or "Question"
     m_uid = _Q_UID_RE.search(uid)
     numero_court = m_uid.group(3) if m_uid else uid
     qtype_label = {
@@ -270,16 +347,38 @@ def _normalize_question(obj, src, cat):
         "QST": "Question orale",
     }.get((m_uid.group(2).upper() if m_uid else ""), "Question")
 
+    title_bits = [f"{qtype_label} n°{numero_court}", f"— {auteur_label}"]
+    if auteur_groupe:
+        title_bits.append(f"({auteur_groupe})")
+    if ministere:
+        title_bits.append(f"→ {ministere}")
+    title_bits.append(f": {sujet_court}")
+    title = " ".join(title_bits)[:220]
+
+    # Summary enrichi pour matching : on inclut auteur + ministère + rubrique
+    # + texte + réponse. Le matcher attaque title+summary.
+    summary_parts = [
+        f"{auteur_label}" + (f" ({auteur_groupe})" if auteur_groupe else ""),
+        f"Destinataire : {ministere}" if ministere else "",
+        f"Rubrique : {rubrique}" if rubrique else "",
+        f"Analyse : {analyse}" if analyse else "",
+        texte,
+        reponse,
+    ]
+    summary = " — ".join(p for p in summary_parts if p).strip()[:2000]
+
     yield Item(
         source_id=src["id"],
         uid=uid,
         category=cat,
         chamber="AN",
-        title=f"{qtype_label} n°{numero_court} — {sujet_court}",
+        title=title,
         url=_question_url(uid),
         published_at=date_pub,
-        summary=(texte or reponse)[:500],
-        raw={"auteur": auteur, "path": "assemblee:question"},
+        summary=summary,
+        raw={"auteur_ref": auteur_ref, "auteur": auteur_label,
+             "groupe": auteur_groupe, "ministere": ministere,
+             "path": "assemblee:question"},
     )
 
 
@@ -290,16 +389,58 @@ def _normalize_agenda(obj, src, cat):
     uid = _text_of(_first(root, "uid", default=""))
     if not uid:
         return
-    titre = _text_of(_first(root, "objet.libelleObjet", default="Réunion"))
-    dt = parse_iso(_first(root, "timestampDebut", "timestampDebutReunion", default=None))
+    titre = _text_of(_first(root, "objet.libelleObjet",
+                              "titreReunion", default="Réunion"))
+    dt = parse_iso(_first(root, "timestampDebut",
+                           "timestampDebutReunion",
+                           "dateReunion", default=None))
+
+    # Organe (commission, délégation…)
+    organe = _text_of(_first(root, "organeReuniRef",
+                               "organeRef",
+                               "typeReunion",
+                               default=""))
+    lieu = _text_of(_first(root, "lieu.libelleCourt",
+                            "lieu.libelle", default=""))
+
+    # Ordre du jour / thèmes — souvent structurés en liste.
+    # On aplati tout ce qui ressemble à un thème/libellé pour nourrir le matcher.
+    odj_parts: list[str] = []
+    themes = _first(root, "objet.themes", default=None)
+    if isinstance(themes, (dict, list)):
+        for p, v in _flatten(themes):
+            if isinstance(v, str) and len(v) > 3:
+                odj_parts.append(v)
+    elif isinstance(themes, str):
+        odj_parts.append(themes)
+
+    points = _first(root, "pointsOrdreDuJour", "ordreDuJour", default=None)
+    if isinstance(points, (dict, list)):
+        for p, v in _flatten(points):
+            if isinstance(v, str) and len(v) > 3 and ("libelle" in p.lower() or "objet" in p.lower() or "texte" in p.lower()):
+                odj_parts.append(v)
+
+    odj_text = " · ".join(odj_parts)[:2000]
+
+    title_bits = [f"Agenda — {titre}"]
+    if organe:
+        title_bits.append(f"({organe})")
+    title = " ".join(title_bits)[:220]
+
+    summary = " — ".join(p for p in [
+        f"Organe : {organe}" if organe else "",
+        f"Lieu : {lieu}" if lieu else "",
+        odj_text,
+    ] if p)[:2000]
+
     yield Item(
         source_id=src["id"],
         uid=uid,
         category=cat,
         chamber="AN",
-        title=f"Agenda — {titre}",
+        title=title,
         url=f"https://www.assemblee-nationale.fr/dyn/17/reunions/{uid}",
         published_at=dt,
-        summary=(_text_of(_first(root, "objet.themes", default="")))[:500],
-        raw={"path": "assemblee:reunion"},
+        summary=summary,
+        raw={"path": "assemblee:reunion", "organe": organe, "lieu": lieu},
     )

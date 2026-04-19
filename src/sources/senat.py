@@ -33,122 +33,190 @@ def _first_sentence(text: str, max_len: int = 140) -> str:
 SEP = ";"
 
 
-def _read_csv(payload: bytes) -> Iterable[dict]:
+def _read_csv(payload: bytes, sid: str = "") -> Iterable[dict]:
+    """Lit un CSV Sénat. Les fichiers open data Sénat ont parfois basculé
+    entre ';' et ',' selon les datasets. On teste les deux séparateurs et
+    on retient celui qui produit le plus de colonnes."""
     text = payload.decode("utf-8-sig", errors="replace")
-    reader = csv.DictReader(io.StringIO(text), delimiter=SEP)
+    # Sniff délimiteur
+    first_line = text.split("\n", 1)[0] if text else ""
+    sep = SEP
+    if first_line.count(",") > first_line.count(";"):
+        sep = ","
+    reader = csv.DictReader(io.StringIO(text), delimiter=sep)
+    rows = []
     for row in reader:
-        yield {(k or "").strip(): (v or "").strip() for k, v in row.items()}
+        rows.append({(k or "").strip(): (v or "").strip() for k, v in row.items()})
+    # Log diagnostic : nombre de lignes + noms des colonnes
+    if rows:
+        cols = list(rows[0].keys())
+        log.info("Sénat %s : CSV lu (%d lignes, sep=%r) — colonnes : %s",
+                 sid, len(rows), sep, cols[:12])
+    else:
+        log.warning("Sénat %s : CSV vide ou illisible (sep=%r, len=%d)",
+                    sid, sep, len(text))
+    return iter(rows)
 
 
 def fetch_source(src: dict) -> list[Item]:
     fmt = src.get("format")
     sid = src["id"]
-    log.info("Fetch Sénat %s (%s)", sid, fmt)
+    log.info("Fetch Sénat %s (%s) %s", sid, fmt, src["url"])
     try:
         if fmt == "csv":
             payload = fetch_bytes(src["url"])
-            rows = list(_read_csv(payload))
-            return list(_normalize_rows(src, rows))
+            rows = list(_read_csv(payload, sid))
+            items = list(_normalize_rows(src, rows))
+            log.info("Sénat %s : %d items normalisés (sur %d lignes CSV)",
+                     sid, len(items), len(rows))
+            return items
         if fmt == "csv_zip":
             data = fetch_bytes(src["url"])
             items: list[Item] = []
-            for name, payload in unzip_members(data):
+            members = list(unzip_members(data))
+            log.info("Sénat %s : ZIP contient %d fichiers", sid, len(members))
+            for name, payload in members:
                 if not name.lower().endswith(".csv"):
                     continue
-                rows = list(_read_csv(payload))
-                items.extend(_normalize_rows(src, rows, csv_name=name))
+                rows = list(_read_csv(payload, f"{sid}:{name}"))
+                batch = list(_normalize_rows(src, rows, csv_name=name))
+                items.extend(batch)
+                log.info("Sénat %s/%s : %d items (sur %d lignes)",
+                         sid, name, len(batch), len(rows))
             return items
         if fmt == "rss":
             return _normalize_rss(src, fetch_text(src["url"]))
     except Exception as e:
-        log.error("Sénat %s KO: %s", sid, e)
+        log.exception("Sénat %s KO: %s", sid, e)
     return []
+
+
+def _pick(row: dict, *names, default: str = "") -> str:
+    """Premier champ non-vide parmi une liste de noms probables (tolérant sur la casse)."""
+    low = {k.lower(): v for k, v in row.items()}
+    for n in names:
+        v = low.get(n.lower())
+        if v:
+            return v
+    return default
 
 
 def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable[Item]:
     sid = src["id"]
     cat = src["category"]
 
-    # Dossiers législatifs — colonnes « numero_initiative », « titre », « date_depot »…
+    # Dossiers législatifs — colonnes qui ont bougé : numero_initiative,
+    # numeroInitiative, id_dosleg, etc. On liste large.
     if sid in ("senat_dosleg", "senat_ppl", "senat_promulguees"):
         for r in rows:
-            uid = r.get("numero_initiative") or r.get("numero") or r.get("id") or ""
-            titre = r.get("titre") or r.get("intitule") or ""
-            date = parse_iso(r.get("date_depot") or r.get("datePromulgation") or r.get("date"))
+            uid = _pick(r, "numero_initiative", "numeroInitiative",
+                         "numero", "num", "id_dosleg", "id", "uid")
+            titre = _pick(r, "titre", "intitule", "libelle", "intituleLong")
+            date = parse_iso(_pick(r, "date_depot", "dateDepot",
+                                     "datePromulgation", "datePublication",
+                                     "date_publication", "date"))
             if not uid or not titre:
                 continue
+            url = _pick(r, "url", "lien") or f"https://www.senat.fr/dossier-legislatif/{uid}.html"
+            # Contenu utile pour matching : on ajoute tout le texte du row
+            extras = " ".join(v for v in r.values() if isinstance(v, str) and len(v) > 3)
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
-                title=titre[:220],
-                url=r.get("url") or f"https://www.senat.fr/dossier-legislatif/{uid}.html",
-                published_at=date, summary=titre[:500], raw=r,
+                title=titre[:220], url=url,
+                published_at=date,
+                summary=(titre + " — " + extras)[:2000],
+                raw=r,
             )
 
     elif sid == "senat_rapports":
         for r in rows:
-            uid = r.get("numero") or r.get("id") or ""
-            titre = r.get("titre") or ""
+            uid = _pick(r, "numero", "num", "id", "uid")
+            titre = _pick(r, "titre", "intitule", "libelle")
             if not uid or not titre:
                 continue
+            extras = " ".join(v for v in r.values() if isinstance(v, str) and len(v) > 3)
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
                 title=f"Rapport n°{uid} — {titre}"[:220],
-                url=r.get("url") or f"https://www.senat.fr/rap/{uid}.html",
-                published_at=parse_iso(r.get("date")),
-                summary=titre[:500], raw=r,
+                url=_pick(r, "url", "lien") or f"https://www.senat.fr/rap/{uid}.html",
+                published_at=parse_iso(_pick(r, "date", "datePublication", "date_publication")),
+                summary=extras[:2000], raw=r,
             )
 
     elif sid in ("senat_ameli",):
         for r in rows:
-            uid = r.get("num_amdt") or r.get("numero") or r.get("id") or ""
-            obj = r.get("objet") or r.get("titre") or ""
-            disp = r.get("dispositif") or ""
+            uid = _pick(r, "num_amdt", "numero", "id", "uid", "numeroAmendement")
+            obj = _pick(r, "objet", "titre", "libelle")
+            disp = _pick(r, "dispositif", "texteAmendement", "texte")
+            auteur = _pick(r, "auteur", "nomAuteur", "signataire")
+            sort = _pick(r, "sort", "statut", "etatAmendement")
             if not uid:
                 continue
+            title_bits = [f"Amendement n°{uid}"]
+            if sort:
+                title_bits.append(f"[{sort}]")
+            if auteur:
+                title_bits.append(f"— {auteur}")
+            summary_parts = [f"Auteur : {auteur}" if auteur else "",
+                             f"Sort : {sort}" if sort else "",
+                             obj, disp]
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
-                title=f"Amendement {uid}"[:220],
-                url=r.get("url") or f"https://www.senat.fr/enseance/{uid}.html",
-                published_at=parse_iso(r.get("date")),
-                summary=(obj or disp)[:500], raw=r,
+                title=" ".join(title_bits)[:220],
+                url=_pick(r, "url", "lien") or f"https://www.senat.fr/enseance/{uid}.html",
+                published_at=parse_iso(_pick(r, "date", "datePublication")),
+                summary=" — ".join(p for p in summary_parts if p)[:2000], raw=r,
             )
 
     elif sid in ("senat_questions", "senat_qg", "senat_questions_1an"):
         for r in rows:
-            uid = r.get("numQuestion") or r.get("numero") or r.get("id") or ""
-            titre = r.get("titre") or r.get("objet") or ""
-            texte = r.get("texte") or r.get("texteQuestion") or ""
-            rubrique = r.get("rubrique") or r.get("theme") or ""
+            uid = _pick(r, "numQuestion", "numero", "num", "id", "uid")
+            titre = _pick(r, "titre", "objet", "intitule")
+            texte = _pick(r, "texte", "texteQuestion", "libelle")
+            rubrique = _pick(r, "rubrique", "theme")
+            auteur = _pick(r, "auteur", "nomAuteur", "senateur", "signataire")
+            ministere = _pick(r, "ministere", "ministereAttributaire",
+                               "minInt", "destinataire")
             if not uid:
                 continue
-            # Construction d'un titre lisible :
-            # préférence rubrique > titre/objet > 1re phrase du texte
-            sujet = (titre or rubrique or _first_sentence(texte, 120) or "Question").strip()
+            sujet = (titre or rubrique or _first_sentence(texte, 100) or "Question").strip()
             qtype_label = {
                 "senat_questions": "Question écrite",
                 "senat_qg": "Question au gouvernement",
                 "senat_questions_1an": "Question de +1 an sans réponse",
             }.get(sid, "Question")
+            title_bits = [f"{qtype_label} n°{uid}"]
+            if auteur:
+                title_bits.append(f"— {auteur}")
+            if ministere:
+                title_bits.append(f"→ {ministere}")
+            title_bits.append(f": {sujet}")
+            summary = " — ".join(p for p in [
+                auteur, f"Destinataire : {ministere}" if ministere else "",
+                f"Rubrique : {rubrique}" if rubrique else "",
+                texte, titre,
+            ] if p)[:2000]
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
-                title=f"{qtype_label} n°{uid} — {sujet}"[:220],
-                url=r.get("url") or f"https://www.senat.fr/questions/base/{uid}.html",
-                published_at=parse_iso(r.get("date") or r.get("datePublication")),
-                summary=(texte or titre)[:500], raw=r,
+                title=" ".join(title_bits)[:220],
+                url=_pick(r, "url", "lien") or f"https://www.senat.fr/questions/base/{uid}.html",
+                published_at=parse_iso(_pick(r, "date", "datePublication", "date_publication")),
+                summary=summary, raw=r,
             )
 
     elif sid in ("senat_debats", "senat_cri"):
         for r in rows:
-            uid = r.get("id") or r.get("numero") or r.get("date") or ""
-            titre = r.get("titre") or r.get("sujet") or "Séance publique"
+            uid = _pick(r, "id", "numero", "uid", "date")
+            titre = _pick(r, "titre", "sujet", "libelle") or "Séance publique"
             if not uid:
                 continue
+            extras = " ".join(v for v in r.values() if isinstance(v, str) and len(v) > 3)
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
                 title=titre[:220],
-                url=r.get("url") or "https://www.senat.fr/seances/",
-                published_at=parse_iso(r.get("date")),
-                summary=titre[:500], raw=r,
+                url=_pick(r, "url", "lien") or "https://www.senat.fr/seances/",
+                published_at=parse_iso(_pick(r, "date", "datePublication")),
+                summary=extras[:2000], raw=r,
             )
 
 
