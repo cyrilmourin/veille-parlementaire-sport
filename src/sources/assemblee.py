@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Iterable
 
 from ..models import Item
-from ._common import fetch_bytes, parse_iso, unzip_members
+from ._common import fetch_bytes, parse_iso, unzip_members, unzip_members_since
 
 log = logging.getLogger(__name__)
 
@@ -111,7 +112,14 @@ def _all_text(node) -> str:
 
 
 def fetch_source(src: dict) -> list[Item]:
-    """Récupère et normalise un dataset AN."""
+    """Récupère et normalise un dataset AN.
+
+    Supporte un filtre `since_days` (config source ou env var `AN_SINCE_DAYS`)
+    appliqué sur `ZipInfo.date_time` : pour les dumps massifs (ex. Amendements
+    avec 104k JSON), on évite de décompresser et normaliser les entrées trop
+    anciennes. Une veille quotidienne n'a pas besoin de re-ingérer des
+    amendements de 2023 à chaque run.
+    """
     fmt = src.get("format", "json_zip")
     if fmt != "json_zip":
         log.warning("Format %s non supporté pour %s", fmt, src["id"])
@@ -119,7 +127,34 @@ def fetch_source(src: dict) -> list[Item]:
     data = fetch_bytes(src["url"])
     items: list[Item] = []
     file_count = 0
-    for name, payload in unzip_members(data):
+
+    # Fenêtre date optionnelle : src["since_days"] > env AN_SINCE_DAYS > None
+    since_days_raw = src.get("since_days") or os.environ.get("AN_SINCE_DAYS")
+    since: datetime | None = None
+    if since_days_raw:
+        try:
+            since = datetime.utcnow() - timedelta(days=int(since_days_raw))
+            log.info(
+                "%s : filtre date >= %s (fenêtre %s jours)",
+                src["id"], since.date().isoformat(), since_days_raw,
+            )
+        except (ValueError, TypeError):
+            log.warning("%s : since_days invalide (%r), pas de filtre",
+                        src["id"], since_days_raw)
+
+    # 1er filtre (cheap) sur ZipInfo.date_time. Peut être sans effet si le
+    # dump AN régénère les mtimes à chaque build — auquel cas on filtrera
+    # sur la date réelle extraite du JSON plus bas.
+    if since is not None:
+        iterator = (
+            (name, payload)
+            for name, _dt, payload in unzip_members_since(data, since=since)
+        )
+    else:
+        iterator = unzip_members(data)
+
+    filtered_by_content = 0
+    for name, payload in iterator:
         if not name.endswith(".json"):
             continue
         file_count += 1
@@ -128,7 +163,20 @@ def fetch_source(src: dict) -> list[Item]:
         except Exception as e:
             log.debug("JSON KO %s: %s", name, e)
             continue
-        items.extend(_normalize(src, name, obj))
+        for item in _normalize(src, name, obj):
+            # 2e filtre (reliable) sur la date extraite du JSON : garantit
+            # que la fenêtre s'applique même si ZipInfo.date_time est
+            # uniforme (cas des dumps régénérés quotidiennement).
+            if since is not None and item.published_at is not None:
+                if item.published_at < since:
+                    filtered_by_content += 1
+                    continue
+            items.append(item)
+    if since is not None and filtered_by_content:
+        log.info(
+            "%s : %d items retirés par filtre date (published_at < %s)",
+            src["id"], filtered_by_content, since.date().isoformat(),
+        )
     log.info("%s : %d items (sur %d fichiers JSON)", src["id"], len(items), file_count)
     return items
 

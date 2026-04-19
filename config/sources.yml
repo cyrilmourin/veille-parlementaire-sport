@@ -18,21 +18,25 @@ assemblee_nationale:
       category: amendements
       url: https://data.assemblee-nationale.fr/static/openData/repository/17/loi/amendements_div_legis/Amendements.json.zip
       format: json_zip
+      since_days: 30      # fenêtre (sinon 104k amendements rechargés à chaque run)
 
     - id: an_questions_ecrites
       category: questions
       url: https://data.assemblee-nationale.fr/static/openData/repository/17/questions/questions_ecrites/Questions_ecrites.json.zip
       format: json_zip
+      since_days: 30
 
     - id: an_questions_gouvernement
       category: questions
       url: https://data.assemblee-nationale.fr/static/openData/repository/17/questions/questions_gouvernement/Questions_gouvernement.json.zip
       format: json_zip
+      since_days: 30
 
     - id: an_agenda
       category: agenda
       url: https://data.assemblee-nationale.fr/static/openData/repository/17/vp/reunions/Agenda.json.zip
       format: json_zip
+      since_days: 30
 
 senat:
   sources:
