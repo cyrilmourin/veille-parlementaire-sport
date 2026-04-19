@@ -20,7 +20,11 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 
 
 def _slugify(s: str) -> str:
-    s = re.sub(r"[^a-zA-Z0-9]+", "-", s or "").strip("-").lower()
+    s = s or ""
+    # Retire les schémas d'URL pour qu'ils ne polluent pas les slugs
+    s = re.sub(r"https?://", "", s, flags=re.IGNORECASE)
+    s = re.sub(r"www\.", "", s, flags=re.IGNORECASE)
+    s = re.sub(r"[^a-zA-Z0-9]+", "-", s).strip("-").lower()
     return s[:80] or "item"
 
 
@@ -145,20 +149,21 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         fp = d / f"{slug}.md"
         title = (r.get("title") or "").replace('"', "'")
         date = r.get("published_at") or r.get("inserted_at") or ""
+        source_url = (r.get("url") or "").replace('"', "")
         lines = [
             "---",
             f'title: "{title}"',
             f"date: {date}",
             f"category: {cat}",
-            f"chamber: {r.get('chamber') or ''}",
-            f"source: {r.get('source_id') or ''}",
-            f"url: {r.get('url') or ''}",
+            f'chamber: "{r.get("chamber") or ""}"',
+            f'source: "{r.get("source_id") or ""}"',
+            f'source_url: "{source_url}"',
             f"keywords: {json.dumps(r.get('matched_keywords') or [], ensure_ascii=False)}",
             f"families: {json.dumps(r.get('keyword_families') or [], ensure_ascii=False)}",
             "---",
             "",
             (r.get("summary") or "").strip(),
             "",
-            f"[Consulter la source officielle]({r.get('url') or '#'})",
+            f"[Consulter la source officielle]({source_url or '#'})",
         ]
         fp.write_text("\n".join(lines), encoding="utf-8")

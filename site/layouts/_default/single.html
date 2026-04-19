@@ -13,7 +13,7 @@
     <ul class="tags">{{ range . }}<li>{{ . }}</li>{{ end }}</ul>
   {{ end }}
   <div class="content">{{ .Content }}</div>
-  {{ with .Params.url }}
+  {{ with .Params.source_url }}
     <p><a class="btn" href="{{ . }}" rel="noopener" target="_blank">Consulter la source officielle &rarr;</a></p>
   {{ end }}
 </article>
