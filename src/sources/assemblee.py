@@ -82,6 +82,34 @@ def _text_of(node) -> str:
     return str(node)
 
 
+def _all_text(node) -> str:
+    """Collecte récursive de toutes les chaînes textuelles d'un nœud JSON.
+
+    Filet de sécurité 'shotgun' : les dumps AN ont des structures
+    variables, nos paths ciblés ratent parfois le contenu pertinent.
+    Concaténer tout le texte garantit que le matcher mots-clés voit
+    le contenu, même quand la structure change.
+    """
+    bits: list[str] = []
+
+    def _walk(n):
+        if n is None:
+            return
+        if isinstance(n, str):
+            s = n.strip()
+            if s and len(s) > 1:
+                bits.append(s)
+        elif isinstance(n, dict):
+            for v in n.values():
+                _walk(v)
+        elif isinstance(n, list):
+            for v in n:
+                _walk(v)
+
+    _walk(node)
+    return " ".join(bits)
+
+
 def fetch_source(src: dict) -> list[Item]:
     """Récupère et normalise un dataset AN."""
     fmt = src.get("format", "json_zip")
@@ -225,7 +253,12 @@ def _normalize_amendement(obj, src, cat):
         expose,
         dispo,
     ]
-    summary = " — ".join(p for p in summary_parts if p).strip()[:2000]
+    structured = " — ".join(p for p in summary_parts if p).strip()
+    # Shotgun : quand les paths ciblés ne couvrent pas la structure
+    # réelle du JSON (fréquent sur dumps AN), on ajoute tout le texte
+    # du nœud pour que le matcher mots-clés trouve les occurrences.
+    shotgun = _all_text(root)
+    summary = (structured + " — " + shotgun if structured else shotgun)[:2000]
 
     # Titre compact et informatif
     title_bits = [f"Amendement n°{num}"]
@@ -427,11 +460,15 @@ def _normalize_agenda(obj, src, cat):
         title_bits.append(f"({organe})")
     title = " ".join(title_bits)[:220]
 
-    summary = " — ".join(p for p in [
+    structured = " — ".join(p for p in [
         f"Organe : {organe}" if organe else "",
         f"Lieu : {lieu}" if lieu else "",
         odj_text,
-    ] if p)[:2000]
+    ] if p)
+    # Shotgun : filet de sécurité au cas où la structure du JSON
+    # réunion ne colle pas à nos paths ciblés.
+    shotgun = _all_text(root)
+    summary = (structured + " — " + shotgun if structured else shotgun)[:2000]
 
     yield Item(
         source_id=src["id"],
