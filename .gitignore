@@ -10,6 +10,10 @@ dist/
 data/cache/
 data/test_*.sqlite3
 data/sample_*.html
+# DB runtime (>100 Mo avec ~100k amendements) : persistance via actions/cache, pas via git
+data/veille.sqlite3
+data/veille.sqlite3-journal
+check_run.py
 site/public/
 site/resources/
 site/content/items/*/

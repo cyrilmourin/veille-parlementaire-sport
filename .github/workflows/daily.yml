@@ -49,13 +49,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
+      # La DB n'est plus trackée en git (>100 Mo). Persistance via cache,
+      # avec une clé datée pour créer une nouvelle entrée à chaque run tout
+      # en restaurant la plus récente disponible.
       - name: Restore SQLite cache
         if: github.event.inputs.reset_db != '1'
         uses: actions/cache@v4
         with:
           path: data/veille.sqlite3
-          key: veille-sqlite-v2-${{ github.run_id }}
-          restore-keys: veille-sqlite-v2-
+          key: veille-sqlite-v3-${{ github.run_id }}
+          restore-keys: |
+            veille-sqlite-v3-
 
       - name: Reset SQLite (si demandé)
         if: github.event.inputs.reset_db == '1'
@@ -108,11 +112,13 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: Commit SQLite (keep state between runs)
+      # Commit uniquement le dernier digest HTML (lisible, ~300 Ko).
+      # La DB SQLite est persistée via actions/cache (>100 Mo, donc pas dans git).
+      - name: Commit last digest
         if: always()
         run: |
           git config user.name "veille-bot"
           git config user.email "veille-bot@sideline-conseil.fr"
-          git add data/veille.sqlite3 data/last_digest.html || true
-          git diff --cached --quiet || git commit -m "chore: snapshot veille $(date -u +%Y-%m-%dT%H:%MZ)"
+          git add data/last_digest.html || true
+          git diff --cached --quiet || git commit -m "chore: snapshot digest $(date -u +%Y-%m-%dT%H:%MZ)"
           git push || true
