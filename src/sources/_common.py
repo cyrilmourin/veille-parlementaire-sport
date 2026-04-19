@@ -66,6 +66,43 @@ def unzip_members(payload: bytes) -> Iterable[tuple[str, bytes]]:
             yield name, zf.read(name)
 
 
+def unzip_members_since(
+    payload: bytes, since: datetime | None = None
+) -> Iterable[tuple[str, datetime, bytes]]:
+    """Itère sur (nom, date, contenu) des membres d'un zip, en ne
+    décompressant QUE les entrées plus récentes que `since`.
+
+    Utile pour les zips massifs (Sénat CRI/débats, 500+ Mo, 2800+ fichiers)
+    où l'on ne veut ingérer que la fenêtre récente. La date vient de
+    `ZipInfo.date_time` (stockée dans l'entrée zip, pas besoin d'extraire
+    le fichier pour la connaître).
+
+    Si `since` est None → comportement = `unzip_members` mais expose
+    aussi la date.
+    """
+    with zipfile.ZipFile(io.BytesIO(payload)) as zf:
+        kept = 0
+        dropped = 0
+        for info in zf.infolist():
+            if info.is_dir():
+                continue
+            # date_time = (year, month, day, hour, minute, second)
+            try:
+                dt = datetime(*info.date_time)
+            except (ValueError, TypeError):
+                dt = datetime(1970, 1, 1)
+            if since is not None and dt < since:
+                dropped += 1
+                continue
+            kept += 1
+            yield info.filename, dt, zf.read(info.filename)
+        if since is not None:
+            log.info(
+                "unzip_members_since : %d entrées gardées (>= %s), %d ignorées",
+                kept, since.date().isoformat(), dropped,
+            )
+
+
 def parse_iso(s: str | None) -> datetime | None:
     if not s:
         return None

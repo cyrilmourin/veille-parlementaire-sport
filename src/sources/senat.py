@@ -2,16 +2,18 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import logging
+import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Iterable
 
 import feedparser
 
 from ..models import Item
-from ._common import fetch_bytes, fetch_text, parse_iso, unzip_members
+from ._common import fetch_bytes, fetch_text, parse_iso, unzip_members, unzip_members_since
 
 log = logging.getLogger(__name__)
 
@@ -86,6 +88,11 @@ def fetch_source(src: dict) -> list[Item]:
                      sid, len(items), len(rows))
             return items
         if fmt == "csv_zip":
+            # Comptes rendus (debats, cri) : zips massifs avec des milliers
+            # de fichiers texte par session. Filtre par date (ZipInfo.date_time)
+            # et traitement fichier-par-fichier pour éviter l'OOM.
+            if sid in ("senat_debats", "senat_cri"):
+                return _fetch_debats_zip(src)
             data = fetch_bytes(src["url"])
             items: list[Item] = []
             members = list(unzip_members(data))
@@ -104,6 +111,85 @@ def fetch_source(src: dict) -> list[Item]:
     except Exception as e:
         log.exception("Sénat %s KO: %s", sid, e)
     return []
+
+
+# Nombre de jours à conserver pour les zips de débats/CRI (config via
+# env var SENAT_DEBATS_SINCE_DAYS ou src["since_days"], défaut 30).
+_DEFAULT_DEBATS_SINCE_DAYS = 30
+
+
+def _fetch_debats_zip(src: dict) -> list[Item]:
+    """Fetch + normalise un zip de comptes rendus Sénat (debats / cri).
+
+    Approche :
+    1. Télécharge le zip en mémoire
+    2. Itère les entrées via unzip_members_since (filtre par ZipInfo.date_time)
+    3. Pour chaque fichier récent, génère un Item (UID = sha1 du nom,
+       summary = texte décodé brut, date = date_time de l'entrée)
+
+    Évite de décompresser les milliers de fichiers anciens (le cri.zip
+    complet fait 2803 fichiers / plusieurs Go décompressé).
+    """
+    sid = src["id"]
+    cat = src["category"]
+    # Fenêtre : config source > env var > défaut 30j
+    since_days = int(
+        src.get("since_days")
+        or os.environ.get("SENAT_DEBATS_SINCE_DAYS")
+        or _DEFAULT_DEBATS_SINCE_DAYS
+    )
+    since = datetime.utcnow() - timedelta(days=since_days)
+    log.info(
+        "Sénat %s : fetch zip + filtre date >= %s (fenêtre %d jours)",
+        sid, since.date().isoformat(), since_days,
+    )
+    data = fetch_bytes(src["url"])
+    items: list[Item] = []
+    ext_counts: dict[str, int] = {}
+
+    for name, dt, payload in unzip_members_since(data, since=since):
+        ext = os.path.splitext(name)[1].lower().lstrip(".") or "no-ext"
+        ext_counts[ext] = ext_counts.get(ext, 0) + 1
+
+        # Décode le contenu en texte (cp1252 fréquent côté Sénat)
+        text, _enc = _decode_payload(payload)
+        # Si c'est du HTML/XML, on déballe les tags pour exposer le texte
+        # brut au matcher sans s'embêter avec un parser.
+        if ext in ("html", "htm", "xml"):
+            text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        if not text:
+            continue
+
+        # UID déterministe (hash du nom complet dans le zip) — stable
+        # d'un run à l'autre, donc la dédoublonnage via store fonctionne.
+        uid = hashlib.sha1(f"{sid}:{name}".encode()).hexdigest()[:16]
+        base = os.path.basename(name)
+
+        # Titre : nom de base (souvent parlant ex. "s20260315_001.html")
+        label = "Compte rendu analytique" if sid == "senat_debats" else "CR intégral"
+        title = f"{label} — {base}"[:220]
+        summary = text[:2000]
+
+        items.append(Item(
+            source_id=sid,
+            uid=uid,
+            category=cat,
+            chamber="Senat",
+            title=title,
+            url="https://www.senat.fr/seances/s{}/".format(
+                dt.strftime("%Y%m")) if dt.year > 2000 else "https://www.senat.fr/seances/",
+            published_at=dt,
+            summary=summary,
+            raw={"path": f"senat:{sid}", "zip_member": name, "size": len(payload)},
+        ))
+
+    log.info(
+        "Sénat %s : %d items produits (extensions : %s)",
+        sid, len(items),
+        ", ".join(f"{k}={v}" for k, v in sorted(ext_counts.items())) or "aucun",
+    )
+    return items
 
 
 _NORM_RE = re.compile(r"[\s_\-\.]+")
@@ -289,20 +375,9 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
                 summary=summary, raw=r,
             )
 
-    elif sid in ("senat_debats", "senat_cri"):
-        for r in rows:
-            uid = _pick(r, "id", "numero", "uid", "date")
-            titre = _pick(r, "titre", "sujet", "libelle") or "Séance publique"
-            if not uid:
-                continue
-            extras = " ".join(v for v in r.values() if isinstance(v, str) and len(v) > 3)
-            yield Item(
-                source_id=sid, uid=str(uid), category=cat, chamber="Senat",
-                title=titre[:220],
-                url=_pick(r, "url", "lien") or "https://www.senat.fr/seances/",
-                published_at=parse_iso(_pick(r, "date", "datePublication")),
-                summary=extras[:2000], raw=r,
-            )
+    # NB : senat_debats / senat_cri ne passent PAS par _normalize_rows.
+    # Leurs zips ne contiennent pas de CSV — ce sont des milliers de
+    # fichiers texte/HTML/XML par session. Voir _fetch_debats_zip().
 
 
 def _normalize_rss(src, text: str) -> list[Item]:
