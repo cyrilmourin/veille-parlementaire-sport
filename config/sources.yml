@@ -32,10 +32,30 @@ assemblee_nationale:
       format: json_zip
       since_days: 30
 
+    - id: an_questions_orales_sans_debat
+      category: questions
+      url: https://data.assemblee-nationale.fr/static/openData/repository/17/questions/questions_orales_sans_debat/Questions_orales_sans_debat.json.zip
+      format: json_zip
+      since_days: 30
+
     - id: an_agenda
       category: agenda
       url: https://data.assemblee-nationale.fr/static/openData/repository/17/vp/reunions/Agenda.json.zip
       format: json_zip
+      since_days: 30
+
+    # NB : pas de dump "Reunions.json.zip" séparé — la page
+    # /reunions/reunions ne pointe que vers Agenda.json.zip, qui couvre
+    # déjà toutes les réunions.
+
+    # Syceron brut = comptes rendus intégraux de séance publique.
+    # URL récupérée via la page /travaux-parlementaires/debats.
+    # ATTENTION : le nom du fichier est "syseron" (avec un S) et pas
+    # "syceron" (avec un C) — typo historique dans le nommage AN.
+    - id: an_syceron
+      category: comptes_rendus
+      url: https://data.assemblee-nationale.fr/static/openData/repository/17/vp/syceronbrut/syseron.xml.zip
+      format: xml_zip
       since_days: 30
 
 senat:

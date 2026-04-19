@@ -1,6 +1,7 @@
-"""Connecteur Assemblée nationale — open data (zip JSON quotidiens)."""
+"""Connecteur Assemblée nationale — open data (zip JSON + XML comptes rendus)."""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -111,6 +112,104 @@ def _all_text(node) -> str:
     return " ".join(bits)
 
 
+_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+_DATE_IN_NAME_RE = re.compile(r"(\d{4})[-_]?(\d{2})[-_]?(\d{2})")
+
+
+def _strip_xml(text: str) -> str:
+    """Retire les tags XML/HTML et normalise les espaces."""
+    no_tags = _TAG_RE.sub(" ", text)
+    return _WS_RE.sub(" ", no_tags).strip()
+
+
+def _decode(payload: bytes) -> str:
+    """Décode un payload texte (XML/HTML) en essayant utf-8 puis cp1252."""
+    for enc in ("utf-8", "cp1252", "iso-8859-1"):
+        try:
+            return payload.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return payload.decode("utf-8", errors="replace")
+
+
+def _fetch_xml_zip(src: dict) -> list[Item]:
+    """Handler XML zip — pour les dumps type Syceron Brut (comptes rendus AN).
+
+    Principe : un fichier XML = une séance (ou un fragment). On ne parse pas
+    la structure XML (propriétaire, changeante) — on strippe les tags et on
+    laisse le matcher mots-clés attaquer tout le texte. UID hash-based stable
+    par nom de fichier.
+    """
+    sid = src["id"]
+    cat = src["category"]
+    data = fetch_bytes(src["url"])
+
+    # Fenêtre date : src["since_days"] > env AN_SINCE_DAYS > 30 (défaut)
+    since_days_raw = src.get("since_days") or os.environ.get("AN_SINCE_DAYS") or 30
+    try:
+        since = datetime.utcnow() - timedelta(days=int(since_days_raw))
+        log.info(
+            "%s : filtre date >= %s (fenêtre %s jours)",
+            sid, since.date().isoformat(), since_days_raw,
+        )
+    except (ValueError, TypeError):
+        since = datetime.utcnow() - timedelta(days=30)
+        log.warning("%s : since_days invalide (%r), défaut 30j", sid, since_days_raw)
+
+    items: list[Item] = []
+    file_count = 0
+    for name, dt, payload in unzip_members_since(data, since=since):
+        if not name.lower().endswith((".xml", ".html", ".htm", ".txt")):
+            continue
+        file_count += 1
+        try:
+            raw = _decode(payload)
+        except Exception as e:
+            log.debug("decode KO %s: %s", name, e)
+            continue
+        text = _strip_xml(raw)
+        if not text:
+            continue
+
+        # Date : préfère la date extraite du nom de fichier (ex. seance_20260315.xml)
+        # sinon ZipInfo.date_time.
+        published_at = dt
+        m = _DATE_IN_NAME_RE.search(name)
+        if m:
+            try:
+                published_at = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            except ValueError:
+                pass
+
+        # UID stable basé sur (source_id, nom_fichier)
+        uid = hashlib.sha1(f"{sid}:{name}".encode()).hexdigest()[:16]
+
+        # Titre : on extrait la base du nom du fichier (sans chemin/extension)
+        base = os.path.basename(name).rsplit(".", 1)[0]
+        title = f"Compte rendu AN — {base}"[:220]
+
+        # Résumé : tronqué à 2000 caractères. Le matcher mots-clés verra
+        # donc la première partie du CR, suffisant pour détecter une
+        # mention « sport ».
+        summary = text[:2000]
+
+        items.append(Item(
+            source_id=sid,
+            uid=uid,
+            category=cat,
+            chamber="AN",
+            title=title,
+            url=f"https://www.assemblee-nationale.fr/dyn/17/seances",
+            published_at=published_at,
+            summary=summary,
+            raw={"path": "assemblee:syceron", "fichier": name,
+                 "taille": len(payload)},
+        ))
+    log.info("%s : %d items (sur %d fichiers XML/HTML)", sid, len(items), file_count)
+    return items
+
+
 def fetch_source(src: dict) -> list[Item]:
     """Récupère et normalise un dataset AN.
 
@@ -119,8 +218,14 @@ def fetch_source(src: dict) -> list[Item]:
     avec 104k JSON), on évite de décompresser et normaliser les entrées trop
     anciennes. Une veille quotidienne n'a pas besoin de re-ingérer des
     amendements de 2023 à chaque run.
+
+    Formats supportés :
+    - json_zip : dumps JSON agrégés (amendements, questions, agenda, dossiers…)
+    - xml_zip  : dumps XML (Syceron comptes rendus) — strippe les tags avant matcher
     """
     fmt = src.get("format", "json_zip")
+    if fmt == "xml_zip":
+        return _fetch_xml_zip(src)
     if fmt != "json_zip":
         log.warning("Format %s non supporté pour %s", fmt, src["id"])
         return []
