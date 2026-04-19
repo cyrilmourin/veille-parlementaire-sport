@@ -47,22 +47,22 @@ EMAIL_TEMPLATE = Template(r"""<!DOCTYPE html>
         {{ label }} <span style="color:#9ca3af;font-weight:400;">({{ buckets[cat]|length }})</span>
       </h2>
       {% for it in buckets[cat] %}
+        {%- set ch_color = "#5c6577" -%}
+        {%- if it.chamber == "AN" -%}{%- set ch_color = "#122549" -%}{%- endif -%}
+        {%- if it.chamber in ("Senat", "Sénat") -%}{%- set ch_color = "#c98b1b" -%}{%- endif -%}
         <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #f1ead0;">
-          <a href="{{ it.url }}" style="color:#122549;font-weight:600;font-size:15px;text-decoration:none;">{{ it.title }}</a>
-          <div style="color:#5c6577;font-size:12px;margin-top:3px;">
-            {{ it.chamber or '' }}{% if it.published_at %} · {{ it.published_at[:10] }}{% endif %}
+          {% if it.url %}<a href="{{ it.url }}" style="color:#122549;font-weight:600;font-size:15px;text-decoration:none;">{{ it.title }}</a>{% else %}<span style="color:#122549;font-weight:600;font-size:15px;">{{ it.title }}</span>{% endif %}
+          <div style="color:#5c6577;font-size:12px;margin-top:4px;line-height:1.7;">
+            {% if it.chamber %}<span style="display:inline-block;background:{{ ch_color }};color:#fff;padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-right:5px;">{{ it.chamber }}</span>{% endif %}
+            {% if it.published_at %}{{ it.published_at[:10] }}{% endif %}
+            {% if it.matched %}
+              {% for kw in it.matched[:12] %}<span style="display:inline-block;background:#DA4431;color:#fff;font-size:11px;padding:1px 8px;border-radius:10px;margin:0 3px 2px 4px;">{{ kw }}</span>{% endfor %}
+            {% endif %}
           </div>
           {% if it.snippet %}
           <div style="color:#5c6577;font-size:13px;margin-top:8px;padding:8px 12px;border-left:3px solid #DA4431;background:#fff8ea;font-style:italic;">« {{ it.snippet }} »</div>
           {% elif it.summary %}
-          <div style="color:#374151;font-size:13px;margin-top:6px;">{{ it.summary }}</div>
-          {% endif %}
-          {% if it.matched %}
-          <div style="margin-top:8px;">
-            {% for kw in it.matched %}
-            <span style="display:inline-block;background:#DA4431;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;margin:2px 4px 2px 0;">{{ kw }}</span>
-            {% endfor %}
-          </div>
+          <div style="color:#374151;font-size:13px;margin-top:6px;">{{ it.summary[:280] }}{% if it.summary|length > 280 %}…{% endif %}</div>
           {% endif %}
         </div>
       {% endfor %}

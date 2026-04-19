@@ -340,7 +340,8 @@ def _normalize(src: dict, name: str, obj) -> Iterable[Item]:
     elif sid == "an_dossiers_legislatifs":
         for rec in _iter_records(obj, "dossierParlementaire"):
             yield from _normalize_dosleg({"dossierParlementaire": rec}, src, cat)
-    elif sid in ("an_questions_ecrites", "an_questions_gouvernement"):
+    elif sid in ("an_questions_ecrites", "an_questions_gouvernement",
+                 "an_questions_orales_sans_debat"):
         for rec in _iter_records(obj, "question"):
             yield from _normalize_question({"question": rec}, src, cat)
     elif sid == "an_agenda":
@@ -608,10 +609,10 @@ def _normalize_agenda(obj, src, cat):
 
     odj_text = " · ".join(odj_parts)[:2000]
 
-    title_bits = [f"Agenda — {titre}"]
-    if organe:
-        title_bits.append(f"({organe})")
-    title = " ".join(title_bits)[:220]
+    # Titre : on garde l'objet de la réunion, lisible tel quel
+    # (style Follaw). Date et lieu sont exposés dans la méta (pas dans
+    # le titre) et rendus comme texte simple sans lien hypertexte.
+    title = (titre or "Réunion")[:220]
 
     structured = " — ".join(p for p in [
         f"Organe : {organe}" if organe else "",
@@ -623,13 +624,17 @@ def _normalize_agenda(obj, src, cat):
     shotgun = _all_text(root)
     summary = (structured + " — " + shotgun if structured else shotgun)[:2000]
 
+    # URL : il n'existe pas d'URL publique stable par UID de réunion
+    # (testé : /dyn/17/reunions/{uid} 404, idem /reunion/{uid}, /agenda/{uid}).
+    # On laisse une URL vide — à l'affichage, le titre est rendu en clair
+    # (pas de lien cliquable) pour rester aligné sur Follaw.
     yield Item(
         source_id=src["id"],
         uid=uid,
         category=cat,
         chamber="AN",
         title=title,
-        url=f"https://www.assemblee-nationale.fr/dyn/17/reunions/{uid}",
+        url="",
         published_at=dt,
         summary=summary,
         raw={"path": "assemblee:reunion", "organe": organe, "lieu": lieu},

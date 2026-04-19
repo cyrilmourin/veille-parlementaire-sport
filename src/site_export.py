@@ -93,6 +93,37 @@ def _filter_window(rows: list[dict]) -> list[dict]:
     return kept
 
 
+def _dedup(rows: list[dict]) -> list[dict]:
+    """Déduplication par (title, url) — filet de sécurité au-delà du hash_key.
+
+    Le store déduplique déjà par (source_id, uid), mais il arrive qu'un même
+    dossier législatif (ou une même question) soit référencé sous plusieurs
+    UIDs différents selon le chemin dans le JSON AN (ex : un dossier a un uid
+    au niveau racine ET un uid dans dossier.uid, stockés comme 2 items).
+    On garde la 1re occurrence (la plus récente, car rows est déjà trié
+    par date desc à ce stade).
+    """
+    seen: set[tuple[str, str]] = set()
+    out = []
+    dropped = 0
+    for r in rows:
+        key = (
+            (r.get("title") or "").strip().lower(),
+            (r.get("url") or "").strip().lower(),
+        )
+        if key in seen:
+            dropped += 1
+            continue
+        seen.add(key)
+        out.append(r)
+    if dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "site_export : %d doublons (title+url) écartés", dropped,
+        )
+    return out
+
+
 def _group(rows: list[dict], key: str) -> dict[str, list[dict]]:
     buckets: dict[str, list[dict]] = {}
     for r in rows:
@@ -127,10 +158,13 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     (data / "by_chamber").mkdir(parents=True, exist_ok=True)
     items_dir.mkdir(parents=True, exist_ok=True)
 
-    # Charge + filtre 30 jours glissants + tri date desc
+    # Charge + filtre 30 jours glissants + tri date desc + dédup
     rows = _load(rows)
     rows = _filter_window(rows)
     rows = _sort_by_date_desc(rows)
+    # Dédup APRÈS tri par date : on garde la version la plus récente en cas
+    # de doublons (title+url identique, UID différent).
+    rows = _dedup(rows)
 
     # Index global
     index_payload = {
@@ -197,33 +231,59 @@ def _recent(rows: list[dict], hours: int = 24) -> list[dict]:
 def _fmt_item_line(it: dict) -> str:
     """Ligne Markdown d'un item (home / catégorie). Layout :
 
-    - **[Titre](url)** — Chambre · Date
-      <tags mots-clés colorés à la ligne>
+    - **[Titre](url)** <span class="chamber" data-chamber="AN">AN</span> · Date · tags inline
       <snippet éventuel>
+
+    Si url est vide (typiquement catégorie agenda, cf. `_normalize_agenda`),
+    le titre est rendu en texte simple, sans lien cliquable — alignement
+    sur Follaw qui affiche les réunions sans hypertexte.
     """
     date = (it.get("published_at") or "")[:10]
     title = (it.get("title") or "").replace("\n", " ").strip()
-    url = it.get("url") or "#"
+    url = (it.get("url") or "").strip()
     chamber = it.get("chamber") or ""
     kws = it.get("matched_keywords") or []
+    fams = it.get("keyword_families") or []
+    # Pair chaque mot-clé avec sa famille (même ordre que matched_keywords).
+    # Le matcher ne stocke que les familles uniques, pas la famille de chaque
+    # mot. Pour une coloration par famille on ne peut donc que teinter
+    # UNIFORMÉMENT via la 1re famille ; acceptable pour un tag visuel.
+    dominant_fam = fams[0] if fams else ""
     snippet = (it.get("snippet") or "").replace("\n", " ").strip()
 
-    meta_bits = []
+    # Chambre : badge HTML avec data-chamber pour coloration AN/Senat distincte
+    chamber_html = ""
     if chamber:
-        meta_bits.append(chamber)
-    if date:
-        meta_bits.append(date)
-    meta = (" — " + " · ".join(meta_bits)) if meta_bits else ""
+        chamber_html = (
+            f'<span class="chamber" data-chamber="{_escape(chamber)}">'
+            f'{_escape(chamber)}</span>'
+        )
 
-    line = f"- **[{title}]({url})**{meta}"
+    date_html = f'<time class="date">{date}</time>' if date else ""
 
-    # Mots-clés : chacun dans un <span class="kw-tag"> pour coloration CSS.
-    # Markdown garde le HTML inline. On passe à la ligne via "  \n  ".
+    # Mots-clés : inline (pas de retour à la ligne), sur la même ligne que
+    # la meta. Coloration via CSS .kw-tag[data-family=...].
+    tags_html = ""
     if kws:
         tags_html = " ".join(
-            f'<span class="kw-tag">{_escape(k)}</span>' for k in kws[:12]
+            f'<span class="kw-tag" data-family="{_escape(dominant_fam)}">'
+            f'{_escape(k)}</span>'
+            for k in kws[:12]
         )
-        line += f"  \n  <div class=\"kw-list\">{tags_html}</div>"
+
+    meta_parts = [p for p in [chamber_html, date_html, tags_html] if p]
+    meta_inline = (" · ".join(meta_parts)) if meta_parts else ""
+    meta_html = (
+        f' <span class="item-meta">{meta_inline}</span>' if meta_inline else ""
+    )
+
+    # Titre : hypertexte uniquement si on a une URL exploitable.
+    # Sinon (ex. réunions AN : pas d'URL publique stable), on affiche
+    # le titre en texte gras simple — cf. Follaw.
+    if url:
+        line = f"- **[{title}]({url})**{meta_html}"
+    else:
+        line = f"- **{title}**{meta_html}"
 
     if snippet:
         line += f"  \n  <div class=\"snippet-inline\">« {_escape(snippet)} »</div>"
@@ -275,9 +335,9 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         # Lien vers la page catégorie pour consultation exhaustive
         lines.append(f"### [{label}](/items/{cat}/) ({len(bucket)})")
         lines.append("")
-        for it in bucket[:15]:
+        for it in bucket[:10]:
             lines.append(_fmt_item_line(it))
-        if len(bucket) > 15:
+        if len(bucket) > 10:
             lines.append(f"")
             lines.append(f"→ [Voir les {len(bucket)} {label.lower()}](/items/{cat}/)")
         lines.append("")
@@ -337,6 +397,9 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
             "",
             (r.get("summary") or "").strip(),
             "",
-            f"[Consulter la source officielle]({source_url or '#'})",
         ]
+        # Bouton "Consulter la source" : seulement si on a une vraie URL.
+        # Les réunions AN n'en ont pas (cf. commentaire dans _normalize_agenda).
+        if source_url:
+            fm.append(f"[Consulter la source officielle]({source_url})")
         fp.write_text("\n".join(fm), encoding="utf-8")

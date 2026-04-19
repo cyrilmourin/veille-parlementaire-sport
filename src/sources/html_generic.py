@@ -20,6 +20,109 @@ log = logging.getLogger(__name__)
 
 
 _DATE_PAT = re.compile(r"(\d{4})[-/](\d{2})[-/](\d{2})")
+# URL contenant une date : /2026/04/15/ ou /2026-04-15/
+_DATE_IN_URL = re.compile(r"/(\d{4})[/-](\d{2})[/-](\d{2})/")
+# Format français "15 avril 2026"
+_MONTHS_FR = {
+    "janvier": 1, "février": 2, "fevrier": 2, "mars": 3, "avril": 4,
+    "mai": 5, "juin": 6, "juillet": 7, "août": 8, "aout": 8,
+    "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12, "decembre": 12,
+}
+_DATE_FR_PAT = re.compile(
+    r"\b(\d{1,2})\s+("
+    + "|".join(_MONTHS_FR.keys())
+    + r")\s+(\d{4})\b",
+    re.IGNORECASE,
+)
+
+
+def _extract_date(a, url: str) -> datetime | None:
+    """Stratégie en cascade pour trouver la date d'un lien d'article.
+
+    Ordre : <time> proche → data-date ancêtre → date dans l'URL →
+    français dans le texte voisin → ISO dans le texte voisin → None.
+    On reste dans un rayon de 3 ancêtres maximum pour éviter de remonter
+    jusqu'à <body> et de capturer une date sans rapport.
+    """
+    # 1. <time datetime> dans un rayon proche (3 ancêtres max). On stoppe dès
+    #    qu'on rencontre <body>/<html>/<main> — ces conteneurs globaux
+    #    mélangent tous les articles et un <time> y piocherait la date
+    #    d'un autre item. On n'explore que les descendants proches
+    #    (profondeur ≤ 2) de chaque ancêtre retenu.
+    _STOP_TAGS = {"body", "html", "main"}
+    parents = []
+    for anc in a.parents:
+        if anc is None:
+            break
+        if getattr(anc, "name", None) in _STOP_TAGS:
+            break
+        parents.append(anc)
+        if len(parents) >= 3:
+            break
+
+    def _close_time(anc) -> datetime | None:
+        """Cherche un <time datetime> parmi les descendants directs de anc
+        (profondeur ≤ 2) pour ne pas capter un <time> d'un autre article."""
+        if not hasattr(anc, "children"):
+            return None
+        for child in anc.children:
+            if getattr(child, "name", None) is None:
+                continue
+            if child.name == "time" and child.get("datetime"):
+                dt = parse_iso(child["datetime"])
+                if dt:
+                    return dt
+            # un cran plus bas
+            if hasattr(child, "find"):
+                t = child.find("time", recursive=False)
+                if t and t.get("datetime"):
+                    dt = parse_iso(t["datetime"])
+                    if dt:
+                        return dt
+        return None
+
+    for anc in parents:
+        dt = _close_time(anc)
+        if dt:
+            return dt
+        m = _DATE_PAT.search(str(anc.get("data-date") or ""))
+        if m:
+            try:
+                return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            except ValueError:
+                pass
+    # 2. Date dans l'URL (ex. /2026/04/15/article-slug)
+    m = _DATE_IN_URL.search(url)
+    if m:
+        try:
+            return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            pass
+    # 3. Date au format français "15 avril 2026" dans texte du lien ou
+    #    des 2 premiers parents (on récupère leur texte complet).
+    texts = [a.get_text(" ", strip=True) or ""]
+    for anc in parents[:2]:
+        if hasattr(anc, "get_text"):
+            texts.append(anc.get_text(" ", strip=True) or "")
+    for text in texts:
+        m = _DATE_FR_PAT.search(text)
+        if m:
+            day = int(m.group(1))
+            month = _MONTHS_FR[m.group(2).lower()]
+            year = int(m.group(3))
+            try:
+                return datetime(year, month, day)
+            except ValueError:
+                pass
+    # 4. Format ISO dans le texte (filet)
+    for text in texts:
+        m = _DATE_PAT.search(text)
+        if m:
+            try:
+                return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            except ValueError:
+                pass
+    return None
 
 
 def _chamber(domain: str) -> str:
@@ -87,19 +190,8 @@ def fetch_source(src: dict) -> list[Item]:
             title = (a.get_text(" ", strip=True) or "")[:240]
             if not title or len(title) < 5:
                 continue
-            # date : on scrute les ancêtres pour un <time>
-            dt = None
-            for anc in a.parents:
-                if anc is None or anc is soup:
-                    break
-                t = anc.find("time") if hasattr(anc, "find") else None
-                if t and t.get("datetime"):
-                    dt = parse_iso(t["datetime"])
-                    break
-                m = _DATE_PAT.search(str(anc.get("data-date") or ""))
-                if m:
-                    dt = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-                    break
+            # date : cascade <time> → data-date → URL → texte français → ISO
+            dt = _extract_date(a, url)
             seen.add(url)
             out.append(Item(
                 source_id=src["id"], uid=url, category=src["category"], chamber=chamber,
