@@ -90,17 +90,62 @@ def fetch_source(src: dict) -> list[Item]:
         return []
     data = fetch_bytes(src["url"])
     items: list[Item] = []
+    file_count = 0
     for name, payload in unzip_members(data):
         if not name.endswith(".json"):
             continue
+        file_count += 1
         try:
             obj = json.loads(payload.decode("utf-8", errors="replace"))
         except Exception as e:
             log.debug("JSON KO %s: %s", name, e)
             continue
         items.extend(_normalize(src, name, obj))
-    log.info("%s : %d items", src["id"], len(items))
+    log.info("%s : %d items (sur %d fichiers JSON)", src["id"], len(items), file_count)
     return items
+
+
+# Clés englobantes fréquentes dans les dumps agrégés de l'AN
+# (ex. {"amendements": {"amendement": [...]}} ou {"export": {...}})
+_WRAPPER_KEYS = {"amendement", "amendements", "dossier", "dossiers",
+                 "dossierParlementaire", "dossiersLegislatifs",
+                 "reunion", "reunions", "agenda",
+                 "question", "questions", "questionsEcrites",
+                 "questionsGouvernement", "export", "items", "records"}
+
+
+def _iter_records(obj, target_singular: str):
+    """Itère sur les 'records' d'un objet JSON AN — tolère les 2 formats :
+
+    - un fichier = un item → racine = {target_singular: {...}} → yield l'objet
+    - un fichier = agrégat → racine = {target_plural: [{target_singular: {...}}, …]}
+      ou {wrapper: {target_singular: [{...}, {...}]}} → yield chaque item
+
+    target_singular : 'amendement' | 'dossierParlementaire' | 'question' | 'reunion'
+    """
+    if obj is None:
+        return
+    # Cas 1 : l'objet est déjà l'item recherché (racine = {target: {…}})
+    if isinstance(obj, dict) and target_singular in obj:
+        inner = obj[target_singular]
+        if isinstance(inner, list):
+            for it in inner:
+                if isinstance(it, dict):
+                    yield it
+        elif isinstance(inner, dict):
+            yield inner
+        return
+    # Cas 2 : l'objet est un array d'items
+    if isinstance(obj, list):
+        for it in obj:
+            yield from _iter_records(it, target_singular)
+        return
+    # Cas 3 : descente dans les wrappers connus
+    if isinstance(obj, dict):
+        # Préférence : clés plurielles ou wrappers
+        for k, v in obj.items():
+            if k in _WRAPPER_KEYS or k.lower().endswith("s"):
+                yield from _iter_records(v, target_singular)
 
 
 def _normalize(src: dict, name: str, obj) -> Iterable[Item]:
@@ -109,13 +154,17 @@ def _normalize(src: dict, name: str, obj) -> Iterable[Item]:
     cat = src["category"]
 
     if sid == "an_amendements":
-        yield from _normalize_amendement(obj, src, cat)
+        for rec in _iter_records(obj, "amendement"):
+            yield from _normalize_amendement({"amendement": rec}, src, cat)
     elif sid == "an_dossiers_legislatifs":
-        yield from _normalize_dosleg(obj, src, cat)
+        for rec in _iter_records(obj, "dossierParlementaire"):
+            yield from _normalize_dosleg({"dossierParlementaire": rec}, src, cat)
     elif sid in ("an_questions_ecrites", "an_questions_gouvernement"):
-        yield from _normalize_question(obj, src, cat)
+        for rec in _iter_records(obj, "question"):
+            yield from _normalize_question({"question": rec}, src, cat)
     elif sid == "an_agenda":
-        yield from _normalize_agenda(obj, src, cat)
+        for rec in _iter_records(obj, "reunion"):
+            yield from _normalize_agenda({"reunion": rec}, src, cat)
     else:
         log.debug("Pas de normaliseur pour %s", sid)
 
@@ -162,14 +211,17 @@ def _normalize_dosleg(obj, src, cat):
     titre = _text_of(
         _first(root, "dossier.titreDossier.titre", "titreDossier.titre", default="")
     )
+    # Date = DERNIÈRE date d'acte législatif (= dernière étape de procédure),
+    # pas la date de dépôt. On scanne toutes les dates du chrono et on prend le max.
     chrono = _first(root, "dossier.actesLegislatifs", default=None)
-    date_depot = None
-    if isinstance(chrono, dict):
-        # on tente d'attraper la première date trouvée
+    dates_found: list[datetime] = []
+    if isinstance(chrono, (dict, list)):
         for p, v in _flatten(chrono):
-            if "date" in p.lower() and isinstance(v, str) and len(v) >= 10:
-                date_depot = parse_iso(v[:10])
-                break
+            if isinstance(v, str) and len(v) >= 10 and any(k in p.lower() for k in ("date", "timestamp")):
+                dt = parse_iso(v[:10])
+                if dt:
+                    dates_found.append(dt)
+    derniere_date = max(dates_found) if dates_found else None
     yield Item(
         source_id=src["id"],
         uid=uid,
@@ -177,11 +229,11 @@ def _normalize_dosleg(obj, src, cat):
         chamber="AN",
         title=titre or f"Dossier {uid}",
         url=f"https://www.assemblee-nationale.fr/dyn/17/dossiers/{uid}",
-        published_at=date_depot,
+        published_at=derniere_date,
         summary=_text_of(
             _first(root, "dossier.titreDossier.titreChemin", default="")
         )[:500],
-        raw={"path": "assemblee:dossier"},
+        raw={"path": "assemblee:dossier", "nb_actes": len(dates_found)},
     )
 
 

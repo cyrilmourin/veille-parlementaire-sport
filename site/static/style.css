@@ -140,6 +140,39 @@ a:hover { text-decoration: underline; }
 }
 .home .content p em { color: var(--muted); }
 
+/* ---------- Tags mots-clés (home + listing + détail) -------------------- */
+.kw-list {
+  margin: 6px 0 4px;
+  line-height: 1.9;
+}
+.kw-tag {
+  display: inline-block;
+  background: var(--sl-red);
+  color: #fff;
+  padding: 2px 9px;
+  border-radius: 11px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  margin: 0 5px 4px 0;
+  white-space: nowrap;
+}
+/* Variantes par famille — permet de nuancer par couleur */
+.kw-tag[data-family="acteur"]     { background: var(--sl-blue); }
+.kw-tag[data-family="federation"] { background: #6a5acd; }
+.kw-tag[data-family="dispositif"] { background: var(--sl-green); }
+.kw-tag[data-family="evenement"]  { background: #c98b1b; }
+.kw-tag[data-family="theme"]      { background: var(--sl-red); }
+
+.snippet-inline {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 13px;
+  margin-top: 6px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+
 /* ---------- Listing (liste catégorie) ------------------------------------ */
 .listing h1 {
   color: var(--sl-blue);

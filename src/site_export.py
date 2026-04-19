@@ -69,20 +69,26 @@ def _load(rows: list[dict]) -> list[dict]:
 
 
 def _filter_window(rows: list[dict]) -> list[dict]:
-    """Garde uniquement les items publiés dans la fenêtre WINDOW_DAYS.
-    Si la date de publication est absente, on garde par défaut (utile pour les
-    sources sans date fiable — ces items seront classés 'autre')."""
+    """Garde uniquement les items dont la date de PUBLICATION est dans WINDOW_DAYS.
+
+    Stratégie stricte : on n'utilise plus `inserted_at` comme fallback, pour
+    éviter qu'un item sans date officielle se voie attribuer la date du jour
+    (= la date à laquelle le scraper l'a ingéré). Un item sans `published_at`
+    est conservé uniquement s'il a été inséré récemment (il est alors affiché
+    sans date pour ne pas tromper l'utilisateur).
+    """
     cutoff = datetime.utcnow() - timedelta(days=WINDOW_DAYS)
     kept = []
     for r in rows:
         dt = _parse_dt(r.get("published_at"))
-        if dt is None:
-            # On tente la date d'insertion en base comme fallback
-            dt = _parse_dt(r.get("inserted_at"))
-        if dt is None:
-            # Aucune date — on skip plutôt que de polluer avec de l'ancien
+        if dt is not None:
+            if dt >= cutoff:
+                kept.append(r)
             continue
-        if dt >= cutoff:
+        # Pas de date de publication : on garde si l'insertion est récente
+        # (source sans date fiable — on ne fait pas semblant d'en avoir une).
+        ins = _parse_dt(r.get("inserted_at"))
+        if ins is not None and ins >= cutoff:
             kept.append(r)
     return kept
 
@@ -96,9 +102,13 @@ def _group(rows: list[dict], key: str) -> dict[str, list[dict]]:
 
 
 def _sort_by_date_desc(rows: list[dict]) -> list[dict]:
+    """Tri par date de publication décroissante. Les items sans published_at
+    sont placés en fin de liste (ils apparaîtront après les items datés).
+    On n'utilise PAS inserted_at pour trier — on ne veut pas qu'un item sans
+    date officielle remonte en haut juste parce qu'on l'a ingéré aujourd'hui."""
     return sorted(
         rows,
-        key=lambda r: (_parse_dt(r.get("published_at")) or _parse_dt(r.get("inserted_at")) or datetime.min),
+        key=lambda r: (_parse_dt(r.get("published_at")) or datetime.min),
         reverse=True,
     )
 
@@ -185,27 +195,47 @@ def _recent(rows: list[dict], hours: int = 24) -> list[dict]:
 # ---------- écritures Markdown ---------------------------------------------
 
 def _fmt_item_line(it: dict) -> str:
-    """Ligne Markdown d'un item dans un listing (home / catégorie)."""
+    """Ligne Markdown d'un item (home / catégorie). Layout :
+
+    - **[Titre](url)** — Chambre · Date
+      <tags mots-clés colorés à la ligne>
+      <snippet éventuel>
+    """
     date = (it.get("published_at") or "")[:10]
     title = (it.get("title") or "").replace("\n", " ").strip()
     url = it.get("url") or "#"
     chamber = it.get("chamber") or ""
     kws = it.get("matched_keywords") or []
     snippet = (it.get("snippet") or "").replace("\n", " ").strip()
-    parts = [f"- **[{title}]({url})**"]
+
     meta_bits = []
     if chamber:
         meta_bits.append(chamber)
     if date:
         meta_bits.append(date)
+    meta = (" — " + " · ".join(meta_bits)) if meta_bits else ""
+
+    line = f"- **[{title}]({url})**{meta}"
+
+    # Mots-clés : chacun dans un <span class="kw-tag"> pour coloration CSS.
+    # Markdown garde le HTML inline. On passe à la ligne via "  \n  ".
     if kws:
-        meta_bits.append("mots-clés : " + ", ".join(kws[:5]))
-    if meta_bits:
-        parts.append(" — " + " · ".join(meta_bits))
-    line = "".join(parts)
+        tags_html = " ".join(
+            f'<span class="kw-tag">{_escape(k)}</span>' for k in kws[:12]
+        )
+        line += f"  \n  <div class=\"kw-list\">{tags_html}</div>"
+
     if snippet:
-        line += f"  \n  <small>« {snippet} »</small>"
+        line += f"  \n  <div class=\"snippet-inline\">« {_escape(snippet)} »</div>"
     return line
+
+
+def _escape(s: str) -> str:
+    """Échappement HTML minimal pour injection dans le Markdown."""
+    return (str(s)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;"))
 
 
 def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict]],
@@ -240,7 +270,8 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         if cat not in by_cat:
             continue
         label = CATEGORY_LABELS.get(cat, cat)
-        bucket = by_cat[cat]
+        # Tri explicite du bucket par date desc (plus récent en haut)
+        bucket = _sort_by_date_desc(by_cat[cat])
         # Lien vers la page catégorie pour consultation exhaustive
         lines.append(f"### [{label}](/items/{cat}/) ({len(bucket)})")
         lines.append("")
@@ -283,13 +314,18 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         slug = _slugify(f"{r.get('source_id','')}-{r.get('uid','')}-{r.get('title','')[:40]}")
         fp = d / f"{slug}.md"
         title = (r.get("title") or "").replace('"', "'")
-        date = r.get("published_at") or r.get("inserted_at") or ""
+        # Date réelle de publication uniquement — pas de fallback inserted_at,
+        # qui ferait apparaître la date du jour pour les items sans date fiable.
+        published_at = r.get("published_at") or ""
         source_url = (r.get("url") or "").replace('"', "")
         snippet = (r.get("snippet") or "").replace('"', "'").replace("\n", " ")
-        lines = [
+        fm = [
             "---",
             f'title: "{title}"',
-            f"date: {date}",
+        ]
+        if published_at:
+            fm.append(f"date: {published_at}")
+        fm += [
             f"category: {cat}",
             f'chamber: "{r.get("chamber") or ""}"',
             f'source: "{r.get("source_id") or ""}"',
@@ -303,4 +339,4 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
             "",
             f"[Consulter la source officielle]({source_url or '#'})",
         ]
-        fp.write_text("\n".join(lines), encoding="utf-8")
+        fp.write_text("\n".join(fm), encoding="utf-8")

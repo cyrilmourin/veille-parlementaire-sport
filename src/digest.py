@@ -18,7 +18,6 @@ CATEGORY_LABELS = {
     "amendements": "Amendements",
     "questions": "Questions",
     "comptes_rendus": "Comptes rendus",
-    "publications": "Publications",
     "nominations": "Nominations",
     "agenda": "Agenda",
     "communiques": "Communiqués",

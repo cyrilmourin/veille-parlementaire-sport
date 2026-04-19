@@ -6,19 +6,18 @@
   <h1>{{ .Title }}</h1>
   <p class="meta">
     {{ with .Params.chamber }}<span class="chamber">{{ . }}</span>{{ end }}
-    {{ with .Date }}<time datetime="{{ .Format "2006-01-02" }}">{{ .Format "02/01/2006" }}</time>{{ end }}
+    {{ if not .Date.IsZero }}<time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006" }}</time>{{ end }}
     {{ with .Params.source }}<span class="source">{{ . }}</span>{{ end }}
   </p>
 
-  {{ with .Params.snippet }}
-    <blockquote class="snippet">« {{ . }} »</blockquote>
+  {{ with .Params.keywords }}
+    <div class="kw-list">
+      {{ range . }}<span class="kw-tag">{{ . }}</span>{{ end }}
+    </div>
   {{ end }}
 
-  {{ with .Params.keywords }}
-    <div class="kw-block">
-      <span class="kw-label">Mots-clés détectés :</span>
-      <ul class="tags">{{ range . }}<li>{{ . }}</li>{{ end }}</ul>
-    </div>
+  {{ with .Params.snippet }}
+    <blockquote class="snippet">« {{ . }} »</blockquote>
   {{ end }}
 
   <div class="content">{{ .Content }}</div>

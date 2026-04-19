@@ -9,9 +9,13 @@
         <a href="{{ .RelPermalink }}" class="title">{{ .Title }}</a>
         <span class="meta">
           {{ with .Params.chamber }}{{ . }}{{ end }}
-          {{ with .Date }} · <time datetime="{{ .Format "2006-01-02" }}">{{ .Format "02/01/2006" }}</time>{{ end }}
-          {{ with .Params.keywords }} · <em>{{ delimit (first 4 .) ", " }}</em>{{ end }}
+          {{ if not .Date.IsZero }} · <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006" }}</time>{{ end }}
         </span>
+        {{ with .Params.keywords }}
+          <div class="kw-list">
+            {{ range first 12 . }}<span class="kw-tag">{{ . }}</span>{{ end }}
+          </div>
+        {{ end }}
         {{ with .Params.snippet }}<div class="snippet-inline">« {{ . }} »</div>{{ end }}
       </li>
     {{ end }}

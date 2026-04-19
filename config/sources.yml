@@ -47,7 +47,7 @@ senat:
       format: csv
 
     - id: senat_rapports
-      category: publications
+      category: communiques
       url: https://data.senat.fr/data/dosleg/rapports.csv
       format: csv
 
@@ -214,32 +214,32 @@ ministeres:
 autorites:
   sources:
     - id: ans
-      category: publications
+      category: communiques
       url: https://www.agencedusport.fr/actualites
       format: html
 
     - id: afld
-      category: publications
+      category: communiques
       url: https://www.afld.fr/actualites/
       format: html
 
     - id: arcom
-      category: publications
+      category: communiques
       url: https://www.arcom.fr/actualites
       format: html
 
     - id: anj
-      category: publications
+      category: communiques
       url: https://anj.fr/actualites
       format: html
 
     - id: cour_comptes
-      category: publications
+      category: communiques
       url: https://www.ccomptes.fr/fr/publications
       format: html
 
     - id: defenseur_droits
-      category: publications
+      category: communiques
       url: https://www.defenseurdesdroits.fr/fr/actualites
       format: html
 
