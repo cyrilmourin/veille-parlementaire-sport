@@ -1,11 +1,13 @@
 """Connecteur JORF via le dump XML DILA OPENDATA — pas de credentials.
 
 Source : https://echanges.dila.gouv.fr/OPENDATA/JORF/
-Format : fichiers .taz (= tar.gz) quotidiens contenant les XML LEGIPUBLI.
+Format : fichiers `JORF_YYYYMMDD-HHMMSS.tar.gz` (1 à 2 éditions par jour,
+matin et soir) contenant les XML LEGIPUBLI.
 
 Avantage sur l'API PISTE : aucune authentification, flux stable, données identiques.
 
-On télécharge les N derniers fichiers quotidiens (param `days_back` dans sources.yml),
+On télécharge les N dernières éditions (param `days_back` dans sources.yml,
+sémantiquement = nombre d'éditions car le flux peut publier 2 fois/jour),
 on extrait les XML à la volée, on ne retient que les natures pertinentes :
 ARRETE, DECRET, DECISION, LOI, ORDONNANCE. Les arrêtés de nomination sont
 reclassés dans la catégorie "nominations".
@@ -28,15 +30,24 @@ from ._common import fetch_bytes, fetch_text, parse_iso
 log = logging.getLogger(__name__)
 
 BASE_INDEX = "https://echanges.dila.gouv.fr/OPENDATA/JORF/"
-# Fichiers quotidiens : JORF_YYYYMMDD-HHMMSS.taz
-_FILE_PAT = re.compile(r"^JORF_(\d{8})-\d{6}\.taz$", re.IGNORECASE)
+# Éditions quotidiennes : JORF_YYYYMMDD-HHMMSS.tar.gz (parfois 2/jour)
+# On capture séparément date + heure pour pouvoir trier précisément — sinon
+# deux éditions du même jour apparaissent indistinctement.
+_FILE_PAT = re.compile(
+    r"^JORF_(?P<date>\d{8})-(?P<time>\d{6})\.tar\.gz$", re.IGNORECASE
+)
 
 # Natures que l'on garde (les plus fréquentes dans la veille sport)
 KEEP_NATURES = {"ARRETE", "DECRET", "DECISION", "LOI", "ORDONNANCE"}
 
 
 def _list_recent_dumps(n: int = 8) -> list[tuple[str, datetime]]:
-    """Parse l'index Apache et renvoie [(url, date)…] triés du plus récent au plus ancien."""
+    """Parse l'index Apache et renvoie [(url, datetime)…] triés du plus
+    récent au plus ancien.
+
+    On intègre l'heure pour distinguer les deux éditions quotidiennes
+    éventuelles (matin ~00:30 UTC, soir ~20:00 UTC).
+    """
     try:
         html = fetch_text(BASE_INDEX)
     except Exception as e:
@@ -50,11 +61,19 @@ def _list_recent_dumps(n: int = 8) -> list[tuple[str, datetime]]:
         if not m:
             continue
         try:
-            dt = datetime.strptime(m.group(1), "%Y%m%d")
+            dt = datetime.strptime(
+                m.group("date") + m.group("time"), "%Y%m%d%H%M%S"
+            )
         except ValueError:
             continue
         entries.append((urljoin(BASE_INDEX, href), dt))
     entries.sort(key=lambda x: x[1], reverse=True)
+    if not entries:
+        log.warning(
+            "DILA JORF : aucune entrée ne matche _FILE_PAT dans l'index "
+            "(index HTML de %d chars). Vérifie le format des noms de fichier.",
+            len(html or ""),
+        )
     return entries[:n]
 
 

@@ -125,7 +125,9 @@ dila:
       category: jorf
       url: https://echanges.dila.gouv.fr/OPENDATA/JORF/
       format: dila_jorf
-      days_back: 8      # fenêtre d'agrégation (en jours)
+      # Nombre d'éditions à ingérer. DILA publie ~2 éditions par jour (matin
+      # ~00h30 + soir ~21h), donc 16 ≈ 8 jours de couverture.
+      days_back: 16
 
 # Exécutif — flux RSS quand disponibles, sinon scraping structuré
 executif:
