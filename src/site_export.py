@@ -36,17 +36,54 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     "agenda": 90,
 }
 
+# --- Regex partagés pour la réparation CR AN ---------------------------
+# Les dumps Syceron Brut (AN) ne portent pas la date de séance dans le nom
+# de fichier (CRSAN…), mais l'en-tête du XML contient :
+#   <timeStampDebut>YYYYMMDDHHMMSSmmm</timeStampDebut>
+# soit en texte brut "20250709150000000" = 2025-07-09 15:00. On récupère la
+# date en lisant la première occurrence d'une séquence AAAAMMJJ + 9 chiffres.
+_AN_CR_DATE_RE = re.compile(r"\b(20\d{2})(\d{2})(\d{2})\d{9}\b")
+# Après l'en-tête, la première ligne du texte contient toujours
+#   « Présidence de <M./Mme/Mlle> <prénom> <nom> <OBJET DE LA SEANCE> 0 …»
+# (le « 0 » servant de séparateur de sous-section Syceron). On capture donc
+# le thème jusqu'au premier « 0 » isolé.
+_AN_CR_THEME_RE = re.compile(
+    r"Présidence\s+de\s+(?:M\.|Mme|Mlle)\s+\S+\s+\S+\s+(.+?)\s+0\s",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _extract_an_cr_meta(summary: str | None) -> tuple[str, str]:
+    """Depuis le résumé Syceron stripé, retourne (date_iso, theme).
+
+    Les deux peuvent être vides si le pattern ne matche pas."""
+    text = (summary or "")[:4000]
+    date_iso = ""
+    m_d = _AN_CR_DATE_RE.search(text)
+    if m_d:
+        date_iso = f"{m_d.group(1)}-{m_d.group(2)}-{m_d.group(3)}"
+    theme = ""
+    m_t = _AN_CR_THEME_RE.search(text)
+    if m_t:
+        theme = re.sub(r"\s+", " ", m_t.group(1)).strip(" .,;:—-")
+        # Garde-fou : on accepte ≤130 caractères ; au-delà, on a probablement
+        # raté la borne du sous-section divider — on coupe au dernier mot.
+        if len(theme) > 130:
+            theme = theme[:130].rsplit(" ", 1)[0] + "…"
+    return date_iso, theme
+
+
 def _fix_cr_row(r: dict) -> None:
     """Répare en mémoire l'URL et le titre d'un item comptes_rendus
     ingéré avant les patchs AN/Sénat (CR). Opère sur place.
 
     - AN : ancienne URL /dyn/17/seances (404) → /dyn/17/comptes-rendus/seance/{cr_ref}
-      ou à défaut /dyn/17/comptes-rendus (toujours 200).
+      ou à défaut /dyn/17/comptes-rendus (toujours 200). Date séance +
+      thème extraits du résumé (timeStampDebut + "Présidence de …").
     - Sénat : URL tronquée https://www.senat.fr/seances/s{YYYYMM}/ → ajoute
       le jour final /s{YYYYMMDD}/ depuis raw.seance_date_iso.
     - Titre générique (« Compte rendu AN — CRSAN… ») réécrit en « Séance
-      {chambre} du JJ/MM/AAAA — {thème} » si le raw contient le thème et/ou
-      la date.
+      {chambre} du JJ/MM/AAAA — {thème} ».
 
     Cette fonction est idempotente : réappliquer le patch n'a pas d'effet
     sur un item déjà normalisé.
@@ -61,20 +98,23 @@ def _fix_cr_row(r: dict) -> None:
     cham = (r.get("chamber") or "").strip()
 
     # Date réelle de séance, à déduire avec prudence :
-    # - AN : sans champ dédié dans raw (les CR AN n'ont pas de date embarquée
-    #        dans la cr_ref) → on ne l'invente PAS. published_at vaut la date
-    #        d'ingestion et n'est pas une date de séance fiable.
+    # - AN : on ne fait PAS confiance à published_at (= date d'ingestion).
+    #        On extrait la date du XML stripé (timeStampDebut = AAAAMMJJ+9 chiffres).
     # - Sénat : le parser pré-patch laissait le nom de fichier XML dans le
     #        titre ("CR intégral — d20260119.xml"). On y récupère la date.
     seance_iso = (raw.get("seance_date_iso") or "").strip()
+    an_theme_extracted = ""
+    if not seance_iso and cham == "AN":
+        # Extraction depuis le résumé (Syceron brut stripé)
+        seance_iso, an_theme_extracted = _extract_an_cr_meta(r.get("summary"))
     if not seance_iso:
         # Nom de fichier embarqué dans le titre (cas Sénat pré-patch)
         m_date = re.search(r"d(\d{4})(\d{2})(\d{2})\.xml", title)
         if m_date:
             seance_iso = f"{m_date.group(1)}-{m_date.group(2)}-{m_date.group(3)}"
     # Pour le Sénat uniquement, si toujours rien, on peut tomber sur
-    # published_at comme dernier recours (meilleure que rien). Pour AN on
-    # n'a aucun fallback fiable → on laisse vide.
+    # published_at comme dernier recours. Pour AN on n'utilise jamais
+    # published_at : c'est la date d'ingestion Syceron, pas la séance.
     if not seance_iso and cham in ("Senat", "Sénat"):
         pa = r.get("published_at")
         if isinstance(pa, str) and re.match(r"^\d{4}-\d{2}-\d{2}", pa):
@@ -107,12 +147,34 @@ def _fix_cr_row(r: dict) -> None:
             r["url"] = f"https://www.senat.fr/seances/s{ymd[:6]}/s{ymd}/"
 
     # --- Titre générique pré-patch → réécriture avec date + thème
+    # On détecte aussi les titres déjà partiellement « patchés » mais
+    # construits sur la date d'ingestion (ex. « Séance AN du 20/04/2026 — … »
+    # pour tous les CR d'une même run Syceron).
     looks_generic = bool(
         re.match(r"^(Compte rendu (AN|intégral|analytique) —|CR (intégral|analytique) —)",
                  title)
     )
-    if looks_generic:
-        theme = (raw.get("theme") or "").strip()
+    # Détection d'un titre "Séance AN du JJ/MM/AAAA — …" où la date vient de
+    # published_at (bug _fetch_xml_zip) et qu'on a maintenant la vraie date.
+    fake_an_date = False
+    if cham == "AN" and seance_iso:
+        m_old = re.match(r"^Séance AN du (\d{2})/(\d{2})/(\d{4}) — ", title)
+        if m_old:
+            old_iso = f"{m_old.group(3)}-{m_old.group(2)}-{m_old.group(1)}"
+            if old_iso != seance_iso:
+                fake_an_date = True
+    if looks_generic or fake_an_date:
+        theme = (
+            (raw.get("theme") or "").strip()
+            or an_theme_extracted
+        )
+        # Si on n'a toujours pas de thème mais qu'on a un titre existant qui
+        # ressemble à « Séance AN du JJ/MM/AAAA — <bruit> », on le refait
+        # depuis le résumé (plus fiable que _THEMES_RE qui capture les
+        # jetons de balise).
+        if not theme and cham == "AN":
+            _, theme_ex = _extract_an_cr_meta(r.get("summary"))
+            theme = theme_ex
         date_label = ""
         if re.match(r"^\d{4}-\d{2}-\d{2}$", seance_iso):
             y, mo, dd = seance_iso.split("-")
@@ -136,6 +198,16 @@ def _fix_cr_row(r: dict) -> None:
             cref = m.group(0).upper() if m else ""
             if cref:
                 r["title"] = f"Compte rendu AN — séance {cref}"[:220]
+
+    # --- Date publication recalée : pour trier correctement les CR sur la
+    # page d'accueil, on remplace published_at par la date de séance
+    # extraite (published_at Syceron/Sénat = date d'ingestion, biaise le tri
+    # et fait apparaître des CR anciens comme « Dernières 24h »).
+    if seance_iso and re.match(r"^\d{4}-\d{2}-\d{2}$", seance_iso):
+        pa = (r.get("published_at") or "")
+        if not isinstance(pa, str) or not pa.startswith(seance_iso):
+            # On fixe 12:00 : seule la date est fiable ici.
+            r["published_at"] = f"{seance_iso}T12:00:00"
 
 
 def _window_for(category: str | None) -> int:
@@ -291,17 +363,19 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     (data / "by_chamber").mkdir(parents=True, exist_ok=True)
     items_dir.mkdir(parents=True, exist_ok=True)
 
-    # Charge + filtre 30 jours glissants + tri date desc + dédup
+    # Charge + réparation in-place des CR (URLs AN/Sénat, titres génériques,
+    # et surtout `published_at` recalé sur la date de séance AN — les CR
+    # Syceron arrivent avec published_at = date d'ingestion).
+    # Appliqué AVANT le filtre fenêtre pour que la fenêtre 30j s'applique
+    # bien à la date de séance et pas à la date de compression du zip.
     rows = _load(rows)
+    for r in rows:
+        _fix_cr_row(r)
     rows = _filter_window(rows)
     rows = _sort_by_date_desc(rows)
     # Dédup APRÈS tri par date : on garde la version la plus récente en cas
     # de doublons (title+url identique, UID différent).
     rows = _dedup(rows)
-    # Réparation in-place des CR pré-patch (URLs cassées AN/Sénat, titres
-    # génériques). Voir _fix_cr_row : idempotent.
-    for r in rows:
-        _fix_cr_row(r)
 
     # Index global
     index_payload = {

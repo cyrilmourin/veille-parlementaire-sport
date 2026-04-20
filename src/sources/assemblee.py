@@ -230,6 +230,42 @@ _DATE_IN_NAME_RE = re.compile(r"(\d{4})[-_]?(\d{2})[-_]?(\d{2})")
 # Chercher dans le nom de fichier OU dans le contenu (balise xml <idCR>).
 _CR_REF_RE = re.compile(r"CRSAN[A-Z0-9]{5,30}", re.IGNORECASE)
 
+# Syceron : en-tête du texte stripé contient un timestamp compacté (
+# <timeStampDebut>20250709150000000</timeStampDebut> → AAAAMMJJHHMMSSsss).
+# On matche 8 chiffres date + 9 chiffres heure. Plus fiable que ZipInfo
+# (le zip Syceron est recompressé à chaque publication → dates toutes ~today).
+_SYCERON_TS_RE = re.compile(r"\b(20\d{2})(\d{2})(\d{2})\d{9}\b")
+# Thème : après « Présidence de <civ> <prenom> <nom> », la première ligne
+# contient l'objet de la séance, délimité par « 0 » (séparateur Syceron).
+_SYCERON_THEME_RE = re.compile(
+    r"Présidence\s+de\s+(?:M\.|Mme|Mlle)\s+\S+\s+\S+\s+(.+?)\s+0\s",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _extract_syceron_meta(text: str) -> tuple[datetime | None, str]:
+    """Depuis le texte stripé d'un CR Syceron, renvoie (datetime séance, thème).
+
+    La date vient du timeStampDebut (champ technique, toujours présent).
+    Le thème vient de la ligne « Présidence de <nom> <OBJET> 0 … » (très
+    régulier sur tout le corpus 2024+).
+    """
+    sample = text[:4000]
+    dt_out: datetime | None = None
+    m_d = _SYCERON_TS_RE.search(sample)
+    if m_d:
+        try:
+            dt_out = datetime(int(m_d.group(1)), int(m_d.group(2)), int(m_d.group(3)))
+        except ValueError:
+            dt_out = None
+    theme = ""
+    m_t = _SYCERON_THEME_RE.search(sample)
+    if m_t:
+        theme = _WS_RE.sub(" ", m_t.group(1)).strip(" .,;:—-")
+        if len(theme) > 130:
+            theme = theme[:130].rsplit(" ", 1)[0] + "…"
+    return dt_out, theme
+
 
 def _strip_xml(text: str) -> str:
     """Retire les tags XML/HTML et normalise les espaces."""
@@ -287,15 +323,22 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
         if not text:
             continue
 
-        # Date : préfère la date extraite du nom de fichier (ex. seance_20260315.xml)
-        # sinon ZipInfo.date_time.
-        published_at = dt
-        m = _DATE_IN_NAME_RE.search(name)
-        if m:
-            try:
-                published_at = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-            except ValueError:
-                pass
+        # Date séance : priorité aux métadonnées Syceron (timeStampDebut),
+        # puis date YYYYMMDD dans le nom de fichier (autres dumps xml_zip
+        # éventuels), puis ZipInfo en dernier recours.
+        # NB: ZipInfo.date_time vaut la date de recompression du dump
+        # Syceron (~aujourd'hui), pas la séance — donc inutilisable seul.
+        ts_dt, syceron_theme = _extract_syceron_meta(text)
+        published_at = ts_dt or dt
+        if not ts_dt:
+            m = _DATE_IN_NAME_RE.search(name)
+            if m:
+                try:
+                    published_at = datetime(
+                        int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                    )
+                except ValueError:
+                    pass
 
         # UID stable basé sur (source_id, nom_fichier)
         uid = hashlib.sha1(f"{sid}:{name}".encode()).hexdigest()[:16]
@@ -317,15 +360,20 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
             url = "https://www.assemblee-nationale.fr/dyn/17/comptes-rendus"
 
         # Titre : on veut évoquer le thème du débat. Ordre de priorité :
-        #   1) thème extrait du texte (discussion du projet de loi…)
-        #   2) à défaut, juste la date + mention séance AN
-        theme = extract_cr_theme(text)
-        if published_at and theme:
+        #   1) thème Syceron (« Présidence de … <OBJET> 0 … ») — fiable
+        #   2) thème générique extract_cr_theme (motifs « projet de loi… »)
+        #   3) fallback date + mention CR intégral
+        theme = syceron_theme or extract_cr_theme(text)
+        # Indicateur : la date vient-elle bien du timestamp et pas du Zip ?
+        date_is_from_seance = ts_dt is not None
+        if date_is_from_seance and theme:
             title = f"Séance AN du {published_at:%d/%m/%Y} — {theme}"[:220]
-        elif published_at:
+        elif date_is_from_seance:
             title = f"Séance AN du {published_at:%d/%m/%Y} — Compte rendu intégral"[:220]
         elif theme:
             title = f"Séance AN — {theme}"[:220]
+        elif cr_ref:
+            title = f"Compte rendu AN — séance {cr_ref}"[:220]
         else:
             title = f"Compte rendu AN — {base}"[:220]
 
@@ -353,6 +401,12 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
                 "report_type": "integral",
                 "report_label": "Compte rendu intégral",
                 "theme": theme,
+                # Date officielle de séance (depuis timeStampDebut du XML).
+                # Consommée par _fix_cr_row : permet au rebuild du site
+                # d'écrire le titre correct même pour les items déjà en DB.
+                "seance_date_iso": (
+                    ts_dt.date().isoformat() if ts_dt else ""
+                ),
             },
         ))
     log.info("%s : %d items (sur %d fichiers XML/HTML)", sid, len(items), file_count)
