@@ -89,5 +89,23 @@ def run_all(config_path: str | Path, parallel: int = 6) -> tuple[list[Item], dic
             stats[sid] = {"fetched": len(items), "error": err}
             all_items.extend(items)
 
+    # Récap erreurs ET zero-hit. Sans ça, un an_amendements=0 silencieux
+    # (cas R11 → R11d) passe inaperçu dans le bruit des logs quotidiens. On
+    # émet un bloc WARNING visible qui liste les sources qui ont produit
+    # zéro item, avec leur éventuelle erreur. À surveiller dans le run CI.
+    errored = [(sid, s["error"]) for sid, s in stats.items() if s["error"]]
+    empty = [sid for sid, s in stats.items() if s["error"] is None and s["fetched"] == 0]
+    if errored:
+        log.warning("Pipeline : %d source(s) en erreur :", len(errored))
+        for sid, err in errored:
+            log.warning("  [ERREUR] %s → %s", sid, err)
+    if empty:
+        log.warning(
+            "Pipeline : %d source(s) à 0 item (sans erreur) — à auditer si persistant :",
+            len(empty),
+        )
+        for sid in empty:
+            log.warning("  [0 items] %s", sid)
+
     log.info("Pipeline : %d items au total", len(all_items))
     return all_items, stats

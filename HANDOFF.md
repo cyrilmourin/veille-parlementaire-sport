@@ -1,12 +1,12 @@
 ---
 title: Veille Parlementaire Sport — Handoff
 maintainer: Cyril Mourin
-last_updated: 2026-04-20
+last_updated: 2026-04-21
 ---
 
 # Handoff — Veille Parlementaire Sport
 
-Ce document est le point d'entrée pour reprendre le projet sans contexte préalable. Il résume l'architecture, l'état au **2026-04-20**, les décisions prises, ce qu'il reste à faire et les pièges connus.
+Ce document est le point d'entrée pour reprendre le projet sans contexte préalable. Il résume l'architecture, l'état au **2026-04-21**, les décisions prises, ce qu'il reste à faire et les pièges connus.
 
 À lire dans l'ordre : §1 (quoi) → §2 (comment ça tourne) → §3 (où on en est) → §4 (pièges) → §5 (suite).
 
@@ -95,53 +95,63 @@ Depuis R11b : un second cache `data/an_texte_to_dossier.json` mappe `texteLegisl
 ### 3.1 Dernier commit en date
 
 ```
+44a090e R11d — fix URL AN amendements (amendements_div_legis)
+9840f3a docs: handoff complet du projet (R11)
 9c4af6b R11 — Amendements : fix AN parser + pivot Sénat per-texte
 ```
 
-Sur `main`, pushed to `origin/main`. Working tree propre sauf un fichier untracked (`data/an_texte_to_dossier.json` — cache généré, à décider s'il faut le tracker).
+Sur `main`, pushed to `origin/main`. Un second commit R11e (durcissement `fetch_bytes_*` + récap `run_all` + tests) est en préparation au-dessus de `44a090e`. Working tree propre sauf `data/an_texte_to_dossier.json` (cache untracked, à arbitrer).
 
 ### 3.2 Ce qui fonctionne
 
-- **44/44 tests verts**.
+- **49/49 tests verts** (44 historiques + 5 ajoutés en R11d sur la politique fetch).
 - **R9** — Sénat : CR séance avec dates réelles, titres lisibles, URLs sommaire journalier. AN : CR avec date séance + thème depuis XML Syceron.
 - **R10** — Publications : fenêtre 90j, filtre strict `published_at`, réactive ANS (soft-fail des timeouts).
 - **R11a** — Paths JSON de `_normalize_amendement` corrigés. Anciens paths renvoyaient `None` systématiquement → 0/5683 matchés. Corrigés : `identification.numeroLong`, `corps.contenuAuteur.dispositif` + `exposeSommaire`, `signataires.auteur.groupePolitiqueRef`.
-- **R11b** — Amendement enrichi avec titre du dossier parent dans summary → le matcher retombe sur le thème même quand le texte de l'amendement ne cite pas les mots-clés. Test Follaw reproduit : Ollivier N°6 sur "Protéger mineurs" matche `clubs sportifs`.
+- **R11b** — Amendement enrichi avec titre du dossier parent dans summary → le matcher retombe sur le thème même quand le texte de l'amendement ne cite pas les mots-clés.
 - **R11c** — Pivot Sénat : `senat_ameli.zip` désactivé (c'était un dump PostgreSQL, pas un zip de CSV — 0 item ingéré depuis des mois). Remplacé par `senat_amendements` (source `akn_discussion`) qui itère `depots.xml` et fetche `jeu_complet_<session>_<num>.csv` + variante commission.
+- **R11d** (commit `44a090e`) — Fix URL AN amendements : `amendements_div_legis` et non `amendements_legis`, qui renvoyait 404 silencieux depuis R11. Validation : 5683 amendements AN ingérés dont 3 matchés sport (Amdts 52/56/57 LFI sur PJL sécurité) + les 6 Sénat pré-existants = **9 amendements matchés au total**, reproduisant au passage 2/4 des cas Follaw AN historiques (52 et 56).
+- **R11e** (en cours, non encore pushed) — Durcissement de `_common.fetch_bytes_*` : `log.error` explicite sur 4xx/5xx avec URL+code, `retry_if_exception` qui ne retry PAS sur 4xx (économie 16s+ par source morte). Récap WARNING en fin de `run_all` qui liste les sources KO et les sources à 0 item. Le premier run post-R11e a révélé 3 bugs latents qui étaient jusqu'ici invisibles : HTTP 404 sur `diplomatie.gouv.fr`, timezone bug sur `an_agenda` (`can't compare offset-naive and offset-aware datetimes`, source critique 6411 items en DB), et 8 sources à 0 item dont certains scrapers HTML probablement cassés (`min_sante`, `min_travail`, `min_affaires_etrangeres`, `cnosf`). À traiter en R11f/R11g.
 - Site UX/UI : layout central + sidebar, recherche client-side, thématiques pliées avec compteur, agenda en module à droite, favicon Sideline, maquette dossiers législatifs façon AN.
 - Cache AMO : script weekly + workflow idempotent.
 
-### 3.3 Volumes DB actuels
+### 3.3 Volumes DB actuels (après R11d, run 2026-04-20 22:00)
 
 ```
 questions              8 337
-dossiers_legislatifs   6 537
-agenda                 6 468
+amendements            8 163   ← 5 721 AN + 2 442 Sénat (était 0 avant R11d)
+dossiers_legislatifs   6 765
+agenda                 6 475
 comptes_rendus         3 292
-communiques            1 160
-amendements                0   ← purgés par reset_category avant re-ingest R11
+jorf                   1 575
+communiques            1 322
+nominations              215
 ```
+
+Amendements matchés sport : **9** (3 AN + 6 Sénat).
 
 Top sources :
 
 ```
 an_agenda                 6 411
+an_amendements            5 721   ← R11d
 senat_questions_1an       5 263
 senat_promulguees         4 291
 senat_cri                 2 801
+senat_amendements         2 442   ← R11c
 senat_qg                  2 330
 an_dossiers_legislatifs   1 336
 ```
 
 ### 3.4 Ce qui reste à faire (immédiat)
 
-1. **Re-ingest amendements post-R11** — la purge `reset_category amendements --yes` a été lancée (5683 items supprimés). Il faut maintenant lancer `python -m src.main run --since 7 --no-email -v` pour valider que :
-   - les amendements AN sont matchés à nouveau (n'importe quel volume > 0),
-   - les 4 amendements Follaw de référence apparaissent : AN 52/53/54/56 sur le dossier "Renforcer la sécurité…JO 2024" (match `paris 2024, les jo`),
-   - l'amendement Sénat Ollivier N°6 sur "Protéger mineurs" apparaît avec `clubs sportifs`.
-   - Lancer via venv : `source .venv/bin/activate && python -m src.main run --since 7 --no-email -v`.
+1. **~~Re-ingest amendements post-R11~~** — ✅ fait en R11d. Résultats observés :
+   - AN : 5721 items ingérés, 3 matchés sport (Amdts 52/56/57 LFI sur « Renforcer la sécurité, rétention administrative et prévention des risques »). 2/4 des cas Follaw historiques reproduits (52 et 56 ✅, 53 et 54 ❌ absents — probablement filtrés par la fenêtre `since_days: 30` car plus anciens, à confirmer si besoin en élargissant).
+   - Sénat : 2442 items ingérés, 6 matchés sport (4 Gouvernement sur JO 2030, 1 VÉRIEN sur `dopage`, 1 CANALÈS sur polices municipales).
+   - Ollivier N°6 « Protéger mineurs » : l'amendement est bien ingéré mais **ne matche pas** — voir §4.4 piège n°5 (hypothèse R11b invalidée).
 2. **Décider du sort de `data/an_texte_to_dossier.json`** — actuellement untracked. Soit l'ajouter à `.gitignore` (cache local), soit le commit pour speed-up premier run CI. Logique actuelle : régénéré par `assemblee._harvest_texte_refs` si absent.
-3. **Reset DB prévu** (memo en memory) — à faire lors de la prochaine modif de `daily.yml` pour re-normaliser l'historique complet avec les parsers R9+R10+R11.
+3. **Reset DB prévu** (memo en memory) — à faire lors de la prochaine modif de `daily.yml` pour re-normaliser l'historique complet avec les parsers R9+R10+R11+R11d.
+4. **Audit des 4 cas Follaw manquants** — AN 53/54 absents, et Ollivier N°6 ne matche pas. À recroiser avec l'état actuel des dossiers dans Follaw (les textes ont pu être amendés ou retirés côté source depuis la rédaction initiale du HANDOFF).
 
 ### 3.5 Ce qui reste à faire (moyen terme)
 
@@ -182,15 +192,23 @@ an_dossiers_legislatifs   1 336
 
 ### 4.4 Matching
 
-- **Amendement ≠ texte du dossier** : l'amendement cite rarement les mots-clés sport littéralement. **Il faut enrichir le haystack avec le titre du dossier parent** (logique R11b). Sans ça, N°6 Ollivier sur les clubs sportifs échoue.
+- **Amendement ≠ texte du dossier** : l'amendement cite rarement les mots-clés sport littéralement. **Il faut enrichir le haystack avec le titre du dossier parent** (logique R11b). Le match peut alors tomber sur le thème porté par le dossier plutôt que sur le corps de l'amendement.
 - **Priorité summary** : titre du dossier **en premier** dans summary, puis objet, puis dispositif. Si on inverse, le dispositif (souvent long et générique) peut dominer l'extrait affiché.
 - **`ANS` seul retiré** des keywords : faux positifs massifs (unidecode → "ans"). Seulement `Agence nationale du sport` en full.
 - **`ARCOM` seul retiré** : faux positifs audiovisuel. Seulement formes contextualisées (`ARCOM sport`, `ARCOM paris sportifs`, etc.).
+- **Hypothèse « Ollivier N°6 matche `clubs sportifs` » invalidée (R11d)** — le HANDOFF initial citait ce cas comme test Follaw de la logique R11b. Vérifié en R11d : le dossier PPL 469 « Protéger les mineurs des risques des réseaux sociaux » n'emporte aucune mention sport dans ses amendements Ollivier (N°1 à N°6 + COM-6 à COM-11), ni dans le titre du dossier parent. Aucun amendement ingéré (0/2442 Sénat) ne contient la sous-chaîne « clubs sportifs ». Le cas Follaw d'origine visait probablement un amendement/dossier différent — ne pas chercher à reproduire ce match en l'état. **Ne pas ressusciter ce faux test de non-régression** : il consomme du temps sans rien prouver.
 
 ### 4.5 Publications (R10)
 
 - **`STRICT_DATED_CATEGORIES = {'communiques'}`** : pas de fallback `inserted_at`. Élimine les rapports Sénat CSV sans date, pages pivot html_generic, agendas hebdo datés en fin de semaine à venir.
 - **ANS timeouts intermittents** : `_common.fetch` absorbe les `ConnectTimeout` via soft-fail (ne bloque pas le pipeline).
+
+### 4.7 Politique fetch HTTP (R11e)
+
+- **`fetch_bytes` / `fetch_bytes_heavy` ne retry plus sur 4xx** — l'ancienne politique tenacity retentait 2-3 fois un 404, ajoutant 16+ secondes de latence pour rien et masquant le diagnostic. Désormais, `retry_if_exception(_is_retryable)` n'autorise le retry que sur les 5xx + erreurs réseau (ConnectError, RemoteProtocolError, ReadTimeout, etc.).
+- **`log.error` explicite sur 4xx/5xx** — `_raise_for_status_loud` émet un ERROR avec code HTTP + URL complète au moment où l'erreur survient. Évite que l'erreur ne soit noyée dans les DEBUG `httpcore` au niveau `normalize._fetch_one` (cas qui a laissé `an_amendements = 0` inaperçu entre R11 et R11d).
+- **Récap `run_all`** — bloc WARNING en fin de pipeline qui liste (a) les sources en erreur avec leur message, (b) les sources qui ont produit 0 item sans erreur. Surveiller cette section dans les logs CI quotidiens : c'est le canari qui aurait dû alerter sur le 404 `amendements_legis`.
+- **À surveiller** : si une source qui produit légitimement 0 item dans une fenêtre courte (ex. weekend Sénat sans dépôt) apparaît dans le récap, on aura du bruit. Si ça devient systématique pour certaines sources, blanchir via une liste `EXPECTED_ZERO_HIT_SOURCES`.
 
 ### 4.6 Méthodologie
 
@@ -201,15 +219,13 @@ an_dossiers_legislatifs   1 336
 
 ## 5. Prochaine session — amorce
 
-1. Activer venv et lancer pipeline : `source .venv/bin/activate && python -m src.main run --since 7 --no-email -v`.
-2. Interroger DB :
-   ```bash
-   sqlite3 data/veille.sqlite3 \
-     "SELECT title, matched_keywords FROM items WHERE category='amendements' AND source_id='senat_amendements' LIMIT 20;"
-   ```
-3. Confirmer les cas Follaw (AN 52/53/54/56 JO 2024 + Ollivier N°6).
-4. Si OK → commit la mise à jour du digest + push → laisser tourner le cron quotidien.
-5. Si KO → re-diag avec `dry -v` et inspection des `raw` JSON des items qui devraient matcher.
+L'étape R11d (fix URL AN + durcissement fetch) est close. Pistes à ouvrir dans l'ordre :
+
+1. **Décision `data/an_texte_to_dossier.json`** — tracker ou gitignore. Si tracker, faire un commit séparé avec le cache à jour (~570 Ko) pour speed-up premier run CI après reset DB.
+2. **AN 53/54 manquants** — si l'audit Follaw les juge importants, élargir `since_days` de `an_amendements` à 60 ou 90 et relancer un run isolé. Si leur absence est due à un filtre date, ce sera résolu par la purge complète lors du prochain `reset_db` workflow.
+3. **Procédure législative** — Cyril veut qu'on maîtrise les étapes avant de patcher le tri/filtre des dossiers. Prérequis à toute évolution du `status_label` dans `site_export`.
+4. **Liste `EXPECTED_ZERO_HIT_SOURCES`** si le récap WARNING de `run_all` devient bruyant sur certaines sources qui ne publient pas tous les jours (weekend Sénat, ministères en pause estivale, etc.).
+5. **Audit des 51 sources** via `scripts/audit_sources.py` — maintenant que R11d a renforcé la visibilité, les 404 latents vont remonter plus vite. Première passe conseillée la semaine prochaine pour établir un baseline.
 
 ---
 
@@ -242,6 +258,8 @@ an_dossiers_legislatifs   1 336
 
 | Tag | Description | Commit |
 |---|---|---|
+| R11e | Durcissement `fetch_bytes_*` : no-retry 4xx, log.error explicite, récap `run_all`. A révélé 3 bugs latents auparavant invisibles (diplomatie 404, an_agenda tz-bug, 8 sources 0-items). | — |
+| R11d | Fix URL AN amendements (`amendements_legis` 404 → `amendements_div_legis`). Validé : 5683 AN ingérés, 3 matchés sport (Amdts 52/56/57 LFI). | `44a090e` |
 | R11 | Fix AN amendements parser + pivot Sénat per-texte | `9c4af6b` |
 | R10 | Publications : fenêtre 90j + strict published_at + réactive ANS | `c7c6f2e` |
 | R9d | CR AN : date séance + thème depuis XML Syceron | `39c5fdb` |

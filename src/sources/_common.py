@@ -9,9 +9,29 @@ from pathlib import Path
 from typing import Iterable
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import (
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 log = logging.getLogger(__name__)
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    """Politique de retry : on retry les erreurs réseau / 5xx, jamais les 4xx.
+
+    Une URL qui renvoie 404 (ex. dump renommé côté producteur, cf. R11d)
+    ne se mettra pas à répondre 200 au 2e essai — les 3 retries de tenacity
+    consommaient 16+ secondes pour rien et masquaient le diagnostic. Les
+    timeouts, RemoteProtocolError, ConnectError, etc. restent retryables
+    (transitoires côté réseau).
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        # 5xx = côté serveur, mérite un retry. 4xx = côté URL, abandon.
+        return exc.response.status_code >= 500
+    return True
 
 # UA type navigateur Chrome sur macOS — les sites .gouv.fr refusent
 # systématiquement les UA déclaratifs de type bot (403). On garde une
@@ -53,26 +73,52 @@ def _client(timeout: httpx.Timeout = _TIMEOUT_LIGHT) -> httpx.Client:
     )
 
 
+def _raise_for_status_loud(r: httpx.Response) -> None:
+    """Wrapper sur `raise_for_status` qui loggue explicitement le 4xx/5xx.
+
+    Sans ça, un 404 silencieux remontait juste en traceback générique côté
+    `normalize._fetch_one`, noyé dans les DEBUG httpcore — c'est ce qui a
+    laissé `an_amendements = 0 items` inaperçu entre R11 et R11d. On log
+    au moment où l'erreur survient, avec l'URL complète et le code.
+    """
+    if r.is_success:
+        return
+    log.error(
+        "HTTP %d sur GET %s — %s",
+        r.status_code, r.url, r.reason_phrase or "(no reason)"
+    )
+    r.raise_for_status()
+
+
 # Retry "léger" pour le scraping HTML : 2 tentatives suffisent. Une source
-# morte ne mérite pas 3×60s = 3 min de latence dans la pipeline.
-@retry(stop=stop_after_attempt(2), wait=wait_exponential(min=1, max=5))
+# morte ne mérite pas 3×60s = 3 min de latence dans la pipeline. On ne retry
+# PAS sur 4xx (cf. `_is_retryable`).
+@retry(
+    stop=stop_after_attempt(2),
+    wait=wait_exponential(min=1, max=5),
+    retry=retry_if_exception(_is_retryable),
+)
 def fetch_bytes(url: str) -> bytes:
     log.info("GET %s", url)
     with _client() as c:
         r = c.get(url)
-        r.raise_for_status()
+        _raise_for_status_loud(r)
         return r.content
 
 
 # Retry "lourd" pour les dumps AN/Sénat : 3 tentatives, backoff large, timeout
 # read généreux. Les dumps sont gros (jusqu'à 537 Mo) et méritent plus de
-# patience qu'une page HTML.
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=20))
+# patience qu'une page HTML. Pareil : pas de retry sur 4xx.
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=2, max=20),
+    retry=retry_if_exception(_is_retryable),
+)
 def fetch_bytes_heavy(url: str) -> bytes:
     log.info("GET (heavy) %s", url)
     with _client(timeout=_TIMEOUT_HEAVY) as c:
         r = c.get(url)
-        r.raise_for_status()
+        _raise_for_status_loud(r)
         return r.content
 
 
