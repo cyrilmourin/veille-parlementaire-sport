@@ -862,6 +862,129 @@ def _normalize_question(obj, src, cat):
     )
 
 
+# --- Agenda AN : helpers pour extraire un titre lisible depuis la structure
+# JSON. Source : XSD AN 0.9.8 (/Schemas_Entites/VieAN/Schemas_AgendaParlementaire.xsd).
+# Clés en camelCase avec S majuscule : `timeStampDebut`, `timeStampFin`,
+# `libelleLong` / `libelleCourt` pour `lieu`, `@xsi:type` pour distinguer
+# seance_type / reunionCommission_type / reunionBase_type.
+
+# Préfixes d'identifiants AN à écarter comme "titre" (ce sont des codes,
+# pas des libellés). POxxxx = organe, PAxxxx = acteur, RUANRxxx = réunion,
+# SLANxxx = salle, CRSANxxx = compte rendu, DLR*L17Nxxx = dossier lég.,
+# PTxxxx = point ODJ, CTAxxxx = code thème, podj*_type = sous-type XSD ODJ.
+_AGENDA_ID_RE = re.compile(
+    r"^\s*("
+    r"PO[A-Z0-9]+|PA[A-Z0-9]+|RU[A-Z0-9]+|SL[A-Z0-9]+|CR[A-Z0-9]+|"
+    r"DLR[A-Z0-9]+|PT[A-Z0-9]+|CTA[A-Z0-9]+|ODJ[A-Z]*|"
+    r"podj\w*_type|\w+_type|"
+    r"\d{2,}|[A-Z]{2,}\d+"
+    r")\s*$",
+)
+
+# Chaînes de bruit : statuts, états de participation, booléens, adjectifs
+# ordinaux de session, valeurs xsi:type, codes de rôle.
+_AGENDA_NOISE = {
+    "confirmé", "confirme", "reporté", "reporte", "annulé", "annule",
+    "ordinaire", "extraordinaire", "première", "premiere", "deuxième",
+    "deuxieme", "troisième", "troisieme", "quatrième", "quatrieme",
+    "présent", "present", "absent", "excusé", "excuse",
+    "true", "false", "null", "none",
+    "ouverturepresse", "ouverture presse",
+    "assemblée nationale", "assemblee nationale",
+    "oui", "non",
+    # Chaînes de namespace / schéma qui apparaissent dans le shotgun
+    "http://schemas.assemblee-nationale.fr/referentiel",
+    "http://www.w3.org/2001/xmlschema-instance",
+}
+
+# Clés JSON prioritaires pour le titre d'un point ODJ ou d'une réunion.
+# L'ordre reflète la préférence (plus haut = meilleur candidat).
+_AGENDA_TITLE_KEYS = [
+    "titreODJ", "titreOrdreDuJour", "libelleOrdreDuJour",
+    "libelleObjet", "titreReunion", "intitule",
+    "objet", "libelle", "libelleLong",
+]
+
+
+def _is_agenda_title_candidate(s) -> bool:
+    """Heuristique : true si `s` ressemble à un libellé lisible d'ODJ."""
+    if not isinstance(s, str):
+        return False
+    t = s.strip()
+    if len(t) < 15 or len(t) > 400:
+        return False
+    low = t.lower()
+    if low in _AGENDA_NOISE:
+        return False
+    if _AGENDA_ID_RE.match(t):
+        return False
+    # Pas une date ISO pure
+    if re.match(r"^\d{4}-\d{2}-\d{2}(T|$)", t):
+        return False
+    # Doit contenir au moins un espace (vrai texte, pas un code collé)
+    if " " not in t:
+        return False
+    # Doit contenir au moins une lettre minuscule (les codes sont MAJ)
+    if not any(c.islower() for c in t):
+        return False
+    return True
+
+
+def _collect_agenda_titles(root) -> list[str]:
+    """Collecte les libellés lisibles dans l'arbre JSON d'une réunion.
+
+    Retourne une liste dédupliquée, ordonnée par priorité de clé :
+    `titreODJ` > `libelleObjet` > `objet` > `libelle` > autres.
+    """
+    prioritized: dict[int, list[str]] = {}
+    seen: set[str] = set()
+    stack = [(root, None)]
+    while stack:
+        cur, parent_key = stack.pop()
+        if isinstance(cur, dict):
+            for k, v in cur.items():
+                if isinstance(v, str):
+                    if _is_agenda_title_candidate(v):
+                        t = v.strip()
+                        if t in seen:
+                            continue
+                        seen.add(t)
+                        try:
+                            prio = _AGENDA_TITLE_KEYS.index(k)
+                        except ValueError:
+                            prio = len(_AGENDA_TITLE_KEYS) + 10
+                        prioritized.setdefault(prio, []).append(t)
+                elif isinstance(v, (dict, list)):
+                    stack.append((v, k))
+        elif isinstance(cur, list):
+            for v in cur:
+                if isinstance(v, (dict, list)):
+                    stack.append((v, parent_key))
+    result: list[str] = []
+    for prio in sorted(prioritized):
+        result.extend(prioritized[prio])
+    return result
+
+
+def _agenda_url(uid: str, xsi_type: str, dt, cr_ref: str = "") -> str:
+    """Construit une URL publique AN stable pour un item d'agenda.
+
+    - Séance avec idCR : lien vers le compte rendu de séance.
+    - Sinon, lien vers la page agenda filtrée par jour.
+    """
+    # Séance avec compte rendu : CRSANR5L17S2026O1N039 → page CR séance
+    # URL canonique : /dyn/17/comptes-rendus/seance/{cr_ref}
+    if "seance" in xsi_type and cr_ref:
+        return f"https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/seance/{cr_ref}"
+    if dt is not None:
+        return (
+            "https://www.assemblee-nationale.fr/dyn/agendas-parlementaires/agenda-an"
+            f"#jour-{dt.date().isoformat()}"
+        )
+    # Dernier recours : agenda global
+    return "https://www.assemblee-nationale.fr/dyn/agendas-parlementaires/agenda-an"
+
+
 def _normalize_agenda(obj, src, cat):
     root = obj.get("reunion") if isinstance(obj, dict) else None
     if not root:
@@ -869,66 +992,110 @@ def _normalize_agenda(obj, src, cat):
     uid = _text_of(_first(root, "uid", default=""))
     if not uid:
         return
-    titre = _text_of(_first(root, "objet.libelleObjet",
-                              "titreReunion", default="Réunion"))
-    dt = parse_iso(_first(root, "timestampDebut",
-                           "timestampDebutReunion",
-                           "dateReunion", default=None))
 
-    # Organe (commission, délégation…)
-    organe = _text_of(_first(root, "organeReuniRef",
-                               "organeRef",
-                               "typeReunion",
-                               default=""))
-    lieu = _text_of(_first(root, "lieu.libelleCourt",
-                            "lieu.libelle", default=""))
+    # --- Type de réunion : attribut XML xsi:type → clé JSON variable
+    # selon convertisseur (`@xsi:type`, `xsi:type`, `xsiType`).
+    xsi_type = _text_of(_first(
+        root, "@xsi:type", "xsi:type", "xsiType", "type", default=""
+    )).lower()
+    # Fallback : retrouver *_type dans le shotgun si aucune clé directe.
+    if not xsi_type:
+        m = re.search(r"\b(seance_type|reunion[a-z]*_type|podj[a-z]*_type)\b",
+                      _all_text(root), re.IGNORECASE)
+        if m:
+            xsi_type = m.group(1).lower()
 
-    # Ordre du jour / thèmes — souvent structurés en liste.
-    # On aplati tout ce qui ressemble à un thème/libellé pour nourrir le matcher.
-    odj_parts: list[str] = []
-    themes = _first(root, "objet.themes", default=None)
-    if isinstance(themes, (dict, list)):
-        for p, v in _flatten(themes):
-            if isinstance(v, str) and len(v) > 3:
-                odj_parts.append(v)
-    elif isinstance(themes, str):
-        odj_parts.append(themes)
+    is_seance = "seance_type" in xsi_type
+    is_commission = "commission" in xsi_type
 
-    points = _first(root, "pointsOrdreDuJour", "ordreDuJour", default=None)
-    if isinstance(points, (dict, list)):
-        for p, v in _flatten(points):
-            if isinstance(v, str) and len(v) > 3 and ("libelle" in p.lower() or "objet" in p.lower() or "texte" in p.lower()):
-                odj_parts.append(v)
+    # --- DATE : le XSD AN définit `timeStampDebut` (S majuscule).
+    # On essaie les variantes + fallback deep-find + SeanceID.DateSeance.
+    dt_raw = _first(
+        root,
+        "timeStampDebut", "timestampDebut",
+        "timeStampDebutReunion", "timestampDebutReunion",
+        "dateReunion", default=None,
+    )
+    if dt_raw in (None, ""):
+        dt_raw = _deep_find(root, "timeStampDebut", "timestampDebut",
+                            "DateSeance", "dateSeance")
+    dt = parse_iso(_text_of(dt_raw)) if dt_raw else None
 
-    odj_text = " · ".join(odj_parts)[:2000]
+    # --- LIEU : lieuAN_type = {code, libelleCourt, libelleLong}.
+    lieu = _text_of(_first(
+        root, "lieu.libelleLong", "lieu.libelleCourt",
+        default="",
+    ))
+    if not lieu:
+        lieu = _text_of(_deep_find(root, "libelleLong") or "")
+    # Rejeter les codes purs type 'SLANPBS6351' passés par erreur
+    if lieu and _AGENDA_ID_RE.match(lieu):
+        lieu = ""
 
-    # Titre : on garde l'objet de la réunion, lisible tel quel
-    # (style Follaw). Date et lieu sont exposés dans la méta (pas dans
-    # le titre) et rendus comme texte simple sans lien hypertexte.
-    title = (titre or "Réunion")[:220]
+    # --- ORGANE (IdOrgane_type, ex. PO838901) : gardé en raw
+    organe_ref = _text_of(_first(root, "organeReuniRef", "organeRef",
+                                   default=""))
+    if not organe_ref:
+        organe_ref = _text_of(_deep_find(root, "organeReuniRef",
+                                          "organeRef") or "")
 
+    # --- COMPTE RENDU DE SÉANCE (référence externe pour l'URL)
+    cr_ref = ""
+    if is_seance:
+        cr_ref = _text_of(_deep_find(root, "compteRenduRef", "idCompteRendu",
+                                      "idCR") or "")
+
+    # --- TITRE : libellé d'ODJ ou d'audition, filtré du bruit.
+    titles = _collect_agenda_titles(root)
+    main_title = titles[0] if titles else ""
+
+    if is_seance:
+        quant = _text_of(_deep_find(root, "quantieme") or "")
+        num_jo = _text_of(_deep_find(root, "numSeanceJO", "idJO") or "")
+        prefix = "Séance"
+        if quant:
+            prefix = f"{quant.capitalize()} séance"
+        if num_jo:
+            prefix += f" n°{num_jo}"
+        title = f"{prefix} — {main_title}" if main_title else prefix
+    elif is_commission:
+        if main_title:
+            if main_title.lower().startswith("audition"):
+                title = main_title
+            else:
+                title = f"Commission — {main_title}"
+        else:
+            title = f"Réunion de commission ({organe_ref})" if organe_ref else "Réunion de commission"
+    else:
+        title = main_title or (f"Réunion ({organe_ref})" if organe_ref else "Réunion")
+
+    title = title[:220]
+
+    # --- URL stable
+    url = _agenda_url(uid, xsi_type, dt, cr_ref)
+
+    # --- SUMMARY : structuré + shotgun pour alimenter le matcher.
     structured = " — ".join(p for p in [
-        f"Organe : {organe}" if organe else "",
+        f"Organe : {organe_ref}" if organe_ref else "",
         f"Lieu : {lieu}" if lieu else "",
-        odj_text,
+        " · ".join(titles[:5]) if titles else "",
     ] if p)
-    # Shotgun : filet de sécurité au cas où la structure du JSON
-    # réunion ne colle pas à nos paths ciblés.
     shotgun = _all_text(root)
     summary = (structured + " — " + shotgun if structured else shotgun)[:2000]
 
-    # URL : il n'existe pas d'URL publique stable par UID de réunion
-    # (testé : /dyn/17/reunions/{uid} 404, idem /reunion/{uid}, /agenda/{uid}).
-    # On laisse une URL vide — à l'affichage, le titre est rendu en clair
-    # (pas de lien cliquable) pour rester aligné sur Follaw.
     yield Item(
         source_id=src["id"],
         uid=uid,
         category=cat,
         chamber="AN",
         title=title,
-        url="",
+        url=url,
         published_at=dt,
         summary=summary,
-        raw={"path": "assemblee:reunion", "organe": organe, "lieu": lieu},
+        raw={
+            "path": "assemblee:reunion",
+            "organe": organe_ref,
+            "lieu": lieu,
+            "xsi_type": xsi_type,
+        },
     )
