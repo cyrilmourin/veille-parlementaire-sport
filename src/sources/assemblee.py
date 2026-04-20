@@ -11,7 +11,7 @@ from typing import Iterable
 
 from ..models import Item
 from .. import amo_loader
-from ._common import fetch_bytes, parse_iso, unzip_members, unzip_members_since
+from ._common import fetch_bytes, fetch_bytes_heavy, parse_iso, unzip_members, unzip_members_since
 
 log = logging.getLogger(__name__)
 
@@ -90,6 +90,40 @@ def _text_of(node) -> str:
             return str(node["#text"])
         return json.dumps(node, ensure_ascii=False)
     return str(node)
+
+
+def _strip_html_text(node) -> str:
+    """Extrait le texte brut d'un nœud XHTML/XML parsé en JSON.
+
+    Les éléments `corps.dispositif` et `corps.exposeSommaire` des amendements
+    AN sont typés `TexteNonVide_Type` (XHTML). Le JSON dumper les rend sous
+    forme d'arbre : `{"#text": "...", "p": [{"#text": "..."}, …]}`. Le
+    ancien `_text_of` tombait sur `json.dumps()` et perdait le texte réel
+    dans du markup — donc aucun mot-clé sport ne ressortait.
+
+    Cette fonction walke récursivement l'arbre, ignore les attributs
+    XML (clés `@xxx`) et concatène tous les `#text` + strings feuilles.
+    """
+    if node is None:
+        return ""
+    if isinstance(node, str):
+        return node.strip()
+    if isinstance(node, list):
+        return " ".join(_strip_html_text(it) for it in node if it).strip()
+    if isinstance(node, dict):
+        parts: list[str] = []
+        # 1) contenu textuel direct du nœud
+        if "#text" in node:
+            parts.append(str(node["#text"]).strip())
+        # 2) enfants (hors attributs XML `@xxx` et hors #text déjà lu)
+        for k, v in node.items():
+            if k == "#text" or (isinstance(k, str) and k.startswith("@")):
+                continue
+            t = _strip_html_text(v)
+            if t:
+                parts.append(t)
+        return " ".join(p for p in parts if p).strip()
+    return str(node).strip()
 
 
 def _all_text(node) -> str:
@@ -211,7 +245,8 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
     """
     sid = src["id"]
     cat = src["category"]
-    data = fetch_bytes(src["url"])
+    # Syceron AN ~ XML zip 80+ Mo : retry lourd + read 120s.
+    data = fetch_bytes_heavy(src["url"])
 
     # Fenêtre date : src["since_days"] > env AN_SINCE_DAYS > 30 (défaut)
     since_days_raw = src.get("since_days") or os.environ.get("AN_SINCE_DAYS") or 30
@@ -297,7 +332,9 @@ def fetch_source(src: dict) -> list[Item]:
     if fmt != "json_zip":
         log.warning("Format %s non supporté pour %s", fmt, src["id"])
         return []
-    data = fetch_bytes(src["url"])
+    # Dumps JSON AN agrégés (amendements, questions, agenda, dossiers) :
+    # 50-200 Mo. Retry lourd + read 120s pour ne pas timeout sur les gros.
+    data = fetch_bytes_heavy(src["url"])
     items: list[Item] = []
     file_count = 0
 
@@ -456,19 +493,28 @@ def _normalize_amendement(obj, src, cat):
         if groupe_lib:
             auteur_groupe = groupe_lib
 
-    # Dispositif + exposé sommaire (matériel pertinent pour matching mots-clés)
-    dispo = _text_of(_first(root, "corps.dispositif", default=""))
-    expose = _text_of(_first(root, "corps.exposeSommaire", "exposeSommaire", default=""))
+    # Dispositif + exposé sommaire (matériel pertinent pour matching mots-clés).
+    # Ces champs sont typés `TexteNonVide_Type` (XHTML) : le JSON les rend
+    # en arbre {"#text": "...", "p": [...]} — il faut _strip_html_text pour
+    # récupérer le texte brut, sinon le matcher ne voit que du markup.
+    dispo = _strip_html_text(_first(root, "corps.dispositif",
+                                      "contenuAuteur.dispositif", default=""))
+    expose = _strip_html_text(_first(root, "corps.exposeSommaire",
+                                       "contenuAuteur.exposeSommaire",
+                                       "exposeSommaire", default=""))
 
     # Statut : sort en séance / en commission / "Irrecevable"
-    sort = _text_of(_first(
+    # Sur certains amendements, `sortEnSeance` et `etat` sont des dicts
+    # ({"code": "ET", "libelle": "En traitement"}) — _strip_html_text
+    # extrait le `libelle` au lieu de dumper le dict en JSON.
+    sort = _strip_html_text(_first(
         root,
+        "cycleDeVie.sort.libelle",
         "cycleDeVie.sort.sortEnSeance",
         "cycleDeVie.etatDesTraitements.etat",
-        "cycleDeVie.sort.libelle",
         default=""
     ))
-    etat = _text_of(_first(root, "etat", "cycleDeVie.etat", default=""))
+    etat = _strip_html_text(_first(root, "etat", "cycleDeVie.etat", default=""))
     statut = sort or etat or ""
 
     # Contexte dossier (article, division)
@@ -1059,22 +1105,45 @@ def _collect_agenda_titles(root) -> list[str]:
     return result
 
 
-def _agenda_url(uid: str, xsi_type: str, dt, cr_ref: str = "") -> str:
+def _agenda_url(uid: str, xsi_type: str, dt, cr_ref: str = "",
+                 organe_ref: str = "") -> str:
     """Construit une URL publique AN stable pour un item d'agenda.
 
-    - Séance avec idCR : lien vers le compte rendu de séance.
-    - Sinon, lien vers la page agenda filtrée par jour.
+    Priorité (du + spécifique au + générique) :
+    1. Séance avec idCR → page du compte rendu de séance (lien le + utile).
+    2. Réunion de commission (organe_ref connu) → page agenda de la commission
+       filtrée par jour — le portail AN accepte `#commission-{organe}/jour-{d}`.
+    3. Date connue → ancre jour dans l'agenda global.
+    4. Dernier recours → agenda global.
+
+    Avant ce patch, toute réunion sans idCR retombait direct sur le cas 4 —
+    tous les items d'agenda pointaient alors vers la MÊME URL générique,
+    donnant l'impression d'items statiques ("rien ne change, liens morts").
     """
-    # Séance avec compte rendu : CRSANR5L17S2026O1N039 → page CR séance
-    # URL canonique : /dyn/17/comptes-rendus/seance/{cr_ref}
+    # 1. Séance avec compte rendu : CRSANR5L17S2026O1N039 → page CR séance
+    #    URL canonique : /dyn/17/comptes-rendus/seance/{cr_ref}
     if "seance" in xsi_type and cr_ref:
         return f"https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/seance/{cr_ref}"
+    # 2. Réunion rattachée à un organe connu (commission, délégation…) :
+    #    on peut cibler l'agenda de CET organe au lieu de l'agenda global.
+    #    Plus ciblé = distinct par réunion = clic utile côté lecteur.
+    if organe_ref and dt is not None:
+        return (
+            "https://www.assemblee-nationale.fr/dyn/agendas-parlementaires/"
+            f"agenda-commissions#{organe_ref}/jour-{dt.date().isoformat()}"
+        )
+    if organe_ref:
+        return (
+            "https://www.assemblee-nationale.fr/dyn/agendas-parlementaires/"
+            f"agenda-commissions#{organe_ref}"
+        )
+    # 3. Date connue sans organe : ancre jour dans l'agenda global.
     if dt is not None:
         return (
             "https://www.assemblee-nationale.fr/dyn/agendas-parlementaires/agenda-an"
             f"#jour-{dt.date().isoformat()}"
         )
-    # Dernier recours : agenda global
+    # 4. Dernier recours : agenda global.
     return "https://www.assemblee-nationale.fr/dyn/agendas-parlementaires/agenda-an"
 
 
@@ -1179,7 +1248,7 @@ def _normalize_agenda(obj, src, cat):
     title = title[:220]
 
     # --- URL stable
-    url = _agenda_url(uid, xsi_type, dt, cr_ref)
+    url = _agenda_url(uid, xsi_type, dt, cr_ref, organe_ref=organe_ref)
 
     # --- SUMMARY : structuré + shotgun NETTOYÉ pour alimenter le matcher.
     # On filtre du shotgun :

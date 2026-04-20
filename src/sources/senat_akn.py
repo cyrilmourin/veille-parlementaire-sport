@@ -385,6 +385,10 @@ def fetch_akn_index(src: dict) -> list[Item]:
             ] if p).strip()
         if not titre:
             continue
+        # Les titres extraits des .akn.xml arrivent souvent en minuscule
+        # ("projet de loi relatif à…") — on capitalise la première lettre
+        # sans toucher au reste pour préserver les sigles (SNCF, CNIL…).
+        titre = titre[0].upper() + titre[1:]
 
         date_last = data.get("date_last") or dt_idx
         if date_last is None:

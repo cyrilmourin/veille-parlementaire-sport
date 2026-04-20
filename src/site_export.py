@@ -28,6 +28,11 @@ WINDOW_DAYS = 30
 # sur WINDOW_DAYS pour les catégories listées.
 WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     "dossiers_legislatifs": 730,   # 2 ans — cycle législatif complet
+    # Agenda : on veut 3 mois pour voir les réunions passées récentes ET les
+    # séances futures planifiées (ordre du jour de la session en cours).
+    # 30j coupait trop court : une réunion annoncée 6 semaines à l'avance
+    # ou passée depuis 5 semaines disparaissait du site.
+    "agenda": 90,
 }
 
 def _window_for(category: str | None) -> int:
@@ -546,6 +551,18 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
                 fm.append("    stage: \"" + str(a.get("stage", "")) + "\"")
                 fm.append("    step: \"" + str(a.get("step", "")) + "\"")
                 fm.append("    is_promulgation: " + str(bool(a.get("is_promulgation"))).lower())
+        # Frontmatter étendu pour les comptes rendus (Sénat + AN) :
+        # expose report_type ("analytique" | "integral") et report_label
+        # ("Compte rendu analytique" | "Compte rendu intégral") pour que
+        # le template comptes_rendus/list.html puisse rendre un badge
+        # distinct sans re-parser le titre.
+        if cat == "comptes_rendus" and isinstance(raw, dict):
+            report_type = (raw.get("report_type") or "").strip()
+            report_label = (raw.get("report_label") or "").strip().replace('"', "'")
+            if report_type:
+                fm.append(f'report_type: "{report_type}"')
+            if report_label:
+                fm.append(f'report_label: "{report_label}"')
         fm += [
             "---",
             "",

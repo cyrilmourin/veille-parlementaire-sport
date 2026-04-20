@@ -1,0 +1,115 @@
+{{ define "main" }}
+{{/*
+  Page dédiée Dossiers législatifs.
+
+  Maquette inspirée de la page « Dossiers législatifs » de l'AN
+  (assemblee-nationale.fr/dyn/17/dossiers) :
+    - une carte par dossier (fond blanc, bordure, padding généreux)
+    - pictogramme chambre à gauche
+    - titre cliquable en bleu
+    - type de texte en gras (déduit du libellé)
+    - ligne « Dépôt à [chambre] le [date] »
+    - badge « En cours : [statut] » en bleu si non promulgué, vert si promulgué
+    - liens « Voir le dossier législatif → » alignés à droite
+
+  Champs frontmatter consommés (cf. src/site_export.py) :
+    .Title, .Date, .Params.chamber, .Params.source_url,
+    .Params.status_label, .Params.is_promulgated, .Params.snippet,
+    .Params.keywords, .Params.families
+*/}}
+{{ $pages := (.Paginate .Pages.ByDate.Reverse).Pages }}
+
+<section class="listing dosleg-list">
+  <nav class="breadcrumb"><a href="/">Accueil</a> &rsaquo; {{ .Title }}</nav>
+  <h1>{{ .Title }}</h1>
+  {{ with .Content }}<div class="intro">{{ . }}</div>{{ end }}
+
+  {{ if not $pages }}
+  <p class="empty-state">Aucun dossier législatif récent.</p>
+  {{ end }}
+
+  {{ range $pages }}
+    {{/* Capitalisation 1re lettre du titre sans casser sigles (PJL, etc.) */}}
+    {{ $t := .Title }}
+    {{ $titleDisplay := "" }}
+    {{ if gt (len $t) 0 }}
+      {{ $titleDisplay = printf "%s%s" (substr $t 0 1 | strings.ToUpper) (substr $t 1) }}
+    {{ end }}
+
+    {{/* Type de texte : déduit du préfixe lowercase du titre */}}
+    {{ $low := lower $t }}
+    {{ $type := "" }}
+    {{ if hasPrefix $low "projet de loi de finances" }}{{ $type = "Projet de loi de finances" }}
+    {{ else if hasPrefix $low "projet de loi de financement" }}{{ $type = "Projet de loi de financement" }}
+    {{ else if hasPrefix $low "projet de loi organique" }}{{ $type = "Projet de loi organique" }}
+    {{ else if hasPrefix $low "projet de loi constitutionnelle" }}{{ $type = "Projet de loi constitutionnelle" }}
+    {{ else if hasPrefix $low "projet de loi" }}{{ $type = "Projet de loi" }}
+    {{ else if hasPrefix $low "proposition de loi organique" }}{{ $type = "Proposition de loi organique" }}
+    {{ else if hasPrefix $low "proposition de loi constitutionnelle" }}{{ $type = "Proposition de loi constitutionnelle" }}
+    {{ else if hasPrefix $low "proposition de loi" }}{{ $type = "Proposition de loi" }}
+    {{ else if hasPrefix $low "proposition de résolution" }}{{ $type = "Proposition de résolution" }}
+    {{ else if hasPrefix $low "proposition de résolution européenne" }}{{ $type = "Proposition de résolution européenne" }}
+    {{ end }}
+
+    {{/* Préposition selon la chambre */}}
+    {{ $cham := .Params.chamber | default "" }}
+    {{ $depotLib := "Dépôt" }}
+    {{ if eq $cham "AN" }}{{ $depotLib = "Dépôt à l'Assemblée nationale" }}
+    {{ else if or (eq $cham "Senat") (eq $cham "Sénat") }}{{ $depotLib = "Dépôt au Sénat" }}
+    {{ end }}
+
+    <article class="dosleg-card" data-chamber="{{ $cham }}"{{ if .Params.is_promulgated }} data-promulgated="true"{{ end }}>
+      <div class="dosleg-card__icon" aria-hidden="true">
+        {{ if eq $cham "AN" }}AN
+        {{ else if or (eq $cham "Senat") (eq $cham "Sénat") }}SÉN
+        {{ else }}DOS
+        {{ end }}
+      </div>
+      <div class="dosleg-card__body">
+        <h2 class="dosleg-card__title">
+          {{ if .Params.source_url }}
+            <a href="{{ .Params.source_url }}" rel="noopener" target="_blank">{{ $titleDisplay }}</a>
+          {{ else }}
+            <span>{{ $titleDisplay }}</span>
+          {{ end }}
+        </h2>
+
+        {{ with $type }}<div class="dosleg-card__type">{{ . }}</div>{{ end }}
+
+        <div class="dosleg-card__deposit">
+          {{ $depotLib }}
+          {{ if not .Date.IsZero }} le <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006" }}</time>{{ end }}
+        </div>
+
+        {{ with .Params.status_label }}
+          <div class="dosleg-card__status{{ if $.Params.is_promulgated }} dosleg-card__status--promulgated{{ end }}">
+            {{ if $.Params.is_promulgated }}Promulgué : {{ . }}{{ else }}En cours : {{ . }}{{ end }}
+          </div>
+        {{ end }}
+
+        {{ with .Params.snippet }}<div class="snippet-inline">« {{ . }} »</div>{{ end }}
+
+        {{ with .Params.families }}{{ $fam := index . 0 }}{{ with $.Params.keywords }}
+          <div class="dosleg-card__kws">
+            {{ range first 8 . }}<span class="kw-tag" data-family="{{ $fam }}">{{ . }}</span>{{ end }}
+          </div>
+        {{ end }}{{ end }}
+        {{ if not .Params.families }}{{ with .Params.keywords }}
+          <div class="dosleg-card__kws">
+            {{ range first 8 . }}<span class="kw-tag">{{ . }}</span>{{ end }}
+          </div>
+        {{ end }}{{ end }}
+
+        <div class="dosleg-card__links">
+          {{ if .Params.source_url }}
+            <a class="dosleg-card__cta" href="{{ .Params.source_url }}" rel="noopener" target="_blank">Voir le dossier législatif &rsaquo;</a>
+          {{ end }}
+          <a class="dosleg-card__detail" href="{{ .RelPermalink }}">Procédure détaillée &rsaquo;</a>
+        </div>
+      </div>
+    </article>
+  {{ end }}
+
+  {{ partial "pagination-inline.html" . }}
+</section>
+{{ end }}

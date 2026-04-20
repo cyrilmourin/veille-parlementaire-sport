@@ -170,20 +170,27 @@ executif:
       url: https://www.elysee.fr/agenda
       format: html
 
+    # Matignon + info.gouv.fr : protégés par Cloudflare challenge JS
+    # (Cf-Mitigated: challenge, 403 systématique sur httpx). Aucun RSS
+    # officiel équivalent identifié. Sources désactivées tant qu'on n'a
+    # pas de contournement (Playwright ou flux RSS confirmé).
     - id: matignon_actualites
       category: communiques
       url: https://www.gouvernement.fr/actualite
       format: html
+      enabled: false
 
     - id: matignon_agenda
       category: agenda
       url: https://www.gouvernement.fr/agenda
       format: html
+      enabled: false
 
     - id: info_gouv_actualites
       category: communiques
       url: https://www.info.gouv.fr/actualite
       format: html
+      enabled: false
 
 ministeres:
   # Scraping des espaces presse / listings actualités (RSS non disponible partout)
@@ -211,20 +218,26 @@ ministeres:
       format: html
       poids: 3
 
+    # Education + Intérieur + Economie : Cloudflare challenge JS (403).
+    # À ré-activer si un flux RSS officiel est confirmé ou si on introduit
+    # un fallback Playwright pour les sources marquées needs_js.
     - id: min_education
       category: communiques
       url: https://www.education.gouv.fr/presse
       format: html
+      enabled: false
 
     - id: min_interieur
       category: communiques
       url: https://www.interieur.gouv.fr/actualites/presse
       format: html
+      enabled: false
 
     - id: min_economie
       category: communiques
       url: https://www.economie.gouv.fr/espace-presse
       format: html
+      enabled: false
 
     - id: min_justice
       category: communiques
@@ -248,7 +261,9 @@ ministeres:
 
     - id: min_affaires_etrangeres
       category: communiques
-      url: https://www.diplomatie.gouv.fr/fr/salle-de-presse/
+      # L'ancienne racine /salle-de-presse/ renvoyait 404. On cible la
+      # sous-page "communiqués techniques" qui agrège les actualités.
+      url: https://www.diplomatie.gouv.fr/fr/salle-de-presse/communiques-techniques/
       format: html
 
     - id: min_transition_ecologique
@@ -268,15 +283,21 @@ ministeres:
 
     - id: min_enseignement_sup
       category: communiques
-      url: https://www.enseignementsup-recherche.gouv.fr/fr/presse
+      # /fr/presse redirige vers /404. Nouveau slug stable : /fr/espace-presse-50621.
+      url: https://www.enseignementsup-recherche.gouv.fr/fr/espace-presse-50621
       format: html
 
 autorites:
   sources:
     - id: ans
       category: communiques
+      # Domaine agencedusport.fr : ConnectTimeout chronique (3×60s = 3 min
+      # perdues par run). À ré-activer après vérification manuelle que le
+      # host répond, ou basculement sur une autre URL (sports.gouv.fr agrège
+      # déjà les actualités ANS via /agence-nationale-du-sport).
       url: https://www.agencedusport.fr/actualites
       format: html
+      enabled: false
 
     - id: afld
       category: communiques
@@ -290,13 +311,18 @@ autorites:
 
     - id: anj
       category: communiques
-      url: https://anj.fr/actualites
+      # /actualites renvoyait 404. Page officielle confirmée.
+      url: https://anj.fr/communiques-de-presse
       format: html
 
     - id: cour_comptes
       category: communiques
+      # ccomptes.fr : ConnectTimeout chronique (3×60s = 3 min perdues par
+      # run). À ré-activer après vérification manuelle du host, ou
+      # basculement sur un flux RSS officiel si disponible.
       url: https://www.ccomptes.fr/fr/publications
       format: html
+      enabled: false
 
     - id: defenseur_droits
       category: communiques
@@ -305,7 +331,8 @@ autorites:
 
     - id: cnosf
       category: communiques
-      url: https://cnosf.franceolympique.com/cnosf/actus/
+      # /cnosf/actus/ renvoyait 404 (ancien path). Nouveau path officiel.
+      url: https://cnosf.franceolympique.com/actualites
       format: html
 
     - id: france_paralympique
@@ -315,5 +342,11 @@ autorites:
 
     - id: alpes_2030
       category: communiques
+      # cojop.fr : domaine inexistant (DNS KO). Le COJOP Alpes 2030
+      # (créé le 18/02/2025, président Edgar Grospiron) n'a pas encore
+      # publié de site web officiel au moment de ce commit. Les actualités
+      # Alpes 2030 sont captées via min_sports_presse + cnosf. Source
+      # désactivée en attendant la mise en ligne du site officiel COJOP.
       url: https://cojop.fr/
       format: html
+      enabled: false

@@ -26,9 +26,18 @@ CACHE_DIR = Path("data/cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _client() -> httpx.Client:
+# Timeouts granulaires : on sépare connect (SYN/handshake) du read (corps).
+# Une source injoignable doit échouer en 8s de connect × 2 retries = 16s max,
+# pas en 60s × 3 = 3 min comme dans l'ancienne version. Le read reste
+# confortable (60s) pour les gros zips Sénat (CRI 537 Mo) et AN (agrégats
+# questions/amendements).
+_TIMEOUT_LIGHT = httpx.Timeout(connect=8.0, read=30.0, write=10.0, pool=5.0)
+_TIMEOUT_HEAVY = httpx.Timeout(connect=10.0, read=120.0, write=15.0, pool=5.0)
+
+
+def _client(timeout: httpx.Timeout = _TIMEOUT_LIGHT) -> httpx.Client:
     return httpx.Client(
-        timeout=60.0,
+        timeout=timeout,
         follow_redirects=True,
         headers={
             "User-Agent": USER_AGENT,
@@ -44,10 +53,24 @@ def _client() -> httpx.Client:
     )
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=20))
+# Retry "léger" pour le scraping HTML : 2 tentatives suffisent. Une source
+# morte ne mérite pas 3×60s = 3 min de latence dans la pipeline.
+@retry(stop=stop_after_attempt(2), wait=wait_exponential(min=1, max=5))
 def fetch_bytes(url: str) -> bytes:
     log.info("GET %s", url)
     with _client() as c:
+        r = c.get(url)
+        r.raise_for_status()
+        return r.content
+
+
+# Retry "lourd" pour les dumps AN/Sénat : 3 tentatives, backoff large, timeout
+# read généreux. Les dumps sont gros (jusqu'à 537 Mo) et méritent plus de
+# patience qu'une page HTML.
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=20))
+def fetch_bytes_heavy(url: str) -> bytes:
+    log.info("GET (heavy) %s", url)
+    with _client(timeout=_TIMEOUT_HEAVY) as c:
         r = c.get(url)
         r.raise_for_status()
         return r.content

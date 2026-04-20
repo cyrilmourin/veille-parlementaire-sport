@@ -46,12 +46,21 @@ def _dispatch(group: str, src: dict) -> Callable[[dict], list[Item]]:
 
 
 def iter_sources(config: dict):
-    """Itère sur (group_name, source_dict) pour chaque source du YAML."""
+    """Itère sur (group_name, source_dict) pour chaque source du YAML.
+
+    Une source peut être désactivée temporairement avec `enabled: false`
+    dans son entrée YAML (ex. domaine cassé, Cloudflare challenge insoluble,
+    timeout connect chronique). Elle est alors silencieusement skippée par
+    la pipeline — utile pour stop-loss sans supprimer la conf.
+    """
     for group_name, group in config.items():
         if not isinstance(group, dict):
             continue
         sources = group.get("sources") or []
         for src in sources:
+            if src.get("enabled") is False:
+                log.info("Source %s désactivée (enabled: false), skip", src.get("id", "?"))
+                continue
             yield group_name, src
 
 

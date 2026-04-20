@@ -14,7 +14,14 @@ from typing import Iterable
 import feedparser
 
 from ..models import Item
-from ._common import fetch_bytes, fetch_text, parse_iso, unzip_members, unzip_members_since
+from ._common import (
+    fetch_bytes,
+    fetch_bytes_heavy,
+    fetch_text,
+    parse_iso,
+    unzip_members,
+    unzip_members_since,
+)
 
 log = logging.getLogger(__name__)
 
@@ -115,7 +122,9 @@ def fetch_source(src: dict) -> list[Item]:
             # et traitement fichier-par-fichier pour éviter l'OOM.
             if sid in ("senat_debats", "senat_cri"):
                 return _fetch_debats_zip(src)
-            data = fetch_bytes(src["url"])
+            # ameli.zip + questions.zip + debats.zip sont des dumps lourds
+            # (100-300 Mo), retry lourd + timeout read 120s.
+            data = fetch_bytes_heavy(src["url"])
             items: list[Item] = []
             members = list(unzip_members(data))
             log.info("Sénat %s : ZIP contient %d fichiers", sid, len(members))
@@ -171,7 +180,8 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
         "Sénat %s : fetch zip + filtre date >= %s (fenêtre %d jours)",
         sid, since.date().isoformat(), since_days,
     )
-    data = fetch_bytes(src["url"])
+    # CRI.zip = 537 Mo, debats.zip = 33 Mo : retry lourd + read 120s.
+    data = fetch_bytes_heavy(src["url"])
     items: list[Item] = []
     ext_counts: dict[str, int] = {}
 
@@ -216,9 +226,12 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
 
         # Titre humain : "Séance du 11 février 2026 — Compte rendu intégral"
         # Le suffixe (analytique / intégral) dépend du dataset source.
+        # report_type expose la distinction aux templates dédiés sans avoir
+        # à parser le titre.
+        report_type = "analytique" if sid == "senat_debats" else "integral"
         label = (
             "Compte rendu analytique"
-            if sid == "senat_debats"
+            if report_type == "analytique"
             else "Compte rendu intégral"
         )
         if m_name and seance_dt.year > 2000:
@@ -249,7 +262,19 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
             url=url,
             published_at=seance_dt,
             summary=summary,
-            raw={"path": f"senat:{sid}", "zip_member": name, "size": len(payload)},
+            raw={
+                "path": f"senat:{sid}",
+                "zip_member": name,
+                "size": len(payload),
+                # Exposés au template comptes_rendus/list.html pour rendre
+                # le type ("analytique" vs "intégral") sous forme de badge
+                # et offrir un regroupement / tri visuel.
+                "report_type": report_type,
+                "report_label": label,
+                "seance_date_iso": (
+                    seance_dt.date().isoformat() if seance_dt.year > 2000 else ""
+                ),
+            },
         ))
 
     log.info(
