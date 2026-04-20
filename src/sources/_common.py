@@ -4,7 +4,7 @@ from __future__ import annotations
 import io
 import logging
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -218,12 +218,36 @@ def extract_cr_theme(text: str | None, max_len: int = 110) -> str:
 
 
 def parse_iso(s: str | None) -> datetime | None:
+    """Parse une date ISO 8601 → datetime NAÏF en UTC.
+
+    Convention du projet : tous les `published_at` sont stockés naïfs en UTC
+    (cf. `main.py` et `_utcnow_naive`). Or certaines sources (AN agenda
+    `timeStampDebut`, Élysée sitemap `lastmod`) exposent des timestamps
+    tz-aware (`+01:00`, `Z`) tandis que d'autres (AN amendements
+    `cycleDeVie.dateDepot`, Sénat CSV) sont naïves. Avant R11f, `parse_iso`
+    propageait cette incohérence → crash `can't compare offset-naive and
+    offset-aware datetimes` sur `assemblee.fetch_source` quand la fenêtre
+    `since_days` comparait un `published_at` aware à un `since` naïf
+    (bug latent sur `an_agenda`, 6411 items soudainement à 0).
+
+    Politique unifiée :
+    - entrée aware → conversion en UTC puis strip tzinfo → naïf UTC
+    - entrée naïve → considérée UTC telle quelle
+    - entrée invalide / vide → None
+
+    Tolère "2026-04-18T12:34:56+00:00", "2026-04-18T12:34:56Z",
+    "2026-04-18T12:34:56.000+01:00", "2026-04-18", et les cas vides.
+    """
     if not s:
         return None
     try:
-        # tolère "2026-04-18T12:34:56+00:00" et "2026-04-18"
+        # tolère "Z" comme alias de "+00:00"
         if "T" in s:
-            return datetime.fromisoformat(s.replace("Z", "+00:00"))
-        return datetime.fromisoformat(s)
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        else:
+            dt = datetime.fromisoformat(s)
     except Exception:
         return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt

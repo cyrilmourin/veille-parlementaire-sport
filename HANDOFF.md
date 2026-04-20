@@ -100,18 +100,23 @@ Depuis R11b : un second cache `data/an_texte_to_dossier.json` mappe `texteLegisl
 9c4af6b R11 — Amendements : fix AN parser + pivot Sénat per-texte
 ```
 
-Sur `main`, pushed to `origin/main`. Un second commit R11e (durcissement `fetch_bytes_*` + récap `run_all` + tests) est en préparation au-dessus de `44a090e`. Working tree propre sauf `data/an_texte_to_dossier.json` (cache untracked, à arbitrer).
+Sur `main`, pushed to `origin/main`. **Deux commits en préparation au-dessus de `44a090e`** :
+- R11e : durcissement `fetch_bytes_*` (no-retry 4xx, log.error, récap `run_all`) + 5 tests
+- R11f : fix tz-bug `an_agenda` (normalisation naïf UTC dans `parse_iso` / `_parse_date_any` / `_parse_dt`) + 17 tests
+
+Working tree propre sauf `data/an_texte_to_dossier.json` (cache untracked, à arbitrer).
 
 ### 3.2 Ce qui fonctionne
 
-- **49/49 tests verts** (44 historiques + 5 ajoutés en R11d sur la politique fetch).
+- **66/66 tests verts** (44 historiques + 5 R11e sur la politique fetch + 17 R11f sur la normalisation naïf UTC).
 - **R9** — Sénat : CR séance avec dates réelles, titres lisibles, URLs sommaire journalier. AN : CR avec date séance + thème depuis XML Syceron.
 - **R10** — Publications : fenêtre 90j, filtre strict `published_at`, réactive ANS (soft-fail des timeouts).
 - **R11a** — Paths JSON de `_normalize_amendement` corrigés. Anciens paths renvoyaient `None` systématiquement → 0/5683 matchés. Corrigés : `identification.numeroLong`, `corps.contenuAuteur.dispositif` + `exposeSommaire`, `signataires.auteur.groupePolitiqueRef`.
 - **R11b** — Amendement enrichi avec titre du dossier parent dans summary → le matcher retombe sur le thème même quand le texte de l'amendement ne cite pas les mots-clés.
 - **R11c** — Pivot Sénat : `senat_ameli.zip` désactivé (c'était un dump PostgreSQL, pas un zip de CSV — 0 item ingéré depuis des mois). Remplacé par `senat_amendements` (source `akn_discussion`) qui itère `depots.xml` et fetche `jeu_complet_<session>_<num>.csv` + variante commission.
 - **R11d** (commit `44a090e`) — Fix URL AN amendements : `amendements_div_legis` et non `amendements_legis`, qui renvoyait 404 silencieux depuis R11. Validation : 5683 amendements AN ingérés dont 3 matchés sport (Amdts 52/56/57 LFI sur PJL sécurité) + les 6 Sénat pré-existants = **9 amendements matchés au total**, reproduisant au passage 2/4 des cas Follaw AN historiques (52 et 56).
-- **R11e** (en cours, non encore pushed) — Durcissement de `_common.fetch_bytes_*` : `log.error` explicite sur 4xx/5xx avec URL+code, `retry_if_exception` qui ne retry PAS sur 4xx (économie 16s+ par source morte). Récap WARNING en fin de `run_all` qui liste les sources KO et les sources à 0 item. Le premier run post-R11e a révélé 3 bugs latents qui étaient jusqu'ici invisibles : HTTP 404 sur `diplomatie.gouv.fr`, timezone bug sur `an_agenda` (`can't compare offset-naive and offset-aware datetimes`, source critique 6411 items en DB), et 8 sources à 0 item dont certains scrapers HTML probablement cassés (`min_sante`, `min_travail`, `min_affaires_etrangeres`, `cnosf`). À traiter en R11f/R11g.
+- **R11e** (en cours, non encore pushed) — Durcissement de `_common.fetch_bytes_*` : `log.error` explicite sur 4xx/5xx avec URL+code, `retry_if_exception` qui ne retry PAS sur 4xx (économie 16s+ par source morte). Récap WARNING en fin de `run_all` qui liste les sources KO et les sources à 0 item. Le premier run post-R11e a révélé 3 bugs latents qui étaient jusqu'ici invisibles : HTTP 404 sur `diplomatie.gouv.fr`, timezone bug sur `an_agenda` (fixé en R11f), et 8 sources à 0 item dont certains scrapers HTML probablement cassés (`min_sante`, `min_travail`, `min_affaires_etrangeres`, `cnosf`). À traiter en R11g.
+- **R11f** (en cours, non encore pushed) — Fix du tz-bug sur `an_agenda`. Les timestamps AN agenda sont au format `"2025-11-07T21:30:00.000+01:00"` (tz-aware), et `parse_iso` les renvoyait aware, incompatibles avec le `since = _utcnow_naive() - timedelta(...)` du filtre `since_days` → crash `TypeError: can't compare offset-naive and offset-aware datetimes` sur `assemblee.fetch_source`. Même cause-racine latente dans `senat._parse_date_any` et `site_export._parse_dt`. Fix : normalisation unifiée en **naïf UTC** à l'entrée du pipeline (conversion `astimezone(UTC).replace(tzinfo=None)` appliquée dans les 3 parseurs), conforme à la convention du projet (cf. `main.py:71`, `_utcnow_naive`). 17 nouveaux tests paramétrés. Validé sur 10 timestamps AN agenda live : 10/10 comparaisons réussies là où c'était 0/10 avant.
 - Site UX/UI : layout central + sidebar, recherche client-side, thématiques pliées avec compteur, agenda en module à droite, favicon Sideline, maquette dossiers législatifs façon AN.
 - Cache AMO : script weekly + workflow idempotent.
 
@@ -258,6 +263,7 @@ L'étape R11d (fix URL AN + durcissement fetch) est close. Pistes à ouvrir dans
 
 | Tag | Description | Commit |
 |---|---|---|
+| R11f | Fix tz-bug `an_agenda` : `parse_iso` / `_parse_date_any` / `_parse_dt` normalisent en naïf UTC au lieu de propager l'aware ISO 8601. Convention "tout naïf" du projet enfin homogène. | — |
 | R11e | Durcissement `fetch_bytes_*` : no-retry 4xx, log.error explicite, récap `run_all`. A révélé 3 bugs latents auparavant invisibles (diplomatie 404, an_agenda tz-bug, 8 sources 0-items). | — |
 | R11d | Fix URL AN amendements (`amendements_legis` 404 → `amendements_div_legis`). Validé : 5683 AN ingérés, 3 matchés sport (Amdts 52/56/57 LFI). | `44a090e` |
 | R11 | Fix AN amendements parser + pivot Sénat per-texte | `9c4af6b` |

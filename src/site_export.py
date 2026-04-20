@@ -242,20 +242,32 @@ def _slugify(s: str) -> str:
 
 
 def _parse_dt(value) -> datetime | None:
-    """Parse best-effort d'un datetime stocké en string ISO."""
+    """Parse best-effort d'un datetime stocké en string ISO.
+
+    Normalise en naïf UTC (cf. R11f / `_common.parse_iso`) pour rester
+    comparable à `datetime.utcnow()` utilisé en aval dans `_window_keep`.
+    Sans ça, un `published_at` stocké avec tz (ex. vieil item AN agenda
+    pré-R11f) crash la comparaison `dt >= cutoff`.
+    """
+    from datetime import timezone as _tz
     if not value:
         return None
     if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            return value.astimezone(_tz.utc).replace(tzinfo=None)
         return value
     s = str(value)
     try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
     except Exception:
         # fallback : juste la date
         try:
-            return datetime.fromisoformat(s[:10])
+            dt = datetime.fromisoformat(s[:10])
         except Exception:
             return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(_tz.utc).replace(tzinfo=None)
+    return dt
 
 
 def _load(rows: list[dict]) -> list[dict]:

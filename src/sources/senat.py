@@ -312,7 +312,11 @@ def _parse_date_any(s: str | None) -> datetime | None:
     formats selon les fichiers. parse_iso seul rejette DD/MM/YYYY et
     laissait beaucoup de lignes sans date (les dossiers apparaissaient
     alors sans date sur le site).
+
+    Comme `_common.parse_iso` (R11f), normalise en naïf UTC pour rester
+    comparable aux autres `published_at` du pipeline.
     """
+    from datetime import timezone as _tz
     if not s:
         return None
     s = s.strip()
@@ -321,8 +325,12 @@ def _parse_date_any(s: str | None) -> datetime | None:
     # ISO 8601 (avec ou sans T)
     try:
         if "T" in s:
-            return datetime.fromisoformat(s.replace("Z", "+00:00"))
-        return datetime.fromisoformat(s)
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        else:
+            dt = datetime.fromisoformat(s)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(_tz.utc).replace(tzinfo=None)
+        return dt
     except Exception:
         pass
     # DD/MM/YYYY ou D/M/YYYY
