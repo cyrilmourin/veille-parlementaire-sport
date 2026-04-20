@@ -28,6 +28,27 @@ def _first_sentence(text: str, max_len: int = 140) -> str:
         return clean[: m.end()].strip()
     return clean[:max_len].rstrip() + ("…" if len(clean) > max_len else "")
 
+
+# Mois français pour formater "11 février 2026" sans dépendre de la locale
+# système (les CI GitHub Actions n'ont pas forcément fr_FR.UTF-8).
+_FR_MONTHS = [
+    "janvier", "février", "mars", "avril", "mai", "juin",
+    "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+]
+
+
+def _fmt_fr_date(dt: datetime) -> str:
+    """Formate un datetime en "11 février 2026"."""
+    return f"{dt.day} {_FR_MONTHS[dt.month - 1]} {dt.year}"
+
+
+# Noms de fichiers CR Sénat : préfixe (1 lettre) + date AAAAMMJJ + suffixe.
+# Exemples observés : d20260211.xml (séance), s20260315_001.html (CRI),
+# a20260315.html (analytique). On capture la lettre + la date séparément.
+_CR_NAME_RE = re.compile(
+    r"^([a-z])(\d{8})(?:[_\-].*)?\.(?:xml|html?|txt)$", re.IGNORECASE
+)
+
 # --- mapping CSV ------------------------------------------------------------
 
 # Les CSV Sénat sont en UTF-8 avec délimiteur ';' et guillemets double.
@@ -166,9 +187,43 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
         uid = hashlib.sha1(f"{sid}:{name}".encode()).hexdigest()[:16]
         base = os.path.basename(name)
 
-        # Titre : nom de base (souvent parlant ex. "s20260315_001.html")
-        label = "Compte rendu analytique" if sid == "senat_debats" else "CR intégral"
-        title = f"{label} — {base}"[:220]
+        # Extraction de la date réelle de séance depuis le nom de fichier
+        # (préfixe lettre + AAAAMMJJ). La date ZipInfo.date_time reflète
+        # l'archivage, pas la date de séance — elle peut déplacer tous les
+        # CR du mois sur la même journée. Quand le pattern ne matche pas,
+        # on retombe sur la date ZipInfo.
+        seance_dt = dt
+        m_name = _CR_NAME_RE.match(base)
+        if m_name:
+            try:
+                seance_dt = datetime.strptime(m_name.group(2), "%Y%m%d")
+            except ValueError:
+                pass
+
+        # Titre humain : "Séance du 11 février 2026 — Compte rendu intégral"
+        # Le suffixe (analytique / intégral) dépend du dataset source.
+        label = (
+            "Compte rendu analytique"
+            if sid == "senat_debats"
+            else "Compte rendu intégral"
+        )
+        if m_name and seance_dt.year > 2000:
+            title = f"Séance du {_fmt_fr_date(seance_dt)} — {label}"[:220]
+        else:
+            # Fallback : ancien format (nom de fichier non reconnu)
+            title = f"{label} — {base}"[:220]
+
+        # URL du sommaire de la séance (validé en live avril 2026) :
+        # https://www.senat.fr/seances/sAAAAMM/sAAAAMMJJ/ → listing HTML
+        # Plus précis que l'URL mensuelle précédente qui renvoyait un 403.
+        if seance_dt.year > 2000:
+            url = (
+                f"https://www.senat.fr/seances/s{seance_dt:%Y%m}"
+                f"/s{seance_dt:%Y%m%d}/"
+            )
+        else:
+            url = "https://www.senat.fr/seances/"
+
         summary = text[:2000]
 
         items.append(Item(
@@ -177,9 +232,8 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
             category=cat,
             chamber="Senat",
             title=title,
-            url="https://www.senat.fr/seances/s{}/".format(
-                dt.strftime("%Y%m")) if dt.year > 2000 else "https://www.senat.fr/seances/",
-            published_at=dt,
+            url=url,
+            published_at=seance_dt,
             summary=summary,
             raw={"path": f"senat:{sid}", "zip_member": name, "size": len(payload)},
         ))
