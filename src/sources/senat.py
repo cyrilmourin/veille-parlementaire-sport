@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import html
 import io
 import logging
 import os
@@ -184,6 +185,13 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
         # brut au matcher sans s'embêter avec un parser.
         if ext in ("html", "htm", "xml"):
             text = re.sub(r"<[^>]+>", " ", text)
+        # Décode les entités HTML (&#233; → é, &#160; → espace insécable) —
+        # sans ça, le snippet affiché sur le site contient du bruit moche
+        # comme « Pr&#233;sidence de M.&#160;G&#233;rard Larcher ».
+        text = html.unescape(text)
+        # Normalise les espaces insécables et autres séparateurs typographiques
+        # en espace simple (plus lisible dans l'extrait).
+        text = text.replace("\u00a0", " ").replace("\u202f", " ")
         text = re.sub(r"\s+", " ", text).strip()
         if not text:
             continue

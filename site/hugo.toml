@@ -9,6 +9,14 @@ enableRobotsTXT = true
 buildFuture = true
 buildExpired = true
 
+# 50 items par page dans les listings — demande utilisateur (densité).
+# Hugo ≥ 0.128 utilise la section [pagination]; les versions antérieures
+# lisaient `paginate` top-level. On met les deux pour compatibilité.
+paginate = 50
+
+[pagination]
+  pagerSize = 50
+
 [params]
   description = "Veille institutionnelle du sport — Parlement, Gouvernement, JORF, autorités."
   author = "Sideline Conseil"

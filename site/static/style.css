@@ -75,8 +75,22 @@ a:hover { text-decoration: underline; }
   padding-top: 22px;
   padding-bottom: 22px;
 }
-.brand { color: var(--sl-cream); display: flex; flex-direction: column; }
+.brand {
+  color: var(--sl-cream);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+}
 .brand:hover { text-decoration: none; }
+.brand-logo {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  object-fit: contain;
+  display: block;
+}
+.brand-text { display: flex; flex-direction: column; }
 .brand-kicker {
   font-size: 11px; letter-spacing: 3px; opacity: .85; font-weight: 600;
 }
@@ -225,6 +239,7 @@ a:hover { text-decoration: underline; }
   padding: 1px 8px;
   border-radius: 10px;
   font-size: 11px;
+  white-space: nowrap;
   font-weight: 600;
   letter-spacing: 0.2px;
   margin: 0 3px 2px 0;
@@ -357,6 +372,365 @@ a:hover { text-decoration: underline; }
   background: var(--sl-red);
   border-color: var(--sl-red);
   color: #fff !important;
+}
+
+/* ---------- Lien auteur (Questions) ---------------------------------- */
+.auteur-link {
+  color: var(--sl-blue);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  font-weight: 500;
+}
+.auteur-link:hover {
+  color: var(--sl-red);
+  text-decoration-style: solid;
+}
+.auteur-line {
+  margin: 2px 0 14px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.auteur-line .auteur-link,
+.auteur-line .auteur-name {
+  color: var(--sl-blue);
+  font-weight: 600;
+}
+.auteur-groupe {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+  margin-left: 4px;
+}
+
+/* ---------- Pagination inline (listings) ----------------------------- */
+.pagination-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 22px 0 6px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.pagination-inline a,
+.pagination-inline span {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--sl-blue);
+}
+.pagination-inline a:hover {
+  background: var(--sl-blue);
+  color: #fff;
+}
+.pagination-inline .pg-num {
+  min-width: 28px;
+  text-align: center;
+}
+.pagination-inline .pg-current {
+  background: var(--sl-red);
+  color: #fff;
+  font-weight: 700;
+}
+.pagination-inline .pg-disabled {
+  color: #b8bcc8;
+}
+.pagination-inline .pg-gap {
+  color: var(--muted);
+  padding: 4px 2px;
+}
+.pagination-inline .pg-info {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+@media (max-width: 640px) {
+  .pagination-inline .pg-info { display: none; }
+}
+
+/* ---------- Accueil : layout 2 colonnes (main + agenda latéral) -------- */
+.home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 28px;
+  align-items: start;
+  margin-top: 10px;
+}
+.home-main { min-width: 0; }
+.home-side {
+  position: sticky;
+  top: 16px;
+}
+.side-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px 12px;
+}
+.side-title {
+  margin: 0;
+  color: var(--sl-blue);
+  font-family: var(--font-title);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+}
+.side-caption {
+  margin: 2px 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+.side-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.side-item {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.side-item:last-child { border-bottom: 0; }
+.side-date time {
+  display: inline-block;
+  background: var(--sl-blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 0;
+  width: 100%;
+  text-align: center;
+  border-radius: 4px;
+}
+.side-body {
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--fg);
+}
+.side-body .chamber {
+  margin-right: 5px;
+  font-size: 10px;
+  padding: 1px 6px;
+}
+.side-title-link { color: var(--sl-blue); }
+.side-title-link:hover { color: var(--sl-red); }
+.side-title-text { color: var(--fg); }
+.side-more {
+  margin: 10px 0 0;
+  text-align: right;
+  font-size: 12px;
+}
+.side-more a { color: var(--sl-blue); font-weight: 600; }
+.side-more a:hover { color: var(--sl-red); }
+.side-empty {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 13px;
+  margin: 6px 0;
+}
+
+@media (max-width: 900px) {
+  .home-grid {
+    grid-template-columns: 1fr;
+  }
+  .home-side {
+    position: static;
+  }
+}
+
+/* ---------- Accueil : thématiques repliables -------------------------- */
+.cat-fold {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin: 10px 0;
+  padding: 0;
+}
+.cat-fold > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 16px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-family: var(--font-title);
+}
+.cat-fold > summary::-webkit-details-marker { display: none; }
+.cat-fold > summary::before {
+  content: "▸";
+  color: var(--sl-red);
+  font-size: 14px;
+  transition: transform .15s;
+  display: inline-block;
+}
+.cat-fold[open] > summary::before {
+  transform: rotate(90deg);
+}
+.cat-label {
+  font-weight: 800;
+  font-size: 17px;
+  color: var(--sl-blue);
+}
+.cat-count {
+  background: var(--sl-red);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 12px;
+  font-family: var(--font);
+  letter-spacing: 0.3px;
+}
+.cat-window {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--font);
+  font-style: italic;
+}
+.cat-all {
+  margin-left: auto;
+  font-size: 12px;
+  font-family: var(--font);
+  color: var(--sl-blue);
+  text-decoration: none;
+  font-weight: 600;
+}
+.cat-all:hover { color: var(--sl-red); }
+.cat-fold > ul,
+.cat-fold > p {
+  padding: 0 18px 14px 18px;
+  margin: 0;
+}
+
+/* ---------- Accueil : section Dernières 24 h (compact, sans tags) --------- */
+.recent-24 ul,
+.recent-24 > ul {
+  margin: 0;
+  padding-left: 20px;
+}
+.recent-24 ul li {
+  padding: 5px 0;
+  margin: 0;
+  border-bottom: 1px dashed var(--line);
+  line-height: 1.4;
+}
+.recent-24 ul li:last-child { border-bottom: 0; }
+.recent-24 .kw-tag { display: none; }
+.recent-24 .snippet-inline { display: none; }
+
+/* ---------- Dossier législatif : timeline procédurale --------------------- */
+.dosleg-timeline {
+  margin: 24px 0 28px;
+  padding: 20px 22px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.dosleg-timeline h2 {
+  margin: 0 0 4px 0;
+  color: var(--sl-blue);
+  font-size: 18px;
+}
+.dosleg-timeline .timeline-caption {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 18px 0;
+}
+.timeline {
+  list-style: none;
+  padding: 0 0 0 22px;
+  margin: 0;
+  position: relative;
+  border-left: 2px solid var(--line);
+}
+.timeline-step {
+  position: relative;
+  padding: 0 0 18px 16px;
+}
+.timeline-step:last-child { padding-bottom: 0; }
+.timeline-marker {
+  position: absolute;
+  left: -27px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--sl-blue);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px var(--sl-blue);
+}
+.timeline-step[data-institution="Sénat"] .timeline-marker {
+  background: var(--sl-red);
+  box-shadow: 0 0 0 2px var(--sl-red);
+}
+.timeline-step--promulgation .timeline-marker {
+  background: var(--sl-green);
+  box-shadow: 0 0 0 2px var(--sl-green);
+  width: 14px;
+  height: 14px;
+  top: 3px;
+  left: -28px;
+}
+.timeline-step--promulgation {
+  background: rgba(102,162,102,0.08);
+  border-radius: 6px;
+  padding: 6px 10px 8px 16px;
+}
+.timeline-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.timeline-date {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--sl-blue);
+}
+.timeline-inst {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  background: var(--sl-blue);
+  color: #fff;
+}
+.timeline-inst[data-inst="Sénat"] { background: var(--sl-red); }
+.timeline-inst[data-inst="CMP"]   { background: #7b5ea0; }
+.timeline-inst[data-inst="JORF"]  { background: var(--sl-green); }
+.timeline-stage {
+  font-style: italic;
+  color: var(--muted);
+}
+.timeline-lib {
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.timeline-step--promulgation .timeline-lib {
+  font-weight: 700;
+  color: #2c5f2c;
+}
+.timeline-code {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #8891a3;
+  font-family: "SFMono-Regular", "Menlo", Consolas, monospace;
+  letter-spacing: 0.2px;
 }
 
 /* ---------- Footer -------------------------------------------------------- */

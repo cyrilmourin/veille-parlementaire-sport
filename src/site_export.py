@@ -217,6 +217,27 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
             encoding="utf-8",
         )
 
+    # Sidebar agenda : 8 prochains rendez-vous (futurs ou du jour),
+    # consommés par layouts/index.html pour afficher un module latéral.
+    # On repart de by_cat["agenda"] déjà constitué et on filtre sur les
+    # dates à venir. Si rien dans le futur (collecte en retard), on retombe
+    # sur les 8 items les plus récents pour garder le module alimenté.
+    today_iso = datetime.utcnow().date().isoformat()
+    agenda_rows = by_cat.get("agenda", [])
+    upcoming = sorted(
+        [r for r in agenda_rows if (r.get("published_at") or "")[:10] >= today_iso],
+        key=lambda r: (r.get("published_at") or ""),
+    )
+    if not upcoming:
+        # Fallback : 8 plus récents (tous dans le passé mais mieux que vide).
+        upcoming = _sort_by_date_desc(agenda_rows)[:8]
+    else:
+        upcoming = upcoming[:8]
+    (data / "sidebar_agenda.json").write_text(
+        json.dumps(upcoming, ensure_ascii=False, indent=2, default=str),
+        encoding="utf-8",
+    )
+
     # Page d'accueil
     recent = _recent(rows, hours=RECENT_HOURS)
     _write_home(content, rows, by_cat, recent)
@@ -253,7 +274,7 @@ def _recent(rows: list[dict], hours: int = 24) -> list[dict]:
 
 # ---------- écritures Markdown ---------------------------------------------
 
-def _fmt_item_line(it: dict) -> str:
+def _fmt_item_line(it: dict, with_tags: bool = True) -> str:
     """Ligne Markdown d'un item (home / catégorie). Layout :
 
     - **[Titre](url)** <span class="chamber" data-chamber="AN">AN</span> · Date · tags inline
@@ -262,6 +283,10 @@ def _fmt_item_line(it: dict) -> str:
     Si url est vide (typiquement catégorie agenda, cf. `_normalize_agenda`),
     le titre est rendu en texte simple, sans lien cliquable — alignement
     sur Follaw qui affiche les réunions sans hypertexte.
+
+    `with_tags=False` : n'affiche pas les mots-clés. Utilisé par la section
+    "Dernières 24 h" pour ne garder que titre + chambre + date (demande
+    utilisateur : zone très compacte, les tags encombrent).
     """
     date = (it.get("published_at") or "")[:10]
     title = (it.get("title") or "").replace("\n", " ").strip()
@@ -309,7 +334,7 @@ def _fmt_item_line(it: dict) -> str:
     # Mots-clés : inline (pas de retour à la ligne), sur la même ligne que
     # la meta. Coloration via CSS .kw-tag[data-family=...].
     tags_html = ""
-    if kws:
+    if kws and with_tags:
         tags_html = " ".join(
             f'<span class="kw-tag" data-family="{_escape(dominant_fam)}">'
             f'{_escape(k)}</span>'
@@ -361,16 +386,26 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
     ]
 
     # -------- Section top : mises à jour des dernières 24 h ----------
+    # Bloc compact (padding réduit, pas de tags) — cf. demande utilisateur
+    # pour densifier le haut de page. Les tags restent dans les sections
+    # par thématique en dessous, qui servent à la lecture exploratoire.
     lines.append(f"## Dernières 24 h ({len(recent)})")
+    lines.append("")
+    lines.append('<div class="recent-24">')
     lines.append("")
     if recent:
         for it in recent[:30]:
-            lines.append(_fmt_item_line(it))
+            lines.append(_fmt_item_line(it, with_tags=False))
     else:
         lines.append("_Aucune nouveauté dans les dernières 24 heures — la collecte reste active._")
     lines.append("")
+    lines.append("</div>")
+    lines.append("")
 
     # -------- Sections par catégorie (fenêtre par catégorie) ----------
+    # Chaque thématique est rendue dans un <details> repliable, avec le
+    # compteur dans le summary. Demande utilisateur : la page d'accueil
+    # doit tenir en un coup d'œil, l'utilisateur déplie ce qui l'intéresse.
     lines.append("## Par thématique")
     lines.append("")
     for cat in CATEGORY_ORDER:
@@ -380,14 +415,26 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         window = _window_for(cat)
         # Tri explicite du bucket par date desc (plus récent en haut)
         bucket = _sort_by_date_desc(by_cat[cat])
-        # Lien vers la page catégorie pour consultation exhaustive
-        lines.append(f"### [{label}](/items/{cat}/) ({len(bucket)}) — fenêtre {window} j")
+        count = len(bucket)
+        # <details> HTML brut — rendu nativement par tous les navigateurs,
+        # pas de JS. `open` n'est PAS positionné par défaut → tout est plié.
+        # Le summary contient le compteur et la fenêtre.
+        lines.append(f'<details class="cat-fold" data-cat="{_escape(cat)}">')
+        lines.append(
+            f'<summary><span class="cat-label">{_escape(label)}</span>'
+            f' <span class="cat-count">{count}</span>'
+            f' <span class="cat-window">fenêtre {window} j</span>'
+            f' <a class="cat-all" href="/items/{cat}/">voir tout →</a>'
+            f'</summary>'
+        )
         lines.append("")
         for it in bucket[:10]:
             lines.append(_fmt_item_line(it))
-        if len(bucket) > 10:
-            lines.append(f"")
-            lines.append(f"→ [Voir les {len(bucket)} {label.lower()}](/items/{cat}/)")
+        if count > 10:
+            lines.append("")
+            lines.append(f"→ [Voir les {count} {label.lower()}](/items/{cat}/)")
+        lines.append("")
+        lines.append("</details>")
         lines.append("")
 
     (content_dir / "_index.md").write_text("\n".join(lines), encoding="utf-8")
@@ -435,6 +482,11 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         raw = r.get("raw") or {}
         status_label = ""
         is_promulgated = False
+        actes_timeline: list[dict] = []
+        nb_actes_utiles = 0
+        auteur_label = ""
+        auteur_groupe = ""
+        auteur_url = ""
         if isinstance(raw, dict):
             status_label = (raw.get("status_label") or "").strip()
             is_promulgated = bool(raw.get("is_promulgated"))
@@ -444,6 +496,19 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
                 if status_label.startswith(prefix):
                     status_label = status_label[len(prefix):]
                     break
+            # Timeline des actes (dossiers législatifs) — exposée au layout
+            # `dossiers_legislatifs/single.html` pour rendre la maquette AN.
+            timeline = raw.get("actes_timeline")
+            if isinstance(timeline, list):
+                actes_timeline = [a for a in timeline if isinstance(a, dict)]
+            nb_actes_utiles = int(raw.get("nb_actes_utiles") or 0)
+            # Auteur (Questions) : label + groupe + URL fiche député AN/Sénat.
+            # Injecté par assemblee._normalize_question (auteur_url est construit
+            # depuis acteurRef si PAxxxx). Consommé par single.html / list.html
+            # pour rendre l'auteur cliquable vers la fiche député.
+            auteur_label = (raw.get("auteur") or "").strip()
+            auteur_groupe = (raw.get("groupe") or "").strip()
+            auteur_url = (raw.get("auteur_url") or "").strip()
         status_label = status_label.replace('"', "'")
 
         fm = [
@@ -462,6 +527,26 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
             f'snippet: "{snippet}"',
             f'status_label: "{status_label}"',
             f"is_promulgated: {str(is_promulgated).lower()}",
+        ]
+        if auteur_label:
+            fm.append(f'auteur: "{auteur_label.replace(chr(34), chr(39))}"')
+        if auteur_groupe:
+            fm.append(f'auteur_groupe: "{auteur_groupe.replace(chr(34), chr(39))}"')
+        if auteur_url:
+            fm.append(f'auteur_url: "{auteur_url}"')
+        # Frontmatter étendu pour les dossiers législatifs (timeline).
+        if cat == "dossiers_legislatifs" and actes_timeline:
+            fm.append(f"nb_actes_utiles: {nb_actes_utiles}")
+            fm.append("actes_timeline:")
+            for a in actes_timeline:
+                fm.append("  - date: \"" + str(a.get("date", ""))[:10] + "\"")
+                fm.append("    code: \"" + str(a.get("code", "")).replace('"', "'") + "\"")
+                fm.append("    libelle: \"" + str(a.get("libelle", "")).replace('"', "'") + "\"")
+                fm.append("    institution: \"" + str(a.get("institution", "")) + "\"")
+                fm.append("    stage: \"" + str(a.get("stage", "")) + "\"")
+                fm.append("    step: \"" + str(a.get("step", "")) + "\"")
+                fm.append("    is_promulgation: " + str(bool(a.get("is_promulgation"))).lower())
+        fm += [
             "---",
             "",
             (r.get("summary") or "").strip(),

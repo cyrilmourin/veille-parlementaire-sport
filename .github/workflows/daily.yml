@@ -71,7 +71,10 @@ jobs:
       # Le script est idempotent : il skippe s'il trouve un cache frais.
       # Le fichier JSON compact (~100 Ko) est committé à la fin du job pour
       # être disponible en dev local sans refetch du dump 80 Mo.
+      # `continue-on-error: true` → si l'AN open data est en panne, on
+      # continue avec le cache existant (le pipeline tolère son absence).
       - name: Refresh AMO cache (weekly)
+        continue-on-error: true
         run: |
           python -m scripts.refresh_amo_cache --max-age-days 7
 

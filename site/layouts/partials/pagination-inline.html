@@ -1,0 +1,51 @@
+{{/*
+  Pagination inline et compacte — remplace _internal/pagination.html de Hugo,
+  qui rend un <ul> vertical un peu lourd. Ici : une seule ligne
+  "< Préc · 1 2 [3] 4 5 · Suiv >".
+*/}}
+{{ $p := .Paginator }}
+{{ if gt $p.TotalPages 1 }}
+  <nav class="pagination-inline" aria-label="Pagination">
+    {{ if $p.HasPrev }}
+      <a class="pg-prev" href="{{ $p.Prev.URL }}" rel="prev">‹ Préc.</a>
+    {{ else }}
+      <span class="pg-prev pg-disabled">‹ Préc.</span>
+    {{ end }}
+
+    {{ $current := $p.PageNumber }}
+    {{ $total := $p.TotalPages }}
+    {{ $min := sub $current 2 }}
+    {{ if lt $min 1 }}{{ $min = 1 }}{{ end }}
+    {{ $max := add $current 2 }}
+    {{ if gt $max $total }}{{ $max = $total }}{{ end }}
+
+    {{ if gt $min 1 }}
+      <a class="pg-num" href="{{ (index $p.Pagers 0).URL }}">1</a>
+      {{ if gt $min 2 }}<span class="pg-gap">…</span>{{ end }}
+    {{ end }}
+
+    {{ range seq $min $max }}
+      {{ $idx := sub . 1 }}
+      {{ if eq . $current }}
+        <span class="pg-num pg-current" aria-current="page">{{ . }}</span>
+      {{ else }}
+        <a class="pg-num" href="{{ (index $p.Pagers $idx).URL }}">{{ . }}</a>
+      {{ end }}
+    {{ end }}
+
+    {{ if lt $max $total }}
+      {{ if lt $max (sub $total 1) }}<span class="pg-gap">…</span>{{ end }}
+      <a class="pg-num" href="{{ (index $p.Pagers (sub $total 1)).URL }}">{{ $total }}</a>
+    {{ end }}
+
+    {{ if $p.HasNext }}
+      <a class="pg-next" href="{{ $p.Next.URL }}" rel="next">Suiv. ›</a>
+    {{ else }}
+      <span class="pg-next pg-disabled">Suiv. ›</span>
+    {{ end }}
+
+    <span class="pg-info">
+      Page {{ $current }} / {{ $total }} · {{ $p.TotalNumberOfElements }} entrées
+    </span>
+  </nav>
+{{ end }}

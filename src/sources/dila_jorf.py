@@ -169,10 +169,19 @@ def fetch_source(src: dict) -> list[Item]:
                 continue
             seen.add(info["id"])
 
-            # Catégorisation : nomination si le titre le suggère
+            # Catégorisation : nomination si le titre le suggère.
+            # On élargit le pattern pour capter aussi : "portant nomination",
+            # "fin de fonctions", "renouvellement du mandat", "désignation",
+            # formulations courantes dans les décrets JORF sport.
             title_low = info["title"].lower()
             cat = src["category"]
-            if "nomination" in title_low or "nommé" in title_low or "désigné" in title_low:
+            _NOM_HINTS = (
+                "nomination", "nommé", "nommée",
+                "désigné", "désignée", "désignation",
+                "cessation de fonctions", "fin de fonctions",
+                "renouvellement du mandat", "renouvellement de mandat",
+            )
+            if any(h in title_low for h in _NOM_HINTS):
                 cat = "nominations"
 
             out.append(Item(

@@ -54,28 +54,48 @@ class KeywordMatcher:
                 families.add(fam)
         return sorted(set(matched)), sorted(families)
 
-    def build_snippet(self, original_text: str, window: int = 80) -> str:
-        """Extrait ~window chars de part et d'autre du 1er mot-clé trouvé
-        dans le texte ORIGINAL (avec accents / casse) — utilisé pour la
-        page d'accueil du site et le digest email."""
+    def build_snippet(self, original_text: str, window: int = 80,
+                      max_len: int = 320) -> str:
+        """Extrait une phrase contenant le 1er mot-clé trouvé.
+
+        On repart d'une fenêtre brute ~`window` chars de part et d'autre
+        du match, puis on étend aux bornes de phrase les plus proches
+        (`. `, `! `, `? `, `\\n`) pour produire un extrait lisible plutôt
+        qu'une troncation arbitraire. Cap à `max_len` pour éviter les
+        paragraphes entiers.
+        """
         if not original_text:
             return ""
         haystack_norm = _normalize(original_text)
         m = self._pattern.search(haystack_norm)
         if not m:
-            # Aucun mot-clé trouvé : renvoyer les premiers N chars
             return original_text.strip()[: 2 * window].strip()
-        # Position approximative du match dans le texte original :
-        # on se base sur la position dans la version normalisée,
-        # qui est alignée char-for-char pour la plupart des cas
-        # (unidecode conserve la taille sauf exceptions rares).
         pos = m.start()
         end = m.end()
+        # Fenêtre initiale large
         start_cut = max(0, pos - window)
         end_cut = min(len(original_text), end + window)
+
+        # Étend start_cut en arrière jusqu'à la dernière borne de phrase
+        # (on ne dépasse pas pos - max_len/2 pour garder le contexte proche).
+        back_limit = max(0, pos - max_len // 2)
+        for boundary in re.finditer(r"[\.\!\?\n]\s+", original_text[back_limit:pos]):
+            # On garde la dernière occurrence avant pos → on met à jour à chaque itération
+            start_cut = back_limit + boundary.end()
+
+        # Étend end_cut en avant jusqu'à la prochaine borne de phrase
+        # (cap à end + max_len/2 pour éviter d'engloutir tout le texte).
+        fwd_limit = min(len(original_text), end + max_len // 2)
+        fwd_match = re.search(r"[\.\!\?](?:\s|$)", original_text[end:fwd_limit])
+        if fwd_match:
+            end_cut = end + fwd_match.end()
+
         snippet = original_text[start_cut:end_cut].strip()
+        # Cap final (au cas où une phrase gigantesque)
+        if len(snippet) > max_len:
+            snippet = snippet[:max_len].rstrip() + "…"
         prefix = "…" if start_cut > 0 else ""
-        suffix = "…" if end_cut < len(original_text) else ""
+        suffix = "…" if end_cut < len(original_text) and not snippet.endswith(("…", ".", "!", "?")) else ""
         return (prefix + snippet + suffix).replace("\n", " ").strip()
 
     def apply(self, items: Iterable):

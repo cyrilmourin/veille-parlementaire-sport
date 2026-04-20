@@ -1,0 +1,72 @@
+{{ define "main" }}
+{{/*
+  Layout dédié aux dossiers législatifs — rend la procédure sous forme
+  de timeline verticale, inspirée de la page dossier de l'Assemblée nationale.
+  Consomme .Params.actes_timeline (injecté par src/site_export.py depuis le
+  champ raw["actes_timeline"] produit par _normalize_dosleg).
+*/}}
+<article class="item dosleg">
+  <nav class="breadcrumb">
+    <a href="/">Accueil</a> &rsaquo;
+    <a href="/items/dossiers_legislatifs/">Dossiers législatifs</a>
+  </nav>
+  <h1>{{ .Title }}</h1>
+  <p class="meta">
+    {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
+    {{ with .Params.status_label }}
+      · <span class="status{{ if $.Params.is_promulgated }} status-promulgated{{ end }}">{{ . }}</span>
+    {{ end }}
+    {{ if not .Date.IsZero }}
+      · <time datetime="{{ .Date.Format "2006-01-02" }}">
+        Dernière étape : {{ .Date.Format "02/01/2006" }}
+      </time>
+    {{ end }}
+  </p>
+
+  {{ with .Params.keywords }}
+    <div class="kw-list">
+      {{ range . }}<span class="kw-tag">{{ . }}</span>{{ end }}
+    </div>
+  {{ end }}
+
+  {{ with .Params.snippet }}
+    <blockquote class="snippet">« {{ . }} »</blockquote>
+  {{ end }}
+
+  {{ with .Params.actes_timeline }}
+    <section class="dosleg-timeline">
+      <h2>Procédure parlementaire</h2>
+      <p class="timeline-caption">
+        {{ len . }} étape{{ if gt (len .) 1 }}s{{ end }} enregistrée{{ if gt (len .) 1 }}s{{ end }}
+        {{ with $.Params.nb_actes_utiles }} · {{ . }} acte{{ if gt . 1 }}s{{ end }} utile{{ if gt . 1 }}s{{ end }} identifié{{ if gt . 1 }}s{{ end }}{{ end }}.
+      </p>
+      <ol class="timeline">
+        {{ range . }}
+          <li class="timeline-step{{ if .is_promulgation }} timeline-step--promulgation{{ end }}"
+              data-institution="{{ .institution }}"
+              data-stage="{{ .stage }}">
+            <div class="timeline-marker" aria-hidden="true"></div>
+            <div class="timeline-body">
+              <div class="timeline-head">
+                {{ with .date }}<time class="timeline-date" datetime="{{ . }}">{{ . }}</time>{{ end }}
+                {{ with .institution }}<span class="timeline-inst" data-inst="{{ . }}">{{ . }}</span>{{ end }}
+                {{ with .stage }}<span class="timeline-stage">{{ . }}</span>{{ end }}
+              </div>
+              <div class="timeline-lib">
+                {{ with .libelle }}{{ . }}{{ else }}{{ .code }}{{ end }}
+              </div>
+              {{ with .code }}<div class="timeline-code">{{ . }}</div>{{ end }}
+            </div>
+          </li>
+        {{ end }}
+      </ol>
+    </section>
+  {{ end }}
+
+  <div class="content">{{ .Content }}</div>
+
+  {{ with .Params.source_url }}
+    <p><a class="btn" href="{{ . }}" rel="noopener" target="_blank">Consulter le dossier officiel &rarr;</a></p>
+  {{ end }}
+</article>
+{{ end }}

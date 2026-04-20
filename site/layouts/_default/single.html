@@ -10,6 +10,18 @@
     {{ with .Params.source }}<span class="source">{{ . }}</span>{{ end }}
   </p>
 
+  {{ if .Params.auteur }}
+    <p class="auteur-line">
+      Par
+      {{ if .Params.auteur_url }}
+        <a class="auteur-link" href="{{ .Params.auteur_url }}" rel="noopener" target="_blank">{{ .Params.auteur }}</a>
+      {{ else }}
+        <span class="auteur-name">{{ .Params.auteur }}</span>
+      {{ end }}
+      {{ with .Params.auteur_groupe }} <span class="auteur-groupe">({{ . }})</span>{{ end }}
+    </p>
+  {{ end }}
+
   {{ with .Params.keywords }}
     <div class="kw-list">
       {{ range . }}<span class="kw-tag">{{ . }}</span>{{ end }}

@@ -59,16 +59,20 @@ except ImportError:  # pragma: no cover
 
 log = logging.getLogger("refresh_amo_cache")
 
+# Dump historique unique : couvre toutes les législatures depuis la XIe (1997)
+# jusqu'à aujourd'hui (donc la XVIIe incluse). Publié sous le path /15/ pour
+# raisons historiques — c'est l'URL référencée par la FAQ AN open data.
 AMO_URL = (
     "https://data.assemblee-nationale.fr/static/openData/repository/"
-    "17/amo/tous_acteurs_mandats_organes_historique/"
+    "15/amo/tous_acteurs_mandats_organes_xi_legislature/"
     "AMO30_tous_acteurs_tous_mandats_tous_organes_historique.json.zip"
 )
-# URL de fallback (législature XVI archivée si la XVII disparaît temporairement)
+# Miroir communautaire (Tricoteuses) en dernier recours — mêmes données,
+# nettoyées et versionnées sur framagit. Utile si l'AN est en panne.
 AMO_URL_FALLBACK = (
-    "https://data.assemblee-nationale.fr/static/openData/repository/"
-    "16/amo/tous_acteurs_mandats_organes_historique/"
-    "AMO30_tous_acteurs_tous_mandats_tous_organes_historique.json.zip"
+    "https://framagit.org/tricoteuses/open-data-assemblee-nationale/"
+    "AMO30_tous_acteurs_tous_mandats_tous_organes_historique/-/archive/"
+    "master/AMO30_tous_acteurs_tous_mandats_tous_organes_historique-master.zip"
 )
 
 USER_AGENT = (
@@ -150,22 +154,40 @@ def _iter_records(obj: Any, key: str) -> Iterable[dict]:
 # ---------------------------------------------------------------------------
 
 
-def download_amo(url: str = AMO_URL, timeout: float = 300.0) -> bytes:
-    """Télécharge le zip AMO (~80 Mo). Retries gérés par httpx."""
+def download_amo(url: str = AMO_URL, timeout: float = 300.0,
+                 _tried_fallback: bool = False) -> bytes | None:
+    """Télécharge le zip AMO (~80 Mo).
+
+    Retourne `None` (au lieu de lever) en cas d'erreur HTTP/réseau — le
+    caller traite l'absence de dump comme un WARN non bloquant afin que
+    le pipeline continue avec le cache existant.
+    """
     if httpx is None:
-        raise RuntimeError("httpx non installé (pip install httpx)")
+        log.error("httpx non installé (pip install httpx)")
+        return None
     log.info("GET %s", url)
-    with httpx.Client(timeout=timeout, follow_redirects=True,
-                      headers={"User-Agent": USER_AGENT,
-                               "Accept": "application/zip, */*",
-                               "From": "veille@sideline-conseil.fr"}) as c:
-        r = c.get(url)
-        if r.status_code == 404 and url == AMO_URL:
-            log.warning("404 sur XVIIe, fallback XVIe")
-            return download_amo(AMO_URL_FALLBACK, timeout=timeout)
-        r.raise_for_status()
-        log.info("Téléchargé %.1f Mo", len(r.content) / 1024 / 1024)
-        return r.content
+    try:
+        with httpx.Client(timeout=timeout, follow_redirects=True,
+                          headers={"User-Agent": USER_AGENT,
+                                   "Accept": "application/zip, */*",
+                                   "From": "veille@sideline-conseil.fr"}) as c:
+            r = c.get(url)
+            if r.status_code >= 400:
+                log.warning("HTTP %d sur %s", r.status_code, url)
+                if not _tried_fallback and url != AMO_URL_FALLBACK:
+                    log.info("Tentative fallback : %s", AMO_URL_FALLBACK)
+                    return download_amo(AMO_URL_FALLBACK, timeout=timeout,
+                                        _tried_fallback=True)
+                return None
+            log.info("Téléchargé %.1f Mo", len(r.content) / 1024 / 1024)
+            return r.content
+    except (httpx.HTTPError, OSError) as exc:
+        log.warning("Échec téléchargement AMO (%s) : %s", url, exc)
+        if not _tried_fallback and url != AMO_URL_FALLBACK:
+            log.info("Tentative fallback : %s", AMO_URL_FALLBACK)
+            return download_amo(AMO_URL_FALLBACK, timeout=timeout,
+                                _tried_fallback=True)
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -453,8 +475,21 @@ def main(argv: list[str] | None = None) -> int:
     payload = download_amo(args.url)
     log.info("Download %.1fs", time.monotonic() - t0)
 
+    if payload is None:
+        if args.output.exists():
+            log.warning("Échec refresh AMO — cache existant conservé (%s)",
+                        args.output)
+        else:
+            log.warning("Échec refresh AMO — aucun cache local ; "
+                        "le pipeline fallback sur libellés PAxxx/POxxx bruts")
+        return 0
+
     t0 = time.monotonic()
-    result = parse_zip(payload)
+    try:
+        result = parse_zip(payload)
+    except Exception as exc:
+        log.error("Parse zip AMO a échoué : %s — cache existant conservé", exc)
+        return 0
     log.info("Parse %.1fs", time.monotonic() - t0)
 
     tmp = args.output.with_suffix(".tmp.json")

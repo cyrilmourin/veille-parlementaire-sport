@@ -120,6 +120,36 @@ def _all_text(node) -> str:
     return " ".join(bits)
 
 
+# Patterns de bruit techniques à retirer du shotgun agenda avant affichage.
+# Gardés hors fonction pour compilation unique.
+_AGENDA_NOISE_PATTERNS = [
+    re.compile(r"\bPA\d{5,7}\b(?:\s+(?:absent|pr[ée]sent|excus[ée]))?"),
+    re.compile(r"\bPO\d{5,7}\b"),
+    re.compile(r"\b(?:RUANR|SLAN|PRANR|SEANR|TAANR)\w+\b"),  # UIDs réunions/salles/séances AN
+    re.compile(r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?\b"),
+    re.compile(r"https?://\S+"),
+    re.compile(r"\b\w+_type\b"),  # xsi:type markers (reunionCommission_type, etc.)
+    re.compile(r"\b(?:true|false)\b", re.IGNORECASE),
+]
+
+
+def _clean_agenda_shotgun(text: str) -> str:
+    """Filtre le shotgun agenda pour ne garder que le contenu sémantique.
+
+    Retire les listes de présence (PAxxxxxx absent…), les UIDs techniques,
+    timestamps, URIs et marqueurs de schéma. Garde les titres d'ODJ,
+    noms de personnes entendues et thèmes — utiles pour l'extrait phrase
+    et pour le matching mots-clés.
+    """
+    if not text:
+        return ""
+    for pat in _AGENDA_NOISE_PATTERNS:
+        text = pat.sub(" ", text)
+    # Collapse espaces + retire tokens d'une lettre orphelins
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
 def _deep_find(node, *key_names: str):
     """Walk un JSON (dicts et listes) et renvoie la première valeur dont la
     clé terminale correspond à `key_names` (match exact, premier en priorité).
@@ -676,6 +706,10 @@ def _normalize_dosleg(obj, src, cat):
     has_promulgation = False
     nb_actes_utiles = 0
     nb_actes_total = 0
+    # Timeline complète des actes utiles — sert à la maquette "façon AN"
+    # sur /items/dossiers_legislatifs/<slug>/ (affichage chronologique
+    # des étapes procédurales avec leurs dates).
+    actes_timeline: list[dict] = []
     if isinstance(chrono, (dict, list)):
         for acte in _iter_actes(chrono):
             nb_actes_total += 1
@@ -693,11 +727,23 @@ def _normalize_dosleg(obj, src, cat):
             if mapping["ignored"]:
                 continue
             nb_actes_utiles += 1
+            libelle_acte = str(acte.get("libelleActe") or "")[:180]
+            actes_timeline.append({
+                "date": dt.date().isoformat(),
+                "code": code,
+                "libelle": libelle_acte,
+                "institution": mapping.get("institution", ""),
+                "stage": mapping.get("stage", ""),
+                "step": mapping.get("step", ""),
+                "is_promulgation": bool(mapping.get("is_promulgation")),
+            })
             if last_date is None or dt > last_date:
                 last_date = dt
                 last_mapping = mapping
                 last_code = code
-                last_libelle = str(acte.get("libelleActe") or "")[:120]
+                last_libelle = libelle_acte[:120]
+    # Tri chronologique ascendant (dépôt → promulgation, comme la page AN).
+    actes_timeline.sort(key=lambda a: a["date"])
 
     # Si on n'a aucun acte utile, le dossier n'a pas de "statut" exploitable
     # (typiquement : AN20-/AN21- purs, ou dossiers vides). On l'écarte.
@@ -740,6 +786,9 @@ def _normalize_dosleg(obj, src, cat):
             "stage": last_mapping.get("stage", ""),
             "step": last_mapping.get("step", ""),
             "is_promulgated": has_promulgation,
+            # Timeline pour la maquette AN-like — borner à 40 étapes pour
+            # garder le JSON raisonnable (certains dossiers ont 70+ actes).
+            "actes_timeline": actes_timeline[-40:],
         },
     )
 
@@ -839,13 +888,15 @@ def _normalize_question(obj, src, cat):
                                  default=""))
 
     # Construction du titre :
-    # "Question écrite n°9711 — Mme Hervieu (Groupe) → Min. Sports : <sujet>"
+    # "Question écrite · 12/04/2026 — Mme Hervieu (LFI-NFP) : sport santé"
+    # Choix demandé par l'utilisateur : nature + date + auteur (+groupe) +
+    # sujet, SANS ministère (l'info ministère reste dans le summary pour le
+    # matching et la consultation détaillée).
     sujet_court = (rubrique or tete_analyse or analyse).strip()
     if not sujet_court:
         sujet_court = _first_sentence(texte, max_len=100)
     sujet_court = sujet_court or "Question"
     m_uid = _Q_UID_RE.search(uid)
-    numero_court = m_uid.group(3) if m_uid else uid
     qtype_label = {
         "QE": "Question écrite",
         "QG": "Question au gouvernement",
@@ -854,11 +905,19 @@ def _normalize_question(obj, src, cat):
         "QM": "Question au ministre",
     }.get((m_uid.group(2).upper() if m_uid else ""), "Question")
 
-    title_bits = [f"{qtype_label} n°{numero_court}", f"— {auteur_label}"]
+    date_label = ""
+    if date_pub:
+        try:
+            date_label = date_pub.strftime("%d/%m/%Y")
+        except Exception:
+            date_label = ""
+
+    title_bits = [qtype_label]
+    if date_label:
+        title_bits.append(f"· {date_label}")
+    title_bits.append(f"— {auteur_label}")
     if auteur_groupe:
         title_bits.append(f"({auteur_groupe})")
-    if ministere:
-        title_bits.append(f"→ {ministere}")
     title_bits.append(f": {sujet_court}")
     title = " ".join(title_bits)[:220]
 
@@ -874,6 +933,12 @@ def _normalize_question(obj, src, cat):
     ]
     summary = " — ".join(p for p in summary_parts if p).strip()[:2000]
 
+    # URL fiche député AN — format moderne dyn/ (redirect automatique
+    # vers l'ancienne fiche si archivée). Seulement si acteurRef = PAxxx.
+    auteur_url = ""
+    if auteur_ref and auteur_ref.startswith("PA") and auteur_ref[2:].isdigit():
+        auteur_url = f"https://www.assemblee-nationale.fr/dyn/deputes/{auteur_ref}"
+
     yield Item(
         source_id=src["id"],
         uid=uid,
@@ -885,6 +950,7 @@ def _normalize_question(obj, src, cat):
         summary=summary,
         raw={"auteur_ref": auteur_ref, "auteur": auteur_label,
              "groupe": auteur_groupe, "ministere": ministere,
+             "auteur_url": auteur_url,
              "path": "assemblee:question"},
     )
 
@@ -1115,7 +1181,15 @@ def _normalize_agenda(obj, src, cat):
     # --- URL stable
     url = _agenda_url(uid, xsi_type, dt, cr_ref)
 
-    # --- SUMMARY : structuré + shotgun pour alimenter le matcher.
+    # --- SUMMARY : structuré + shotgun NETTOYÉ pour alimenter le matcher.
+    # On filtre du shotgun :
+    #   - les listes de présence (PAxxxxxx absent/présent → des dizaines)
+    #   - les UID techniques (PAxxxx, POxxxx, RUANR…, SLAN…)
+    #   - les timestamps ISO et URIs schema
+    #   - les booléens isolés ("false true true")
+    #   - les marqueurs xsi:type (`*_type`)
+    # Pour ne garder que le contenu sémantique (titres ODJ, auditions,
+    # personnes entendues, thèmes), exploitable comme extrait phrase.
     organe_display = (f"{organe_label} ({organe_ref})" if organe_label and organe_ref
                        else organe_label or organe_ref)
     structured = " — ".join(p for p in [
@@ -1123,8 +1197,15 @@ def _normalize_agenda(obj, src, cat):
         f"Lieu : {lieu}" if lieu else "",
         " · ".join(titles[:5]) if titles else "",
     ] if p)
-    shotgun = _all_text(root)
-    summary = (structured + " — " + shotgun if structured else shotgun)[:2000]
+    shotgun_clean = _clean_agenda_shotgun(_all_text(root))
+    summary = (structured + " — " + shotgun_clean if structured else shotgun_clean)[:2000]
+
+    # --- GUARD : on ne garde pas une réunion sans aucune info utile.
+    # Cas observé : l'XML contient juste l'UID + le rattachement organe,
+    # sans titre ni ODJ — produit un item "Réunion" vide qui pollue le site.
+    if title in ("Réunion", "Réunion de commission") and not titles and not organe_label:
+        log.debug("Agenda %s : skip réunion sans titre ni organe", uid)
+        return
 
     yield Item(
         source_id=src["id"],

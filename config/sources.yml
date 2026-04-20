@@ -16,7 +16,9 @@ assemblee_nationale:
 
     - id: an_amendements
       category: amendements
-      url: https://data.assemblee-nationale.fr/static/openData/repository/17/loi/amendements_div_legis/Amendements.json.zip
+      # Path officiel AN FAQ : /loi/amendements_legis/Amendements.json.zip
+      # (l'ancien "amendements_div_legis" renvoyait 404 — typo historique).
+      url: https://data.assemblee-nationale.fr/static/openData/repository/17/loi/amendements_legis/Amendements.json.zip
       format: json_zip
       since_days: 30      # fenêtre (sinon 104k amendements rechargés à chaque run)
 
