@@ -146,6 +146,12 @@ def fetch_source(src: dict) -> list[Item]:
             # XML si la source n'est pas configurée.
             from .senat_akn import fetch_akn_index
             return fetch_akn_index(src)
+        if fmt == "akn_discussion":
+            # Amendements per-texte : itère depots.xml et fetche les CSV
+            # `jeu_complet_<session>_<num>.csv` (séance + commission). Le
+            # dump bulk ameli.zip est un dump PostgreSQL, non exploitable.
+            from .senat_amendements import fetch_source as fetch_amdt_per_texte
+            return fetch_amdt_per_texte(src)
     except Exception as e:
         log.exception("Sénat %s KO: %s", sid, e)
     return []

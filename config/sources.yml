@@ -103,10 +103,30 @@ senat:
       url: https://data.senat.fr/data/dosleg/promulguees.csv
       format: csv
 
+    # senat_ameli.zip = dump PostgreSQL plain (un seul fichier
+    # var/opt/opendata/ameli.sql de 149 Mo), pas un zip de CSV. Le loader
+    # csv_zip filtre sur .csv ligne 133 → 0 item systémique depuis des
+    # mois. Remplacé par `senat_amendements` ci-dessous qui itère les
+    # textes récents et fetche les CSV unitaires `jeu_complet_*.csv`
+    # exposés par le Sénat (doc officielle data.senat.fr/ameli/).
+    # Conservé en config (enabled: false) pour mémoire.
     - id: senat_ameli
       category: amendements
       url: https://data.senat.fr/data/ameli/ameli.zip
       format: csv_zip
+      enabled: false
+
+    # Amendements per-texte : itère depots.xml + adoptions.xml pour
+    # récupérer session+num, puis fetche les CSV jeu_complet séance +
+    # commission exposés en temps réel. Enrichit chaque amendement avec
+    # le titre du dossier parent (logique R11b côté Sénat) pour que le
+    # matcher retombe sur le thème même quand l'amendement lui-même ne
+    # cite pas les mots-clés littéralement.
+    - id: senat_amendements
+      category: amendements
+      url: https://www.senat.fr/akomantoso/depots.xml
+      format: akn_discussion
+      since_days: 90
 
     - id: senat_questions
       category: questions

@@ -488,6 +488,18 @@ def fetch_source(src: dict) -> list[Item]:
             src["id"], filtered_by_content, since.date().isoformat(),
         )
     log.info("%s : %d items (sur %d fichiers JSON)", src["id"], len(items), file_count)
+
+    # R11b — Flush du cache `texteLegislatifRef → dossier_title` après la
+    # passe dossiers. Le fichier écrit sera lu par `_normalize_amendement`
+    # via `amo_loader.resolve_texte_dossier`. On purge ensuite l'accumulateur
+    # pour que les runs suivants (tests, multi-fetch) repartent propres.
+    if src["id"] == "an_dossiers_legislatifs" and _TEXTE_TO_DOSSIER_ACCUM:
+        try:
+            amo_loader.write_texte_dossier_cache(_TEXTE_TO_DOSSIER_ACCUM)
+        except Exception as e:
+            log.warning("Flush cache texte→dossier KO : %s", e)
+        _TEXTE_TO_DOSSIER_ACCUM.clear()
+
     return items
 
 
@@ -561,30 +573,39 @@ def _normalize_amendement(obj, src, cat):
     root = obj.get("amendement") if isinstance(obj, dict) else None
     if not root:
         return
-    uid = _first(root, "identifiant.numero", "uid", default=None)
-    if not uid:
+    # Numéro court d'amendement (ex : "233") — validé sur JSON unitaire AN
+    # `/dyn/opendata/<uid>.json`, avril 2026. La clé réelle du JSON AN est
+    # `identification` (ex: {numeroLong, numeroOrdreDepot, numeroRect,
+    # prefixeOrganeExamen}), pas `identifiant` (legacy 404 — l'ancien path
+    # n'existait plus, donc `uid` remontait le UID technique "AMANR5L17…"
+    # et produisait des titres illisibles type "Amendement n°AMANR5L17…").
+    num = _text_of(_first(root, "identification.numeroLong",
+                           "identification.numeroOrdreDepot",
+                           "identifiant.numero",  # fallback historique
+                           default=""))
+    uid_tech = _text_of(_first(root, "uid", default=""))
+    if not num and not uid_tech:
         return
-    num = _text_of(uid)
+    # Si seul l'UID technique est présent (edge-case), on l'utilise ; sinon
+    # on préfère le numéro court pour l'affichage.
+    num = num or uid_tech
 
-    # Auteur : soit nom+prenom, soit acteurRef (identifiant PA….)
-    auteur_nom = _text_of(_first(root, "signataires.auteur.nom",
-                                   "auteurs.auteur.identite.nom", default=""))
-    auteur_prenom = _text_of(_first(root, "signataires.auteur.prenom",
-                                     "auteurs.auteur.identite.prenom", default=""))
+    # Auteur : acteurRef (identifiant PA…) — path réel confirmé :
+    # signataires.auteur.acteurRef. Les paths `.nom` / `.prenom` / `.identite.*`
+    # N'EXISTENT PAS dans le JSON AN — tous les noms sont résolus via AMO.
     auteur_ref = _text_of(_first(root, "signataires.auteur.acteurRef",
-                                  "corps.contenuAuteur.auteurs.auteur.acteurRef",
-                                  "auteurs.auteur.acteurRef", default=""))
-    auteur_groupe = _text_of(_first(root, "signataires.groupePolitiqueRef",
-                                     "auteurs.auteur.groupePolitiqueRef", default=""))
-    auteur_label = " ".join(x for x in [auteur_prenom, auteur_nom] if x).strip()
-    # Si l'amendement n'expose que l'acteurRef (cas le plus fréquent),
-    # on résout via le cache AMO (data/amo_resolved.json).
-    if not auteur_label and auteur_ref:
+                                  default=""))
+    auteur_groupe = _text_of(_first(root, "signataires.auteur.groupePolitiqueRef",
+                                     default=""))
+    auteur_label = ""
+    # On résout systématiquement via le cache AMO (data/amo_resolved.json) :
+    # civ + prenom + nom compilé depuis AMO_Acteurs.json.
+    if auteur_ref:
         resolved = amo_loader.resolve_acteur(auteur_ref)
         if resolved:
             auteur_label = resolved
-            if not auteur_groupe:
-                auteur_groupe = amo_loader.resolve_groupe(auteur_ref)
+        if not auteur_groupe:
+            auteur_groupe = amo_loader.resolve_groupe(auteur_ref) or ""
     if not auteur_label:
         auteur_label = f"Député {auteur_ref}" if auteur_ref else "Auteur inconnu"
     # Résout aussi le groupe si on n'a qu'un POxxx
@@ -594,37 +615,49 @@ def _normalize_amendement(obj, src, cat):
             auteur_groupe = groupe_lib
 
     # Dispositif + exposé sommaire (matériel pertinent pour matching mots-clés).
-    # Ces champs sont typés `TexteNonVide_Type` (XHTML) : le JSON les rend
-    # en arbre {"#text": "...", "p": [...]} — il faut _strip_html_text pour
-    # récupérer le texte brut, sinon le matcher ne voit que du markup.
-    dispo = _strip_html_text(_first(root, "corps.dispositif",
-                                      "contenuAuteur.dispositif", default=""))
-    expose = _strip_html_text(_first(root, "corps.exposeSommaire",
-                                       "contenuAuteur.exposeSommaire",
-                                       "exposeSommaire", default=""))
+    # Paths réels validés sur JSON unitaire AN : `corps.contenuAuteur.dispositif`
+    # et `corps.contenuAuteur.exposeSommaire` (pas `corps.dispositif` — ce
+    # chemin ne résolvait jamais, donc dispositif/exposé étaient VIDES et
+    # le matcher mots-clés n'avait rien à analyser → 0 match sur 5683 records).
+    # Ces champs sont typés `TexteNonVide_Type` (XHTML) — _strip_html_text
+    # extrait le texte brut des arbres {"#text": "...", "p": [...]}.
+    dispo = _strip_html_text(_first(root,
+                                      "corps.contenuAuteur.dispositif",
+                                      "corps.dispositif",  # fallback legacy
+                                      default=""))
+    expose = _strip_html_text(_first(root,
+                                       "corps.contenuAuteur.exposeSommaire",
+                                       "corps.exposeSommaire",  # fallback legacy
+                                       default=""))
 
-    # Statut : sort en séance / en commission / "Irrecevable"
-    # Sur certains amendements, `sortEnSeance` et `etat` sont des dicts
-    # ({"code": "ET", "libelle": "En traitement"}) — _strip_html_text
-    # extrait le `libelle` au lieu de dumper le dict en JSON.
-    sort = _strip_html_text(_first(
+    # Statut : sort en séance / en commission / "Irrecevable".
+    # Sur beaucoup d'amendements en cours de traitement, `cycleDeVie.sort`
+    # est un dict VIDE — la valeur utile est sur `etatDesTraitements.etat.libelle`
+    # (ex : "En traitement", "Tombe"). On privilégie `sort.libelle` (valeur
+    # finale après séance) puis `etatDesTraitements.etat.libelle` en fallback.
+    statut = _strip_html_text(_first(
         root,
         "cycleDeVie.sort.libelle",
         "cycleDeVie.sort.sortEnSeance",
+        "cycleDeVie.etatDesTraitements.etat.libelle",
         "cycleDeVie.etatDesTraitements.etat",
+        "etat", "cycleDeVie.etat",
         default=""
-    ))
-    etat = _strip_html_text(_first(root, "etat", "cycleDeVie.etat", default=""))
-    statut = sort or etat or ""
+    )) or ""
 
     # Contexte dossier (article, division)
     article = _text_of(_first(root, "pointeurFragmentTexte.division.articleDesignation",
                                "pointeurFragmentTexte.article.numeroCorrection",
                                default=""))
-    dossier_titre = _text_of(_first(root, "identifiant.numeroLong",
-                                     "examinentInfo.loi.intitule",
-                                     "dossierRef",
-                                     default=""))
+    # Référence au texte législatif parent (ex : "PIONANR5L17BTC2335").
+    # Le titre humain du dossier est résolu via le cache an_texte_to_dossier
+    # (construit en pré-pass par _normalize_dosleg, voir R11b) — essentiel
+    # pour que les mots-clés du titre du dossier parent (ex : "JO 2024",
+    # "sport", "clubs sportifs") ressortent dans le haystack du matcher.
+    texte_ref = _text_of(_first(root, "texteLegislatifRef", default=""))
+    dossier_titre = ""
+    if texte_ref:
+        dossier_titre = amo_loader.resolve_texte_dossier(texte_ref) or ""
 
     # Summary ciblé : on va DIRECTEMENT au contenu utile pour le matching
     # (dispositif + exposé sommaire) en les mettant en tête. Le shotgun
@@ -641,17 +674,25 @@ def _normalize_amendement(obj, src, cat):
     # maximiser la chance de match dans les 2000 premiers caractères ;
     # dispositif (souvent plus technique) ensuite ; métadonnées
     # auteur/statut/article en queue (utile à l'affichage, non au match).
+    # Ordre : (1) dossier_titre EN TÊTE — le titre du dossier parent contient
+    # souvent les mots-clés thématiques (ex : "sécurité des JO 2024",
+    # "mineurs réseaux sociaux") que l'amendement ne répète pas mais sur
+    # lesquels Follaw matche. (2) exposé (prose, riche). (3) dispositif
+    # (technique). (4) métadonnées auteur/statut/article en queue.
     summary_parts = [
+        f"Dossier : {dossier_titre}" if dossier_titre else "",
         expose,
         dispo,
         f"Auteur : {auteur_label}" if auteur_label else "",
         f"Statut : {statut}" if statut else "",
         f"Article : {article}" if article else "",
-        f"Dossier : {dossier_titre}" if dossier_titre else "",
     ]
     summary = " — ".join(p for p in summary_parts if p).strip()[:2000]
 
-    # Titre compact et informatif
+    # Titre compact et informatif — on inclut le libellé court du dossier
+    # parent pour que le matcher mots-clés (qui regarde aussi `title`) ait
+    # accès au sujet du dossier depuis le titre lui-même, et pour que
+    # l'utilisateur voie le contexte dans la liste des amendements.
     title_bits = [f"Amendement n°{num}"]
     if statut:
         title_bits.append(f"[{statut}]")
@@ -660,20 +701,29 @@ def _normalize_amendement(obj, src, cat):
         title_bits.append(f"({auteur_groupe})")
     if article:
         title_bits.append(f"· art. {article}")
+    if dossier_titre:
+        # Tronqué pour ne pas exploser title[:220]
+        title_bits.append(f"· sur « {dossier_titre[:80]} »")
     title = " ".join(title_bits)[:220]
+
+    # URL : on préfère le UID technique (unique) au numéro court (unique
+    # seulement par dossier). L'URL publique AN accepte les deux mais seul
+    # le UID technique garantit un hit direct sur l'amendement.
+    uid_for_url = uid_tech or num
 
     yield Item(
         source_id=src["id"],
-        uid=str(num),
+        uid=str(uid_tech or num),
         category=cat,
         chamber="AN",
         title=title,
-        url=f"https://www.assemblee-nationale.fr/dyn/17/amendements/{num}",
+        url=f"https://www.assemblee-nationale.fr/dyn/17/amendements/{uid_for_url}",
         published_at=parse_iso(_first(root, "cycleDeVie.dateDepot",
                                        "cycleDeVie.dateSaisie", default=None)),
         summary=summary,
         raw={"path": "assemblee:amendement", "auteur_ref": auteur_ref,
-             "groupe": auteur_groupe, "dossier": dossier_titre, "statut": statut},
+             "groupe": auteur_groupe, "dossier": dossier_titre,
+             "texte_ref": texte_ref, "statut": statut, "numero": num},
     )
 
 
@@ -827,6 +877,50 @@ def _format_status(mapping: dict) -> str:
 _DOSLEG_MAX_AGE_ACTIVE_DAYS = 365      # non-promulgués : < 12 mois
 _DOSLEG_MAX_AGE_PROMULGATED_DAYS = 548  # promulgués : < 18 mois
 
+# Accumulateur du cache `texteLegislatifRef → dossier_title`, rempli par
+# `_normalize_dosleg` au fil de l'itération sur le dump `Dossiers_Legislatifs.json.zip`,
+# puis flushé par `fetch_source` à la fin de la passe dossiers. Utilisé par
+# `_normalize_amendement` via `amo_loader.resolve_texte_dossier` — essentiel
+# pour que le titre du dossier parent (ex : "Sécurité des JO 2024") figure
+# dans le haystack matching des amendements (R11b).
+_TEXTE_TO_DOSSIER_ACCUM: dict[str, str] = {}
+
+# Pattern d'identifiant de texte législatif AN (préfixes validés via JSON
+# unitaire `/dyn/opendata/<uid>.json`, avril 2026) :
+#   PION* (Proposition d'Initiative Origine Non-adoptée)
+#   PRJL* (Projet de loi)
+#   PPL*  (Proposition de loi)
+#   TA*   (Texte Adopté)
+# Format complet : <prefix><chambre><chrono>, ex "PIONANR5L17BTC2335".
+_TEXTE_REF_RE = re.compile(r"^(?:PION|PRJL|PPL|TA)[A-Z0-9]{8,}$")
+
+
+def _harvest_texte_refs(node, title: str, accum: dict[str, str]) -> None:
+    """Walk récursif : collecte tous les `texteLegislatifRef`-like qu'on voit
+    passer dans l'arbre du dossier et les mappe vers `title`.
+
+    Les textes législatifs AN sont référencés dans les actes via plusieurs
+    clés selon le codeActe (`refTexteAssocie`, `texteAssocie`, leaf strings
+    directes dans les actes de dépôt). Plutôt que de s'appuyer sur un schéma
+    XSD précis — susceptible de varier entre actes —, on parcourt l'arbre
+    et on harvest toute chaîne matchant `_TEXTE_REF_RE` (PION*, PRJL*, PPL*,
+    TA*). Faux positifs très improbables : les autres UIDs AN commencent
+    par AM, DLR, PA, PO, TI, RU, SE, etc.
+    """
+    if isinstance(node, str):
+        if _TEXTE_REF_RE.match(node):
+            # Premier mapping gagne : on privilégie la 1ère occurrence (texte
+            # initial) plutôt que les mises à jour ultérieures d'un même
+            # texte qui pourraient se référer au dossier enfant.
+            accum.setdefault(node, title)
+        return
+    if isinstance(node, dict):
+        for v in node.values():
+            _harvest_texte_refs(v, title, accum)
+    elif isinstance(node, list):
+        for v in node:
+            _harvest_texte_refs(v, title, accum)
+
 
 def _normalize_dosleg(obj, src, cat):
     # Structure AN (vérifiée via scripts/diag_dosleg.py, avril 2026) :
@@ -845,6 +939,16 @@ def _normalize_dosleg(obj, src, cat):
     titre = _text_of(
         _first(root, "titreDossier.titre", "dossier.titreDossier.titre", default="")
     )
+
+    # R11b — Harvest des références de textes législatifs du dossier courant
+    # vers l'accumulateur global. On les mappe au titre du dossier pour
+    # enrichir le haystack de matching des amendements (qui référencent ces
+    # textes via `texteLegislatifRef`). Appelé AVANT le filtre date/statut
+    # pour que même les dossiers écartés de l'affichage alimentent le cache
+    # — un amendement peut se référer à un texte d'un dossier promulgué
+    # ancien et son titre reste utile au matching.
+    if titre:
+        _harvest_texte_refs(root, titre, _TEXTE_TO_DOSSIER_ACCUM)
 
     # Parcours de l'arbre actesLegislatifs : on extrait, pour chaque acte,
     # (dateActe, codeActe, @xsi:type) et on applique _map_code_acte pour

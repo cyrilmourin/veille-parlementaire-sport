@@ -37,12 +37,31 @@ _lock = threading.Lock()
 _loaded: dict | None = None
 _load_error: str | None = None
 
+# Cache auxiliaire : mapping `texteLegislatifRef` (ex: "PIONANR5L17BTC2335")
+# → titre humain du dossier parent. Alimenté par `_normalize_dosleg` lors
+# de l'ingestion quotidienne de `Dossiers_Legislatifs.json.zip`. Utilisé
+# par `_normalize_amendement` pour enrichir le haystack de matching des
+# amendements avec le thème du dossier parent (essentiel pour que les
+# mots-clés du sujet — "JO 2024", "clubs sportifs" — ressortent même
+# quand l'amendement lui-même ne les cite pas littéralement).
+_TXT_CACHE_ENV = "VEILLE_AN_TEXTE_DOSSIER_CACHE"
+_DEFAULT_TXT_CACHE = Path("data/an_texte_to_dossier.json")
+_txt_lock = threading.Lock()
+_txt_loaded: dict | None = None
+
 
 def _resolve_path() -> Path:
     env = os.environ.get(_CACHE_PATH_ENV)
     if env:
         return Path(env)
     return _DEFAULT_CACHE
+
+
+def _resolve_txt_path() -> Path:
+    env = os.environ.get(_TXT_CACHE_ENV)
+    if env:
+        return Path(env)
+    return _DEFAULT_TXT_CACHE
 
 
 def load_cache(path: Path | None = None, force_reload: bool = False) -> dict:
@@ -86,10 +105,77 @@ def load_cache(path: Path | None = None, force_reload: bool = False) -> dict:
 
 def reset() -> None:
     """Utile dans les tests."""
-    global _loaded, _load_error
+    global _loaded, _load_error, _txt_loaded
     with _lock:
         _loaded = None
         _load_error = None
+    with _txt_lock:
+        _txt_loaded = None
+
+
+def _load_txt_cache(path: Path | None = None) -> dict:
+    """Charge le cache `texteLegislatifRef → dossier_title`.
+
+    Tolère l'absence du fichier (premier run, dev local) — retourne
+    un dict vide qui produira "" pour toutes les résolutions.
+    """
+    global _txt_loaded
+    with _txt_lock:
+        if _txt_loaded is not None:
+            return _txt_loaded
+        target = path or _resolve_txt_path()
+        if not target.exists():
+            log.info("Cache texte→dossier introuvable (%s) — amendements "
+                     "sans titre dossier parent", target)
+            _txt_loaded = {"textes": {}, "generated_at": None}
+            return _txt_loaded
+        try:
+            data = json.loads(target.read_text())
+        except Exception as exc:
+            log.warning("Cache texte→dossier corrompu (%s) : %s", target, exc)
+            _txt_loaded = {"textes": {}, "generated_at": None}
+            return _txt_loaded
+        data.setdefault("textes", {})
+        _txt_loaded = data
+        log.info("Cache texte→dossier chargé : %d entrées (gen %s)",
+                 len(data["textes"]), data.get("generated_at") or "?")
+        return _txt_loaded
+
+
+def write_texte_dossier_cache(textes: dict[str, str], path: Path | None = None) -> Path:
+    """Persiste le mapping `texteLegislatifRef → dossier_title`.
+
+    Appelé par `_normalize_dosleg` (ou par un script dédié) après ingestion
+    du dump dossiers. Le fichier est versionné dans data/ et lu par les
+    runs ultérieurs jusqu'au prochain refresh.
+    """
+    global _txt_loaded
+    target = path or _resolve_txt_path()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "textes": dict(textes),
+    }
+    target.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+    with _txt_lock:
+        _txt_loaded = payload
+    log.info("Cache texte→dossier écrit : %d entrées → %s",
+             len(textes), target)
+    return target
+
+
+def resolve_texte_dossier(texte_ref: str) -> str:
+    """Renvoie le titre humain du dossier parent pour un `texteLegislatifRef`.
+
+    Ex : `resolve_texte_dossier("PIONANR5L17BTC2335")` →
+         "visant à permettre aux salariés de certains établissements …"
+
+    Si inconnu : "" (l'appelant décide du fallback).
+    """
+    if not texte_ref or not isinstance(texte_ref, str):
+        return ""
+    data = _load_txt_cache()
+    return data["textes"].get(texte_ref.strip(), "") or ""
 
 
 # ---------------------------------------------------------------------------

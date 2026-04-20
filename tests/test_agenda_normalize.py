@@ -176,7 +176,13 @@ def test_normalize_agenda_fallback_lowercase_timestamp():
 
 
 def test_normalize_agenda_missing_title():
-    """Réunion sans libellé d'ODJ : titre fallback 'Réunion (POxxx)'."""
+    """Réunion sans libellé d'ODJ : titre fallback mentionnant l'organe.
+
+    Si le cache AMO est chargé (cas normal en prod + local), le code PO
+    est résolu en libellé humain ("Commission des affaires sociales") ;
+    sinon on retombe sur le code brut "PO420120". Le test accepte les
+    deux formes pour rester robuste aux environnements de CI/dev.
+    """
     root = {
         "uid": "RUANR5L17EMPTY",
         "timeStampDebut": "2025-10-01T10:00:00+02:00",
@@ -187,11 +193,16 @@ def test_normalize_agenda_missing_title():
     assert len(items) == 1
     it = items[0]
     assert "Réunion" in it.title
-    assert "PO420120" in it.title
+    # Soit le code brut (cache AMO vide), soit un libellé humain d'organe.
+    assert ("PO420120" in it.title) or ("Commission" in it.title), it.title
 
 
 def test_normalize_agenda_reunioncommission_without_title():
-    """Réunion de commission sans ODJ : fallback 'Réunion de commission (PO…)'."""
+    """Réunion de commission sans ODJ : fallback identifiant l'organe.
+
+    Même logique que `test_normalize_agenda_missing_title` : tolère le
+    code brut ou le libellé humain selon que le cache AMO est chargé.
+    """
     root = {
         "uid": "RUANR5L17C999",
         "@xsi:type": "reunionCommission_type",
@@ -202,8 +213,12 @@ def test_normalize_agenda_reunioncommission_without_title():
     items = list(_normalize_agenda({"reunion": root}, src, "agenda"))
     assert len(items) == 1
     it = items[0]
-    assert "Réunion de commission" in it.title
-    assert "PO420120" in it.title
+    # Cache AMO chargé : "Réunion — Commission des affaires sociales".
+    # Cache AMO absent : "Réunion de commission (PO420120)".
+    # On tolère les deux formes pour rester robuste aux environnements.
+    title_lc = it.title.lower()
+    assert "réunion" in title_lc
+    assert ("commission" in title_lc) or ("PO420120" in it.title), it.title
     assert it.published_at.date().isoformat() == "2025-09-15"
 
 
