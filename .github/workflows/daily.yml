@@ -18,6 +18,10 @@ on:
         description: "Reset SQLite avant run (0/1) — purge l'historique et re-normalise tout"
         required: false
         default: "0"
+      reset_category:
+        description: "Purge ciblée d'une catégorie avant run (ex. amendements, questions, comptes_rendus) — vide si pas de purge"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -66,6 +70,16 @@ jobs:
         run: |
           echo "reset_db=1 → purge de data/veille.sqlite3 pour re-normaliser l'historique"
           rm -f data/veille.sqlite3
+
+      # Purge ciblée d'une catégorie (ex. amendements) : utile après un patch
+      # parser pour forcer la ré-ingestion des items existants. upsert_many()
+      # ignore les collisions de hash_key, donc un patch parser ne réécrit
+      # pas les items déjà en base sans DELETE préalable.
+      - name: Reset catégorie ciblée (si demandé)
+        if: github.event.inputs.reset_category != '' && github.event.inputs.reset_db != '1'
+        run: |
+          echo "reset_category=${{ github.event.inputs.reset_category }} → purge ciblée avant ingest"
+          python scripts/reset_category.py "${{ github.event.inputs.reset_category }}" --yes
 
       # Refresh du cache AMO (acteurs + organes) si absent ou > 7 jours.
       # Le script est idempotent : il skippe s'il trouve un cache frais.

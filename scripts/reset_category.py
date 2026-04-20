@@ -13,6 +13,7 @@ soient ré-insérés au prochain `python -m src.main run`.
 Usage :
     python scripts/reset_category.py amendements
     python scripts/reset_category.py comptes_rendus --dry-run
+    python scripts/reset_category.py amendements --yes    # non-interactif (CI)
 """
 from __future__ import annotations
 
@@ -34,6 +35,8 @@ def main():
                     help="Restreindre à une source précise (ex. an_amendements)")
     ap.add_argument("--dry-run", action="store_true",
                     help="Affiche le count sans supprimer")
+    ap.add_argument("--yes", "-y", action="store_true",
+                    help="Ne demande pas confirmation (mode CI)")
     args = ap.parse_args()
 
     if not DB.exists():
@@ -57,10 +60,11 @@ def main():
     if args.dry_run or n == 0:
         return
 
-    reply = input("Confirmer la suppression ? [y/N] ").strip().lower()
-    if reply not in ("y", "yes", "o", "oui"):
-        print("Abandonné.")
-        return
+    if not args.yes:
+        reply = input("Confirmer la suppression ? [y/N] ").strip().lower()
+        if reply not in ("y", "yes", "o", "oui"):
+            print("Abandonné.")
+            return
 
     cur.execute(f"DELETE FROM items {where}", params)
     conn.commit()

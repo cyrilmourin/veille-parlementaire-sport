@@ -572,22 +572,30 @@ def _normalize_amendement(obj, src, cat):
                                      "dossierRef",
                                      default=""))
 
-    # Summary enrichi : on concatène tout le texte utile pour que le
-    # matcher mots-clés puisse attaquer le contenu entier (pas juste
-    # le dispositif qui est souvent purement technique).
+    # Summary ciblé : on va DIRECTEMENT au contenu utile pour le matching
+    # (dispositif + exposé sommaire) en les mettant en tête. Le shotgun
+    # `_all_text(root)` a été retiré : il visitait le JSON dans l'ordre
+    # d'apparition, donc la liste des co-signataires (PA795228 PA793262…)
+    # et leurs noms résolus (Mme Hamdane, M. Bernalicis…) consommaient les
+    # ~1500 premiers caractères et coupaient avant `corps.dispositif`.
+    # Résultat : aucun mot-clé sport ne ressortait même sur des amendements
+    # manifestement thématiques. En ciblant `corps.dispositif` et
+    # `corps.exposeSommaire` — typés TexteNonVide_Type / XHTML par le XSD
+    # officiel AN — le matcher voit enfin le vrai contenu.
+    #
+    # Ordre : exposé (plus riche, prose explicative) en premier pour
+    # maximiser la chance de match dans les 2000 premiers caractères ;
+    # dispositif (souvent plus technique) ensuite ; métadonnées
+    # auteur/statut/article en queue (utile à l'affichage, non au match).
     summary_parts = [
+        expose,
+        dispo,
         f"Auteur : {auteur_label}" if auteur_label else "",
         f"Statut : {statut}" if statut else "",
         f"Article : {article}" if article else "",
-        expose,
-        dispo,
+        f"Dossier : {dossier_titre}" if dossier_titre else "",
     ]
-    structured = " — ".join(p for p in summary_parts if p).strip()
-    # Shotgun : quand les paths ciblés ne couvrent pas la structure
-    # réelle du JSON (fréquent sur dumps AN), on ajoute tout le texte
-    # du nœud pour que le matcher mots-clés trouve les occurrences.
-    shotgun = _all_text(root)
-    summary = (structured + " — " + shotgun if structured else shotgun)[:2000]
+    summary = " — ".join(p for p in summary_parts if p).strip()[:2000]
 
     # Titre compact et informatif
     title_bits = [f"Amendement n°{num}"]
