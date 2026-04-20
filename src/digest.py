@@ -20,7 +20,7 @@ CATEGORY_LABELS = {
     "comptes_rendus": "Comptes rendus",
     "nominations": "Nominations",
     "agenda": "Agenda",
-    "communiques": "Communiqués",
+    "communiques": "Publications",
 }
 
 CATEGORY_ORDER = list(CATEGORY_LABELS.keys())
@@ -48,12 +48,18 @@ EMAIL_TEMPLATE = Template(r"""<!DOCTYPE html>
       </h2>
       {% for it in buckets[cat] %}
         {%- set ch_color = "#5c6577" -%}
-        {%- if it.chamber == "AN" -%}{%- set ch_color = "#122549" -%}{%- endif -%}
-        {%- if it.chamber in ("Senat", "Sénat") -%}{%- set ch_color = "#c98b1b" -%}{%- endif -%}
+        {%- if it.chamber == "AN" -%}{%- set ch_color = "#20acd9" -%}{%- endif -%}
+        {%- if it.chamber in ("Senat", "Sénat") -%}{%- set ch_color = "#62c925" -%}{%- endif -%}
         <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #f1ead0;">
           {% if it.url %}<a href="{{ it.url }}" style="color:#122549;font-weight:600;font-size:15px;text-decoration:none;">{{ it.title }}</a>{% else %}<span style="color:#122549;font-weight:600;font-size:15px;">{{ it.title }}</span>{% endif %}
           <div style="color:#5c6577;font-size:12px;margin-top:4px;line-height:1.7;">
             {% if it.chamber %}<span style="display:inline-block;background:{{ ch_color }};color:#fff;padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-right:5px;">{{ it.chamber }}</span>{% endif %}
+            {% if it.status_label %}
+              {%- set st_bg = "#c9c2a6" -%}
+              {%- set st_fg = "#122549" -%}
+              {%- if it.is_promulgated -%}{%- set st_bg = "#66A266" -%}{%- set st_fg = "#ffffff" -%}{%- endif -%}
+              <span style="display:inline-block;background:{{ st_bg }};color:{{ st_fg }};padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;letter-spacing:.3px;margin-right:5px;">{{ it.status_label }}</span>
+            {% endif %}
             {% if it.published_at %}{{ it.published_at[:10] }}{% endif %}
             {% if it.matched %}
               {% for kw in it.matched[:12] %}<span style="display:inline-block;background:#DA4431;color:#fff;font-size:11px;padding:1px 8px;border-radius:10px;margin:0 3px 2px 4px;">{{ kw }}</span>{% endfor %}
@@ -83,12 +89,26 @@ def build_html(rows: list[dict], site_url: str) -> tuple[str, int]:
         matched = json.loads(r.get("matched_keywords") or "[]")
         if not matched:
             continue
+        # Statut procédural (dossiers législatifs) — extrait de raw, alimenté
+        # par assemblee._normalize_dosleg.
+        try:
+            raw = json.loads(r.get("raw") or "{}")
+        except Exception:
+            raw = {}
+        status_label = (raw.get("status_label") or "").strip()
+        # On retire le préfixe d'institution redondant avec le badge chambre
+        for prefix in ("AN · ", "Senat · ", "Sénat · "):
+            if status_label.startswith(prefix):
+                status_label = status_label[len(prefix):]
+                break
         item = {
             "title": r["title"], "url": r["url"],
             "summary": r.get("summary") or "",
             "snippet": r.get("snippet") or "",
             "published_at": r.get("published_at") or "", "chamber": r.get("chamber") or "",
             "matched": matched,
+            "status_label": status_label,
+            "is_promulgated": bool(raw.get("is_promulgated")),
         }
         buckets.setdefault(r["category"], []).append(item)
 

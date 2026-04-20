@@ -25,3 +25,12 @@ site/data/index.json
 .DS_Store
 _tmp_*.py
 site/content/_index.md
+
+# Artefacts build Hugo + digest courant
+site/.hugo_build.lock
+data/last_digest.html
+# Miroirs docs externes (schémas AN, volumineux + versionnés côté AN)
+references/
+# Scripts diagnostiques one-shot
+scripts/diag_*.py
+scripts/diag_*.txt

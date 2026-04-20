@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
 from ..models import Item
@@ -16,8 +16,15 @@ log = logging.getLogger(__name__)
 
 BASE_URL = "https://data.assemblee-nationale.fr"
 
+
+def _utcnow_naive() -> datetime:
+    """`now` naïf en UTC — les `published_at` stockés en DB sont naïfs."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 # Parseur d'UID de question AN : "QANR5L17QE9340" → législature 17, type QE, num 9340
-_Q_UID_RE = re.compile(r"L(\d+)(QE|QG|QOSD|QST)(\d+)", re.IGNORECASE)
+# Types XSD officiels : QE (écrite) | QG (au gouvernement) | QOSD (orale sans débat) | QM (ministre)
+# QST = ancien terme officieux, gardé pour rétrocompat des UID historiques.
+_Q_UID_RE = re.compile(r"L(\d+)(QE|QG|QOSD|QST|QM)(\d+)", re.IGNORECASE)
 
 
 def _first_sentence(text: str, max_len: int = 140) -> str:
@@ -112,6 +119,36 @@ def _all_text(node) -> str:
     return " ".join(bits)
 
 
+def _deep_find(node, *key_names: str):
+    """Walk un JSON (dicts et listes) et renvoie la première valeur dont la
+    clé terminale correspond à `key_names` (match exact, premier en priorité).
+
+    Utile pour les schémas XSD dont un élément a `maxOccurs="unbounded"` : le
+    dumper JSON peut rendre soit un dict (1 occurrence) soit une liste (N),
+    ce que `_first` à base de dot-path ne gère pas. Exemple : pour les
+    questions AN, `textesQuestion.texteQuestion.infoJO.dateJO` peut être à
+    deux niveaux de profondeur (dict) OU sous une liste (index 0)."""
+    if node is None:
+        return None
+    # DFS itératif, ordre de visite = ordre d'apparition dans le JSON
+    stack = [node]
+    while stack:
+        cur = stack.pop()
+        if isinstance(cur, dict):
+            for k in key_names:
+                if k in cur and cur[k] not in (None, "", [], {}):
+                    return cur[k]
+            # on pousse les enfants en sens inverse pour préserver l'ordre
+            for v in reversed(list(cur.values())):
+                if isinstance(v, (dict, list)):
+                    stack.append(v)
+        elif isinstance(cur, list):
+            for v in reversed(cur):
+                if isinstance(v, (dict, list)):
+                    stack.append(v)
+    return None
+
+
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
 _DATE_IN_NAME_RE = re.compile(r"(\d{4})[-_]?(\d{2})[-_]?(\d{2})")
@@ -148,13 +185,13 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
     # Fenêtre date : src["since_days"] > env AN_SINCE_DAYS > 30 (défaut)
     since_days_raw = src.get("since_days") or os.environ.get("AN_SINCE_DAYS") or 30
     try:
-        since = datetime.utcnow() - timedelta(days=int(since_days_raw))
+        since = _utcnow_naive() - timedelta(days=int(since_days_raw))
         log.info(
             "%s : filtre date >= %s (fenêtre %s jours)",
             sid, since.date().isoformat(), since_days_raw,
         )
     except (ValueError, TypeError):
-        since = datetime.utcnow() - timedelta(days=30)
+        since = _utcnow_naive() - timedelta(days=30)
         log.warning("%s : since_days invalide (%r), défaut 30j", sid, since_days_raw)
 
     items: list[Item] = []
@@ -238,7 +275,7 @@ def fetch_source(src: dict) -> list[Item]:
     since: datetime | None = None
     if since_days_raw:
         try:
-            since = datetime.utcnow() - timedelta(days=int(since_days_raw))
+            since = _utcnow_naive() - timedelta(days=int(since_days_raw))
             log.info(
                 "%s : filtre date >= %s (fenêtre %s jours)",
                 src["id"], since.date().isoformat(), since_days_raw,
@@ -438,30 +475,230 @@ def _normalize_amendement(obj, src, cat):
     )
 
 
+# ---------------------------------------------------------------------------
+# Mapping codeActe → (institution, stage, step, flags) — dossiers législatifs
+#
+# Source de référence : parser `anpy` de Regards Citoyens (collectif derrière
+# nosdeputes.fr), fichier `anpy/dossier_from_opendata.py`. C'est le référentiel
+# de facto de l'écosystème open source FR, basé sur les XSD AN officiels.
+#   https://github.com/regardscitoyens/anpy/blob/master/anpy/dossier_from_opendata.py
+#
+# Règles clés :
+#   - préfixe `AN*`  → Assemblée nationale, préfixe `SN*` → Sénat
+#   - substring `1-` → 1re lecture, `2-` / `3-` → 2e / 3e, `NLEC-` → nouvelle
+#     lecture, `ANLDEF-` → l. définitive, `CMP-` → CMP, `ANLUNI-` → l. unique
+#   - suffixe `-DEPOT` → dépôt, `-COM*` → commission, `-DEBATS*` → hémicycle
+#   - type `Promulgation_Type` → étape de promulgation au JO
+#   - type `ConclusionEtapeCC_Type` → saisine Conseil constitutionnel
+# Codes ignorés (redondants / non procéduraux) : AVIS-RAPPORT, CMP-DEPOT,
+# DPTLETTRECT, types EtudeImpact/DepotAvisConseilEtat/ProcedureAccelere,
+# préfixes AN20-/AN21- (contrôle parlementaire hors navette) et AN-APPLI-
+# (rapport d'application post-promulgation).
+# ---------------------------------------------------------------------------
+
+_DOSLEG_IGNORED_XSI = {
+    "EtudeImpact_Type",
+    "DepotAvisConseilEtat_Type",
+    "ProcedureAccelere_Type",
+}
+
+_DOSLEG_IGNORED_PREFIX = ("AN20-", "AN21-", "AN-APPLI-")
+_DOSLEG_IGNORED_SUBSTR = ("AVIS-RAPPORT", "-DPTLETTRECT")
+
+
+def _iter_actes(node):
+    """Parcours récursif de l'arbre `actesLegislatifs` : yield chaque dict
+    d'acte portant (typiquement) codeActe / libelleActe / dateActe /
+    @xsi:type / uid. Supporte les deux enveloppes du dump AN :
+    - {"acteLegislatif": [...] | {...}}
+    - liste directe d'actes à la racine."""
+    if isinstance(node, dict):
+        if "acteLegislatif" in node:
+            child = node["acteLegislatif"]
+            if isinstance(child, list):
+                for c in child:
+                    yield from _iter_actes(c)
+            elif isinstance(child, dict):
+                yield from _iter_actes(child)
+        else:
+            # feuille : yield puis descente dans les enfants éventuels
+            if any(k in node for k in ("codeActe", "libelleActe", "dateActe", "@xsi:type")):
+                yield node
+            enfants = node.get("actesLegislatifs")
+            if enfants is not None:
+                yield from _iter_actes(enfants)
+    elif isinstance(node, list):
+        for n in node:
+            yield from _iter_actes(n)
+
+
+def _map_code_acte(code: str, xsi_type: str) -> dict:
+    """Traduit un codeActe (+ @xsi:type) en structure procédurale.
+
+    Renvoie un dict avec :
+      - ignored (bool)        : l'acte ne doit pas servir de statut
+      - is_promulgation (bool)
+      - is_cc (bool)          : Conseil constitutionnel
+      - institution (str)     : "AN" | "Senat" | "CMP" | "Gouvernement" | "ConseilConst" | ""
+      - stage (str)           : "1ère lecture", "nouv. lect.", "CMP", "promulgation"…
+      - step (str)            : "dépôt", "commission", "hémicycle", ""
+    """
+    code = code or ""
+    xsi = xsi_type or ""
+
+    out = {"ignored": False, "is_promulgation": False, "is_cc": False,
+           "institution": "", "stage": "", "step": ""}
+
+    # Types non-étapes à ignorer pour le calcul du statut
+    if xsi in _DOSLEG_IGNORED_XSI:
+        out["ignored"] = True
+        return out
+    if any(s in code for s in _DOSLEG_IGNORED_SUBSTR):
+        out["ignored"] = True
+        return out
+    if any(code.startswith(p) for p in _DOSLEG_IGNORED_PREFIX):
+        out["ignored"] = True
+        return out
+    if code == "CMP-DEPOT":  # redondant avec le cycle CMP
+        out["ignored"] = True
+        return out
+
+    # Promulgation / Conseil constitutionnel (identifiés par @xsi:type)
+    if xsi == "Promulgation_Type" or code.startswith("PROM-"):
+        out["is_promulgation"] = True
+        out["institution"] = "Gouvernement"
+        out["stage"] = "promulgation"
+        return out
+    if xsi == "ConclusionEtapeCC_Type":
+        out["is_cc"] = True
+        out["institution"] = "ConseilConst"
+        out["stage"] = "Conseil constitutionnel"
+        return out
+
+    # Institution
+    if code.startswith("AN"):
+        out["institution"] = "AN"
+    elif code.startswith("SN"):
+        out["institution"] = "Senat"
+    elif code.startswith("CMP"):
+        out["institution"] = "CMP"
+
+    # Phase de navette (stage) — ordre important : NLEC et ANLDEF avant "1-"
+    if "ANLDEF-" in code:
+        out["stage"] = "lecture définitive"
+    elif "NLEC-" in code:
+        out["stage"] = "nouvelle lecture"
+    elif "ANLUNI-" in code:
+        out["stage"] = "lecture unique"
+    elif "CMP-" in code:
+        out["stage"] = "CMP"
+    elif "1-" in code:
+        out["stage"] = "1ère lecture"
+    elif "2-" in code:
+        out["stage"] = "2ème lecture"
+    elif "3-" in code:
+        out["stage"] = "3ème lecture"
+
+    # Sous-étape (step)
+    if "-DEPOT" in code:
+        out["step"] = "dépôt"
+    elif "-COM" in code:
+        out["step"] = "commission"
+    elif "-DEBATS" in code:
+        out["step"] = "hémicycle"
+
+    return out
+
+
+def _format_status(mapping: dict) -> str:
+    """Rend un statut lisible court à partir du mapping : `AN · 1ère lecture · commission`."""
+    inst = mapping.get("institution") or ""
+    stage = mapping.get("stage") or ""
+    step = mapping.get("step") or ""
+    parts = [p for p in (inst, stage, step) if p]
+    return " · ".join(parts)
+
+
+# Fenêtres d'inclusion — alignées sur la mémoire projet
+# (veille_parl_procedure_context.md) : on affiche seulement les dossiers
+# "actifs" ou "promulgués récemment".
+_DOSLEG_MAX_AGE_ACTIVE_DAYS = 365      # non-promulgués : < 12 mois
+_DOSLEG_MAX_AGE_PROMULGATED_DAYS = 548  # promulgués : < 18 mois
+
+
 def _normalize_dosleg(obj, src, cat):
-    # Structure : dossierParlementaire > dossier > ...
+    # Structure AN (vérifiée via scripts/diag_dosleg.py, avril 2026) :
+    # la racine du fichier est {"dossierParlementaire": {...}} et le contenu
+    # est DIRECTEMENT à plat (pas de sous-clé "dossier"). Les clés typiques
+    # sont : uid, legislature, titreDossier.{titre,titreChemin},
+    # procedureParlementaire, initiateur, actesLegislatifs. Les anciens
+    # fallbacks "dossier.*" sont conservés par sécurité pour les vieux
+    # fichiers ou d'éventuelles variantes.
     root = obj.get("dossierParlementaire") if isinstance(obj, dict) else None
     if not root:
         return
-    uid = _text_of(_first(root, "uid", default="")) or _text_of(
-        _first(root, "dossier.uid", default="")
-    )
+    uid = _text_of(_first(root, "uid", "dossier.uid", default=""))
     if not uid:
         return
     titre = _text_of(
-        _first(root, "dossier.titreDossier.titre", "titreDossier.titre", default="")
+        _first(root, "titreDossier.titre", "dossier.titreDossier.titre", default="")
     )
-    # Date = DERNIÈRE date d'acte législatif (= dernière étape de procédure),
-    # pas la date de dépôt. On scanne toutes les dates du chrono et on prend le max.
-    chrono = _first(root, "dossier.actesLegislatifs", default=None)
-    dates_found: list[datetime] = []
+
+    # Parcours de l'arbre actesLegislatifs : on extrait, pour chaque acte,
+    # (dateActe, codeActe, @xsi:type) et on applique _map_code_acte pour
+    # savoir si l'acte compte comme étape procédurale. Les actes "ignorés"
+    # (avis rapporteur, études d'impact, contrôle parlementaire…) ne servent
+    # ni au tri date ni au statut.
+    chrono = _first(root, "actesLegislatifs", "dossier.actesLegislatifs",
+                     default=None)
+    last_mapping: dict = {}
+    last_date: datetime | None = None
+    last_code: str = ""
+    last_libelle: str = ""
+    has_promulgation = False
+    nb_actes_utiles = 0
+    nb_actes_total = 0
     if isinstance(chrono, (dict, list)):
-        for p, v in _flatten(chrono):
-            if isinstance(v, str) and len(v) >= 10 and any(k in p.lower() for k in ("date", "timestamp")):
-                dt = parse_iso(v[:10])
-                if dt:
-                    dates_found.append(dt)
-    derniere_date = max(dates_found) if dates_found else None
+        for acte in _iter_actes(chrono):
+            nb_actes_total += 1
+            raw_date = acte.get("dateActe")
+            if not isinstance(raw_date, str) or len(raw_date) < 10:
+                continue
+            dt = parse_iso(raw_date[:10])
+            if not dt:
+                continue
+            code = str(acte.get("codeActe") or "")
+            xsi = str(acte.get("@xsi:type") or "")
+            mapping = _map_code_acte(code, xsi)
+            if mapping["is_promulgation"]:
+                has_promulgation = True
+            if mapping["ignored"]:
+                continue
+            nb_actes_utiles += 1
+            if last_date is None or dt > last_date:
+                last_date = dt
+                last_mapping = mapping
+                last_code = code
+                last_libelle = str(acte.get("libelleActe") or "")[:120]
+
+    # Si on n'a aucun acte utile, le dossier n'a pas de "statut" exploitable
+    # (typiquement : AN20-/AN21- purs, ou dossiers vides). On l'écarte.
+    if last_date is None:
+        return
+
+    # Règle d'inclusion : on filtre par fraîcheur. Un dossier promulgué
+    # récemment (< 18 mois) ou un dossier en navette active (< 12 mois
+    # depuis le dernier acte utile) entrent dans la veille. Les autres
+    # (promulgués il y a longtemps, dossiers dormants, textes caducs)
+    # sont écartés — cf. ticket Cyril "un dossier de 1990 remontait".
+    today = _utcnow_naive()
+    age_days = (today - last_date).days
+    max_age = _DOSLEG_MAX_AGE_PROMULGATED_DAYS if has_promulgation else _DOSLEG_MAX_AGE_ACTIVE_DAYS
+    if age_days > max_age:
+        return
+
+    status_label = _format_status(last_mapping)
+
     yield Item(
         source_id=src["id"],
         uid=uid,
@@ -469,11 +706,23 @@ def _normalize_dosleg(obj, src, cat):
         chamber="AN",
         title=titre or f"Dossier {uid}",
         url=f"https://www.assemblee-nationale.fr/dyn/17/dossiers/{uid}",
-        published_at=derniere_date,
+        published_at=last_date,
         summary=_text_of(
-            _first(root, "dossier.titreDossier.titreChemin", default="")
+            _first(root, "titreDossier.titreChemin",
+                    "dossier.titreDossier.titreChemin", default="")
         )[:500],
-        raw={"path": "assemblee:dossier", "nb_actes": len(dates_found)},
+        raw={
+            "path": "assemblee:dossier",
+            "nb_actes": nb_actes_total,
+            "nb_actes_utiles": nb_actes_utiles,
+            "status_label": status_label,
+            "code_acte": last_code,
+            "libelle_acte": last_libelle,
+            "institution": last_mapping.get("institution", ""),
+            "stage": last_mapping.get("stage", ""),
+            "step": last_mapping.get("step", ""),
+            "is_promulgated": has_promulgation,
+        },
     )
 
 
@@ -487,17 +736,49 @@ def _normalize_question(obj, src, cat):
     # Indicateurs de contenu :
     # - rubrique / tête d'analyse = thème court (ex. "sports : nautiques")
     # - texte question = corps de la question (1re phrase = bon résumé)
-    rubrique = _text_of(_first(root, "rubrique", "indexationAnalytique.rubrique", default=""))
-    tete_analyse = _text_of(_first(root, "teteAnalyse", "indexationAnalytique.teteAnalyse", default=""))
-    analyse = _text_of(_first(root, "indexationAnalytique.analyses.analyse", default=""))
-    texte = _text_of(_first(root, "textesQuestion.texteQuestion.texte",
-                             "texte", default=""))
-    reponse = _text_of(_first(root, "textesReponses.texteReponse.texte",
-                               "reponse", default=""))
-    date_pub = parse_iso(_first(root, "questionDate", "dateQuestion",
-                                 "dateDepot", default=None))
+    #
+    # XSD officiel Question_Type (voir references/an_schemas/.../Schemas_Questions.html) :
+    #   question.indexationAN.rubrique / .teteAnalyse / .analyses.analyse
+    # Les anciens chemins `indexationAnalytique.*` sont conservés en fallback
+    # par sécurité (variation historique, mais absents du XSD actuel).
+    rubrique = _text_of(_first(root,
+                                "indexationAN.rubrique",
+                                "indexationAnalytique.rubrique",
+                                "rubrique",
+                                default=""))
+    tete_analyse = _text_of(_first(root,
+                                    "indexationAN.teteAnalyse",
+                                    "indexationAnalytique.teteAnalyse",
+                                    "teteAnalyse",
+                                    default=""))
+    analyse = _text_of(_first(root,
+                               "indexationAN.analyses.analyse",
+                               "indexationAnalytique.analyses.analyse",
+                               default=""))
+    # Textes : chercher dans la structure textesQuestion/texteQuestion (liste
+    # ou dict selon le dumper) en utilisant _deep_find qui traverse les deux.
+    texte_node = _deep_find(root.get("textesQuestion"), "texte") \
+                 or _first(root, "texte", default="")
+    texte = _text_of(texte_node)
+    reponse_node = _deep_find(root.get("textesReponse") or root.get("textesReponses"), "texte") \
+                   or _first(root, "reponse", default="")
+    reponse = _text_of(reponse_node)
 
-    # Auteur — on essaie nom/prénom explicites avant de tomber sur acteurRef.
+    # Date publication : XSD place la date dans InfoJO (texteQuestion.infoJO)
+    # via un champ généralement nommé `dateJO` / `dateParution` / `date`.
+    # On tape d'abord ces champs via _deep_find (traverse la liste textesQuestion).
+    date_raw = _deep_find(root.get("textesQuestion"),
+                           "dateJO", "dateParution", "dateJORF", "date") \
+               or _first(root,
+                          "cloture.dateCloture",
+                          "questionDate", "dateQuestion", "dateDepot",
+                          default=None)
+    date_pub = parse_iso(_text_of(date_raw) if date_raw else None)
+
+    # Auteur — XSD : question.auteur n'expose QUE acteurRef + mandatRef (+ groupe).
+    # Les champs nom/prénom/civ existent dans le dump AMO Acteurs, pas ici.
+    # On garde les anciens chemins en fallback (si un jour la source les inclut),
+    # et on formate l'acteurRef proprement quand on tombe dessus.
     auteur_nom = _text_of(_first(root,
                                   "auteur.identite.nom",
                                   "auteur.identite.nomFamille",
@@ -506,16 +787,27 @@ def _normalize_question(obj, src, cat):
                                      "auteur.identite.prenom",
                                      default=""))
     auteur_civilite = _text_of(_first(root, "auteur.identite.civ", default=""))
-    auteur_ref = _text_of(_first(root, "auteur.identite.acteurRef",
-                                  "auteur.acteurRef", default=""))
-    auteur_groupe = _text_of(_first(root, "auteur.groupe.abrege",
+    auteur_ref = _text_of(_first(root,
+                                  "auteur.identite.acteurRef",
+                                  "auteur.acteurRef",
+                                  default=""))
+    # Groupe : XSD dit `auteur.groupe` est un Groupe_type (abrege/developpe).
+    auteur_groupe = _text_of(_first(root,
+                                     "auteur.groupe.abrege",
+                                     "auteur.groupe.developpe",
                                      "auteur.groupePolitiqueRef",
                                      default=""))
     auteur_label = " ".join(x for x in [auteur_civilite, auteur_prenom, auteur_nom] if x).strip()
     if not auteur_label:
-        auteur_label = auteur_ref or "Auteur"
+        # Pas de nom dans le JSON (normal vu le XSD) — on affiche l'acteurRef
+        # préfixé "Député" pour que ce soit lisible. Remplacé par le vrai nom
+        # quand le loader AMO sera en place (task #6).
+        auteur_label = f"Député {auteur_ref}" if auteur_ref else "Auteur"
 
-    ministere = _text_of(_first(root, "minInt.abrege",
+    # Ministère : XSD → `minInt` (TexteAbregeable_type, abrege+developpe).
+    ministere = _text_of(_first(root,
+                                 "minInt.abrege",
+                                 "minInt.developpe",
                                  "ministereAttributaire.intitule",
                                  default=""))
 
@@ -532,6 +824,7 @@ def _normalize_question(obj, src, cat):
         "QG": "Question au gouvernement",
         "QOSD": "Question orale",
         "QST": "Question orale",
+        "QM": "Question au ministre",
     }.get((m_uid.group(2).upper() if m_uid else ""), "Question")
 
     title_bits = [f"{qtype_label} n°{numero_court}", f"— {auteur_label}"]

@@ -64,6 +64,13 @@ def _load(rows: list[dict]) -> list[dict]:
             r["keyword_families"] = json.loads(r.get("keyword_families") or "[]")
         except Exception:
             r["keyword_families"] = []
+        # `raw` est stocké en TEXT JSON dans la DB — on le parse pour exposer
+        # les champs enrichis (notamment status_label pour les dossiers
+        # législatifs, cf. assemblee._normalize_dosleg).
+        try:
+            r["raw"] = json.loads(r.get("raw") or "{}")
+        except Exception:
+            r["raw"] = {}
         out.append(r)
     return out
 
@@ -259,6 +266,26 @@ def _fmt_item_line(it: dict) -> str:
             f'{_escape(chamber)}</span>'
         )
 
+    # Statut procédural (dossiers législatifs) : badge dédié à droite de la
+    # chambre, ex. "1ère lecture · commission". Source : raw["status_label"]
+    # injecté par assemblee._normalize_dosleg.
+    raw = it.get("raw") or {}
+    status_label = (raw.get("status_label") or "").strip() if isinstance(raw, dict) else ""
+    status_html = ""
+    if status_label:
+        # On évite d'afficher juste "AN" en doublon avec le badge chambre :
+        # status_label commence souvent par "AN · ", on retire ce préfixe.
+        clean = status_label
+        for prefix in ("AN · ", "Senat · ", "Sénat · "):
+            if clean.startswith(prefix):
+                clean = clean[len(prefix):]
+                break
+        if clean:
+            promulgated = " status-promulgated" if raw.get("is_promulgated") else ""
+            status_html = (
+                f'<span class="status{promulgated}">{_escape(clean)}</span>'
+            )
+
     date_html = f'<time class="date">{date}</time>' if date else ""
 
     # Mots-clés : inline (pas de retour à la ligne), sur la même ligne que
@@ -271,7 +298,7 @@ def _fmt_item_line(it: dict) -> str:
             for k in kws[:12]
         )
 
-    meta_parts = [p for p in [chamber_html, date_html, tags_html] if p]
+    meta_parts = [p for p in [chamber_html, status_html, date_html, tags_html] if p]
     meta_inline = (" · ".join(meta_parts)) if meta_parts else ""
     meta_html = (
         f' <span class="item-meta">{meta_inline}</span>' if meta_inline else ""

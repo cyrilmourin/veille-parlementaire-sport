@@ -19,7 +19,7 @@ import argparse
 import logging
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import digest, normalize, site_export
@@ -67,7 +67,8 @@ def run(since_days: int = 1, send: bool = True, verbose: bool = False) -> int:
     log.info("Store : %d nouveaux items insérés", inserted)
 
     # 4. Récupère les items à inclure dans le digest et l'export (matched uniquement)
-    since = datetime.utcnow() - timedelta(days=since_days)
+    # `replace(tzinfo=None)` car fetch_matched_since compare à des `published_at` naïfs stockés en DB.
+    since = (datetime.now(timezone.utc) - timedelta(days=since_days)).replace(tzinfo=None)
     digest_rows = store.fetch_matched_since(since, only_matched=True)
     log.info("Digest : %d items matchés sur les %d derniers jours", len(digest_rows), since_days)
 

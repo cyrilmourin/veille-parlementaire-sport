@@ -20,7 +20,29 @@
   --line:    #dfd9c1;        /* séparateur crème un peu plus foncé */
   --radius:  10px;
   --font:    "Inter", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-title: "Inter", "Segoe UI", Arial, sans-serif;
+  --font-title: "Montserrat", "Inter", "Segoe UI", Arial, sans-serif;
+}
+
+/* ----------------------------------------------------------------------------
+   Typographie de titres — Montserrat, cohérente sur tout le site.
+   H1/H2 : très gras (900) et legèrement condensée (letter-spacing négatif)
+   pour le rendu "print-headline" demandé.
+   H3/H4 : même famille, weights standard (laissés au défaut du contexte).
+   ---------------------------------------------------------------------------- */
+h1, h2, h3, h4 {
+  font-family: var(--font-title);
+}
+h1 {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.4px;
+  line-height: 1.2;
+}
+h2 {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.4px;
+  line-height: 1.25;
 }
 
 * { box-sizing: border-box; }
@@ -78,35 +100,25 @@ a:hover { text-decoration: underline; }
 .nav a:hover { opacity: 1; color: #fff; text-decoration: none; border-bottom: 1px solid var(--sl-red); }
 
 /* ---------- Home ---------------------------------------------------------- */
-.home .hero {
-  margin-top: 8px;
-  padding: 8px 0 24px;
+/* H3 d'accueil (sous-titre de positionnement) */
+.home .page-intro {
+  margin: 8px 0 20px;
+  padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
-}
-.home .hero .kicker {
-  text-transform: uppercase; letter-spacing: 2.5px;
-  font-size: 11px; color: var(--sl-red); margin: 0 0 8px;
-  font-weight: 700;
-}
-.home .hero h1 {
-  margin: 0 0 6px;
-  font-size: 30px;
   color: var(--sl-blue);
-  font-family: var(--font-title);
-  letter-spacing: -0.5px;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0;
 }
-.home .hero .lede { font-size: 17px; color: var(--muted); margin: 0; }
 
 .home .content h2 {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 2px;
   color: var(--sl-blue);
   border-left: 4px solid var(--sl-red);
   padding: 2px 0 2px 12px;
   margin-top: 40px;
   margin-bottom: 14px;
-  font-weight: 700;
+  /* font-size / font-weight / letter-spacing : hérités de la règle h2 globale
+     (28/22 px Montserrat 900, letter-spacing -0.4) */
 }
 .home .content h3 {
   font-size: 17px;
@@ -114,7 +126,6 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--line);
   padding-bottom: 6px;
   margin-top: 28px;
-  font-family: var(--font-title);
 }
 .home .content h3 a { color: inherit; }
 .home .content h3 a:hover { color: var(--sl-red); text-decoration: none; }
@@ -154,15 +165,38 @@ a:hover { text-decoration: underline; }
   text-transform: uppercase;
   vertical-align: middle;
 }
-/* AN (Assemblée nationale) : bleu Sideline. */
+/* AN (Assemblée nationale) : bleu clair lumineux, plus lisible sur fond crème
+   et plus distinct du bleu foncé Sideline utilisé pour les titres. */
 .chamber[data-chamber="AN"] {
-  background: var(--sl-blue);
+  background: #20acd9;
   color: #fff;
 }
-/* Sénat : orange/ambré (on utilise le doré-ambré déjà présent dans la palette). */
+/* Sénat : vert lime (continuité avec la tradition chromatique du Palais
+   du Luxembourg, contraste franc avec le bleu AN). */
 .chamber[data-chamber="Senat"],
 .chamber[data-chamber="Sénat"] {
-  background: #c98b1b;
+  background: #62c925;
+  color: #fff;
+}
+
+/* ---------- Badge statut procédural (dossiers législatifs) -------------- */
+/* Affiche l'étape de navette du dossier : "1ère lecture · commission",
+   "CMP", "promulgation", etc. Complète le badge chambre, placé juste après.
+   Base : crème foncé discret ; si promulgué, vert (palette Sideline). */
+.status {
+  display: inline-block;
+  background: #c9c2a6;           /* crème un peu plus sombre */
+  color: var(--sl-blue);
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  vertical-align: middle;
+  margin-left: 2px;
+}
+.status.status-promulgated {
+  background: var(--sl-green);
   color: #fff;
 }
 
@@ -343,5 +377,6 @@ a:hover { text-decoration: underline; }
   .container { padding: 16px; }
   .site-header .container { flex-direction: column; align-items: flex-start; }
   .nav a:first-child { margin-left: 0; }
-  .home .hero h1 { font-size: 24px; }
+  h1 { font-size: 24px; letter-spacing: -0.3px; }
+  h2 { font-size: 19px; letter-spacing: -0.3px; }
 }
