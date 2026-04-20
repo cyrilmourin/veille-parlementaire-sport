@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
+from . import amo_loader
 from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
@@ -34,6 +35,76 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     # ou passée depuis 5 semaines disparaissait du site.
     "agenda": 90,
 }
+
+def _fix_cr_row(r: dict) -> None:
+    """Répare en mémoire l'URL et le titre d'un item comptes_rendus
+    ingéré avant les patchs AN/Sénat (CR). Opère sur place.
+
+    - AN : ancienne URL /dyn/17/seances (404) → /dyn/17/comptes-rendus/seance/{cr_ref}
+      ou à défaut /dyn/17/comptes-rendus (toujours 200).
+    - Sénat : URL tronquée https://www.senat.fr/seances/s{YYYYMM}/ → ajoute
+      le jour final /s{YYYYMMDD}/ depuis raw.seance_date_iso.
+    - Titre générique (« Compte rendu AN — CRSAN… ») réécrit en « Séance
+      {chambre} du JJ/MM/AAAA — {thème} » si le raw contient le thème et/ou
+      la date.
+
+    Cette fonction est idempotente : réappliquer le patch n'a pas d'effet
+    sur un item déjà normalisé.
+    """
+    if (r.get("category") or "") != "comptes_rendus":
+        return
+    raw = r.get("raw")
+    if not isinstance(raw, dict):
+        return
+    url = (r.get("url") or "").strip()
+    title = (r.get("title") or "").strip()
+    cham = (r.get("chamber") or "").strip()
+
+    # --- URL AN cassée
+    if cham == "AN" and "/dyn/17/seances" in url and "/comptes-rendus/" not in url:
+        cr_ref = (raw.get("cr_ref") or "").strip()
+        if not cr_ref:
+            fichier = raw.get("fichier") or ""
+            m = re.search(r"CRSAN[A-Z0-9]{5,30}", fichier, re.IGNORECASE)
+            if m:
+                cr_ref = m.group(0).upper()
+        if cr_ref:
+            url = f"https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/seance/{cr_ref}"
+        else:
+            url = "https://www.assemblee-nationale.fr/dyn/17/comptes-rendus"
+        r["url"] = url
+
+    # --- URL Sénat cassée (manque le jour)
+    elif cham in ("Senat", "Sénat"):
+        m_s = re.match(r"^https://www\.senat\.fr/seances/s(\d{6})/?$", url)
+        if m_s:
+            iso = (raw.get("seance_date_iso") or "").strip()
+            if not iso:
+                # Fallback : reconstruit depuis published_at
+                pa = r.get("published_at")
+                if isinstance(pa, str) and re.match(r"^\d{4}-\d{2}-\d{2}", pa):
+                    iso = pa[:10]
+            if re.match(r"^\d{4}-\d{2}-\d{2}$", iso):
+                ymd = iso.replace("-", "")
+                r["url"] = f"https://www.senat.fr/seances/s{ymd[:6]}/s{ymd}/"
+
+    # --- Titre générique pré-patch → réécriture avec date + thème
+    looks_generic = bool(
+        re.match(r"^Compte rendu (AN|intégral|analytique) — ", title)
+    )
+    if looks_generic:
+        theme = (raw.get("theme") or "").strip()
+        date_str = (r.get("published_at") or "")[:10]
+        date_label = ""
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
+            y, mo, dd = date_str.split("-")
+            date_label = f"{dd}/{mo}/{y}"
+        if date_label and theme:
+            r["title"] = f"Séance {cham} du {date_label} — {theme}"[:220]
+        elif date_label:
+            label_short = "analytique" if "analytique" in title.lower() else "intégral"
+            r["title"] = f"Séance {cham} du {date_label} — Compte rendu {label_short}"[:220]
+
 
 def _window_for(category: str | None) -> int:
     """Fenêtre (jours) applicable à une catégorie donnée."""
@@ -195,6 +266,10 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # Dédup APRÈS tri par date : on garde la version la plus récente en cas
     # de doublons (title+url identique, UID différent).
     rows = _dedup(rows)
+    # Réparation in-place des CR pré-patch (URLs cassées AN/Sénat, titres
+    # génériques). Voir _fix_cr_row : idempotent.
+    for r in rows:
+        _fix_cr_row(r)
 
     # Index global
     index_payload = {
@@ -336,8 +411,13 @@ def _fmt_item_line(it: dict, with_tags: bool = True) -> str:
 
     date_html = f'<time class="date">{date}</time>' if date else ""
 
-    # Mots-clés : inline (pas de retour à la ligne), sur la même ligne que
-    # la meta. Coloration via CSS .kw-tag[data-family=...].
+    # Meta principale (chambre · statut · date) sur une ligne, puis tags sur
+    # une 2e ligne dédiée (.meta-tags) — évite que la liste de mots-clés
+    # déborde du cadre sur les écrans étroits.
+    # Coloration des tags via CSS .kw-tag[data-family=...].
+    main_parts = [p for p in [chamber_html, status_html, date_html] if p]
+    main_inline = " · ".join(main_parts) if main_parts else ""
+
     tags_html = ""
     if kws and with_tags:
         tags_html = " ".join(
@@ -346,11 +426,14 @@ def _fmt_item_line(it: dict, with_tags: bool = True) -> str:
             for k in kws[:12]
         )
 
-    meta_parts = [p for p in [chamber_html, status_html, date_html, tags_html] if p]
-    meta_inline = (" · ".join(meta_parts)) if meta_parts else ""
-    meta_html = (
-        f' <span class="item-meta">{meta_inline}</span>' if meta_inline else ""
-    )
+    meta_html = ""
+    if main_inline or tags_html:
+        meta_html = ' <span class="item-meta">'
+        if main_inline:
+            meta_html += f'<span class="meta-main">{main_inline}</span>'
+        if tags_html:
+            meta_html += f'<span class="meta-tags">{tags_html}</span>'
+        meta_html += "</span>"
 
     # Titre : hypertexte uniquement si on a une URL exploitable.
     # Sinon (ex. réunions AN : pas d'URL publique stable), on affiche
@@ -485,6 +568,8 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         # assemblee._normalize_dosleg). Permet à list.html d'afficher le
         # badge de statut sur /items/dossiers_legislatifs/.
         raw = r.get("raw") or {}
+        # NB : _fix_cr_row a déjà réécrit r["url"] / r["title"] pour les CR
+        # pré-patch au tout début d'export() — pas de post-process ici.
         status_label = ""
         is_promulgated = False
         actes_timeline: list[dict] = []
@@ -514,6 +599,35 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
             auteur_label = (raw.get("auteur") or "").strip()
             auteur_groupe = (raw.get("groupe") or "").strip()
             auteur_url = (raw.get("auteur_url") or "").strip()
+            # Ré-résolution à l'export : certains items (pre-patch AMO) ont
+            # été ingérés avant que le cache PA→nom soit rempli et gardent
+            # "Député PAxxxx" / "PAxxxx" dans raw.auteur. On refait passer
+            # via amo_loader pour afficher le vrai nom.
+            auteur_ref = (raw.get("auteur_ref") or "").strip()
+            needs_resolve = (
+                (not auteur_label)
+                or auteur_label.startswith("Député PA")
+                or bool(re.match(r"^PA\d+$", auteur_label))
+            )
+            if needs_resolve and auteur_ref.startswith("PA"):
+                resolved = amo_loader.resolve_acteur(auteur_ref)
+                if resolved:
+                    auteur_label = resolved
+                    if not auteur_groupe:
+                        auteur_groupe = amo_loader.resolve_groupe(auteur_ref) or ""
+            # Groupe : résoudre POxxx → abrégé si pas encore résolu.
+            if auteur_groupe.startswith("PO") and auteur_groupe[2:].isdigit():
+                grp_lib = amo_loader.resolve_organe(auteur_groupe, prefer_long=False)
+                if grp_lib:
+                    auteur_groupe = grp_lib
+            # URL fiche député : reconstruit si manquant mais acteurRef connu.
+            if not auteur_url and auteur_ref.startswith("PA") and auteur_ref[2:].isdigit():
+                auteur_url = f"https://www.assemblee-nationale.fr/dyn/deputes/{auteur_ref}"
+            # Titre des questions : si le titre embarqué contient encore le
+            # code "Député PAxxxx" (item pre-patch), on le réécrit avec le
+            # nom résolu. Évite un reset DB complet.
+            if auteur_label and title:
+                title = re.sub(r"Député PA\d+", auteur_label, title)
         status_label = status_label.replace('"', "'")
 
         fm = [

@@ -126,6 +126,51 @@ def unzip_members_since(
             )
 
 
+# --- Extraction de thème depuis un compte rendu --------------------------
+# Heuristiques pour deviner l'objet d'une séance (AN ou Sénat) à partir du
+# texte brut de son CR, sans parser le XML propriétaire. Cyril veut que le
+# titre évoque le thème du débat, pas juste "Séance du JJ/MM/AAAA".
+import re as _re_theme
+
+_THEMES_RE = _re_theme.compile(
+    r"("
+    r"discussion (?:générale )?(?:du|de la|des) (?:projet|proposition|texte)[^\.\n;]{5,160}|"
+    r"examen (?:du|de la|des) [^\.\n;]{5,160}|"
+    r"projet de loi (?:relatif|de finances|de programmation|portant|autorisant|ratifiant)[^\.\n;]{5,160}|"
+    r"proposition de loi (?:relative|portant|tendant|visant|ratifiant)[^\.\n;]{5,160}|"
+    r"proposition de résolution[^\.\n;]{5,160}|"
+    r"ordre du jour\s*:\s*[^\.\n;]{5,180}|"
+    r"questions? (?:au gouvernement|d'actualité)[^\.\n;]{0,100}|"
+    r"déclaration du gouvernement (?:relative|sur)[^\.\n;]{5,160}"
+    r")",
+    _re_theme.IGNORECASE,
+)
+
+
+def extract_cr_theme(text: str | None, max_len: int = 110) -> str:
+    """Extrait un libellé de thème pertinent depuis le texte d'un compte rendu.
+
+    Cherche dans les 8000 premiers caractères les patterns typiques d'ordre
+    du jour ou d'objet de séance (« Discussion du projet de loi relatif à… »,
+    « Questions au gouvernement », « Examen du rapport sur… »). Renvoie ""
+    si aucun pattern reconnu.
+    """
+    if not text:
+        return ""
+    sample = text[:8000]
+    m = _THEMES_RE.search(sample)
+    if not m:
+        return ""
+    theme = _re_theme.sub(r"\s+", " ", m.group(1)).strip(" .,;:—-")
+    if not theme:
+        return ""
+    # Capitalise la 1re lettre, préserve les sigles / accents.
+    theme = theme[0].upper() + theme[1:]
+    if len(theme) > max_len:
+        theme = theme[:max_len].rsplit(" ", 1)[0] + "…"
+    return theme
+
+
 def parse_iso(s: str | None) -> datetime | None:
     if not s:
         return None

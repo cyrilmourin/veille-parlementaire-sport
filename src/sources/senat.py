@@ -15,6 +15,7 @@ import feedparser
 
 from ..models import Item
 from ._common import (
+    extract_cr_theme,
     fetch_bytes,
     fetch_bytes_heavy,
     fetch_text,
@@ -224,8 +225,9 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
             except ValueError:
                 pass
 
-        # Titre humain : "Séance du 11 février 2026 — Compte rendu intégral"
-        # Le suffixe (analytique / intégral) dépend du dataset source.
+        # Titre humain : on veut évoquer le thème du débat quand possible
+        # (« Séance du 11 février 2026 — Discussion du projet de loi relatif
+        # au sport amateur »). À défaut, on garde la mention analytique/intégral.
         # report_type expose la distinction aux templates dédiés sans avoir
         # à parser le titre.
         report_type = "analytique" if sid == "senat_debats" else "integral"
@@ -234,8 +236,14 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
             if report_type == "analytique"
             else "Compte rendu intégral"
         )
-        if m_name and seance_dt.year > 2000:
-            title = f"Séance du {_fmt_fr_date(seance_dt)} — {label}"[:220]
+        theme = extract_cr_theme(text)
+        date_label = _fmt_fr_date(seance_dt) if (m_name and seance_dt.year > 2000) else ""
+        if date_label and theme:
+            title = f"Séance du {date_label} — {theme}"[:220]
+        elif date_label:
+            title = f"Séance du {date_label} — {label}"[:220]
+        elif theme:
+            title = f"{label} — {theme}"[:220]
         else:
             # Fallback : ancien format (nom de fichier non reconnu)
             title = f"{label} — {base}"[:220]
@@ -274,6 +282,9 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
                 "seance_date_iso": (
                     seance_dt.date().isoformat() if seance_dt.year > 2000 else ""
                 ),
+                # Thème extrait du corps du CR (utile pour diagnostic + pour
+                # enrichir le titre côté export si celui en base est vieux).
+                "theme": theme,
             },
         ))
 
@@ -286,6 +297,58 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
 
 
 _NORM_RE = re.compile(r"[\s_\-\.]+")
+
+
+def _parse_date_any(s: str | None) -> datetime | None:
+    """Parse une date ISO (YYYY-MM-DD) ou française (DD/MM/YYYY).
+
+    Les CSV du Sénat (dosleg, ppl, promulguees…) mélangent les deux
+    formats selon les fichiers. parse_iso seul rejette DD/MM/YYYY et
+    laissait beaucoup de lignes sans date (les dossiers apparaissaient
+    alors sans date sur le site).
+    """
+    if not s:
+        return None
+    s = s.strip()
+    if not s:
+        return None
+    # ISO 8601 (avec ou sans T)
+    try:
+        if "T" in s:
+            return datetime.fromisoformat(s.replace("Z", "+00:00"))
+        return datetime.fromisoformat(s)
+    except Exception:
+        pass
+    # DD/MM/YYYY ou D/M/YYYY
+    m = re.match(r"^(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{2,4})$", s)
+    if m:
+        d, mo, y = m.groups()
+        y = int(y)
+        if y < 100:
+            y += 2000
+        try:
+            return datetime(int(y), int(mo), int(d))
+        except ValueError:
+            return None
+    # DD mois YYYY (ex : "18 février 2026")
+    parts = s.lower().split()
+    if len(parts) == 3 and parts[1] in _FR_MONTHS:
+        try:
+            return datetime(int(parts[2]), _FR_MONTHS.index(parts[1]) + 1,
+                            int(parts[0]))
+        except (ValueError, IndexError):
+            return None
+    return None
+
+
+def _cap_first(text: str) -> str:
+    """Met en majuscule la 1re lettre, préserve le reste (sigles : SNCF, CNIL).
+    Aligné sur senat_akn._fetch_akn_index (ligne 391) — cohérence dossiers
+    législatifs entre sources CSV et AKN."""
+    if not text:
+        return text
+    return text[0].upper() + text[1:]
+
 
 def _norm_key(s: str) -> str:
     """Normalise un nom de colonne : minuscule, sans accents, sans espaces/_-."""
@@ -326,23 +389,38 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
                          "numero_initiative", "numeroInitiative",
                          "numero", "num", "id_dosleg", "id", "uid")
             titre = _pick(r, "Titre", "intitule", "libelle", "intituleLong")
-            date = parse_iso(_pick(r, "Date de dépôt", "Date de promulgation",
-                                     "Date initiale", "Date de la décision",
-                                     "date_depot", "dateDepot",
-                                     "datePromulgation", "datePublication",
-                                     "date_publication", "date"))
+            # Date : CSV Sénat historiquement en DD/MM/YYYY. _parse_date_any
+            # couvre ISO + DD/MM/YYYY + "DD mois YYYY". Sans ça, tous les
+            # dossiers issus des CSV arrivaient sans date sur le site.
+            date = _parse_date_any(_pick(
+                r, "Date de dépôt", "Date de promulgation",
+                "Date initiale", "Date de la décision",
+                "date_depot", "dateDepot",
+                "datePromulgation", "datePublication",
+                "date_publication", "date",
+            ))
             if not uid or not titre:
                 continue
             url = (_pick(r, "URL du dossier", "url", "lien")
                    or f"https://www.senat.fr/dossier-legislatif/{uid}.html")
+            # Titre : CSV Sénat remontent souvent le libellé en minuscule
+            # ("projet de loi relatif à…"). On aligne la capitalisation sur
+            # senat_akn pour cohérence visuelle des dossiers législatifs.
+            titre_disp = _cap_first(titre)
             # Contenu utile pour matching : on ajoute tout le texte du row
             extras = " ".join(v for v in r.values() if isinstance(v, str) and len(v) > 3)
+            # Si la source est "promulguees", on marque le flag pour que le
+            # badge passe en vert côté template.
+            raw = dict(r)
+            if sid == "senat_promulguees":
+                raw["is_promulgated"] = True
+                raw.setdefault("status_label", "Promulguée")
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
-                title=titre[:220], url=url,
+                title=titre_disp[:220], url=url,
                 published_at=date,
-                summary=(titre + " — " + extras)[:2000],
-                raw=r,
+                summary=(titre_disp + " — " + extras)[:2000],
+                raw=raw,
             )
 
     elif sid == "senat_rapports":

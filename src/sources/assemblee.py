@@ -11,7 +11,14 @@ from typing import Iterable
 
 from ..models import Item
 from .. import amo_loader
-from ._common import fetch_bytes, fetch_bytes_heavy, parse_iso, unzip_members, unzip_members_since
+from ._common import (
+    extract_cr_theme,
+    fetch_bytes,
+    fetch_bytes_heavy,
+    parse_iso,
+    unzip_members,
+    unzip_members_since,
+)
 
 log = logging.getLogger(__name__)
 
@@ -218,6 +225,11 @@ _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
 _DATE_IN_NAME_RE = re.compile(r"(\d{4})[-_]?(\d{2})[-_]?(\d{2})")
 
+# cr_ref AN : identifiant canonique d'un compte rendu de séance.
+# Exemple : CRSANR5L17S2026O1N039 → /dyn/17/comptes-rendus/seance/CRSANR5L17S2026O1N039
+# Chercher dans le nom de fichier OU dans le contenu (balise xml <idCR>).
+_CR_REF_RE = re.compile(r"CRSAN[A-Z0-9]{5,30}", re.IGNORECASE)
+
 
 def _strip_xml(text: str) -> str:
     """Retire les tags XML/HTML et normalise les espaces."""
@@ -288,9 +300,34 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
         # UID stable basé sur (source_id, nom_fichier)
         uid = hashlib.sha1(f"{sid}:{name}".encode()).hexdigest()[:16]
 
-        # Titre : on extrait la base du nom du fichier (sans chemin/extension)
+        # cr_ref : identifiant canonique du CR (ex. CRSANR5L17S2026O1N039).
+        # On le cherche d'abord dans le nom de fichier, puis en fallback dans
+        # le texte brut (balise propriétaire <idCR>CRSAN…</idCR>).
         base = os.path.basename(name).rsplit(".", 1)[0]
-        title = f"Compte rendu AN — {base}"[:220]
+        m_cr = _CR_REF_RE.search(base) or _CR_REF_RE.search(raw[:5000])
+        cr_ref = m_cr.group(0).upper() if m_cr else ""
+
+        # URL : si on a un cr_ref, on pointe vers la page CR dédiée
+        # (/dyn/17/comptes-rendus/seance/{cr_ref}) ; sinon fallback liste
+        # des séances du mandat (toujours 200). L'ancienne URL
+        # /dyn/17/seances est en 404.
+        if cr_ref:
+            url = f"https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/seance/{cr_ref}"
+        else:
+            url = "https://www.assemblee-nationale.fr/dyn/17/comptes-rendus"
+
+        # Titre : on veut évoquer le thème du débat. Ordre de priorité :
+        #   1) thème extrait du texte (discussion du projet de loi…)
+        #   2) à défaut, juste la date + mention séance AN
+        theme = extract_cr_theme(text)
+        if published_at and theme:
+            title = f"Séance AN du {published_at:%d/%m/%Y} — {theme}"[:220]
+        elif published_at:
+            title = f"Séance AN du {published_at:%d/%m/%Y} — Compte rendu intégral"[:220]
+        elif theme:
+            title = f"Séance AN — {theme}"[:220]
+        else:
+            title = f"Compte rendu AN — {base}"[:220]
 
         # Résumé : tronqué à 2000 caractères. Le matcher mots-clés verra
         # donc la première partie du CR, suffisant pour détecter une
@@ -303,11 +340,20 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
             category=cat,
             chamber="AN",
             title=title,
-            url=f"https://www.assemblee-nationale.fr/dyn/17/seances",
+            url=url,
             published_at=published_at,
             summary=summary,
-            raw={"path": "assemblee:syceron", "fichier": name,
-                 "taille": len(payload)},
+            raw={
+                "path": "assemblee:syceron",
+                "fichier": name,
+                "taille": len(payload),
+                "cr_ref": cr_ref,
+                # Exposé au template comptes_rendus/list.html pour le badge
+                # de type (AN = intégral par défaut).
+                "report_type": "integral",
+                "report_label": "Compte rendu intégral",
+                "theme": theme,
+            },
         ))
     log.info("%s : %d items (sur %d fichiers XML/HTML)", sid, len(items), file_count)
     return items
