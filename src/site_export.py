@@ -19,8 +19,23 @@ from typing import Iterable
 
 from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 
-# Fenêtre de publication visible sur le site (jours).
+# Fenêtre de publication visible sur le site (jours) — par défaut pour les
+# flux à forte rotation (questions, CR, amendements, communiqués, agenda).
 WINDOW_DAYS = 30
+
+# Fenêtre spécifique par catégorie pour les flux à cycle long (dossiers
+# législatifs : navettes de plusieurs mois à plusieurs années). Le dict prime
+# sur WINDOW_DAYS pour les catégories listées.
+WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
+    "dossiers_legislatifs": 730,   # 2 ans — cycle législatif complet
+}
+
+def _window_for(category: str | None) -> int:
+    """Fenêtre (jours) applicable à une catégorie donnée."""
+    if category and category in WINDOW_DAYS_BY_CATEGORY:
+        return WINDOW_DAYS_BY_CATEGORY[category]
+    return WINDOW_DAYS
+
 # Sous-fenêtre "mises à jour du jour" pour le haut de la home.
 RECENT_HOURS = 24
 
@@ -76,17 +91,20 @@ def _load(rows: list[dict]) -> list[dict]:
 
 
 def _filter_window(rows: list[dict]) -> list[dict]:
-    """Garde uniquement les items dont la date de PUBLICATION est dans WINDOW_DAYS.
+    """Garde uniquement les items dont la date de PUBLICATION est dans la
+    fenêtre applicable à leur catégorie (WINDOW_DAYS_BY_CATEGORY sinon
+    WINDOW_DAYS).
 
-    Stratégie stricte : on n'utilise plus `inserted_at` comme fallback, pour
-    éviter qu'un item sans date officielle se voie attribuer la date du jour
-    (= la date à laquelle le scraper l'a ingéré). Un item sans `published_at`
-    est conservé uniquement s'il a été inséré récemment (il est alors affiché
-    sans date pour ne pas tromper l'utilisateur).
+    Stratégie stricte : on n'utilise plus `inserted_at` comme fallback pour
+    les items datés, afin d'éviter qu'un item sans date officielle se voie
+    attribuer la date du jour. Un item sans `published_at` est conservé
+    uniquement s'il a été inséré récemment (dans la fenêtre de sa catégorie).
     """
-    cutoff = datetime.utcnow() - timedelta(days=WINDOW_DAYS)
+    now = datetime.utcnow()
     kept = []
     for r in rows:
+        window = _window_for(r.get("category"))
+        cutoff = now - timedelta(days=window)
         dt = _parse_dt(r.get("published_at"))
         if dt is not None:
             if dt >= cutoff:
@@ -328,14 +346,16 @@ def _escape(s: str) -> str:
 def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict]],
                 recent: list[dict]):
     now = datetime.now()
+    # NB : on ne met pas l'heure dans `date:` pour éviter les pages cachées
+    # par Hugo si `date > now()` au moment du build (fuseau navigateur vs UTC).
     lines = [
         "---",
         f'title: "Veille parlementaire sport — {now:%Y-%m-%d}"',
-        f'date: {now.isoformat(timespec="seconds")}',
+        f'date: {now:%Y-%m-%d}',
         'description: "Veille institutionnelle du sport — actualisée quotidiennement par Sideline Conseil."',
         "---",
         "",
-        f"**{len(rows)} publications officielles** dans la fenêtre des {WINDOW_DAYS} derniers jours.",
+        f"**{len(rows)} publications officielles** dans la fenêtre glissante.",
         "Dernière mise à jour : " + now.strftime("%A %d %B %Y — %H:%M").capitalize() + ".",
         "",
     ]
@@ -350,17 +370,18 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         lines.append("_Aucune nouveauté dans les dernières 24 heures — la collecte reste active._")
     lines.append("")
 
-    # -------- Sections par catégorie (fenêtre 30 j) ------------------
-    lines.append(f"## Derniers {WINDOW_DAYS} jours, par thématique")
+    # -------- Sections par catégorie (fenêtre par catégorie) ----------
+    lines.append("## Par thématique")
     lines.append("")
     for cat in CATEGORY_ORDER:
         if cat not in by_cat:
             continue
         label = CATEGORY_LABELS.get(cat, cat)
+        window = _window_for(cat)
         # Tri explicite du bucket par date desc (plus récent en haut)
         bucket = _sort_by_date_desc(by_cat[cat])
         # Lien vers la page catégorie pour consultation exhaustive
-        lines.append(f"### [{label}](/items/{cat}/) ({len(bucket)})")
+        lines.append(f"### [{label}](/items/{cat}/) ({len(bucket)}) — fenêtre {window} j")
         lines.append("")
         for it in bucket[:10]:
             lines.append(_fmt_item_line(it))
@@ -379,13 +400,14 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
         d.mkdir(parents=True, exist_ok=True)
         label = CATEGORY_LABELS.get(cat, cat)
         count = len(by_cat.get(cat, []))
+        window = _window_for(cat)
         lines = [
             "---",
             f'title: "{label}"',
-            f'description: "Veille {label.lower()} — {count} items sur {WINDOW_DAYS} jours glissants."',
+            f'description: "Veille {label.lower()} — {count} items sur {window} jours glissants."',
             "---",
             "",
-            f"{count} publication{'s' if count > 1 else ''} dans cette catégorie sur les {WINDOW_DAYS} derniers jours.",
+            f"{count} publication{'s' if count > 1 else ''} dans cette catégorie sur les {window} derniers jours.",
             "",
         ]
         (d / "_index.md").write_text("\n".join(lines), encoding="utf-8")
@@ -406,6 +428,24 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         published_at = r.get("published_at") or ""
         source_url = (r.get("url") or "").replace('"', "")
         snippet = (r.get("snippet") or "").replace('"', "'").replace("\n", " ")
+        # Remonte les champs enrichis depuis `raw` pour les dossiers
+        # législatifs (status_label + is_promulgated injectés par
+        # assemblee._normalize_dosleg). Permet à list.html d'afficher le
+        # badge de statut sur /items/dossiers_legislatifs/.
+        raw = r.get("raw") or {}
+        status_label = ""
+        is_promulgated = False
+        if isinstance(raw, dict):
+            status_label = (raw.get("status_label") or "").strip()
+            is_promulgated = bool(raw.get("is_promulgated"))
+            # On retire le préfixe "AN · " ou "Senat · " pour éviter le
+            # doublon visuel avec le badge chambre (cf. _fmt_item_line).
+            for prefix in ("AN · ", "Senat · ", "Sénat · "):
+                if status_label.startswith(prefix):
+                    status_label = status_label[len(prefix):]
+                    break
+        status_label = status_label.replace('"', "'")
+
         fm = [
             "---",
             f'title: "{title}"',
@@ -420,6 +460,8 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
             f"keywords: {json.dumps(r.get('matched_keywords') or [], ensure_ascii=False)}",
             f"families: {json.dumps(r.get('keyword_families') or [], ensure_ascii=False)}",
             f'snippet: "{snippet}"',
+            f'status_label: "{status_label}"',
+            f"is_promulgated: {str(is_promulgated).lower()}",
             "---",
             "",
             (r.get("summary") or "").strip(),

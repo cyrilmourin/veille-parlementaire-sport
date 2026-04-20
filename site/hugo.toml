@@ -3,6 +3,12 @@ languageCode = "fr-fr"
 title = "Veille parlementaire sport — Sideline Conseil"
 enableRobotsTXT = true
 
+# Défense en profondeur : ne pas masquer une page dont `date:` tombe dans le
+# futur à cause d'un écart de fuseau build/navigateur. Toutes les pages
+# veille restent visibles.
+buildFuture = true
+buildExpired = true
+
 [params]
   description = "Veille institutionnelle du sport — Parlement, Gouvernement, JORF, autorités."
   author = "Sideline Conseil"

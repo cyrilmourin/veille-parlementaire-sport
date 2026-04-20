@@ -13,6 +13,7 @@
         {{ end }}
         <span class="item-meta">
           {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
+          {{ with .Params.status_label }} · <span class="status{{ if $.Params.is_promulgated }} status-promulgated{{ end }}">{{ . }}</span>{{ end }}
           {{ if not .Date.IsZero }} · <time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006" }}</time>{{ end }}
           {{ with .Params.families }}{{ $fam := index . 0 }}{{ with $.Params.keywords }} · {{ range first 12 . }}<span class="kw-tag" data-family="{{ $fam }}">{{ . }}</span>{{ end }}{{ end }}{{ end }}
           {{ if not .Params.families }}{{ with .Params.keywords }} · {{ range first 12 . }}<span class="kw-tag">{{ . }}</span>{{ end }}{{ end }}{{ end }}
