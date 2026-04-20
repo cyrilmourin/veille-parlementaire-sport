@@ -67,6 +67,14 @@ jobs:
           echo "reset_db=1 → purge de data/veille.sqlite3 pour re-normaliser l'historique"
           rm -f data/veille.sqlite3
 
+      # Refresh du cache AMO (acteurs + organes) si absent ou > 7 jours.
+      # Le script est idempotent : il skippe s'il trouve un cache frais.
+      # Le fichier JSON compact (~100 Ko) est committé à la fin du job pour
+      # être disponible en dev local sans refetch du dump 80 Mo.
+      - name: Refresh AMO cache (weekly)
+        run: |
+          python -m scripts.refresh_amo_cache --max-age-days 7
+
       - name: Run pipeline (fetch + match + email + export)
         env:
           # PISTE (Légifrance OAuth2) — non utilisé par défaut, JORF passe via DILA OPENDATA.
@@ -112,13 +120,13 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # Commit uniquement le dernier digest HTML (lisible, ~300 Ko).
-      # La DB SQLite est persistée via actions/cache (>100 Mo, donc pas dans git).
-      - name: Commit last digest
+      # Commit du dernier digest HTML (~300 Ko) + cache AMO (~100 Ko) si
+      # regénéré. La DB SQLite reste persistée via actions/cache (>100 Mo).
+      - name: Commit last digest + AMO cache
         if: always()
         run: |
           git config user.name "veille-bot"
           git config user.email "veille-bot@sideline-conseil.fr"
-          git add data/last_digest.html || true
+          git add data/last_digest.html data/amo_resolved.json 2>/dev/null || true
           git diff --cached --quiet || git commit -m "chore: snapshot digest $(date -u +%Y-%m-%dT%H:%MZ)"
           git push || true

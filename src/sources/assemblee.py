@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
 from ..models import Item
+from .. import amo_loader
 from ._common import fetch_bytes, parse_iso, unzip_members, unzip_members_since
 
 log = logging.getLogger(__name__)
@@ -408,7 +409,22 @@ def _normalize_amendement(obj, src, cat):
                                   "auteurs.auteur.acteurRef", default=""))
     auteur_groupe = _text_of(_first(root, "signataires.groupePolitiqueRef",
                                      "auteurs.auteur.groupePolitiqueRef", default=""))
-    auteur_label = " ".join(x for x in [auteur_prenom, auteur_nom] if x).strip() or auteur_ref or "Auteur inconnu"
+    auteur_label = " ".join(x for x in [auteur_prenom, auteur_nom] if x).strip()
+    # Si l'amendement n'expose que l'acteurRef (cas le plus fréquent),
+    # on résout via le cache AMO (data/amo_resolved.json).
+    if not auteur_label and auteur_ref:
+        resolved = amo_loader.resolve_acteur(auteur_ref)
+        if resolved:
+            auteur_label = resolved
+            if not auteur_groupe:
+                auteur_groupe = amo_loader.resolve_groupe(auteur_ref)
+    if not auteur_label:
+        auteur_label = f"Député {auteur_ref}" if auteur_ref else "Auteur inconnu"
+    # Résout aussi le groupe si on n'a qu'un POxxx
+    if auteur_groupe and auteur_groupe.startswith("PO"):
+        groupe_lib = amo_loader.resolve_organe(auteur_groupe, prefer_long=False)
+        if groupe_lib:
+            auteur_groupe = groupe_lib
 
     # Dispositif + exposé sommaire (matériel pertinent pour matching mots-clés)
     dispo = _text_of(_first(root, "corps.dispositif", default=""))
@@ -456,6 +472,8 @@ def _normalize_amendement(obj, src, cat):
     if statut:
         title_bits.append(f"[{statut}]")
     title_bits.append(f"— {auteur_label}")
+    if auteur_groupe and not auteur_groupe.startswith("PO"):
+        title_bits.append(f"({auteur_groupe})")
     if article:
         title_bits.append(f"· art. {article}")
     title = " ".join(title_bits)[:220]
@@ -798,11 +816,20 @@ def _normalize_question(obj, src, cat):
                                      "auteur.groupePolitiqueRef",
                                      default=""))
     auteur_label = " ".join(x for x in [auteur_civilite, auteur_prenom, auteur_nom] if x).strip()
+    if not auteur_label and auteur_ref:
+        # Résolution via cache AMO : PAxxx → "Mme Marie Dupont"
+        resolved = amo_loader.resolve_acteur(auteur_ref)
+        if resolved:
+            auteur_label = resolved
+            if not auteur_groupe:
+                auteur_groupe = amo_loader.resolve_groupe(auteur_ref)
     if not auteur_label:
-        # Pas de nom dans le JSON (normal vu le XSD) — on affiche l'acteurRef
-        # préfixé "Député" pour que ce soit lisible. Remplacé par le vrai nom
-        # quand le loader AMO sera en place (task #6).
         auteur_label = f"Député {auteur_ref}" if auteur_ref else "Auteur"
+    # Résout le groupe si c'est un POxxx (groupePolitiqueRef brut)
+    if auteur_groupe and auteur_groupe.startswith("PO"):
+        groupe_lib = amo_loader.resolve_organe(auteur_groupe, prefer_long=False)
+        if groupe_lib:
+            auteur_groupe = groupe_lib
 
     # Ministère : XSD → `minInt` (TexteAbregeable_type, abrege+developpe).
     ministere = _text_of(_first(root,
@@ -1032,12 +1059,13 @@ def _normalize_agenda(obj, src, cat):
     if lieu and _AGENDA_ID_RE.match(lieu):
         lieu = ""
 
-    # --- ORGANE (IdOrgane_type, ex. PO838901) : gardé en raw
+    # --- ORGANE (IdOrgane_type, ex. PO838901) : gardé en raw + résolu
     organe_ref = _text_of(_first(root, "organeReuniRef", "organeRef",
                                    default=""))
     if not organe_ref:
         organe_ref = _text_of(_deep_find(root, "organeReuniRef",
                                           "organeRef") or "")
+    organe_label = amo_loader.resolve_organe(organe_ref) if organe_ref else ""
 
     # --- COMPTE RENDU DE SÉANCE (référence externe pour l'URL)
     cr_ref = ""
@@ -1059,15 +1087,28 @@ def _normalize_agenda(obj, src, cat):
             prefix += f" n°{num_jo}"
         title = f"{prefix} — {main_title}" if main_title else prefix
     elif is_commission:
+        # Privilégie le libellé résolu de la commission quand on l'a
+        commission_label = organe_label or (f"({organe_ref})" if organe_ref else "")
         if main_title:
             if main_title.lower().startswith("audition"):
                 title = main_title
+            elif organe_label:
+                title = f"{organe_label} — {main_title}"
             else:
                 title = f"Commission — {main_title}"
         else:
-            title = f"Réunion de commission ({organe_ref})" if organe_ref else "Réunion de commission"
+            title = (f"Réunion — {organe_label}" if organe_label
+                     else (f"Réunion de commission ({organe_ref})" if organe_ref
+                           else "Réunion de commission"))
     else:
-        title = main_title or (f"Réunion ({organe_ref})" if organe_ref else "Réunion")
+        if main_title:
+            title = main_title
+        elif organe_label:
+            title = f"Réunion — {organe_label}"
+        elif organe_ref:
+            title = f"Réunion ({organe_ref})"
+        else:
+            title = "Réunion"
 
     title = title[:220]
 
@@ -1075,8 +1116,10 @@ def _normalize_agenda(obj, src, cat):
     url = _agenda_url(uid, xsi_type, dt, cr_ref)
 
     # --- SUMMARY : structuré + shotgun pour alimenter le matcher.
+    organe_display = (f"{organe_label} ({organe_ref})" if organe_label and organe_ref
+                       else organe_label or organe_ref)
     structured = " — ".join(p for p in [
-        f"Organe : {organe_ref}" if organe_ref else "",
+        f"Organe : {organe_display}" if organe_display else "",
         f"Lieu : {lieu}" if lieu else "",
         " · ".join(titles[:5]) if titles else "",
     ] if p)
@@ -1095,6 +1138,7 @@ def _normalize_agenda(obj, src, cat):
         raw={
             "path": "assemblee:reunion",
             "organe": organe_ref,
+            "organe_label": organe_label,
             "lieu": lieu,
             "xsi_type": xsi_type,
         },
