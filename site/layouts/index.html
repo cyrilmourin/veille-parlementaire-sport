@@ -1,58 +1,18 @@
 {{ define "main" }}
 {{/*
-  Accueil en 2 zones :
-    .home-main  — contenu central (Dernières 24h + Par thématique)
-    .home-side  — aside Agenda, positionné EN DEHORS de la zone centrale
-                  sur grand écran (>=1500px) via position:absolute, réintégré
-                  dans le flux en dessous du main sur écran moyen/mobile.
-  L'aside n'est PAS dans un wrapper grid : il est frère direct de .home-main
-  dans .home--split (lui-même en position:relative).
+  Accueil : le contenu central uniquement. La sidebar (Recherche + Agenda)
+  est gérée par `layouts/_default/baseof.html` via le partial `sidebar.html`,
+  ce qui la rend disponible sur toutes les pages non full-width (home +
+  listings de catégories).
 */}}
-<section class="home home--split">
+<section class="home">
   <h3 class="page-intro">Veille institutionnelle du sport — Parlement, Gouvernement, JORF, Autorités</h3>
 
-  <div class="home-main">
-    {{/*
-      La page d'accueil est générée par src/site_export.py sous forme de
-      Markdown. Elle contient deux zones structurées (h2) : "Dernières 24 h"
-      puis "Par thématique" (thématiques repliables via <details>).
-    */}}
-    <div class="content">{{ .Content }}</div>
-  </div>
-
-  <aside class="home-side" aria-label="Agenda institutionnel">
-    <div class="side-card">
-      <h3 class="side-title">Agenda</h3>
-      <p class="side-caption">Prochains rendez-vous institutionnels</p>
-      {{ with site.Data.sidebar_agenda }}
-        <ul class="side-list">
-          {{ range . }}
-            <li class="side-item" data-chamber="{{ .chamber }}">
-              <div class="side-date">
-                {{ if .published_at }}
-                  <time datetime="{{ substr .published_at 0 10 }}">
-                    {{ dateFormat "02/01" (time.AsTime (substr .published_at 0 10)) }}
-                  </time>
-                {{ end }}
-              </div>
-              <div class="side-body">
-                {{ with .chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
-                {{ if .url }}
-                  <a href="{{ .url }}" class="side-title-link" rel="noopener" target="_blank">{{ .title }}</a>
-                {{ else }}
-                  <span class="side-title-text">{{ .title }}</span>
-                {{ end }}
-              </div>
-            </li>
-          {{ end }}
-        </ul>
-        <p class="side-more">
-          <a href="/items/agenda/">Voir tout l'agenda →</a>
-        </p>
-      {{ else }}
-        <p class="side-empty">Pas de rendez-vous institutionnel à venir.</p>
-      {{ end }}
-    </div>
-  </aside>
+  {{/*
+    La page d'accueil est générée par src/site_export.py sous forme de
+    Markdown. Elle contient deux zones structurées (h2) : "Dernières 24 h"
+    puis "Par thématique" (thématiques repliables via <details>).
+  */}}
+  <div class="content">{{ .Content }}</div>
 </section>
 {{ end }}

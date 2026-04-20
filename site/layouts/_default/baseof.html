@@ -20,8 +20,21 @@
 </head>
 <body>
   {{ partial "header.html" . }}
-  <main class="container">
-    {{ block "main" . }}{{ end }}
+  {{/*
+    Grille 2 colonnes : contenu central + sidebar (recherche + agenda).
+    Les pages qui veulent forcer le pleine-largeur peuvent définir
+    `params.fullwidth = true` dans leur front-matter.
+  */}}
+  {{ $full := or .Params.fullwidth (eq .Kind "404") }}
+  <main class="container layout{{ if not $full }} layout--split{{ end }}">
+    <div class="layout-main">
+      {{ block "main" . }}{{ end }}
+    </div>
+    {{ if not $full }}
+      <aside class="layout-side" aria-label="Modules latéraux">
+        {{ partial "sidebar.html" . }}
+      </aside>
+    {{ end }}
   </main>
   {{ partial "footer.html" . }}
 </body>

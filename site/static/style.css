@@ -58,7 +58,47 @@ body {
 a { color: var(--sl-red); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-.container { max-width: 1120px; margin: 0 auto; padding: 24px; }
+.container { max-width: 1280px; margin: 0 auto; padding: 24px; }
+
+/* ---------- Layout principal : central + sidebar ---------------------------
+   Structure :
+     <main class="container layout layout--split">
+       <div class="layout-main"> … </div>
+       <aside class="layout-side"> … </aside>
+     </main>
+   La grille bascule en 1 colonne sous 960px. Le contenu principal garde
+   min-width:0 pour ne pas déborder des listes longues.
+---------------------------------------------------------------------------- */
+.layout {
+  display: block;
+}
+.layout--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 28px;
+  align-items: start;
+}
+.layout-main {
+  min-width: 0;
+}
+.layout-side {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+@media (max-width: 960px) {
+  .layout--split {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .layout-side {
+    position: static;
+    order: 2;
+  }
+}
 
 /* ---------- Header -------------------------------------------------------- */
 .site-header {
@@ -220,8 +260,8 @@ a:hover { text-decoration: underline; }
   color: #fff;
 }
 
-/* Méta : à la ligne (sous le titre) — chambre · date · auteur sur la 1re ligne,
-   tags mots-clés sur une 2e ligne dédiée. */
+/* Méta : la méta-line est sous le titre, mais chambre · date · auteur · tags
+   sont TOUS sur la même ligne (wrap naturel si la fenêtre est étroite). */
 .item-meta {
   display: block;
   font-size: 12.5px;
@@ -230,12 +270,16 @@ a:hover { text-decoration: underline; }
   margin-left: 0;
   line-height: 1.7;
 }
-.item-meta .meta-main {
-  display: block;
-}
+.item-meta .meta-main,
 .item-meta .meta-tags {
-  display: block;
-  margin-top: 4px;
+  display: inline;
+}
+/* Séparateur visuel entre la meta-main et les tags quand les deux sont
+   présents. Pas de séparateur pour un éventuel espace vide. */
+.item-meta .meta-tags:not(:empty)::before {
+  content: " · ";
+  color: var(--muted);
+  margin: 0 2px;
 }
 .item-meta .date {
   color: var(--muted);
@@ -467,46 +511,64 @@ a:hover { text-decoration: underline; }
   .pagination-inline .pg-info { display: none; }
 }
 
-/* ---------- Accueil : main centré + aside Agenda hors-zone ------------ */
-/*
-   Structure HTML :
-     <section class="home home--split">  (position: relative)
-       <div class="home-main"> ... </div>
-       <aside class="home-side"> ... </aside>
-     </section>
-
-   Sur grand écran (>= 1500px), l'aside sort de la zone centrale en
-   position:absolute, positionné à gauche 100% + gap. Sur écran
-   intermédiaire / mobile, l'aside revient dans le flux, sous le main.
+/* ---------- Sidebar : cards modulaires (recherche + agenda) -----------
+   La sidebar est maintenant gérée par layouts/_default/baseof.html et
+   apparaît sur toutes les pages (grille 2 colonnes plus haut). Chaque
+   module est une card autonome.
 */
-.home--split {
-  position: relative;
-  margin-top: 10px;
-}
-.home-main {
-  min-width: 0;
-  width: 100%;
-}
-.home-side {
-  margin-top: 24px;
-  width: 100%;
-  max-width: 420px;
-}
-@media (min-width: 1500px) {
-  .home-side {
-    position: absolute;
-    top: 48px;
-    left: calc(100% + 24px);
-    margin-top: 0;
-    width: 300px;
-    max-width: 300px;
-  }
-}
 .side-card {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 14px 16px 12px;
+  padding: 16px 18px 14px;
+  box-shadow: 0 1px 3px rgba(18, 37, 73, 0.05);
+}
+
+/* Module recherche dans la sidebar */
+.side-card--search {
+  background: linear-gradient(180deg, #fff 0%, #fbf6e3 100%);
+}
+.side-search {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.side-search input[type="search"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: var(--font);
+  font-size: 13px;
+  background: #fff;
+  color: var(--fg);
+}
+.side-search input[type="search"]:focus {
+  outline: 2px solid var(--sl-blue);
+  outline-offset: 1px;
+  border-color: var(--sl-blue);
+}
+.side-search button {
+  flex: 0 0 36px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--sl-blue);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+.side-search button:hover {
+  background: var(--sl-red);
+}
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
 }
 .side-title {
   margin: 0;
@@ -812,29 +874,22 @@ a:hover { text-decoration: underline; }
   padding: 0 18px 14px 18px;
   margin: 0;
 }
-/* Items dépliés dans une thématique : padding interne L/R 12px pour
-   éviter que les tags/meta touchent le bord de la carte, et wrap propre
-   des mots-clés sur une 2e ligne. */
+/* Items dépliés dans une thématique : padding interne L/R 18px pour
+   éviter que les titres/tags touchent le bord de la carte. Spécificité
+   renforcée (.home .content .cat-fold …) pour battre `.home .content ul li`
+   qui sans ça annule le padding. */
+.home .content .cat-fold > ul li,
 .cat-fold > ul li {
-  padding-left: 12px;
-  padding-right: 12px;
+  padding-left: 18px;
+  padding-right: 18px;
   overflow-wrap: anywhere;
 }
-.cat-fold > ul li .item-meta,
-.home .content ul li .item-meta {
-  display: block;
-  margin-top: 4px;
-  margin-left: 0;
-  line-height: 1.7;
-}
-.cat-fold > ul li .item-meta .meta-main,
-.home .content ul li .item-meta .meta-main {
-  display: block;
-}
-.cat-fold > ul li .item-meta .meta-tags,
+/* Tags mots-clés en ligne avec meta-main (cohérent avec listings). */
+.home .content .cat-fold > ul li .item-meta .meta-main,
+.home .content .cat-fold > ul li .item-meta .meta-tags,
+.home .content ul li .item-meta .meta-main,
 .home .content ul li .item-meta .meta-tags {
-  display: block;
-  margin-top: 4px;
+  display: inline;
 }
 
 /* ---------- Accueil : section Dernières 24 h (compact, sans tags) --------- */
@@ -972,6 +1027,123 @@ a:hover { text-decoration: underline; }
 .site-footer a { color: var(--sl-cream); text-decoration: underline; }
 .site-footer a:hover { color: #fff; }
 .site-footer .small { font-size: 11px; opacity: .7; }
+
+/* ---------- Page Recherche ----------------------------------------------- */
+.search-page h1 {
+  color: var(--sl-blue);
+  margin: 6px 0 10px;
+}
+.search-page .page-intro {
+  color: var(--muted);
+  margin: 0 0 18px;
+  font-size: 14px;
+}
+.search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px 200px;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: 0 1px 3px rgba(18,37,73,0.05);
+}
+@media (max-width: 720px) {
+  .search-form { grid-template-columns: 1fr; }
+}
+.search-form input[type="search"],
+.search-form select {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: var(--font);
+  font-size: 14px;
+  background: #fff;
+  color: var(--fg);
+}
+.search-form input[type="search"]:focus,
+.search-form select:focus {
+  outline: 2px solid var(--sl-blue);
+  outline-offset: 1px;
+  border-color: var(--sl-blue);
+}
+.search-status {
+  color: var(--muted);
+  font-size: 13px;
+  font-style: italic;
+  margin: 14px 2px 8px;
+}
+.search-results {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.search-result {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 16px 10px;
+  box-shadow: 0 1px 2px rgba(18,37,73,0.04);
+}
+.search-result .search-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.search-result .search-cat {
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+  font-size: 10.5px;
+  color: var(--sl-blue);
+}
+.search-result .search-title {
+  margin: 4px 0 6px;
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.search-result .search-title a {
+  color: var(--sl-blue);
+}
+.search-result .search-title a:hover { color: var(--sl-red); }
+.search-result .search-snippet {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 6px;
+  line-height: 1.5;
+}
+.search-result .search-kws {
+  margin-top: 4px;
+}
+.search-more {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 13px;
+  text-align: center;
+  padding: 12px;
+  background: rgba(218,68,49,0.05);
+  border-radius: var(--radius);
+}
+
+/* Lien recherche dans le header (accent subtil) */
+.nav a.nav-search {
+  background: var(--sl-red);
+  padding: 4px 10px;
+  border-radius: 4px;
+  opacity: 1;
+}
+.nav a.nav-search:hover {
+  background: #fff;
+  color: var(--sl-blue);
+  border-bottom: 0;
+}
 
 /* ---------- Responsive ---------------------------------------------------- */
 @media (max-width: 640px) {

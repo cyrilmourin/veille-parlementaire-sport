@@ -1,0 +1,51 @@
+{{/*
+  Sidebar droite, utilisée par baseof.html sur toutes les pages non
+  full-width. Contient deux modules empilés :
+    1. Recherche — input qui redirige vers /recherche/?q={terme}. Sur la
+       page /recherche/ elle-même, le JS dédié intercepte pour rendre
+       les résultats inline.
+    2. Agenda — 8 prochains rendez-vous institutionnels, alimenté par
+       site/data/sidebar_agenda.json généré dans src/site_export.py.
+*/}}
+<div class="side-card side-card--search">
+  <h3 class="side-title">Recherche</h3>
+  <p class="side-caption">Tous les contenus de la veille (30 jours)</p>
+  <form class="side-search" action="/recherche/" method="get" role="search">
+    <label class="visually-hidden" for="side-q">Rechercher</label>
+    <input type="search" id="side-q" name="q" placeholder="ex. JO 2030, ANS, amendement&hellip;" autocomplete="off"/>
+    <button type="submit" aria-label="Lancer la recherche">&rsaquo;</button>
+  </form>
+</div>
+
+<div class="side-card side-card--agenda">
+  <h3 class="side-title">Agenda</h3>
+  <p class="side-caption">Prochains rendez-vous institutionnels</p>
+  {{ with site.Data.sidebar_agenda }}
+    <ul class="side-list">
+      {{ range . }}
+        <li class="side-item" data-chamber="{{ .chamber }}">
+          <div class="side-date">
+            {{ if .published_at }}
+              <time datetime="{{ substr .published_at 0 10 }}">
+                {{ dateFormat "02/01" (time.AsTime (substr .published_at 0 10)) }}
+              </time>
+            {{ end }}
+          </div>
+          <div class="side-body">
+            {{ with .chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
+            {{ if .url }}
+              <a href="{{ .url }}" class="side-title-link" rel="noopener" target="_blank">{{ .title }}</a>
+            {{ else }}
+              <span class="side-title-text">{{ .title }}</span>
+            {{ end }}
+          </div>
+        </li>
+      {{ end }}
+    </ul>
+    <p class="side-more">
+      <a href="/items/agenda/">Voir tout l'agenda &rarr;</a>
+    </p>
+  {{ else }}
+    <p class="side-empty">Pas de rendez-vous institutionnel à venir.</p>
+  {{ end }}
+</div>

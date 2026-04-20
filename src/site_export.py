@@ -60,12 +60,37 @@ def _fix_cr_row(r: dict) -> None:
     title = (r.get("title") or "").strip()
     cham = (r.get("chamber") or "").strip()
 
+    # Date réelle de séance, à déduire avec prudence :
+    # - AN : sans champ dédié dans raw (les CR AN n'ont pas de date embarquée
+    #        dans la cr_ref) → on ne l'invente PAS. published_at vaut la date
+    #        d'ingestion et n'est pas une date de séance fiable.
+    # - Sénat : le parser pré-patch laissait le nom de fichier XML dans le
+    #        titre ("CR intégral — d20260119.xml"). On y récupère la date.
+    seance_iso = (raw.get("seance_date_iso") or "").strip()
+    if not seance_iso:
+        # Nom de fichier embarqué dans le titre (cas Sénat pré-patch)
+        m_date = re.search(r"d(\d{4})(\d{2})(\d{2})\.xml", title)
+        if m_date:
+            seance_iso = f"{m_date.group(1)}-{m_date.group(2)}-{m_date.group(3)}"
+    # Pour le Sénat uniquement, si toujours rien, on peut tomber sur
+    # published_at comme dernier recours (meilleure que rien). Pour AN on
+    # n'a aucun fallback fiable → on laisse vide.
+    if not seance_iso and cham in ("Senat", "Sénat"):
+        pa = r.get("published_at")
+        if isinstance(pa, str) and re.match(r"^\d{4}-\d{2}-\d{2}", pa):
+            seance_iso = pa[:10]
+
     # --- URL AN cassée
     if cham == "AN" and "/dyn/17/seances" in url and "/comptes-rendus/" not in url:
         cr_ref = (raw.get("cr_ref") or "").strip()
         if not cr_ref:
             fichier = raw.get("fichier") or ""
             m = re.search(r"CRSAN[A-Z0-9]{5,30}", fichier, re.IGNORECASE)
+            if m:
+                cr_ref = m.group(0).upper()
+        # Cas rare : la cr_ref est parfois seulement dans le titre pré-patch
+        if not cr_ref:
+            m = re.search(r"CRSAN[A-Z0-9]{5,30}", title, re.IGNORECASE)
             if m:
                 cr_ref = m.group(0).upper()
         if cr_ref:
@@ -77,33 +102,40 @@ def _fix_cr_row(r: dict) -> None:
     # --- URL Sénat cassée (manque le jour)
     elif cham in ("Senat", "Sénat"):
         m_s = re.match(r"^https://www\.senat\.fr/seances/s(\d{6})/?$", url)
-        if m_s:
-            iso = (raw.get("seance_date_iso") or "").strip()
-            if not iso:
-                # Fallback : reconstruit depuis published_at
-                pa = r.get("published_at")
-                if isinstance(pa, str) and re.match(r"^\d{4}-\d{2}-\d{2}", pa):
-                    iso = pa[:10]
-            if re.match(r"^\d{4}-\d{2}-\d{2}$", iso):
-                ymd = iso.replace("-", "")
-                r["url"] = f"https://www.senat.fr/seances/s{ymd[:6]}/s{ymd}/"
+        if m_s and re.match(r"^\d{4}-\d{2}-\d{2}$", seance_iso):
+            ymd = seance_iso.replace("-", "")
+            r["url"] = f"https://www.senat.fr/seances/s{ymd[:6]}/s{ymd}/"
 
     # --- Titre générique pré-patch → réécriture avec date + thème
     looks_generic = bool(
-        re.match(r"^Compte rendu (AN|intégral|analytique) — ", title)
+        re.match(r"^(Compte rendu (AN|intégral|analytique) —|CR (intégral|analytique) —)",
+                 title)
     )
     if looks_generic:
         theme = (raw.get("theme") or "").strip()
-        date_str = (r.get("published_at") or "")[:10]
         date_label = ""
-        if re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
-            y, mo, dd = date_str.split("-")
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", seance_iso):
+            y, mo, dd = seance_iso.split("-")
             date_label = f"{dd}/{mo}/{y}"
+        # Chambre lisible (Senat→Sénat pour affichage)
+        cham_label = "Sénat" if cham in ("Senat", "Sénat") else cham
+        # Type de CR (intégral / analytique)
+        type_label = "intégral"
+        if "analytique" in title.lower():
+            type_label = "analytique"
         if date_label and theme:
-            r["title"] = f"Séance {cham} du {date_label} — {theme}"[:220]
+            r["title"] = f"Séance {cham_label} du {date_label} — {theme}"[:220]
         elif date_label:
-            label_short = "analytique" if "analytique" in title.lower() else "intégral"
-            r["title"] = f"Séance {cham} du {date_label} — Compte rendu {label_short}"[:220]
+            r["title"] = (
+                f"Séance {cham_label} du {date_label} "
+                f"— Compte rendu {type_label}"
+            )[:220]
+        elif cham == "AN":
+            # Pas de date fiable pour AN : on garde la cr_ref + chambre
+            m = re.search(r"CRSAN[A-Z0-9]{5,30}", title, re.IGNORECASE)
+            cref = m.group(0).upper() if m else ""
+            if cref:
+                r["title"] = f"Compte rendu AN — séance {cref}"[:220]
 
 
 def _window_for(category: str | None) -> int:
@@ -296,6 +328,39 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
             json.dumps(lst, ensure_ascii=False, indent=2, default=str),
             encoding="utf-8",
         )
+
+    # Index de recherche léger (~400 o/item) pour le moteur côté client.
+    # Servi tel quel à /search_index.json via site/static/. Contient titre +
+    # URL + category + chamber + date + résumé tronqué + mots-clés, afin de
+    # permettre un filtrage full-text en JS sans requête serveur.
+    # Clés courtes pour minimiser la taille : t=title, u=url, c=category,
+    # ch=chamber, d=date, s=summary court, k=keywords.
+    static_dir = root / "static"
+    static_dir.mkdir(parents=True, exist_ok=True)
+    search_items = []
+    for r in rows:
+        s = (r.get("summary") or "").strip()
+        # tronque à ~280 caractères (assez pour matcher un terme, pas pour
+        # gonfler l'index). On retire les entités HTML les plus fréquentes.
+        if len(s) > 280:
+            s = s[:280]
+        search_items.append({
+            "t": (r.get("title") or "").strip(),
+            "u": (r.get("url") or "").strip(),
+            "c": r.get("category") or "",
+            "ch": r.get("chamber") or "",
+            "d": (r.get("published_at") or "")[:10],
+            "s": s,
+            "k": r.get("matched_keywords") or [],
+        })
+    (static_dir / "search_index.json").write_text(
+        json.dumps({
+            "generated_at": datetime.utcnow().isoformat(timespec="seconds"),
+            "total": len(search_items),
+            "items": search_items,
+        }, ensure_ascii=False, separators=(",", ":"), default=str),
+        encoding="utf-8",
+    )
 
     # Sidebar agenda : 8 prochains rendez-vous (futurs ou du jour),
     # consommés par layouts/index.html pour afficher un module latéral.

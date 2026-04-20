@@ -1,0 +1,178 @@
+{{ define "main" }}
+{{/*
+  Page Recherche : moteur côté client.
+  - Charge /search_index.json (généré par src/site_export.py).
+  - Filtre par titre + résumé + mots-clés + catégorie + chambre, en
+    matching « tous les termes présents » (AND, casse-insensible, accents
+    normalisés).
+  - Pré-remplissage depuis ?q= (lien envoyé par la sidebar globale).
+  - Pas de dépendance externe : JS vanilla.
+
+  Le tag <noscript> assure un fallback minimal : un visiteur sans JS
+  voit le formulaire et est invité à activer JavaScript.
+*/}}
+<section class="search-page">
+  <h1>Recherche</h1>
+  <p class="page-intro">
+    Recherche plein-texte sur l'ensemble des publications collectées
+    (fenêtre 30 jours glissants, hors dossiers législatifs : 2 ans).
+  </p>
+
+  <form id="search-form" class="search-form" role="search" autocomplete="off">
+    <input type="search" id="q" name="q" placeholder="ex. JO 2030, ANS, amendement, ministre des sports&hellip;" autofocus/>
+    <select id="cat" name="cat" aria-label="Catégorie">
+      <option value="">Toutes catégories</option>
+      <option value="dossiers_legislatifs">Dossiers législatifs</option>
+      <option value="amendements">Amendements</option>
+      <option value="questions">Questions</option>
+      <option value="comptes_rendus">Comptes rendus</option>
+      <option value="agenda">Agenda</option>
+      <option value="jorf">JORF</option>
+      <option value="nominations">Nominations</option>
+      <option value="communiques">Publications</option>
+    </select>
+    <select id="chamber" name="chamber" aria-label="Chambre / source">
+      <option value="">Toutes sources</option>
+      <option value="AN">Assemblée nationale</option>
+      <option value="Senat">Sénat</option>
+      <option value="JORF">JORF</option>
+      <option value="Gouvernement">Gouvernement</option>
+      <option value="Elysee">Élysée</option>
+      <option value="Matignon">Matignon</option>
+    </select>
+  </form>
+
+  <p id="search-status" class="search-status" aria-live="polite">Chargement de l'index&hellip;</p>
+  <ol id="search-results" class="search-results"></ol>
+  <noscript>
+    <p class="search-status">Activez JavaScript pour utiliser le moteur de recherche.</p>
+  </noscript>
+</section>
+
+<script>
+(function() {
+  const $q = document.getElementById('q');
+  const $cat = document.getElementById('cat');
+  const $chamber = document.getElementById('chamber');
+  const $form = document.getElementById('search-form');
+  const $status = document.getElementById('search-status');
+  const $results = document.getElementById('search-results');
+
+  const CAT_LABEL = {
+    dossiers_legislatifs: 'Dossiers législatifs',
+    amendements: 'Amendements',
+    questions: 'Questions',
+    comptes_rendus: 'Comptes rendus',
+    agenda: 'Agenda',
+    jorf: 'JORF',
+    nominations: 'Nominations',
+    communiques: 'Publications',
+  };
+
+  // normalisation : minuscules + retrait des accents (NFD + range U+0300-U+036F)
+  function norm(s) {
+    return (s || '').toString().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function escapeHTML(s) {
+    return (s || '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  let INDEX = null;
+
+  function urlParam(name) {
+    const m = window.location.search.match(new RegExp('[?&]' + name + '=([^&]*)'));
+    return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : '';
+  }
+
+  function search() {
+    if (!INDEX) return;
+    const qRaw = $q.value.trim();
+    const cat = $cat.value;
+    const chamber = $chamber.value;
+    const terms = norm(qRaw).split(/\s+/).filter(Boolean);
+
+    let rows = INDEX.items;
+    if (cat) rows = rows.filter(r => r.c === cat);
+    if (chamber) rows = rows.filter(r => r.ch === chamber);
+
+    if (terms.length) {
+      rows = rows.filter(r => {
+        const hay = norm(r.t + ' ' + r.s + ' ' + (r.k || []).join(' '));
+        return terms.every(t => hay.indexOf(t) !== -1);
+      });
+    }
+
+    // Sync URL (sans recharger) pour permettre le partage du lien
+    const qs = new URLSearchParams();
+    if (qRaw) qs.set('q', qRaw);
+    if (cat) qs.set('cat', cat);
+    if (chamber) qs.set('chamber', chamber);
+    const newUrl = window.location.pathname + (qs.toString() ? '?' + qs : '');
+    window.history.replaceState(null, '', newUrl);
+
+    if (!terms.length && !cat && !chamber) {
+      $status.textContent = INDEX.items.length + ' publications dans l\u2019index. Tapez un terme ou choisissez une catégorie.';
+      $results.innerHTML = '';
+      return;
+    }
+
+    $status.textContent = rows.length + ' résultat' + (rows.length > 1 ? 's' : '');
+    const top = rows.slice(0, 100);
+    $results.innerHTML = top.map(r => {
+      const date = r.d ? r.d.split('-').reverse().join('/') : '';
+      const cham = r.ch ? '<span class="chamber" data-chamber="' + escapeHTML(r.ch) + '">' + escapeHTML(r.ch) + '</span> ' : '';
+      const catLabel = CAT_LABEL[r.c] || r.c;
+      const title = r.u
+        ? '<a href="' + escapeHTML(r.u) + '" rel="noopener" target="_blank">' + escapeHTML(r.t) + '</a>'
+        : escapeHTML(r.t);
+      const kws = (r.k || []).slice(0, 6).map(k =>
+        '<span class="kw-tag">' + escapeHTML(k) + '</span>'
+      ).join(' ');
+      const summary = r.s ? '<p class="search-snippet">' + escapeHTML(r.s) + '&hellip;</p>' : '';
+      return (
+        '<li class="search-result">' +
+          '<div class="search-meta">' + cham +
+            '<span class="search-cat">' + escapeHTML(catLabel) + '</span>' +
+            (date ? ' &middot; <span class="date">' + date + '</span>' : '') +
+          '</div>' +
+          '<div class="search-title">' + title + '</div>' +
+          summary +
+          (kws ? '<div class="search-kws">' + kws + '</div>' : '') +
+        '</li>'
+      );
+    }).join('');
+    if (rows.length > top.length) {
+      $results.innerHTML += '<li class="search-more">' + (rows.length - top.length) + ' autres résultats — affinez votre recherche.</li>';
+    }
+  }
+
+  fetch('/search_index.json', {cache: 'no-cache'})
+    .then(r => r.json())
+    .then(data => {
+      INDEX = data;
+      // Pré-remplit depuis ?q=, ?cat=, ?chamber=
+      const q0 = urlParam('q');
+      const cat0 = urlParam('cat');
+      const ch0 = urlParam('chamber');
+      if (q0) $q.value = q0;
+      if (cat0) $cat.value = cat0;
+      if (ch0) $chamber.value = ch0;
+      search();
+    })
+    .catch(err => {
+      $status.textContent = 'Erreur de chargement de l\u2019index : ' + err;
+    });
+
+  $form.addEventListener('submit', e => { e.preventDefault(); search(); });
+  ['input', 'change'].forEach(evt => {
+    $q.addEventListener(evt, search);
+    $cat.addEventListener('change', search);
+    $chamber.addEventListener('change', search);
+  });
+})();
+</script>
+{{ end }}
