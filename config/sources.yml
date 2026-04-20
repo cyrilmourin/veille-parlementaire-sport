@@ -291,13 +291,14 @@ autorites:
   sources:
     - id: ans
       category: communiques
-      # Domaine agencedusport.fr : ConnectTimeout chronique (3×60s = 3 min
-      # perdues par run). À ré-activer après vérification manuelle que le
-      # host répond, ou basculement sur une autre URL (sports.gouv.fr agrège
-      # déjà les actualités ANS via /agence-nationale-du-sport).
+      # Agence nationale du Sport. Historique : ConnectTimeout chronique
+      # au printemps 2026, mais la DB contient ~43 items ingérés sur plusieurs
+      # runs → le host répond par intermittence. Réactivée : le soft-fail
+      # du loader (`_common.fetch`) lâche proprement en cas de timeout, les
+      # items déjà captés restent visibles jusqu'au prochain run réussi.
       url: https://www.agencedusport.fr/actualites
       format: html
-      enabled: false
+      poids: 3
 
     - id: afld
       category: communiques

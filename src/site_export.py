@@ -34,7 +34,19 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     # 30j coupait trop court : une réunion annoncée 6 semaines à l'avance
     # ou passée depuis 5 semaines disparaissait du site.
     "agenda": 90,
+    # Publications (communiqués de presse, actualités ministères / autorités
+    # indépendantes) : 3 mois. Au-delà la page perd en pertinence opérationnelle.
+    "communiques": 90,
 }
+
+# Catégories pour lesquelles on exige une vraie `published_at` ≤ now (pas de
+# fallback `inserted_at`, pas de dates futures). Ça évite que la page
+# Publications se fasse polluer par :
+#   - des rapports Sénat CSV livrés sans date de dépôt,
+#   - des flux RSS legacy sans <pubDate>,
+#   - des « pages pivot » scrapées par html_generic (« Page suivante », « Presse »),
+#   - des agendas hebdo datés en fin de semaine à venir.
+STRICT_DATED_CATEGORIES = {"communiques"}
 
 # --- Regex partagés pour la réparation CR AN ---------------------------
 # Les dumps Syceron Brut (AN) ne portent pas la date de séance dans le nom
@@ -275,17 +287,32 @@ def _filter_window(rows: list[dict]) -> list[dict]:
     fenêtre applicable à leur catégorie (WINDOW_DAYS_BY_CATEGORY sinon
     WINDOW_DAYS).
 
-    Stratégie stricte : on n'utilise plus `inserted_at` comme fallback pour
-    les items datés, afin d'éviter qu'un item sans date officielle se voie
-    attribuer la date du jour. Un item sans `published_at` est conservé
-    uniquement s'il a été inséré récemment (dans la fenêtre de sa catégorie).
+    Règles :
+    - Catégories « strictes » (STRICT_DATED_CATEGORIES, p.ex. publications) :
+      on n'accepte QUE les items avec un `published_at` valide ET ≤ now.
+      Pas de fallback `inserted_at` (évite que les rapports Sénat CSV sans
+      date ou les « pages pivot » scrapées se glissent dans la page), pas
+      de dates futures (évite les agendas hebdos annoncés à fin de semaine).
+    - Autres catégories : stratégie historique — `published_at` dans la
+      fenêtre, sinon fallback `inserted_at` dans la fenêtre.
     """
     now = datetime.utcnow()
     kept = []
     for r in rows:
-        window = _window_for(r.get("category"))
+        cat = r.get("category") or ""
+        window = _window_for(cat)
         cutoff = now - timedelta(days=window)
         dt = _parse_dt(r.get("published_at"))
+        if cat in STRICT_DATED_CATEGORIES:
+            # Strict : impose une published_at valide, non-future, dans la fenêtre.
+            if dt is None:
+                continue
+            if dt > now:
+                continue
+            if dt >= cutoff:
+                kept.append(r)
+            continue
+        # Catégories non strictes : comportement historique.
         if dt is not None:
             if dt >= cutoff:
                 kept.append(r)
