@@ -129,6 +129,12 @@ def fetch_source(src: dict) -> list[Item]:
             return items
         if fmt == "rss":
             return _normalize_rss(src, fetch_text(src["url"]))
+        if fmt == "akn_index":
+            # Flux Akoma Ntoso (depots.xml / adoptions.xml) : route vers
+            # le parser dédié. Import local pour ne pas charger le module
+            # XML si la source n'est pas configurée.
+            from .senat_akn import fetch_akn_index
+            return fetch_akn_index(src)
     except Exception as e:
         log.exception("Sénat %s KO: %s", sid, e)
     return []

@@ -60,6 +60,27 @@ assemblee_nationale:
 
 senat:
   sources:
+    # ----- Dossiers législatifs : flux Akoma Ntoso (titre + statut + date)
+    # depots.xml liste les textes déposés au Sénat (primo-dépôt, transmis,
+    # texte de commission) ; adoptions.xml liste les textes adoptés en
+    # séance. Chaque entrée pointe vers un .akn.xml unitaire contenant le
+    # workflow complet (procédure parlementaire). Doc DSI Sénat (mars 2021).
+    - id: senat_akn_depots
+      category: dossiers_legislatifs
+      url: https://www.senat.fr/akomantoso/depots.xml
+      format: akn_index
+      since_days: 90       # ne fetch que les textes modifiés < 3 mois
+
+    - id: senat_akn_adoptions
+      category: dossiers_legislatifs
+      url: https://www.senat.fr/akomantoso/adoptions.xml
+      format: akn_index
+      since_days: 90
+
+    # ----- Dossiers législatifs : flux CSV legacy (conservés en backup)
+    # Le CSV ne fournit pas de date ni de statut de procédure : ces sources
+    # complètent le flux AKN sur les dossiers anciens, mais le titre / la
+    # date ne sont pas garantis.
     - id: senat_dosleg
       category: dossiers_legislatifs
       url: https://data.senat.fr/data/dosleg/dosleg.zip
