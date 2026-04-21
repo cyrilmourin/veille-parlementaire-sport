@@ -137,13 +137,22 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # Commit du dernier digest HTML (~300 Ko) + cache AMO (~100 Ko) si
-      # regénéré. La DB SQLite reste persistée via actions/cache (>100 Mo).
-      - name: Commit last digest + AMO cache
+      # Commit du dernier digest HTML (~300 Ko) + cache AMO acteurs/organes
+      # (~100 Ko) + cache texte→dossier AN (~500 Ko) si régénérés. La DB
+      # SQLite reste persistée via actions/cache (>100 Mo).
+      #
+      # Rationale an_texte_to_dossier.json (2026-04-21, R13-F) : mapping
+      # texteLegislatifRef → dossier_title consommé par _normalize_amendement
+      # pour enrichir le haystack du matcher (R11b). normalize.run_all
+      # parallélise dosleg + amendements via ThreadPoolExecutor(max_workers=6)
+      # + as_completed → sans pré-chargement, race au premier run après
+      # reset_db (amendements lus avant que dosleg ait écrit le cache). On
+      # persiste entre runs comme les autres caches.
+      - name: Commit last digest + AMO + texte→dossier caches
         if: always()
         run: |
           git config user.name "veille-bot"
           git config user.email "veille-bot@sideline-conseil.fr"
-          git add data/last_digest.html data/amo_resolved.json 2>/dev/null || true
+          git add data/last_digest.html data/amo_resolved.json data/an_texte_to_dossier.json 2>/dev/null || true
           git diff --cached --quiet || git commit -m "chore: snapshot digest $(date -u +%Y-%m-%dT%H:%MZ)"
           git push || true
