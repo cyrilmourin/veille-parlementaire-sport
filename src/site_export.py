@@ -563,6 +563,16 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     data.mkdir(parents=True, exist_ok=True)
     (data / "by_category").mkdir(parents=True, exist_ok=True)
     (data / "by_chamber").mkdir(parents=True, exist_ok=True)
+
+    # R12a (2026-04-21) : purge complète de `content/items/` avant regénération.
+    # Sinon les .md dont le slug dépend du titre (ex. "compte-rendu-an-crsan…")
+    # persistent aux côtés de leur version rebaptisée par `_fix_cr_row`
+    # ("s-ance-an-du-18-12-2025-jeux-olympique.md") → doublons visibles sur
+    # le site Hugo après rebuild. Purge + recréation garantit que chaque
+    # export part d'un contenu frais, cohérent avec l'état DB.
+    import shutil
+    if items_dir.exists():
+        shutil.rmtree(items_dir)
     items_dir.mkdir(parents=True, exist_ok=True)
 
     # Charge + réparation in-place des CR (URLs AN/Sénat, titres génériques,

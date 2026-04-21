@@ -88,6 +88,9 @@ def build_html(rows: list[dict], site_url: str) -> tuple[str, int]:
     # donc r.get("snippet") est toujours vide en lecture DB. On rebuild à
     # la volée depuis summary, comme côté site_export. Idempotent.
     from .keywords import KeywordMatcher
+    from .site_export import (
+        _fix_agenda_row, _fix_cr_row, _fix_dossier_row, _fix_question_row,
+    )
     _matcher = KeywordMatcher("config/keywords.yml")
 
     buckets: dict[str, list[dict]] = {}
@@ -107,16 +110,33 @@ def build_html(rows: list[dict], site_url: str) -> tuple[str, int]:
             if status_label.startswith(prefix):
                 status_label = status_label[len(prefix):]
                 break
+        # R12a (2026-04-21) : même fixups qu'à l'export site pour que le
+        # digest email soit cohérent avec /items/ (titres CR lisibles,
+        # auteurs questions résolus, préfixe "Agenda - " retiré, dossiers
+        # Sénat capitalisés). Sans ça, l'email diverge du site web.
+        # Le `raw` dict vient d'être parsé ci-dessus, on le ré-injecte
+        # dans r pour que les fixups y accèdent proprement.
+        r_proxy = dict(r)
+        r_proxy["raw"] = raw
+        _fix_cr_row(r_proxy)
+        _fix_question_row(r_proxy)
+        _fix_agenda_row(r_proxy)
+        _fix_dossier_row(r_proxy)
+        # Relire title/url après fixup (raw peut avoir été enrichi aussi)
+        title_fixed = r_proxy.get("title") or r["title"]
+        url_fixed = r_proxy.get("url") or r["url"]
+        published_at_fixed = r_proxy.get("published_at") or r.get("published_at") or ""
+        raw = r_proxy.get("raw") if isinstance(r_proxy.get("raw"), dict) else raw
         snippet = (r.get("snippet") or "").strip()
         if not snippet:
-            haystack = (r.get("summary") or r.get("title") or "").strip()
+            haystack = (r.get("summary") or title_fixed or "").strip()
             if haystack:
                 snippet = _matcher.build_snippet(haystack)
         item = {
-            "title": r["title"], "url": r["url"],
+            "title": title_fixed, "url": url_fixed,
             "summary": r.get("summary") or "",
             "snippet": snippet,
-            "published_at": r.get("published_at") or "", "chamber": r.get("chamber") or "",
+            "published_at": published_at_fixed, "chamber": r.get("chamber") or "",
             "matched": matched,
             "status_label": status_label,
             "is_promulgated": bool(raw.get("is_promulgated")),
