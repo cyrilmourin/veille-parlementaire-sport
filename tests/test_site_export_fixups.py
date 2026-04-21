@@ -481,3 +481,70 @@ def test_fix_cr_row_keeps_seance_senat_du():
     }
     _fix_cr_row(r)
     assert r["title"].startswith("Séance Sénat du 18/04/2026")
+
+
+# ---------- _fix_agenda_row R13-H : "Réunion (POxxx)" ---------------------
+
+def test_fix_agenda_row_resolves_organe_when_cache_knows_po():
+    """Si le cache AMO connaît le PO, on affiche le libellé résolu."""
+    with patch("src.site_export.amo_loader.resolve_organe") as m:
+        m.side_effect = lambda po: (
+            "Commission des affaires économiques" if po == "PO59048" else ""
+        )
+        r = {
+            "category": "agenda",
+            "title": "Réunion (PO59048)",
+            "published_at": "2026-04-21T10:00:00",
+        }
+        _fix_agenda_row(r)
+    assert r["title"] == "Réunion — Commission des affaires économiques"
+
+
+def test_fix_agenda_row_falls_back_to_date_when_po_unknown():
+    """Si le PO est inconnu du cache, on utilise la date de séance."""
+    with patch("src.site_export.amo_loader.resolve_organe", return_value=""):
+        r = {
+            "category": "agenda",
+            "title": "Réunion (PO878768)",
+            "published_at": "2026-04-25T09:30:00",
+        }
+        _fix_agenda_row(r)
+    assert r["title"] == "Réunion AN du 25/04/2026"
+    assert "PO878768" not in r["title"]
+
+
+def test_fix_agenda_row_de_commission_falls_back_to_date():
+    """'Réunion de commission (POxxx)' se comporte pareil."""
+    with patch("src.site_export.amo_loader.resolve_organe", return_value=""):
+        r = {
+            "category": "agenda",
+            "title": "Réunion de commission (PO873096)",
+            "published_at": "2026-05-02T14:00:00",
+        }
+        _fix_agenda_row(r)
+    assert r["title"] == "Réunion de commission AN du 02/05/2026"
+
+
+def test_fix_agenda_row_last_resort_without_date_or_po_resolution():
+    """Sans date ni résolution AMO, on affiche 'Réunion parlementaire'."""
+    with patch("src.site_export.amo_loader.resolve_organe", return_value=""):
+        r = {
+            "category": "agenda",
+            "title": "Réunion (PO999999)",
+            "published_at": "",
+        }
+        _fix_agenda_row(r)
+    assert r["title"] == "Réunion parlementaire"
+
+
+def test_fix_agenda_row_preserves_good_titles():
+    """Un titre déjà informatif (hors pattern 'Réunion (POxxx)') est laissé tel quel."""
+    with patch("src.site_export.amo_loader.resolve_organe") as m:
+        r = {
+            "category": "agenda",
+            "title": "Audition de M. Durand sur le financement du sport",
+            "published_at": "2026-04-25T10:00:00",
+        }
+        _fix_agenda_row(r)
+    m.assert_not_called()
+    assert r["title"] == "Audition de M. Durand sur le financement du sport"

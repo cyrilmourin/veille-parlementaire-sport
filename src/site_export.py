@@ -541,6 +541,35 @@ def _fix_agenda_row(r: dict) -> None:
             new_title = new_title[0].upper() + new_title[1:]
             r["title"] = new_title[:220]
 
+    # R13-H (2026-04-21) : "Réunion (POxxx)" — l'item AN agenda n'a pas pu
+    # résoudre l'organe au parsing (cache AMO incomplet pour les commissions
+    # récentes) ET n'a pas de libellé ODJ dans le JSON AN. Plutôt que d'exposer
+    # le code brut, on retente la résolution à l'export (le cache peut avoir
+    # été enrichi entre temps) puis on retombe sur la date de séance si connue.
+    # Idempotent — ne touche pas aux titres qui ne matchent pas le pattern.
+    if cat == "agenda":
+        cur_title = r.get("title") or ""
+        m_po = re.match(
+            r"^(Réunion(?:\s+de\s+commission)?)\s*\((PO\d+)\)$",
+            cur_title,
+        )
+        if m_po:
+            base, po_ref = m_po.group(1), m_po.group(2)
+            organe_label = amo_loader.resolve_organe(po_ref)
+            if organe_label:
+                r["title"] = f"{base} — {organe_label}"[:220]
+            else:
+                # Fallback : date de séance en format humain.
+                pa = r.get("published_at") or ""
+                if isinstance(pa, str) and re.match(r"^\d{4}-\d{2}-\d{2}", pa):
+                    y, mo, dd = pa[:10].split("-")
+                    r["title"] = f"{base} AN du {dd}/{mo}/{y}"[:220]
+                else:
+                    # Dernier recours : "Réunion parlementaire" (lisible, sans
+                    # code technique — le badge .chamber[data-chamber=AN]
+                    # et le tag date ci-dessous porteront le contexte).
+                    r["title"] = "Réunion parlementaire"
+
 
 def _window_for(category: str | None) -> int:
     """Fenêtre (jours) applicable à une catégorie donnée."""

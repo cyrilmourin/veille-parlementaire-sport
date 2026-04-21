@@ -1455,17 +1455,20 @@ def _normalize_agenda(obj, src, cat):
             else:
                 title = f"Commission — {main_title}"
         else:
+            # R13-H (2026-04-21) : ne plus exposer le code PO brut en titre
+            # quand le cache AMO ne résout pas l'organe (ex. commissions
+            # créées après la dernière maj du dump /17/). On préfère un
+            # libellé générique que `_fix_agenda_row` enrichira ensuite
+            # avec la date de séance.
             title = (f"Réunion — {organe_label}" if organe_label
-                     else (f"Réunion de commission ({organe_ref})" if organe_ref
-                           else "Réunion de commission"))
+                     else "Réunion de commission")
     else:
         if main_title:
             title = main_title
         elif organe_label:
             title = f"Réunion — {organe_label}"
-        elif organe_ref:
-            title = f"Réunion ({organe_ref})"
         else:
+            # R13-H : idem, pas de `Réunion ({organe_ref})` avec code brut.
             title = "Réunion"
 
     title = title[:220]
@@ -1495,7 +1498,12 @@ def _normalize_agenda(obj, src, cat):
     # --- GUARD : on ne garde pas une réunion sans aucune info utile.
     # Cas observé : l'XML contient juste l'UID + le rattachement organe,
     # sans titre ni ODJ — produit un item "Réunion" vide qui pollue le site.
-    if title in ("Réunion", "Réunion de commission") and not titles and not organe_label:
+    # R13-H : on tolère organe_ref seul (cache AMO incomplet) — `_fix_agenda_row`
+    # enrichira le titre avec la date de séance au moment de l'export, évitant
+    # que le changement de fallback ci-dessus (pas de code brut) ne masque
+    # des items qui étaient auparavant affichés sous "Réunion (POxxx)".
+    if (title in ("Réunion", "Réunion de commission")
+            and not titles and not organe_label and not organe_ref):
         log.debug("Agenda %s : skip réunion sans titre ni organe", uid)
         return
 
