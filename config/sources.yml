@@ -46,7 +46,11 @@ assemblee_nationale:
       category: agenda
       url: https://data.assemblee-nationale.fr/static/openData/repository/17/vp/reunions/Agenda.json.zip
       format: json_zip
-      since_days: 30
+      # R13-H (2026-04-21) : 30j → 90j pour aligner sur
+      # WINDOW_DAYS_BY_CATEGORY["agenda"] côté site_export. Avec 30j, le
+      # reset_db perdait systématiquement les items 30-90j affichables
+      # sur la page /items/agenda/, d'où un backlog très court après purge.
+      since_days: 90
 
     # NB : pas de dump "Reunions.json.zip" séparé — la page
     # /reunions/reunions ne pointe que vers Agenda.json.zip, qui couvre
