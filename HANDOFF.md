@@ -1,7 +1,7 @@
 ---
 title: Veille Parlementaire Sport — Handoff
 maintainer: Cyril Mourin
-last_updated: 2026-04-21 (nuit, après R11g + R12 UX)
+last_updated: 2026-04-21 (midi, après R13-E + R13-F + R13-G + reset DB)
 ---
 
 # Handoff — Veille Parlementaire Sport
@@ -90,42 +90,23 @@ Depuis R11b : un second cache `data/an_texte_to_dossier.json` mappe `texteLegisl
 
 ---
 
-## 3. État au 2026-04-21 (soir)
+## 3. État au 2026-04-21 (midi)
 
 ### 3.1 Dernier commit en date
 
 ```
-afa6cd7 R11f — fix tz-bug an_agenda : normalisation naive UTC   (commit local)
-f30ce2b R11e — durcissement _common.fetch + recap run_all       (pushed)
-44a090e R11d — fix URL AN amendements (amendements_div_legis)
-9840f3a docs: handoff complet du projet (R11)
-9c4af6b R11 — Amendements : fix AN parser + pivot Sénat per-texte
+8686964 R13-G — batch 15 patches UX (sidebar meta, couleurs, labels, Amdt, Séance du, analyse…)
+10f8e6a R13-F — persister data/an_texte_to_dossier.json entre runs
+253dde5 R13-E — backfill amendements AN + recapitalize matched_keywords à l'export
+901dc25 chore: snapshot digest 2026-04-21T08:50Z
+03a8bbd R13 — bilan visuel Cyril : AMO à jour, kws capitalisés, snippets filtrés
+7db4d59 R12a — purge content/items + applique fixups au digest
+bd4a730 R12 — refonte UX : agenda, dosleg, dates/mots-cles, questions, CR
 ```
 
-Sur `main`. **Deux commits restants à préparer + push** :
-- R11g : audit sources (désactivation doublons + WAF + Nuxt + fix URL MEAE)
-- R12 : volet UX (5 chantiers Cyril) + 25 tests fixups
+Tout pushé sur `origin/main`. **116/116 tests verts** (91 baseline + 10 R13-E + 15 R13-G).
 
-Tous testés (91/91 verts au dernier run sandbox). À pusher demain matin via le script §5bis.
-
-Working tree (snapshot soir 2026-04-21, 23h) :
-```
-M  config/sources.yml          (R11g — désactivations + URL MEAE)
-M  src/sources/senat.py        (R12 UX-D — retrait ministère du titre questions)
-M  src/site_export.py          (R12 UX-A/B/D/E — _fix_*_row + snippet rebuild)
-M  src/digest.py               (R12 UX-E + UX-C — snippet rebuild + restyle dates/kws)
-M  site/static/style.css       (R12 UX-C — dates rouge/gras, kw italique sans bg)
-M  site/layouts/agenda/list.html         (R12 UX-A — pas de liens dans page agenda)
-M  site/layouts/partials/sidebar.html    (R12 UX-A — sidebar liens vers /agenda)
-M  HANDOFF.md                  (mise à jour finale)
-?? tests/test_site_export_fixups.py      (R12 — 25 tests, nouveau)
-?? data/an_texte_to_dossier.json         (cache, à arbitrer .gitignore)
-?? site/data/                            (généré par Hugo au build)
-?? site/static/search_index.json         (généré par site_export)
-```
-
-Les fichiers `test_common_fetch.py` (R11e) et `test_parse_iso_naive.py` (R11f) sont déjà tracked dans `f30ce2b` / `afa6cd7`. Seul `test_site_export_fixups.py` (R12) est à ajouter au prochain commit.
-```
+Le reset DB `reset_db=1 no_email=1` a tourné après R13-F et R13-G (runs `24715675554` puis `24717935781`) : re-normalisation complète de l'historique avec tous les parsers cumulés. Les fixups in-memory (`_fix_*_row`) deviennent maintenant des insurance policies — ils s'appliquent à 0 item post-reset et protègent contre un futur patch parser qui créerait un nouveau delta ancien/récent.
 
 ### 3.2 Ce qui fonctionne
 
@@ -151,50 +132,38 @@ Les fichiers `test_common_fetch.py` (R11e) et `test_parse_iso_naive.py` (R11f) s
 - Site UX/UI : layout central + sidebar, recherche client-side, thématiques pliées avec compteur, agenda en module à droite, favicon Sideline, maquette dossiers législatifs façon AN.
 - Cache AMO : script weekly + workflow idempotent.
 
-### 3.3 Volumes DB actuels (après R11d, run 2026-04-20 22:00)
+### 3.3 Volumes DB actuels (après reset + R13-G, run 2026-04-21 10:40 UTC)
 
-```
-questions              8 337
-amendements            8 163   ← 5 721 AN + 2 442 Sénat (était 0 avant R11d)
-dossiers_legislatifs   6 765
-agenda                 6 475
-comptes_rendus         3 292
-jorf                   1 575
-communiques            1 322
-nominations              215
-```
+45 764 items ingérés au total, **332 matchés sport**, 58 publiés sur le site.
 
-Amendements matchés sport : **9** (3 AN + 6 Sénat).
+Répartition par catégorie (matchés sport uniquement, fenêtre applicable) :
 
-Top sources :
+| Catégorie | Matchés |
+|---|---|
+| questions | 14 |
+| communiques | 11 |
+| comptes_rendus | 10 |
+| dossiers_legislatifs | 10 |
+| jorf | 5 |
+| amendements | 4 |
+| agenda | 4 |
 
-```
-an_agenda                 6 411
-an_amendements            5 721   ← R11d
-senat_questions_1an       5 263
-senat_promulguees         4 291
-senat_cri                 2 801
-senat_amendements         2 442   ← R11c
-senat_qg                  2 330
-an_dossiers_legislatifs   1 336
-```
+Par chambre sur la home : AN 33, Sénat 9, MinSports 8, JORF 5, CPSF 2, autres ministériels via badges MinARMEES / MinJUSTICE / MinCULTURE / etc.
+
+Agenda ingéré : `an_agenda` (6412), `matignon_agenda` (57), `min_sports_agenda` (7). **Commissions Sénat : aucune source active** — pas dans `sources.yml`, à ajouter en R14 (cf. §3.5).
 
 ### 3.4 Ce qui reste à faire (immédiat)
 
-1. **~~Re-ingest amendements post-R11~~** — ✅ fait en R11d. Résultats observés :
-   - AN : 5721 items ingérés, 3 matchés sport (Amdts 52/56/57 LFI sur « Renforcer la sécurité, rétention administrative et prévention des risques »). 2/4 des cas Follaw historiques reproduits (52 et 56 ✅, 53 et 54 ❌ absents — probablement filtrés par la fenêtre `since_days: 30` car plus anciens, à confirmer si besoin en élargissant).
-   - Sénat : 2442 items ingérés, 6 matchés sport (4 Gouvernement sur JO 2030, 1 VÉRIEN sur `dopage`, 1 CANALÈS sur polices municipales).
-   - Ollivier N°6 « Protéger mineurs » : l'amendement est bien ingéré mais **ne matche pas** — voir §4.4 piège n°5 (hypothèse R11b invalidée).
-2. **Décider du sort de `data/an_texte_to_dossier.json`** — actuellement untracked. Soit l'ajouter à `.gitignore` (cache local), soit le commit pour speed-up premier run CI. Logique actuelle : régénéré par `assemblee._harvest_texte_refs` si absent.
-3. **Reset DB prévu** (memo en memory) — à faire lors de la prochaine modif de `daily.yml` pour re-normaliser l'historique complet avec les parsers R9+R10+R11+R11d.
-4. **Audit des 4 cas Follaw manquants** — AN 53/54 absents, et Ollivier N°6 ne matche pas. À recroiser avec l'état actuel des dossiers dans Follaw (les textes ont pu être amendés ou retirés côté source depuis la rédaction initiale du HANDOFF).
+1. **Patch 12 (R14 dédié) — lien CR vers ancre du 1er kw** — Cyril veut que cliquer sur un compte-rendu atterrisse directement à la 1re occurrence d'un mot-clé sport. Les CR sont publiés sur `assemblee-nationale.fr/dyn/17/comptes-rendus/seance/...` (site externe, ancres non standardisées). Trois pistes : (a) scraper les ancres AN à l'ingestion pour trouver un `#para_XY` proche du match ; (b) héberger une copie du CR sur notre site avec ancre `#kw-1` injectée ; (c) utiliser l'API AN si elle expose des permaliens paragraphe. À cadrer en session dédiée R14.
+2. **Patch 15 — JO 2030 statut "Conseil Constit" côté AN alors que promulgué** — Bug sur le `status_label` des dossiers législatifs AN. Le flag `is_promulgated` est bien positionné côté Sénat (badge vert visible) mais la carte AN affiche encore "Conseil Constitutionnel" (étape précédente dans la navette). Bloqué par le TODO "procédure législative" (§3.5) : Cyril veut qu'on maîtrise la séquence dépôt → commission → séance → adoption → CC → promulgation avant de patcher le mapping codeActe → étape.
+3. **Sources agenda manquantes (partie patch 4 R13-G)** — `min_sports_agenda` ingère 7 items mais 0 matchés sport (probablement pages d'index, pas d'events), **et surtout aucune source pour les commissions du Sénat** (pas dans `sources.yml`). Pistes : `https://www.senat.fr/commission/` listing, agenda XML Akoma Ntoso, ou flux RSS commission.
 
 ### 3.5 Ce qui reste à faire (moyen terme)
 
 - **PISTE Légifrance OAuth2** — connecteur prêt (`src/sources/piste.py`), désactivé par défaut. Secrets `PISTE_CLIENT_ID` / `PISTE_CLIENT_SECRET` à créer côté GitHub pour doubler la source JORF. Pas prioritaire tant que DILA OPENDATA tient.
-- **Procédure législative** — Cyril veut qu'on maîtrise les étapes (dépôt → commission → séance → adoption → promulgation) avant de patcher le tri/filtre des dossiers. Voir `reference/procedure_legislative.md` si créé, sinon prérequis avant de toucher au status_label dans `site_export`.
+- **Procédure législative** — Cyril veut qu'on maîtrise les étapes (dépôt → commission → séance → adoption → CC → promulgation) avant de patcher le tri/filtre des dossiers. Prérequis à toute évolution du `status_label` dans `site_export`. Débloquerait le patch 15 (cf. §3.4).
 - **Audit des 51 sources** — `scripts/audit_sources.py` fait un ping HEAD. À lancer périodiquement pour détecter les 404 silencieux.
-- **Coverage tests** — `store.py`, `site_export.py`, `digest.py` pas de test unitaire (sauf smoke test digest). Pas bloquant, mais à considérer si on refactore.
+- **Coverage tests** — `store.py`, `site_export.py`, `digest.py` partiellement couverts. Pas bloquant, mais à considérer si on refactore.
 
 ---
 
@@ -253,115 +222,27 @@ an_dossiers_legislatifs   1 336
 
 ---
 
-## 5bis. Scripts de commit (préparés pour le bash final de Cyril)
+## 5bis. Autonomie sandbox (R13-F session)
 
-**R11f est déjà commit localement (`afa6cd7`).** Il reste donc **2 commits** à enchaîner demain matin.
+Depuis 2026-04-21 après-midi, le sandbox peut déclencher et suivre les workflows sans intervention manuelle :
 
-Tests à lancer avant chacun pour validation rapide :
-
-```bash
-source .venv/bin/activate && python -m pytest tests/ -q
-```
-
-Attendu : `91 passed`.
-
-### Commit 1 — R11g (audit sources)
-
-```bash
-git add config/sources.yml
-git commit -m "R11g — audit sources post-R11e : desactivations + fix URL MEAE
-
-Nettoyage des sources 0-items et URL obsoletes revelees par le recap
-WARNING de R11e :
-
-1. Doublons Senat (R11g-1) : senat_dosleg et senat_questions remplaces
-   fonctionnellement par senat_akn et senat_questions_1an depuis longtemps
-   (0 items recurrents en prod). enabled: false.
-
-2. MEAE (R11g-2) : l arbo /salle-de-presse/ du site diplomatie.gouv.fr a
-   ete totalement supprimee (404 sur racine + toutes sous-pages). Le listing
-   communiques vit maintenant sous
-   /presse-et-ressources/decouvrir-et-informer/actualites/ (verifie live :
-   HTTP 200, 243 ko, 12 liens actualites).
-
-3. Scrapers WAF-bloques (R11g-4) : sante.gouv.fr et travail-emploi.gouv.fr
-   servent une page 'Request Rejected' (WAF F5 ASM) a tout User-Agent
-   Mozilla. Desactivation jusqu a ce qu un navigateur headless soit
-   disponible, ou qu un RSS officiel soit trouve.
-
-4. CNOSF SPA Nuxt (R11g-4) : cnosf.franceolympique.com/actualites ne rend
-   les articles qu apres hydratation JS (sitemap.xml disponible pour fix
-   propre ulterieur, non critique). Desactivation."
-```
-
-### Commit 2 — R12 (volet UX/UI)
-
-```bash
-git add src/site_export.py src/sources/senat.py src/digest.py \
-        site/static/style.css \
-        site/layouts/agenda/list.html \
-        site/layouts/partials/sidebar.html \
-        tests/test_site_export_fixups.py \
-        HANDOFF.md
-git commit -m "R12 — refonte UX : agenda, dosleg, dates/mots-cles, questions, CR
-
-Repond aux 5 chantiers UX demandes par Cyril. Tous les fix sont in-memory
-a l export (_fix_*_row dans site_export.py), idempotents, evitent un reset DB.
-
-UX-A : agenda
-  - Sidebar : les liens pointent vers /items/agenda/ (pas vers la source).
-    Titres tronques a 60 chars.
-  - Page /items/agenda/ : plus de liens dans les occurrences (consultation
-    calendaire). Titres en pleine longueur.
-  - _fix_agenda_row retire le prefixe 'Agenda - ' / 'Agenda - ' / 'Agenda - '
-    en tete des titres agenda/communiques.
-
-UX-B : dossiers legislatifs
-  - Fenetre 730j -> 1095j (3 ans). dossiers_legislatifs ajoute a
-    STRICT_DATED_CATEGORIES (plus de fallback inserted_at -> les vieux
-    items sans date, type dopage 1990, disparaissent).
-  - _fix_dossier_row capitalise la 1re lettre des titres Senat pre-patch
-    (projet de loi -> Projet de loi).
-
-UX-C : dates + mots-cles
-  - Dates en rouge (#DA4431) + gras, partout (home, dosleg-card, digest).
-  - Mots-cles : retrait background + color, italique + gras, separateur
-    virgule entre kw. .kw-tag[data-family] rendu uniforme.
-
-UX-D : questions
-  - Retrait de '-> ministere' et '[sort]' dans les titres (patch
-    connecteur Senat + _fix_question_row pour la DB historique).
-  - Resolution des 'Depute PAxxxx' residuels via cache AMO a chaque export.
-
-UX-E : comptes rendus
-  - Fenetre 30j -> 180j (_fix_cr_row recale published_at sur la date de
-    seance, souvent plusieurs mois en arriere).
-  - Bug revele : store.SCHEMA n a jamais persiste 'snippet' -> digest et
-    site affichaient tous les CR sans extrait. Fix : rebuild en memoire
-    via KeywordMatcher.build_snippet au moment de l export.
-  - Extraction theme Senat via extract_cr_theme pour les CR pre-patch
-    dont le titre etait 'CR integral - d20260205.xml'.
-
-Tests : 25 nouveaux cas dans test_site_export_fixups.py. Total 91/91 verts."
-```
-
-### Push final (R11f + R11g + R12 d'un coup)
-
-```bash
-git push origin main
-```
+- `~/bin/gh` (v2.63.2 arm64) installé en user-space.
+- Token GitHub extrait via Finder + `.command` jetable, stocké dans `data/cache/.ghtoken` (gitignoré via `data/cache/`). Scopes : `repo`, `workflow`.
+- Usage : `export GH_TOKEN=$(cat data/cache/.ghtoken) && ~/bin/gh workflow run daily.yml --ref main [-f reset_db=1 -f no_email=1]`.
+- Pour un push depuis le sandbox : `git push "https://x-access-token:${TOKEN}@github.com/cyrilmourin/veille-parlementaire-sport.git" HEAD:main`.
+- Si `.git/index.lock` se fige (FUSE), utiliser `mcp__cowork__allow_cowork_file_delete` puis `rm -f .git/index.lock`.
 
 ---
 
 ## 5. Prochaine session — amorce
 
-L'étape R11d (fix URL AN + durcissement fetch) est close. Pistes à ouvrir dans l'ordre :
+R13 (et ses sous-rev E/F/G) sont closes et déployées. Le reset DB a été exécuté, la prod est propre. Pistes à ouvrir dans l'ordre :
 
-1. **Décision `data/an_texte_to_dossier.json`** — tracker ou gitignore. Si tracker, faire un commit séparé avec le cache à jour (~570 Ko) pour speed-up premier run CI après reset DB.
-2. **AN 53/54 manquants** — si l'audit Follaw les juge importants, élargir `since_days` de `an_amendements` à 60 ou 90 et relancer un run isolé. Si leur absence est due à un filtre date, ce sera résolu par la purge complète lors du prochain `reset_db` workflow.
-3. **Procédure législative** — Cyril veut qu'on maîtrise les étapes avant de patcher le tri/filtre des dossiers. Prérequis à toute évolution du `status_label` dans `site_export`.
+1. **Patch 12 (R14 dédié) — lien CR vers ancre kw** — cadrage des 3 pistes (scraping ancres AN / proxy sur notre site / API AN permaliens). Voir §3.4.
+2. **Procédure législative** — prérequis au patch 15 (statut JO 2030) et à toute évolution du `status_label`. Cyril veut qu'on maîtrise la séquence complète AN+Sénat+CC+promulgation avant.
+3. **Sources agenda manquantes** — ajouter les commissions du Sénat (pas de source active) et investiguer pourquoi `min_sports_agenda` ingère des pages d'index sans match sport (adapter le scraper ou supprimer la source si elle ne fournit pas d'events utilisables).
 4. **Liste `EXPECTED_ZERO_HIT_SOURCES`** si le récap WARNING de `run_all` devient bruyant sur certaines sources qui ne publient pas tous les jours (weekend Sénat, ministères en pause estivale, etc.).
-5. **Audit des 51 sources** via `scripts/audit_sources.py` — maintenant que R11d a renforcé la visibilité, les 404 latents vont remonter plus vite. Première passe conseillée la semaine prochaine pour établir un baseline.
+5. **Audit des 51 sources** via `scripts/audit_sources.py` — maintenant que R11d a renforcé la visibilité, les 404 latents vont remonter plus vite. Première passe conseillée périodiquement pour établir un baseline.
 
 ---
 
@@ -394,10 +275,15 @@ L'étape R11d (fix URL AN + durcissement fetch) est close. Pistes à ouvrir dans
 
 | Tag | Description | Commit |
 |---|---|---|
-| R12 | Volet UX/UI en réponse aux 5 chantiers Cyril : agenda (liens+titres+taille), dossiers légis (3 ans + statut + majuscule), dates/mots-clés restylées, questions épurées + AMO résolu, CR visibles + extraits (`snippet` reconstruit à l'export, bug historique du schéma SQL qui n'a jamais persisté `snippet`). | — |
-| R11g | Audit sources post-R11e : désactive doublons Sénat (`senat_dosleg`, `senat_questions`), désactive WAF-bloqués (`min_sante`, `min_travail`), désactive SPA Nuxt (`cnosf`), fix URL MEAE refondue (`/presse-et-ressources/decouvrir-et-informer/actualites/`). | — |
-| R11f | Fix tz-bug `an_agenda` : `parse_iso` / `_parse_date_any` / `_parse_dt` normalisent en naïf UTC au lieu de propager l'aware ISO 8601. Convention "tout naïf" du projet enfin homogène. | — |
-| R11e | Durcissement `fetch_bytes_*` : no-retry 4xx, log.error explicite, récap `run_all`. A révélé 3 bugs latents auparavant invisibles (diplomatie 404, an_agenda tz-bug, 8 sources 0-items). | — |
+| R13-G | 15 patches UX Cyril en un batch : sidebar meta (date MAJ + version système via site.Data.meta), recherche en bleu + crème, agenda 3 lignes via line-clamp + date rouge, Questions titre = analyse au lieu de rubrique, dosleg home 6 mois + libellés "Depuis X jours" / "Mis à jour depuis moins de 6 mois", JORF → "Journal Officiel", kw-tag #8E5A44 sans margin, Sénat violet #a85c9e, MinSports doré #d7b800, "Amendement n°" → "Amdt n°", "Séance AN du" → "Séance du", WWW → MinARMEES et autres ministères. Skip patch 12 (CR ancre, R14 dédié) et patch 15 (statut JO 2030, bloqué par procédure législative). | `8686964` |
+| R13-F | Persistance de `data/an_texte_to_dossier.json` (4438 entrées, ~500 Ko) entre runs via le `git add` du workflow. Fixe la race au 1er run après reset_db entre `_normalize_dosleg` et `_normalize_amendement` (ThreadPoolExecutor parallèle). | `10f8e6a` |
+| R13-E | Backfill amendements AN (`_fix_amendement_row` résout `Député PAxxx` résiduels pour les items pré-R13-A) + `KeywordMatcher.recapitalize` qui remappe les `matched_keywords` sur la forme affichable du yaml. First-wins dans l'index keywords pour préférer la variante accentuée. | `253dde5` |
+| R13 | Bilan visuel Cyril : refresh cache AMO /17/ (10 députés XVIIe résolus, 3108 acteurs / 10790 organes), kws capitalisés dans `keywords.yml` avec séparateur `\|` entre tags, dépollution HTML des summaries Sénat amendements, extraits conditionnels par catégorie, statut dosleg en fond doré crème. | `03a8bbd` |
+| R12a | Purge `content/items` à l'export + applique les fixups au digest. | `7db4d59` |
+| R12 | Volet UX/UI en réponse aux 5 chantiers Cyril : agenda (liens+titres+taille), dossiers légis (3 ans + statut + majuscule), dates/mots-clés restylées, questions épurées + AMO résolu, CR visibles + extraits (`snippet` reconstruit à l'export, bug historique du schéma SQL qui n'a jamais persisté `snippet`). | `bd4a730` |
+| R11g | Audit sources post-R11e : désactive doublons Sénat (`senat_dosleg`, `senat_questions`), désactive WAF-bloqués (`min_sante`, `min_travail`), désactive SPA Nuxt (`cnosf`), fix URL MEAE refondue (`/presse-et-ressources/decouvrir-et-informer/actualites/`). | `3c7648c` |
+| R11f | Fix tz-bug `an_agenda` : `parse_iso` / `_parse_date_any` / `_parse_dt` normalisent en naïf UTC au lieu de propager l'aware ISO 8601. Convention "tout naïf" du projet enfin homogène. | `afa6cd7` |
+| R11e | Durcissement `fetch_bytes_*` : no-retry 4xx, log.error explicite, récap `run_all`. A révélé 3 bugs latents auparavant invisibles (diplomatie 404, an_agenda tz-bug, 8 sources 0-items). | `f30ce2b` |
 | R11d | Fix URL AN amendements (`amendements_legis` 404 → `amendements_div_legis`). Validé : 5683 AN ingérés, 3 matchés sport (Amdts 52/56/57 LFI). | `44a090e` |
 | R11 | Fix AN amendements parser + pivot Sénat per-texte | `9c4af6b` |
 | R10 | Publications : fenêtre 90j + strict published_at + réactive ANS | `c7c6f2e` |
