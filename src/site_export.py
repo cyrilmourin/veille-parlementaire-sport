@@ -1175,9 +1175,13 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
         label = CATEGORY_LABELS.get(cat, cat)
         count = len(by_cat.get(cat, []))
         window = _window_for(cat)
+        # R13-J (2026-04-21) : `type: <cat>` force Hugo à résoudre le layout
+        # `layouts/<cat>/list.html` (ex. agenda/list.html avec blocs "À venir"
+        # / "Passé récent") au lieu de retomber sur _default/list.html.
         lines = [
             "---",
             f'title: "{label}"',
+            f'type: "{cat}"',
             f'description: "Veille {label.lower()} — {count} items sur {window} jours glissants."',
             "---",
             "",
