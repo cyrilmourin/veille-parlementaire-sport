@@ -28,7 +28,14 @@ WINDOW_DAYS = 30
 # législatifs : navettes de plusieurs mois à plusieurs années). Le dict prime
 # sur WINDOW_DAYS pour les catégories listées.
 WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
-    "dossiers_legislatifs": 730,   # 2 ans — cycle législatif complet
+    # UX-B (2026-04-21) : 3 ans max — l'user a vu apparaître des vieux
+    # dossiers de 1990 sur le dopage. 730j (2 ans) laissait passer certains
+    # items sans `published_at` via le fallback `inserted_at`. Désormais :
+    # - fenêtre 3 ans (1095j)
+    # - dossiers_legislatifs ajouté à STRICT_DATED_CATEGORIES (pas de fallback)
+    # Résultat : seuls les dossiers avec une date de dépôt / promulgation
+    # fiable et dans les 3 dernières années apparaissent.
+    "dossiers_legislatifs": 1095,  # 3 ans
     # Agenda : on veut 3 mois pour voir les réunions passées récentes ET les
     # séances futures planifiées (ordre du jour de la session en cours).
     # 30j coupait trop court : une réunion annoncée 6 semaines à l'avance
@@ -37,6 +44,14 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     # Publications (communiqués de presse, actualités ministères / autorités
     # indépendantes) : 3 mois. Au-delà la page perd en pertinence opérationnelle.
     "communiques": 90,
+    # Comptes rendus : 6 mois. Avant R11g (UX-E), la fenêtre 30j tuait
+    # quasi tous les CR sport — `_fix_cr_row` recale `published_at` sur la
+    # vraie date de séance (extraite du nom de fichier d20260205.xml ou du
+    # XML Syceron), et beaucoup de séances sport pertinentes (JO 2030,
+    # dopage, ANS) datent de plusieurs mois. Les CR sont par ailleurs peu
+    # nombreux et restent référents longtemps : 180j est un meilleur
+    # compromis.
+    "comptes_rendus": 180,
 }
 
 # Catégories pour lesquelles on exige une vraie `published_at` ≤ now (pas de
@@ -46,7 +61,7 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
 #   - des flux RSS legacy sans <pubDate>,
 #   - des « pages pivot » scrapées par html_generic (« Page suivante », « Presse »),
 #   - des agendas hebdo datés en fin de semaine à venir.
-STRICT_DATED_CATEGORIES = {"communiques"}
+STRICT_DATED_CATEGORIES = {"communiques", "dossiers_legislatifs"}
 
 # --- Regex partagés pour la réparation CR AN ---------------------------
 # Les dumps Syceron Brut (AN) ne portent pas la date de séance dans le nom
@@ -187,6 +202,16 @@ def _fix_cr_row(r: dict) -> None:
         if not theme and cham == "AN":
             _, theme_ex = _extract_an_cr_meta(r.get("summary"))
             theme = theme_ex
+        # UX-E : même logique pour les CR Sénat pré-patch qui apparaissaient
+        # avec le titre "CR intégral — d20260205.xml" (date + .xml du nom
+        # de fichier dans le titre). `extract_cr_theme` sait repérer les
+        # patterns Sénat ("Discussion du projet de loi…", "Questions au
+        # gouvernement", "Examen du rapport…") dans les 8000 premiers chars
+        # du résumé, exactement comme le fait le connecteur au moment de
+        # l'ingestion. Ça réparé les CR historiques sans reset DB.
+        if not theme and cham in ("Senat", "Sénat"):
+            from .sources._common import extract_cr_theme
+            theme = extract_cr_theme(r.get("summary")) or ""
         date_label = ""
         if re.match(r"^\d{4}-\d{2}-\d{2}$", seance_iso):
             y, mo, dd = seance_iso.split("-")
@@ -220,6 +245,125 @@ def _fix_cr_row(r: dict) -> None:
         if not isinstance(pa, str) or not pa.startswith(seance_iso):
             # On fixe 12:00 : seule la date est fiable ici.
             r["published_at"] = f"{seance_iso}T12:00:00"
+
+
+# Pattern pour repérer (et retirer) le segment "→ {ministère} [{sort}]" dans
+# les vieux titres Sénat questions, et la mention "Député PAxxx" dans les
+# items Sénat/AN questions ingérés avant que le cache AMO résolve le code.
+_QTITLE_MIN_RE = re.compile(
+    r"\s*→\s*[^:\[]+(?:\s*\[[^\]]+\])?\s*(?=:)",  # "→ ministère [sort]" avant le ":"
+)
+# Certaines vieilles entrées produisaient "(GRP):sujet" (pas d'espace avant
+# le colon) après retrait du "→ …". Ce post-pattern normalise l'espacement.
+_QTITLE_COLON_FIX_RE = re.compile(r"\)\s*:\s*")
+_QTITLE_DEPUTE_RE = re.compile(r"Député\s+(PA\d+)")
+
+
+def _fix_question_row(r: dict) -> None:
+    """Réécrit en mémoire le titre des items `questions` ingérés avec
+    l'ancien format `… — auteur (groupe) → ministère [sort] : sujet`.
+
+    Le user veut un titre épuré : `{type} n°{num} — {nom prénom auteur}
+    ({groupe}) : {objet/sujet}` (UX-D 2026-04-21). Le ministre interrogé
+    n'apparaît plus, le `[sort]` non plus. L'info ministre / sort reste
+    dans le summary pour matching et consultation.
+
+    Résout aussi les `Député PAxxx` résiduels via le cache AMO. Idempotent.
+    """
+    if (r.get("category") or "") != "questions":
+        return
+    title = (r.get("title") or "")
+    raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
+
+    # 1) Retire la séquence "→ ministère [sort] " du titre ancien Sénat
+    new_title = _QTITLE_MIN_RE.sub("", title) if title else title
+
+    # 2) Résout "Député PAxxx" via cache AMO (manquait avant que le cache
+    #    soit alimenté). Idempotent : si l'auteur est déjà résolu ou si
+    #    le cache n'a pas la clé, on ne touche pas.
+    def _resolve(match: re.Match) -> str:
+        ref = match.group(1)
+        resolved = amo_loader.resolve_acteur(ref) if ref else ""
+        return resolved or match.group(0)
+
+    new_title = _QTITLE_DEPUTE_RE.sub(_resolve, new_title)
+    # Nettoie l'espacement autour du colon après retrait du "→ …" :
+    # "(GRP):sujet" → "(GRP) : sujet"
+    new_title = _QTITLE_COLON_FIX_RE.sub(") : ", new_title)
+    # Double espace résiduel éventuel
+    new_title = re.sub(r"\s{2,}", " ", new_title).strip()
+    if new_title != title:
+        r["title"] = new_title[:220]
+
+    # 3) Si raw.auteur commence encore par "Député PAxxx", on tente la
+    #    résolution AMO et on met à jour pour que l'export Markdown
+    #    n'affiche pas le code dans la fiche détaillée.
+    if isinstance(raw, dict):
+        auteur = (raw.get("auteur") or "").strip()
+        ref = (raw.get("auteur_ref") or "").strip()
+        if auteur.startswith("Député PA") and ref.startswith("PA"):
+            resolved = amo_loader.resolve_acteur(ref)
+            if resolved:
+                raw["auteur"] = resolved
+                if not raw.get("groupe"):
+                    raw["groupe"] = amo_loader.resolve_groupe(ref) or ""
+                # Le raw vient de json.loads(r["raw"]) donc on doit le
+                # réécrire dans r pour qu'il soit propagé en aval.
+                r["raw"] = raw
+
+
+def _fix_dossier_row(r: dict) -> None:
+    """Capitalise la 1re lettre du titre des dossiers législatifs Sénat.
+
+    UX-B (2026-04-21) — certains CSV Sénat (senat_promulguees / senat_ppl /
+    senat_dosleg) exposent le titre en minuscule ("projet de loi relatif à
+    l'organisation…"). Le connecteur récent applique déjà `_cap_first`,
+    mais la DB contient des items pre-patch non normalisés. On capitalise
+    en mémoire à l'export pour ne pas exiger un reset DB. Idempotent,
+    préserve les sigles déjà en majuscules (CNIL, PJL, etc.).
+    """
+    if (r.get("category") or "") != "dossiers_legislatifs":
+        return
+    title = (r.get("title") or "")
+    if not title:
+        return
+    # Si la 1re lettre est déjà en majuscule ou non-alphabétique, on skip
+    first = title[0]
+    if not first.isalpha() or first.isupper():
+        return
+    r["title"] = (first.upper() + title[1:])[:220]
+
+
+def _fix_agenda_row(r: dict) -> None:
+    """Nettoie le titre des items agenda / communiqués « Agenda — … ».
+
+    UX-A (2026-04-21) — demande utilisateur : "pas de mention de Agenda suivi
+    d'un tiret dans les occurrences". Retrait strict du préfixe `Agenda -`,
+    `Agenda –`, `Agenda — ` (avec ou sans espace) uniquement quand le titre
+    COMMENCE par ce motif. On ne touche pas aux "Agenda de X" / "Agenda du Y"
+    qui restent informatifs tels quels (la présence d'une personne nommée
+    apporte du sens — retirer "Agenda de" laisserait un nom nu sans contexte).
+
+    Idempotent. Agit sur les catégories agenda ET communiques (les communiqués
+    ministériels "Agenda - Semaine du X au Y" sont de vrais bulletins d'agenda
+    hebdo, l'user veut que le préfixe redondant disparaisse dans le titre).
+    """
+    cat = r.get("category") or ""
+    if cat not in ("agenda", "communiques"):
+        return
+    title = (r.get("title") or "").strip()
+    if not title:
+        return
+    # Tirets à matcher : hyphen-minus, en-dash, em-dash.
+    # Le pattern impose un espace avant/après pour ne pas casser "Agenda-X"
+    # (ligaturé) qui serait un nom propre.
+    m = re.match(r"^Agenda\s*[-–—]\s*(.+)$", title)
+    if m:
+        new_title = m.group(1).strip()
+        if new_title:
+            # Capitalise la 1re lettre pour un rendu propre
+            new_title = new_title[0].upper() + new_title[1:]
+            r["title"] = new_title[:220]
 
 
 def _window_for(category: str | None) -> int:
@@ -271,7 +415,20 @@ def _parse_dt(value) -> datetime | None:
 
 
 def _load(rows: list[dict]) -> list[dict]:
-    """Parse les colonnes JSON-string vers des objets."""
+    """Parse les colonnes JSON-string vers des objets.
+
+    Recalcule aussi le `snippet` depuis `summary` pour CHAQUE item matché :
+    le schéma SQL n'a jamais eu de colonne `snippet` (cf. `store.SCHEMA`),
+    donc `item.snippet` construit par `KeywordMatcher.apply` n'a jamais été
+    persisté. Résultat : avant UX-E, les CR (et toutes les autres catégories)
+    apparaissaient sans extrait sur le site et dans le digest. On reconstruit
+    ici à l'export, c'est idempotent et suffisamment rapide (~quelques
+    centaines d'items matchés).
+    """
+    # Import local pour éviter une dépendance cyclique au niveau module.
+    from .keywords import KeywordMatcher
+    _matcher = KeywordMatcher("config/keywords.yml")
+
     out = []
     for r in rows:
         r = dict(r)
@@ -283,6 +440,12 @@ def _load(rows: list[dict]) -> list[dict]:
             r["keyword_families"] = json.loads(r.get("keyword_families") or "[]")
         except Exception:
             r["keyword_families"] = []
+        # Snippet : reconstruit à la volée depuis summary (ou title en fallback)
+        # pour les items matchés. On ne stocke pas en DB — UX-E commentaire.
+        if r.get("matched_keywords") and not r.get("snippet"):
+            haystack = (r.get("summary") or r.get("title") or "").strip()
+            if haystack:
+                r["snippet"] = _matcher.build_snippet(haystack)
         # `raw` est stocké en TEXT JSON dans la DB — on le parse pour exposer
         # les champs enrichis (notamment status_label pour les dossiers
         # législatifs, cf. assemblee._normalize_dosleg).
@@ -410,6 +573,9 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     rows = _load(rows)
     for r in rows:
         _fix_cr_row(r)
+        _fix_question_row(r)
+        _fix_agenda_row(r)
+        _fix_dossier_row(r)
     rows = _filter_window(rows)
     rows = _sort_by_date_desc(rows)
     # Dédup APRÈS tri par date : on garde la version la plus récente en cas

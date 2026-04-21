@@ -60,9 +60,9 @@ EMAIL_TEMPLATE = Template(r"""<!DOCTYPE html>
               {%- if it.is_promulgated -%}{%- set st_bg = "#66A266" -%}{%- set st_fg = "#ffffff" -%}{%- endif -%}
               <span style="display:inline-block;background:{{ st_bg }};color:{{ st_fg }};padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;letter-spacing:.3px;margin-right:5px;">{{ it.status_label }}</span>
             {% endif %}
-            {% if it.published_at %}{{ it.published_at[:10] }}{% endif %}
+            {% if it.published_at %}<span style="color:#DA4431;font-weight:700;font-variant-numeric:tabular-nums;">{{ it.published_at[:10] }}</span>{% endif %}
             {% if it.matched %}
-              {% for kw in it.matched[:12] %}<span style="display:inline-block;background:#DA4431;color:#fff;font-size:11px;padding:1px 8px;border-radius:10px;margin:0 3px 2px 4px;">{{ kw }}</span>{% endfor %}
+              {% for kw in it.matched[:12] %}{% if not loop.first %}<span style="color:#9ca3af;">,</span>{% endif %} <span style="font-style:italic;font-weight:700;font-size:12px;color:inherit;">{{ kw }}</span>{% endfor %}
             {% endif %}
           </div>
           {% if it.snippet %}
@@ -84,6 +84,12 @@ EMAIL_TEMPLATE = Template(r"""<!DOCTYPE html>
 
 
 def build_html(rows: list[dict], site_url: str) -> tuple[str, int]:
+    # UX-E : le schéma SQL n'a jamais persisté `snippet` (cf. store.SCHEMA),
+    # donc r.get("snippet") est toujours vide en lecture DB. On rebuild à
+    # la volée depuis summary, comme côté site_export. Idempotent.
+    from .keywords import KeywordMatcher
+    _matcher = KeywordMatcher("config/keywords.yml")
+
     buckets: dict[str, list[dict]] = {}
     for r in rows:
         matched = json.loads(r.get("matched_keywords") or "[]")
@@ -101,10 +107,15 @@ def build_html(rows: list[dict], site_url: str) -> tuple[str, int]:
             if status_label.startswith(prefix):
                 status_label = status_label[len(prefix):]
                 break
+        snippet = (r.get("snippet") or "").strip()
+        if not snippet:
+            haystack = (r.get("summary") or r.get("title") or "").strip()
+            if haystack:
+                snippet = _matcher.build_snippet(haystack)
         item = {
             "title": r["title"], "url": r["url"],
             "summary": r.get("summary") or "",
-            "snippet": r.get("snippet") or "",
+            "snippet": snippet,
             "published_at": r.get("published_at") or "", "chamber": r.get("chamber") or "",
             "matched": matched,
             "status_label": status_label,

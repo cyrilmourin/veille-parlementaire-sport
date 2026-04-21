@@ -32,11 +32,13 @@
   <ul class="items agenda-upcoming">
     {{ range sort $upcoming "Date" "asc" }}
       <li>
-        {{ if .Params.source_url }}
-        <a href="{{ .Params.source_url }}" class="title">{{ .Title }}</a>
-        {{ else }}
+        {{/* UX-A : sur la page agenda, les titres ne sont jamais cliquables.
+             Les pages externes (sites institutionnels) sont peu informatives —
+             l'utilisateur veut consulter l'agenda comme un calendrier, pas
+             chasser des liens. La source reste accessible sur la fiche
+             détaillée /items/agenda/<slug>/. Titre TOUJOURS en pleine
+             longueur ici (pas de troncature, contrairement à la sidebar). */}}
         <span class="title no-link">{{ .Title }}</span>
-        {{ end }}
         <div class="item-meta">
           <span class="meta-main">
             {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
@@ -60,11 +62,13 @@
   <ul class="items agenda-past">
     {{ range (sort $past "Date" "desc") }}
       <li>
-        {{ if .Params.source_url }}
-        <a href="{{ .Params.source_url }}" class="title">{{ .Title }}</a>
-        {{ else }}
+        {{/* UX-A : sur la page agenda, les titres ne sont jamais cliquables.
+             Les pages externes (sites institutionnels) sont peu informatives —
+             l'utilisateur veut consulter l'agenda comme un calendrier, pas
+             chasser des liens. La source reste accessible sur la fiche
+             détaillée /items/agenda/<slug>/. Titre TOUJOURS en pleine
+             longueur ici (pas de troncature, contrairement à la sidebar). */}}
         <span class="title no-link">{{ .Title }}</span>
-        {{ end }}
         <div class="item-meta">
           <span class="meta-main">
             {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}

@@ -20,6 +20,14 @@
 <div class="side-card side-card--agenda">
   <h3 class="side-title">Agenda</h3>
   <p class="side-caption">Prochains rendez-vous institutionnels</p>
+  {{/*
+    UX-A (2026-04-21) : la sidebar agenda redirige vers /items/agenda/ pour
+    que l'utilisateur puisse parcourir l'agenda complet, plutôt que d'envoyer
+    chaque clic sur la page externe de l'événement (souvent une page pivot
+    sans valeur informative supplémentaire). Les titres sont aussi tronqués
+    à 60 caractères pour ne pas casser la grille latérale (la page /agenda/
+    affiche les titres complets).
+  */}}
   {{ with site.Data.sidebar_agenda }}
     <ul class="side-list">
       {{ range . }}
@@ -33,11 +41,9 @@
           </div>
           <div class="side-body">
             {{ with .chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
-            {{ if .url }}
-              <a href="{{ .url }}" class="side-title-link" rel="noopener" target="_blank">{{ .title }}</a>
-            {{ else }}
-              <span class="side-title-text">{{ .title }}</span>
-            {{ end }}
+            {{ $short := .title }}
+            {{ if gt (len .title) 60 }}{{ $short = printf "%s…" (substr .title 0 59) }}{{ end }}
+            <a href="/items/agenda/" class="side-title-link" title="{{ .title }}">{{ $short }}</a>
           </div>
         </li>
       {{ end }}

@@ -532,15 +532,17 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
                 "senat_qg": "Question au gouvernement",
                 "senat_questions_1an": "Question de +1 an sans réponse",
             }.get(sid, "Question")
+            # Titre épuré (UX-D 2026-04-21) : {type} n°{num} — {civ prénom
+            # nom auteur} ({groupe}) : {objet/sujet}. L'ancien format
+            # "→ {ministère interrogé} [{sort}] : {sujet}" est abandonné à la
+            # demande utilisateur : le ministre interrogé n'a pas de valeur
+            # dans le titre (l'info reste disponible dans le summary pour
+            # matching + consultation détaillée).
             title_bits = [f"{qtype_label} n°{uid}"]
             if auteur:
                 title_bits.append(f"— {auteur}")
             if groupe:
                 title_bits.append(f"({groupe})")
-            if ministere:
-                title_bits.append(f"→ {ministere}")
-            if sort and sid == "senat_questions_1an":
-                title_bits.append(f"[{sort}]")
             title_bits.append(f": {sujet}")
             summary = " — ".join(p for p in [
                 auteur, groupe,

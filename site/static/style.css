@@ -281,12 +281,22 @@ a:hover { text-decoration: underline; }
   color: var(--muted);
   margin: 0 2px;
 }
+/* UX-C (2026-04-21) : les dates sont la seule information qui porte la
+   couleur rouge Sideline — rouge + gras pour bien les repérer dans la liste.
+   Les mots-clés ci-dessous passent en italique/gras sans couleur (ni fond
+   ni police) pour ne plus concurrencer visuellement les dates. */
 .item-meta .date {
-  color: var(--muted);
+  color: var(--sl-red);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Tags mots-clés (home + listing + détail) -------------------- */
+/* UX-C (2026-04-21) — refonte : retrait de la couleur de fond et de la
+   couleur de police (réservées aux dates). Les mots-clés conservent juste
+   leur empreinte typographique : italique + gras. Les variantes par famille
+   data-family sont conservées pour compatibilité DOM mais n'influent plus
+   sur le rendu visuel. */
 .kw-list {
   display: inline;
   margin: 0;
@@ -294,24 +304,27 @@ a:hover { text-decoration: underline; }
 }
 .kw-tag {
   display: inline-block;
-  background: var(--sl-red);
-  color: #fff;
-  padding: 1px 8px;
-  border-radius: 10px;
-  font-size: 11px;
+  background: transparent;
+  color: inherit;
+  padding: 0 4px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin: 0 2px 0 0;
   white-space: nowrap;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  margin: 0 3px 2px 0;
-  white-space: nowrap;
-  vertical-align: middle;
+  vertical-align: baseline;
 }
-/* Variantes par famille — permet de nuancer par couleur */
-.kw-tag[data-family="acteur"]     { background: var(--sl-blue); }
-.kw-tag[data-family="federation"] { background: #6a5acd; }
-.kw-tag[data-family="dispositif"] { background: var(--sl-green); }
-.kw-tag[data-family="evenement"]  { background: #c98b1b; }
-.kw-tag[data-family="theme"]      { background: var(--sl-red); }
+/* Retire tout background des anciens variants data-family (rendu uniforme). */
+.kw-tag[data-family] { background: transparent; color: inherit; }
+/* Séparateur visuel léger entre mots-clés : virgule + espace. */
+.kw-tag + .kw-tag::before {
+  content: ", ";
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: -2px;
+}
 
 .snippet-inline {
   color: var(--muted);
@@ -747,7 +760,10 @@ a:hover { text-decoration: underline; }
   font-size: 13px;
   margin-bottom: 4px;
 }
+/* UX-C : date de dépôt/promulgation en rouge + gras, comme les autres dates. */
 .dosleg-card__deposit time {
+  color: var(--sl-red);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .dosleg-card__status {
