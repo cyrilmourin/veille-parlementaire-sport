@@ -63,6 +63,30 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
 #   - des agendas hebdo datés en fin de semaine à venir.
 STRICT_DATED_CATEGORIES = {"communiques", "dossiers_legislatifs"}
 
+# R13-D (2026-04-21) — snippet par contexte :
+#
+# Home : pour garder la page d'accueil compacte, on n'affiche les snippets
+# QUE pour les catégories à forte densité informative (questions,
+# amendements, comptes rendus). Publications / agenda / JORF / dossiers
+# législatifs : titre seul, plus clair en coup d'œil.
+HOMEPAGE_SNIPPET_CATEGORIES = {"questions", "amendements", "comptes_rendus"}
+
+# Pages thématiques (/items/<cat>/) — tailles demandées par Cyril
+# (R13-D 2026-04-21). Absence de clé → snippet retiré pour la catégorie.
+# Note : on stocke le snippet déjà tronqué dans le frontmatter des .md,
+# pour que le template Hugo n'ait pas à se soucier de la catégorie.
+SNIPPET_LEN_BY_CATEGORY: dict[str, int] = {
+    "jorf": 500,
+    "communiques": 500,
+    "amendements": 250,
+    "questions": 250,
+    "comptes_rendus": 250,
+    "agenda": 250,
+    # dossiers_legislatifs : clé absente = pas de snippet sur la page
+    # dédiée (demande user — les cartes dosleg portent déjà titre, type,
+    # date, statut, tags ; un extrait y ajouterait du bruit).
+}
+
 # --- Regex partagés pour la réparation CR AN ---------------------------
 # Les dumps Syceron Brut (AN) ne portent pas la date de séance dans le nom
 # de fichier (CRSAN…), mais l'en-tête du XML contient :
@@ -626,20 +650,30 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # ch=chamber, d=date, s=summary court, k=keywords.
     static_dir = root / "static"
     static_dir.mkdir(parents=True, exist_ok=True)
+    # R13-D : la recherche applique les mêmes règles que la home pour le
+    # snippet. Les catégories hors HOMEPAGE_SNIPPET_CATEGORIES n'ont pas
+    # d'extrait affiché dans les résultats (on envoie quand même le summary
+    # court pour que le filtrage full-text en JS fonctionne, mais le
+    # template search.html ne l'affiche que si la catégorie le permet).
     search_items = []
     for r in rows:
-        s = (r.get("summary") or "").strip()
-        # tronque à ~280 caractères (assez pour matcher un terme, pas pour
-        # gonfler l'index). On retire les entités HTML les plus fréquentes.
-        if len(s) > 280:
-            s = s[:280]
+        cat = r.get("category") or ""
+        s_full = (r.get("summary") or "").strip()
+        if len(s_full) > 280:
+            s_full = s_full[:280]
+        # `s` = snippet affichable ; `si` = summary court pour indexation
+        # full-text (toujours présent pour que la recherche trouve même
+        # dans les catégories "silencieuses").
+        snip_raw = (r.get("snippet") or "").strip()
+        show_snip = cat in HOMEPAGE_SNIPPET_CATEGORIES
         search_items.append({
             "t": (r.get("title") or "").strip(),
             "u": (r.get("url") or "").strip(),
-            "c": r.get("category") or "",
+            "c": cat,
             "ch": r.get("chamber") or "",
             "d": (r.get("published_at") or "")[:10],
-            "s": s,
+            "s": snip_raw if show_snip else "",
+            "si": s_full,
             "k": r.get("matched_keywords") or [],
         })
     (static_dir / "search_index.json").write_text(
@@ -708,7 +742,8 @@ def _recent(rows: list[dict], hours: int = 24) -> list[dict]:
 
 # ---------- écritures Markdown ---------------------------------------------
 
-def _fmt_item_line(it: dict, with_tags: bool = True) -> str:
+def _fmt_item_line(it: dict, with_tags: bool = True,
+                    with_snippet: bool = True) -> str:
     """Ligne Markdown d'un item (home / catégorie). Layout :
 
     - **[Titre](url)** <span class="chamber" data-chamber="AN">AN</span> · Date · tags inline
@@ -721,6 +756,10 @@ def _fmt_item_line(it: dict, with_tags: bool = True) -> str:
     `with_tags=False` : n'affiche pas les mots-clés. Utilisé par la section
     "Dernières 24 h" pour ne garder que titre + chambre + date (demande
     utilisateur : zone très compacte, les tags encombrent).
+
+    `with_snippet=False` (R13-D) : masque l'extrait. Utilisé par le home
+    pour les catégories publications/agenda/jorf/dossiers_legislatifs
+    où un extrait n'apporte rien au-delà du titre.
     """
     date = (it.get("published_at") or "")[:10]
     title = (it.get("title") or "").replace("\n", " ").strip()
@@ -797,7 +836,7 @@ def _fmt_item_line(it: dict, with_tags: bool = True) -> str:
     else:
         line = f"- **{title}**{meta_html}"
 
-    if snippet:
+    if snippet and with_snippet:
         line += f"  \n  <div class=\"snippet-inline\">« {_escape(snippet)} »</div>"
     return line
 
@@ -870,8 +909,10 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
             f'</summary>'
         )
         lines.append("")
+        # R13-D : snippet uniquement pour catégories pertinentes sur la home.
+        show_snip = cat in HOMEPAGE_SNIPPET_CATEGORIES
         for it in bucket[:10]:
-            lines.append(_fmt_item_line(it))
+            lines.append(_fmt_item_line(it, with_snippet=show_snip))
         if count > 10:
             lines.append("")
             lines.append(f"→ [Voir les {count} {label.lower()}](/items/{cat}/)")
@@ -916,7 +957,22 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         # qui ferait apparaître la date du jour pour les items sans date fiable.
         published_at = r.get("published_at") or ""
         source_url = (r.get("url") or "").replace('"', "")
-        snippet = (r.get("snippet") or "").replace('"', "'").replace("\n", " ")
+        # R13-D : snippet tronqué à la taille demandée pour la page
+        # thématique. Si la catégorie n'est pas dans le dict → snippet vide
+        # (ex. dossiers_legislatifs : pas d'extrait sur la page dédiée).
+        _snip_raw = (r.get("snippet") or "").replace('"', "'").replace("\n", " ")
+        _snip_len = SNIPPET_LEN_BY_CATEGORY.get(cat)
+        if _snip_len is None:
+            snippet = ""
+        elif len(_snip_raw) > _snip_len:
+            # Tronque sans couper un mot (recherche dernier espace dans la zone)
+            cut = _snip_raw[:_snip_len].rstrip()
+            last_space = cut.rfind(" ")
+            if last_space > _snip_len - 50:
+                cut = cut[:last_space].rstrip()
+            snippet = cut + "…"
+        else:
+            snippet = _snip_raw
         # Remonte les champs enrichis depuis `raw` pour les dossiers
         # législatifs (status_label + is_promulgated injectés par
         # assemblee._normalize_dosleg). Permet à list.html d'afficher le

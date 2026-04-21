@@ -242,15 +242,16 @@ a:hover { text-decoration: underline; }
 /* ---------- Badge statut procédural (dossiers législatifs) -------------- */
 /* Affiche l'étape de navette du dossier : "1ère lecture · commission",
    "CMP", "promulgation", etc. Complète le badge chambre, placé juste après.
-   Base : crème foncé discret ; si promulgué, vert (palette Sideline). */
+   R13-E (2026-04-21) : fond doré + texte crème gras (demande user).
+   Le flag promulgated garde un vert distinct pour signaler l'aboutissement. */
 .status {
   display: inline-block;
-  background: #c9c2a6;           /* crème un peu plus sombre */
-  color: var(--sl-blue);
-  padding: 1px 7px;
+  background: #C9A227;           /* doré Sideline (ambre soutenu) */
+  color: #FFF8E1;                /* crème clair pour contraste max */
+  padding: 2px 8px;
   border-radius: 4px;
   font-size: 10.5px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.3px;
   vertical-align: middle;
   margin-left: 2px;
@@ -317,9 +318,9 @@ a:hover { text-decoration: underline; }
 }
 /* Retire tout background des anciens variants data-family (rendu uniforme). */
 .kw-tag[data-family] { background: transparent; color: inherit; }
-/* Séparateur visuel léger entre mots-clés : virgule + espace. */
+/* Séparateur visuel léger entre mots-clés : barre verticale (R13-B). */
 .kw-tag + .kw-tag::before {
-  content: ", ";
+  content: " | ";
   font-style: normal;
   font-weight: 400;
   color: var(--muted);
@@ -766,16 +767,24 @@ a:hover { text-decoration: underline; }
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+/* R13-E (2026-04-21) : même traitement que .status (fond doré + crème gras)
+   pour que les cartes dossiers législatifs soient visuellement cohérentes
+   avec la home et la liste. Le flag promulgated passe en vert pour
+   signaler l'aboutissement législatif. */
 .dosleg-card__status {
   display: inline-block;
   margin-top: 4px;
-  color: var(--sl-blue);
+  padding: 3px 10px;
+  background: #C9A227;
+  color: #FFF8E1;
   font-weight: 700;
   font-size: 13px;
-  letter-spacing: 0.1px;
+  letter-spacing: 0.2px;
+  border-radius: 4px;
 }
 .dosleg-card__status--promulgated {
-  color: #2c5f2c;
+  background: var(--sl-green);
+  color: #fff;
 }
 .dosleg-card__kws {
   margin-top: 8px;

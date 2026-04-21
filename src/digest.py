@@ -62,7 +62,7 @@ EMAIL_TEMPLATE = Template(r"""<!DOCTYPE html>
             {% endif %}
             {% if it.published_at %}<span style="color:#DA4431;font-weight:700;font-variant-numeric:tabular-nums;">{{ it.published_at[:10] }}</span>{% endif %}
             {% if it.matched %}
-              {% for kw in it.matched[:12] %}{% if not loop.first %}<span style="color:#9ca3af;">,</span>{% endif %} <span style="font-style:italic;font-weight:700;font-size:12px;color:inherit;">{{ kw }}</span>{% endfor %}
+              {% for kw in it.matched[:12] %}{% if not loop.first %}<span style="color:#9ca3af;"> | </span>{% endif %}<span style="font-style:italic;font-weight:700;font-size:12px;color:inherit;">{{ kw }}</span>{% endfor %}
             {% endif %}
           </div>
           {% if it.snippet %}

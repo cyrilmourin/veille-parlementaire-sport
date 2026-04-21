@@ -3,19 +3,25 @@
 # Chaque terme peut contenir des espaces et des chiffres. Les variantes orthographiques
 # sont listées explicitement (on ne fait pas de stemming — on préfère la précision).
 # Famille : acteur | dispositif | evenement | federation | theme
+#
+# R13-B (2026-04-21) : 1re lettre capitalisée pour affichage propre (badge,
+# digest, home). Les sigles tout-majuscule (CNOSF, AFLD, CIO, FFF…) et les
+# termes déjà capitalisés (Tony Estanguet, Paris 2024) sont préservés tels
+# quels. Le matching côté `src/keywords.py` normalise via unidecode+lower,
+# donc la casse du terme en config n'affecte que le rendu.
 
 acteur:
-  - ministre des sports
-  - ministère des sports
-  - ministere des sports
-  - ministère des sport        # variante observée dans le doc utilisateur
-  - mouvement sportif
+  - Ministre des sports
+  - Ministère des sports
+  - Ministere des sports
+  - Ministère des sport        # variante observée dans le doc utilisateur
+  - Mouvement sportif
   - CNOSF
-  - comité national olympique
-  - comite national olympique
+  - Comité national olympique
+  - Comite national olympique
   - CPSF
-  - comité paralympique et sportif
-  - comite paralympique et sportif
+  - Comité paralympique et sportif
+  - Comite paralympique et sportif
   - CNSE                        # comité national du sport de haut niveau
   # ANS seul retiré — faux positifs avec le mot "ans" (unidecode).
   # On garde uniquement la forme longue.
@@ -45,13 +51,13 @@ acteur:
   - DDCS sport
   - DDCSPP sport
   - DTN                         # directeur technique national
-  - délégué interministériel aux Jeux
-  - delegue interministeriel aux Jeux
-  - délégation interministérielle JOP
-  - commission sport Assemblée
-  - commission sport Sénat
-  - groupe d'études sport
-  - groupe parlementaire sport
+  - Délégué interministériel aux Jeux
+  - Delegue interministeriel aux Jeux
+  - Délégation interministérielle JOP
+  - Commission sport Assemblée
+  - Commission sport Sénat
+  - Groupe d'études sport
+  - Groupe parlementaire sport
   - AMA sport                   # Agence mondiale antidopage
   - Agence mondiale antidopage
   - CIO
@@ -59,21 +65,21 @@ acteur:
   - Comite international olympique
   - IPC                         # Comité paralympique international
   - ARJEL                       # ancien ANJ — pour archives
-  - opérateurs sport
-  - operateurs sport
-  - fonds de dotation sport
+  - Opérateurs sport
+  - Operateurs sport
+  - Fonds de dotation sport
 
 federation:
-  - fédération sportive
-  - federation sportive
-  - fédérations sportives
-  - federations sportives
-  - club sportif
-  - clubs sportifs
-  - association sportive
-  - associations sportives
-  - compétition fédération
-  - competition federation
+  - Fédération sportive
+  - Federation sportive
+  - Fédérations sportives
+  - Federations sportives
+  - Club sportif
+  - Clubs sportifs
+  - Association sportive
+  - Associations sportives
+  - Compétition fédération
+  - Competition federation
   - FFF                         # football
   - FFR                         # rugby
   - FFT                         # tennis
@@ -94,24 +100,24 @@ federation:
   - LNH
   - FFTri                       # triathlon
   - FFGym
-  - fédération française de gymnastique
-  - federation francaise de gymnastique
+  - Fédération française de gymnastique
+  - Federation francaise de gymnastique
   - FFBoxe
   - FFBadminton
   - FFVolley
   - FFSki
-  - fédération française de ski
-  - federation francaise de ski
+  - Fédération française de ski
+  - Federation francaise de ski
   - FFSurf
   - FFRugby à XIII
   - FFAviron
   - FFEsports
   - Fédération Française de Football
   - Federation Francaise de Football
-  - fédération française de rugby
-  - federation francaise de rugby
-  - fédération française de tennis
-  - federation francaise de tennis
+  - Fédération française de rugby
+  - Federation francaise de rugby
+  - Fédération française de tennis
+  - Federation francaise de tennis
   - Ligue nationale de rugby
   - Ligue nationale de basket
   - Ligue nationale de handball
@@ -120,85 +126,85 @@ federation:
   - PSG sport
   - OM sport                    # veille contentieuse
   - OL sport
-  - clubs professionnels
+  - Clubs professionnels
 
 dispositif:
   - Pass'Sport
   - Pass Sport
-  - maison sport-santé
-  - maison sport santé
-  - sport-santé
-  - sport santé
-  - activité physique adaptée
-  - activite physique adaptee
+  - Maison sport-santé
+  - Maison sport santé
+  - Sport-santé
+  - Sport santé
+  - Activité physique adaptée
+  - Activite physique adaptee
   - APA sport
   - 2h de sport
   - 30 minutes d'activité physique
   - Génération 2024
   - Generation 2024
-  - sport de haut niveau
-  - sportifs de haut niveau
-  - liste des sportifs de haut niveau
-  - conventions d'insertion professionnelle
+  - Sport de haut niveau
+  - Sportifs de haut niveau
+  - Liste des sportifs de haut niveau
+  - Conventions d'insertion professionnelle
   - CIP sport
-  - emploi sportif
-  - aide à l'emploi sportif
-  - plan 5000 équipements
-  - plan 5 000 équipements
-  - plan 5000 terrains
-  - héritage des Jeux
-  - heritage des Jeux
-  - héritage Paris 2024
-  - heritage Paris 2024
-  - stratégie nationale sport-santé
-  - strategie nationale sport sante
-  - sport sur ordonnance
-  - contrat d'engagement sport
-  - plan aisance aquatique
-  - savoir nager
-  - savoir rouler à vélo
-  - savoir rouler a velo
-  - plan vélo sport
-  - plan velo sport
-  - sport en entreprise
-  - sport au travail
-  - sport en milieu professionnel
-  - bénévolat sportif
-  - benevolat sportif
-  - crédit d'impôt sport
-  - credit d'impot sport
-  - mécénat sportif
-  - mecenat sportif
+  - Emploi sportif
+  - Aide à l'emploi sportif
+  - Plan 5000 équipements
+  - Plan 5 000 équipements
+  - Plan 5000 terrains
+  - Héritage des Jeux
+  - Heritage des Jeux
+  - Héritage Paris 2024
+  - Heritage Paris 2024
+  - Stratégie nationale sport-santé
+  - Strategie nationale sport sante
+  - Sport sur ordonnance
+  - Contrat d'engagement sport
+  - Plan aisance aquatique
+  - Savoir nager
+  - Savoir rouler à vélo
+  - Savoir rouler a velo
+  - Plan vélo sport
+  - Plan velo sport
+  - Sport en entreprise
+  - Sport au travail
+  - Sport en milieu professionnel
+  - Bénévolat sportif
+  - Benevolat sportif
+  - Crédit d'impôt sport
+  - Credit d'impot sport
+  - Mécénat sportif
+  - Mecenat sportif
   - TVA billetterie sportive
   - PSF                         # projets sportifs fédéraux
-  - projets sportifs fédéraux
-  - projets sportifs federaux
-  - fonds national pour le développement du sport
-  - fonds national pour le developpement du sport
-  - conférence régionale du sport
-  - conference regionale du sport
-  - conférence des financeurs sport
-  - conference des financeurs sport
-  - gouvernance du sport
-  - loi sport
-  - proposition de loi sport
-  - projet de loi sport
-  - loi démocratiser le sport
-  - loi democratiser le sport
-  - plan équipements sportifs
-  - plan equipements sportifs
+  - Projets sportifs fédéraux
+  - Projets sportifs federaux
+  - Fonds national pour le développement du sport
+  - Fonds national pour le developpement du sport
+  - Conférence régionale du sport
+  - Conference regionale du sport
+  - Conférence des financeurs sport
+  - Conference des financeurs sport
+  - Gouvernance du sport
+  - Loi sport
+  - Proposition de loi sport
+  - Projet de loi sport
+  - Loi démocratiser le sport
+  - Loi democratiser le sport
+  - Plan équipements sportifs
+  - Plan equipements sportifs
   - 5000 équipements sportifs
   - 5000 equipements sportifs
   - 1000 dojos
   - 500 terrains de padel
   - CQP sport
-  - formation arbitres
-  - formation entraîneurs
-  - formation entraineurs
+  - Formation arbitres
+  - Formation entraîneurs
+  - Formation entraineurs
 
 evenement:
-  - jeux olympiques
-  - jeux paralympiques
+  - Jeux olympiques
+  - Jeux paralympiques
   - JO d'hiver
   - JO d'hiver 2030
   - Jeux d'hiver 2030
@@ -212,42 +218,42 @@ evenement:
   - Roland-Garros
 
 theme:
-  - violences dans le sport
-  - violences sexuelles et sexistes dans le sport
-  - violences sexuelles dans le sport
-  - violences sexistes dans le sport
+  - Violences dans le sport
+  - Violences sexuelles et sexistes dans le sport
+  - Violences sexuelles dans le sport
+  - Violences sexistes dans le sport
   - VSS sport
-  - dopage
-  - intégrité des compétitions
-  - integrite des competitions
-  - matchs truqués
-  - matchs truques
-  - manipulation de compétitions
-  - manipulation de competitions
-  - supporters sportifs
-  - supporters de match
-  - supporterisme
+  - Dopage
+  - Intégrité des compétitions
+  - Integrite des competitions
+  - Matchs truqués
+  - Matchs truques
+  - Manipulation de compétitions
+  - Manipulation de competitions
+  - Supporters sportifs
+  - Supporters de match
+  - Supporterisme
   - Instance nationale du supporterisme
-  - paris sportifs
-  - droits audiovisuels sport
-  - droits TV sport
-  - esport
-  - e-sport
-  - sport électronique
-  - sport electronique
-  - sport féminin
-  - sport feminin
-  - féminisation du sport
-  - feminisation du sport
-  - parité fédération
-  - parite federation
-  - sport adapté
-  - sport adapte
-  - parasport
-  - éducation physique et sportive
-  - education physique et sportive
-  - sport à l'école
-  - sport a l'ecole
-  - sport scolaire
-  - compétitions sportives
-  - competitions sportives
+  - Paris sportifs
+  - Droits audiovisuels sport
+  - Droits TV sport
+  - Esport
+  - E-sport
+  - Sport électronique
+  - Sport electronique
+  - Sport féminin
+  - Sport feminin
+  - Féminisation du sport
+  - Feminisation du sport
+  - Parité fédération
+  - Parite federation
+  - Sport adapté
+  - Sport adapte
+  - Parasport
+  - Éducation physique et sportive
+  - Education physique et sportive
+  - Sport à l'école
+  - Sport a l'ecole
+  - Sport scolaire
+  - Compétitions sportives
+  - Competitions sportives

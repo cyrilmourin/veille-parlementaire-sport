@@ -60,11 +60,17 @@ except ImportError:  # pragma: no cover
 log = logging.getLogger("refresh_amo_cache")
 
 # Dump historique unique : couvre toutes les législatures depuis la XIe (1997)
-# jusqu'à aujourd'hui (donc la XVIIe incluse). Publié sous le path /15/ pour
-# raisons historiques — c'est l'URL référencée par la FAQ AN open data.
+# jusqu'à la XVIIe en cours.
+#
+# R13-A (2026-04-21) : l'ancien path /15/ existait mais était un FIGÉ depuis
+# 2022 (last-modified 09 juin 2022). Résultat : tous les députés élus après
+# juin 2022 (y compris une grande partie de la XVIIe) étaient absents du
+# cache, et `resolve_acteur("PA795552")` renvoyait '' → "Député PAxxxx"
+# apparaissait dans les titres. Le path /17/ contient le même dump AMO30
+# mais régénéré quotidiennement (vérifié 2026-04-21, last-modified J-0).
 AMO_URL = (
     "https://data.assemblee-nationale.fr/static/openData/repository/"
-    "15/amo/tous_acteurs_mandats_organes_xi_legislature/"
+    "17/amo/tous_acteurs_mandats_organes_xi_legislature/"
     "AMO30_tous_acteurs_tous_mandats_tous_organes_historique.json.zip"
 )
 # Miroir communautaire (Tricoteuses) en dernier recours — mêmes données,

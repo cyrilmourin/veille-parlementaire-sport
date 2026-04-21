@@ -101,7 +101,10 @@
 
     if (terms.length) {
       rows = rows.filter(r => {
-        const hay = norm(r.t + ' ' + r.s + ' ' + (r.k || []).join(' '));
+        // R13-D : `r.si` = summary court indexé (toujours présent).
+        // `r.s` = snippet affichable (peut être vide pour certaines
+        // catégories). On combine pour trouver le terme partout.
+        const hay = norm(r.t + ' ' + (r.si || '') + ' ' + (r.s || '') + ' ' + (r.k || []).join(' '));
         return terms.every(t => hay.indexOf(t) !== -1);
       });
     }

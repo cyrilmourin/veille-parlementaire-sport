@@ -1,12 +1,32 @@
 """Matching des mots-clés — normalisation accents + casse."""
 from __future__ import annotations
 
+import html
 import re
 from pathlib import Path
 from typing import Iterable
 
 import yaml
 from unidecode import unidecode
+
+
+# R13-C (2026-04-21) : certaines sources remontent des summaries contenant
+# du HTML brut (balises + entités numériques). Ex. Sénat amendements via
+# `senat_amendements` : `<p style="text-align: justify;">Par cet amendement,
+# les d&#x00E9;put&#x00E9;.es du groupe…`. On dépollue à la construction du
+# snippet pour que le site et le digest affichent du texte propre.
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_MULTISPACE_RE = re.compile(r"\s+")
+
+
+def _clean_html(text: str) -> str:
+    """Strip HTML tags + décode les entités (&#x00E9; → é, &amp; → &)."""
+    if not text:
+        return ""
+    text = _HTML_TAG_RE.sub(" ", text)
+    text = html.unescape(text)
+    text = _MULTISPACE_RE.sub(" ", text).strip()
+    return text
 
 
 def _normalize(text: str) -> str:
@@ -63,7 +83,12 @@ class KeywordMatcher:
         (`. `, `! `, `? `, `\\n`) pour produire un extrait lisible plutôt
         qu'une troncation arbitraire. Cap à `max_len` pour éviter les
         paragraphes entiers.
+
+        R13-C : dépollue l'HTML en amont (tags + entités) — sinon le
+        snippet affiche `&#x00E9;put&#x00E9;.es` au lieu de `député.es`
+        (cas Sénat amendements).
         """
+        original_text = _clean_html(original_text)
         if not original_text:
             return ""
         haystack_norm = _normalize(original_text)
