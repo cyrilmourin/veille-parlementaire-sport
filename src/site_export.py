@@ -779,9 +779,24 @@ _DOSLEG_STRIP_PREFIX_RE = re.compile(
     re.IGNORECASE,
 )
 _DOSLEG_STRIP_CONNECTORS_RE = re.compile(
-    r"^(?:relatif[e]?s?\s+[àa]|relative[s]?\s+[àa]|visant\s+[àa]|portant|tendant\s+[àa]|ayant\s+pour\s+objet|concernant|autorisant|approuvant|de\s+modernisation\s+de|pour\s+l['e])",
+    r"^(?:relatif[e]?s?\s+[àa]|relative[s]?\s+[àa]|visant\s+[àa]|portant|tendant\s+[àa]|ayant\s+pour\s+objet|concernant|autorisant|approuvant|de\s+modernisation\s+de|pour\s+l['e]|pour\s+un)",
     re.IGNORECASE,
 )
+# R13-L (2026-04-21) : après stripage des préfixes type+connecteurs, on retire
+# aussi tous les mots-outils courts en tête pour matcher des titres
+# grammaticalement différents mais sémantiquement identiques
+# (ex. "l'organisation des jeux Olympiques" vs "jeux Olympiques" → match).
+_DOSLEG_STOPWORDS = {
+    "l", "la", "le", "les", "de", "du", "des", "d", "a", "au", "aux",
+    "et", "ou", "un", "une", "en", "dans", "sur", "par", "pour",
+    "lorganisation", "organisation",
+    "lheritage", "heritage",
+    "lactivite", "activite",
+    "ratification", "ratifier", "rectifier",
+    "projet", "proposition", "loi", "pjl", "ppl", "relatif", "relative",
+    "relatifs", "relatives", "visant", "portant", "tendant", "concernant",
+    "autorisant", "approuvant",
+}
 
 
 def _dosleg_subject_key(title: str) -> str:
@@ -814,8 +829,15 @@ def _dosleg_subject_key(title: str) -> str:
     # Ne garde que lettres + chiffres + espaces
     s = re.sub(r"[^a-z0-9\s]+", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
-    # Limite de taille pour éviter les hash sur titres très longs
-    return s[:80]
+    # R13-L : approche bag-of-words triée pour matcher
+    # "projet de loi relatif à l'organisation des jeux Olympiques et
+    # Paralympiques de 2030" == "Jeux Olympiques et Paralympiques de 2030 (PJL)".
+    # On retire stopwords (mots-outils + type-de-loi), puis on trie les
+    # mots significatifs ≥ 3 chars. Deux titres décrivant le même dossier
+    # ont alors la même clé canonique.
+    words = s.split()
+    significant = sorted({w for w in words if len(w) >= 3 and w not in _DOSLEG_STOPWORDS})
+    return " ".join(significant)[:80]
 
 
 def _dedup(rows: list[dict]) -> list[dict]:
