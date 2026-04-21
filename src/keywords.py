@@ -45,10 +45,17 @@ class KeywordMatcher:
             family: [k for k in items] for family, items in raw.items()
         }
         # index plat {terme_normalisé: (terme_original, famille)}
+        # "First wins" : quand plusieurs variantes se normalisent pareil
+        # (ex. "Activité physique adaptée" + "Activite physique adaptee"),
+        # on garde la première rencontrée. Convention yaml : la variante
+        # accentuée est toujours listée en premier pour que le libellé
+        # affichable (R13-B) soit la forme typographiquement correcte.
         self.index: dict[str, tuple[str, str]] = {}
         for family, items in self.families.items():
             for term in items:
-                self.index[_normalize(term)] = (term, family)
+                key = _normalize(term)
+                if key not in self.index:
+                    self.index[key] = (term, family)
 
         # pré-compile une regex OR pour accélérer le matching
         # Tri par longueur desc pour privilégier le match le plus spécifique
@@ -73,6 +80,28 @@ class KeywordMatcher:
             if fam:
                 families.add(fam)
         return sorted(set(matched)), sorted(families)
+
+    def recapitalize(self, keywords: Iterable[str]) -> list[str]:
+        """Remappe chaque kw déjà matché sur sa forme affichable du yaml.
+
+        R13-B (2026-04-21) : les items ingérés avant la capitalisation du
+        `config/keywords.yml` ont une liste `matched_keywords` persistée
+        en minuscules non-accentuées ("jeux olympiques", "activite
+        physique adaptee"). On remappe à l'export via l'index normalisé
+        sans re-matcher le texte. Idempotent : si la forme passée est
+        déjà canonique (égale à celle du yaml), renvoie telle quelle.
+
+        Préserve l'ordre d'apparition et déduplique.
+        """
+        out: list[str] = []
+        seen: set[str] = set()
+        for kw in keywords or []:
+            entry = self.index.get(_normalize(kw))
+            canonical = entry[0] if entry else kw
+            if canonical not in seen:
+                seen.add(canonical)
+                out.append(canonical)
+        return out
 
     def build_snippet(self, original_text: str, window: int = 80,
                       max_len: int = 320) -> str:

@@ -22,6 +22,7 @@ sys.path.insert(0, str(_ROOT))
 
 from src.site_export import (  # noqa: E402
     _fix_agenda_row,
+    _fix_amendement_row,
     _fix_cr_row,
     _fix_dossier_row,
     _fix_question_row,
@@ -225,3 +226,105 @@ def test_fix_dossier_row_empty_title():
     r = {"category": "dossiers_legislatifs", "title": ""}
     _fix_dossier_row(r)  # ne crash pas
     assert r["title"] == ""
+
+
+# ---------- _fix_amendement_row (R13-A backfill) ---------------------------
+
+def test_fix_amendement_row_resolves_deputy_code_from_raw_ref():
+    """Priorité à `raw.auteur_ref` pour résoudre PAxxxx, pas au code du title."""
+    with patch("src.site_export.amo_loader.resolve_acteur") as m:
+        m.side_effect = lambda ref: (
+            "Mme Clémence Guetté" if ref == "PA794130" else ""
+        )
+        r = {
+            "category": "amendements",
+            "title": (
+                "Amendement n°57 [Discuté] — Député PA794130 · art. ARTICLE 5 "
+                "· sur « Renforcer la sécurité »"
+            ),
+            "raw": {"auteur_ref": "PA794130", "numero": "57"},
+        }
+        _fix_amendement_row(r)
+    assert "Député PA794130" not in r["title"]
+    assert "Mme Clémence Guetté" in r["title"]
+    # Le reste du titre est préservé
+    assert "Amendement n°57" in r["title"]
+    assert "art. ARTICLE 5" in r["title"]
+
+
+def test_fix_amendement_row_falls_back_to_captured_code_if_no_raw_ref():
+    """Sans raw.auteur_ref, on retombe sur le code PAxxxx capturé dans le title."""
+    with patch("src.site_export.amo_loader.resolve_acteur") as m:
+        m.side_effect = lambda ref: (
+            "M. Hadrien Clouet" if ref == "PA795746" else ""
+        )
+        r = {
+            "category": "amendements",
+            "title": "Amendement n°52 [Discuté] — Député PA795746 · art. 5",
+            "raw": {"numero": "52"},  # pas d'auteur_ref
+        }
+        _fix_amendement_row(r)
+    assert "Député PA795746" not in r["title"]
+    assert "M. Hadrien Clouet" in r["title"]
+
+
+def test_fix_amendement_row_noop_when_already_resolved():
+    """Idempotent : si le title ne contient pas "Député PAxxxx", on ne touche pas."""
+    with patch("src.site_export.amo_loader.resolve_acteur") as m:
+        r = {
+            "category": "amendements",
+            "title": "Amendement n°10 [Discuté] — Mme Sandrine Rousseau · art. 3",
+            "raw": {"auteur_ref": "PA720892"},
+        }
+        _fix_amendement_row(r)
+    m.assert_not_called()
+    assert r["title"] == "Amendement n°10 [Discuté] — Mme Sandrine Rousseau · art. 3"
+
+
+def test_fix_amendement_row_keeps_title_if_cache_miss():
+    """Si le cache AMO ne connaît pas la clé, on garde le code brut (pas un None)."""
+    with patch("src.site_export.amo_loader.resolve_acteur") as m:
+        m.return_value = ""  # miss
+        r = {
+            "category": "amendements",
+            "title": "Amendement n°99 — Député PA999999 · art. 1",
+            "raw": {"auteur_ref": "PA999999"},
+        }
+        _fix_amendement_row(r)
+    assert "Député PA999999" in r["title"]  # inchangé
+
+
+def test_fix_amendement_row_ignores_other_categories():
+    r = {
+        "category": "questions",
+        "title": "Question — Député PA123",
+        "raw": {"auteur_ref": "PA123"},
+    }
+    _fix_amendement_row(r)
+    assert r["title"] == "Question — Député PA123"  # inchangé
+
+
+# ---------- _load : recapitalize matched_keywords (R13-B backfill) ----------
+
+def test_load_recapitalizes_legacy_matched_keywords():
+    """Les items pré-R13-B ont des kws en minuscules unidecodées → remappés."""
+    import json
+    row = {
+        "category": "questions",
+        "title": "Question sport",
+        "summary": "",
+        "matched_keywords": json.dumps(
+            ["jeux olympiques", "activite physique adaptee"]
+        ),
+        "keyword_families": json.dumps(["evenement", "dispositif"]),
+        "raw": "{}",
+    }
+    out = list(_load([row]))
+    assert len(out) == 1
+    kws = out[0]["matched_keywords"]
+    # Les deux kws ont récupéré leur forme canonique du yaml.
+    assert "Jeux olympiques" in kws
+    assert "Activité physique adaptée" in kws
+    # Aucun résidu en minuscule.
+    assert "jeux olympiques" not in kws
+    assert "activite physique adaptee" not in kws

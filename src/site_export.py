@@ -336,6 +336,47 @@ def _fix_question_row(r: dict) -> None:
                 r["raw"] = raw
 
 
+_AMEND_DEPUTE_RE = re.compile(r"Député\s+(PA\d+)")
+
+
+def _fix_amendement_row(r: dict) -> None:
+    """Résout les « Député PAxxx » résiduels dans les titres d'amendements AN.
+
+    R13-A (2026-04-21) — le refresh du cache AMO /17/ couvre maintenant tous
+    les députés XVIIe législature. Les *nouveaux* amendements ingérés après
+    le refresh sont bien résolus dans `_normalize_amendement`
+    (src/sources/assemblee.py), mais les items déjà en DB gardent leur ancien
+    titre "Amendement n°X [statut] — Député PAxxxx · art. … · sur « … »" car
+    `upsert_many` ne met pas à jour les hash_key existants. On réécrit ici en
+    mémoire à l'export sans exiger un reset DB. Idempotent.
+
+    Ne touche pas aux amendements Sénat (auteur en clair dans le CSV).
+    """
+    if (r.get("category") or "") != "amendements":
+        return
+    title = (r.get("title") or "")
+    if "Député PA" not in title:
+        return
+    raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
+    auteur_ref_raw = (
+        (raw.get("auteur_ref") or "").strip() if isinstance(raw, dict) else ""
+    )
+
+    def _resolve(match: re.Match) -> str:
+        # Priorité à auteur_ref du raw (canonique), fallback sur le code capturé.
+        ref = (
+            auteur_ref_raw
+            if auteur_ref_raw.startswith("PA")
+            else match.group(1)
+        )
+        resolved = amo_loader.resolve_acteur(ref) if ref else ""
+        return resolved or match.group(0)
+
+    new_title = _AMEND_DEPUTE_RE.sub(_resolve, title)
+    if new_title != title:
+        r["title"] = new_title[:220]
+
+
 def _fix_dossier_row(r: dict) -> None:
     """Capitalise la 1re lettre du titre des dossiers législatifs Sénat.
 
@@ -460,6 +501,12 @@ def _load(rows: list[dict]) -> list[dict]:
             r["matched_keywords"] = json.loads(r.get("matched_keywords") or "[]")
         except Exception:
             r["matched_keywords"] = []
+        # R13-B backfill : les items pré-capitalisation du yaml ont des
+        # `matched_keywords` stockés en minuscules non-accentuées ("jeux
+        # olympiques", "activite physique adaptee"). On remappe sur le
+        # libellé affichable courant sans re-matcher. Idempotent.
+        if r["matched_keywords"]:
+            r["matched_keywords"] = _matcher.recapitalize(r["matched_keywords"])
         try:
             r["keyword_families"] = json.loads(r.get("keyword_families") or "[]")
         except Exception:
@@ -610,6 +657,7 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
         _fix_question_row(r)
         _fix_agenda_row(r)
         _fix_dossier_row(r)
+        _fix_amendement_row(r)
     rows = _filter_window(rows)
     rows = _sort_by_date_desc(rows)
     # Dédup APRÈS tri par date : on garde la version la plus récente en cas
