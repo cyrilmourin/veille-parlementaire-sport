@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R13-L"
+SYSTEM_VERSION_LABEL = "R13-M"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -1338,15 +1338,12 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
         label = CATEGORY_LABELS.get(cat, cat)
         count = len(by_cat.get(cat, []))
         window = _window_for(cat)
-        # R13-K/L (2026-04-21) : `type: <cat>` UNIQUEMENT pour agenda qui
-        # a un layout spécifique voulu (blocs "À venir / Passé récent").
-        # Pour dosleg : Cyril a signalé que seul 1 item sur 9 s'affichait
-        # avec `type: "dossiers_legislatifs"` — Hugo semble filtrer les
-        # pages sans `date:` valide (cas des senat_promulguees avec
-        # published_at=null). Retour à _default/list.html qui garde tout.
-        # On perd le layout dossiers_legislatifs/list.html (cards dédiées)
-        # temporairement jusqu'à cadrage du pourquoi Hugo filtrait.
-        SPECIFIC_LAYOUT_CATS = {"agenda"}
+        # R13-M (2026-04-21) : réactive `type: dossiers_legislatifs` pour
+        # bénéficier du layout cards dédié (logos AN/Sénat 56x56 ajoutés).
+        # Si Hugo filtre à nouveau les items sans `date:` valide, on
+        # retombera sur _default/list.html via SPECIFIC_LAYOUT_CATS=agenda
+        # seul. À surveiller après le run R13-M.
+        SPECIFIC_LAYOUT_CATS = {"agenda", "dossiers_legislatifs"}
         lines = [
             "---",
             f'title: "{label}"',

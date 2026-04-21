@@ -60,9 +60,15 @@
 
     <article class="dosleg-card" data-chamber="{{ $cham }}"{{ if .Params.is_promulgated }} data-promulgated="true"{{ end }}>
       <div class="dosleg-card__icon" aria-hidden="true">
-        {{ if eq $cham "AN" }}AN
-        {{ else if or (eq $cham "Senat") (eq $cham "Sénat") }}SÉN
-        {{ else }}DOS
+        {{/* R13-M (2026-04-21) : logos AN / Sénat 56x56 (SVG locaux
+             site/static/logos/) remplacent le texte brut. Le SVG
+             Dossier (chemise dorée) sert de fallback générique. */}}
+        {{ if eq $cham "AN" }}
+          <img src="/logos/an.svg" alt="Assemblée nationale" width="56" height="56"/>
+        {{ else if or (eq $cham "Senat") (eq $cham "Sénat") }}
+          <img src="/logos/senat.svg" alt="Sénat" width="56" height="56"/>
+        {{ else }}
+          <img src="/logos/dossier.svg" alt="Dossier législatif" width="56" height="56"/>
         {{ end }}
       </div>
       <div class="dosleg-card__body">

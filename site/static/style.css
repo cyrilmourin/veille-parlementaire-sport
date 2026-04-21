@@ -680,19 +680,26 @@ a:hover { text-decoration: underline; }
   text-align: center;
   border-radius: 4px;
 }
+/* R13-M (2026-04-21) : chamber + titre vraiment inline (flex baseline),
+   pas de retour chariot entre les deux. Le titre garde son line-clamp 3
+   pour ne pas déborder. */
 .side-body {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-wrap: wrap;
   font-size: 12.5px;
   line-height: 1.35;
   color: var(--fg);
 }
 .side-body .chamber {
-  margin-right: 5px;
+  flex: 0 0 auto;
   font-size: 10px;
   padding: 1px 6px;
 }
-/* R13-G : titre agenda limité à 3 lignes via line-clamp (au lieu de
-   l'ancienne troncature à 60 caractères côté template, trop brutale). */
 .side-title-link {
+  flex: 1 1 60%;
+  min-width: 0;
   color: var(--sl-blue);
   display: -webkit-box;
   -webkit-line-clamp: 3;

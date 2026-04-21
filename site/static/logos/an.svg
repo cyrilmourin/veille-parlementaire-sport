@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" width="56" height="56" role="img" aria-label="Assemblée nationale">
+  <!-- Cadre bleu Sideline -->
+  <rect width="56" height="56" rx="6" fill="#122549"/>
+  <!-- Bande tricolore bas (France) -->
+  <rect x="6" y="42" width="14" height="6" fill="#0055A4"/>
+  <rect x="20" y="42" width="14" height="6" fill="#FFFFFF"/>
+  <rect x="34" y="42" width="16" height="6" fill="#EF4135"/>
+  <!-- Texte AN -->
+  <text x="28" y="30"
+        text-anchor="middle"
+        dominant-baseline="middle"
+        font-family="Montserrat, Arial, sans-serif"
+        font-size="20"
+        font-weight="900"
+        fill="#FFFFFF"
+        letter-spacing="1">AN</text>
+</svg>

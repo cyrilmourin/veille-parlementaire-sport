@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" width="56" height="56" role="img" aria-label="Sénat">
+  <!-- Cadre violet Sénat (palette R13-G) -->
+  <rect width="56" height="56" rx="6" fill="#a85c9e"/>
+  <!-- Ornement : dôme stylisé (évoque le Palais du Luxembourg) -->
+  <path d="M18 40 Q28 24 38 40 Z" fill="#FFFFFF" opacity="0.18"/>
+  <circle cx="28" cy="24" r="2.5" fill="#FFFFFF" opacity="0.35"/>
+  <!-- Texte Sénat -->
+  <text x="28" y="32"
+        text-anchor="middle"
+        dominant-baseline="middle"
+        font-family="Montserrat, Arial, sans-serif"
+        font-size="14"
+        font-weight="900"
+        fill="#FFFFFF"
+        letter-spacing="1">SÉNAT</text>
+</svg>

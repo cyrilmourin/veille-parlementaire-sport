@@ -387,23 +387,41 @@ autorites:
       url: https://www.defenseurdesdroits.fr/fr/actualites
       format: html
 
-    # cnosf : DÉSACTIVÉ en R11g-4 (2026-04-21).
-    # Le site CNOSF est passé à Nuxt (SSR partiel) : la page /actualites
-    # charge bien (HTTP 200, 900 ko) mais les articles individuels sont
-    # rendus par JS côté client — html_generic ne trouve donc aucun
-    # sélecteur (0 matches sur `article a`, `h2 a`, `h3 a`). Le sitemap
-    # XML officiel (https://cnosf.franceolympique.com/sitemap.xml, 326 ko,
-    # Drupal Simple XML Sitemap) contient tous les articles avec date
-    # <lastmod> ; fix propre = ajouter un nouveau connecteur `sitemap`
-    # générique (comme elysee_sitemap mais sans la logique rubriques
-    # spécifique Élysée). Reporté — le CNOSF n'est pas une source critique
-    # sport pour la veille parlementaire (les communiqués institutionnels
-    # arrivent déjà via FranceOlympique + sports.gouv.fr).
+    # R13-M (2026-04-21) — Cyril : ajout des 3 hautes juridictions en
+    # publications. RSS officiels confirmés pour CE et CC (QPC360).
+    # Cour de cassation : RSS officiel non documenté publiquement —
+    # fallback HTML scraping de /toutes-les-actualites.
+    - id: conseil_etat
+      category: communiques
+      url: https://www.conseil-etat.fr/rss/actualites-rss
+      format: rss
+
+    - id: conseil_constit_actualites
+      category: communiques
+      url: https://qpc360.conseil-constitutionnel.fr/rss/actualites
+      format: rss
+
+    - id: conseil_constit_decisions
+      category: jorf
+      url: https://qpc360.conseil-constitutionnel.fr/rss/decisions
+      format: rss
+
+    - id: cour_cassation
+      category: communiques
+      url: https://www.courdecassation.fr/toutes-les-actualites
+      format: html
+
+    # R13-M (2026-04-21) — réactivation CNOSF via sitemap.xml Drupal.
+    # Le site CNOSF est Nuxt (rendu JS côté client pour /actualites), donc
+    # html_generic ne voyait aucun lien. Le sitemap XML officiel est
+    # statique, contient toutes les URLs d'articles avec <lastmod>. Le
+    # nouveau format "sitemap" dans html_generic filtre les URLs qui
+    # contiennent "actualit-"/"news-"/"communique" et reconstitue le titre
+    # depuis le slug.
     - id: cnosf
       category: communiques
-      url: https://cnosf.franceolympique.com/actualites
-      format: html
-      enabled: false
+      url: https://cnosf.franceolympique.com/sitemap.xml
+      format: sitemap
 
     - id: france_paralympique
       category: communiques

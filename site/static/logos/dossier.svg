@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" width="56" height="56" role="img" aria-label="Dossier législatif">
+  <!-- Fond neutre crème -->
+  <rect width="56" height="56" rx="6" fill="#EEE8D1"/>
+  <!-- Pochette dossier -->
+  <path d="M10 18 L18 12 L28 12 L30 16 L46 16 L46 44 L10 44 Z"
+        fill="#C9A227" stroke="#8a6b14" stroke-width="1"/>
+  <rect x="14" y="22" width="28" height="16" fill="#FFFFFF"/>
+  <line x1="18" y1="28" x2="38" y2="28" stroke="#8a6b14" stroke-width="1"/>
+  <line x1="18" y1="32" x2="34" y2="32" stroke="#8a6b14" stroke-width="1"/>
+</svg>

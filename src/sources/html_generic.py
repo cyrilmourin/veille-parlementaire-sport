@@ -3,20 +3,148 @@
 Stratégie : on télécharge la page d'atterrissage (listing presse / actualités),
 on sélectionne les <a> portant un titre lisible, et on retient la date si on
 la trouve dans le lien parent ou via un <time datetime>.
+
+R13-M (2026-04-21) : ajout dispatch RSS (Conseil d'État, Conseil Constitutionnel)
+et sitemap (CNOSF). Permet d'ingérer des sources tierces sans créer un
+connecteur dédié par site.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urljoin, urlparse
 
+import feedparser
 from bs4 import BeautifulSoup
+from lxml import etree
 
 from ..models import Item
 from ._common import fetch_text, parse_iso
 
 log = logging.getLogger(__name__)
+
+
+# R13-M : cutoff ~120j pour les sources RSS/sitemap (cohérent avec la
+# fenêtre communiques 90j côté site_export + marge pour absorber les
+# retards d'ingestion).
+_RSS_SITEMAP_CUTOFF_DAYS = 120
+
+
+def _from_rss_generic(src: dict) -> list[Item]:
+    """Parse un flux RSS 2.0 / Atom — titre + lien + date + description.
+
+    Tolérant : utilise feedparser (même lib que senat._normalize_rss).
+    Chamber résolu via `_chamber(domain)` pour cohérence avec les badges
+    d'affichage existants.
+    """
+    try:
+        text = fetch_text(src["url"])
+    except Exception as e:
+        log.warning("RSS KO %s : %s", src["id"], e)
+        return []
+    d = feedparser.parse(text)
+    domain = urlparse(src["url"]).netloc
+    chamber = _chamber(domain)
+    out: list[Item] = []
+    cutoff = datetime.utcnow() - timedelta(days=_RSS_SITEMAP_CUTOFF_DAYS)
+    for e in d.entries:
+        uid = getattr(e, "id", None) or getattr(e, "link", "")
+        if not uid:
+            continue
+        link = (getattr(e, "link", "") or "").strip()
+        title = (getattr(e, "title", "") or "").strip()
+        if not title:
+            continue
+        summary = (getattr(e, "summary", "") or getattr(e, "description", "") or "").strip()
+        # Date : published_parsed / updated_parsed → datetime naïf UTC.
+        dt = None
+        for key in ("published_parsed", "updated_parsed"):
+            t = getattr(e, key, None)
+            if t:
+                try:
+                    dt = datetime(*t[:6])
+                    break
+                except Exception:
+                    pass
+        if dt and dt < cutoff:
+            continue
+        out.append(Item(
+            source_id=src["id"],
+            uid=uid[:200],
+            category=src["category"],
+            chamber=chamber,
+            title=title[:220],
+            url=link or src["url"],
+            published_at=dt,
+            summary=summary[:2000],
+            raw={"path": "rss_generic", "link": link},
+        ))
+    log.info("%s : %d items RSS (cutoff %dj)", src["id"], len(out), _RSS_SITEMAP_CUTOFF_DAYS)
+    return out
+
+
+def _from_sitemap_generic(src: dict) -> list[Item]:
+    """Parse un sitemap XML standard (schemas.sitemaps.org/0.9).
+
+    Pour chaque <url>, récupère <loc> (URL), <lastmod> (date). Le titre est
+    reconstruit depuis le dernier segment de l'URL (slug → mots). Filtre :
+    cutoff date + motif d'URL ("actualites" / "actualite" / "news") pour
+    exclure les pages statiques (mentions légales, etc.).
+    """
+    try:
+        text = fetch_text(src["url"])
+    except Exception as e:
+        log.warning("Sitemap KO %s : %s", src["id"], e)
+        return []
+    try:
+        root = etree.fromstring(text.encode("utf-8"))
+    except Exception as e:
+        log.warning("Sitemap XML KO %s : %s", src["id"], e)
+        return []
+    ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    domain = urlparse(src["url"]).netloc
+    chamber = _chamber(domain)
+    cutoff = datetime.utcnow() - timedelta(days=_RSS_SITEMAP_CUTOFF_DAYS)
+    out: list[Item] = []
+    # Motif optionnel de filtre URL (défaut : mots-clés d'actualité courants).
+    url_filter_patterns = src.get("url_filter") or [
+        "actualites", "actualite", "actu-", "news", "communique", "presse",
+    ]
+    for url_node in root.findall("s:url", ns):
+        loc = (url_node.findtext("s:loc", namespaces=ns) or "").strip()
+        if not loc:
+            continue
+        # Filtre : doit matcher au moins un pattern "actualité-like".
+        low = loc.lower()
+        if not any(p in low for p in url_filter_patterns):
+            continue
+        last = parse_iso((url_node.findtext("s:lastmod", namespaces=ns) or "").strip())
+        if last and last < cutoff:
+            continue
+        # Titre reconstruit depuis le slug du dernier segment.
+        slug = loc.rstrip("/").rsplit("/", 1)[-1]
+        title = slug.replace("-", " ").replace("_", " ").strip()[:200]
+        if not title:
+            continue
+        title = title[:1].upper() + title[1:]
+        uid = hashlib.sha1(loc.encode("utf-8")).hexdigest()[:16]
+        out.append(Item(
+            source_id=src["id"],
+            uid=uid,
+            category=src["category"],
+            chamber=chamber,
+            title=title[:220],
+            url=loc,
+            published_at=last,
+            summary="",
+            raw={"path": "sitemap_generic", "loc": loc,
+                 "lastmod": str(last) if last else ""},
+        ))
+    log.info("%s : %d items sitemap (cutoff %dj)", src["id"], len(out),
+             _RSS_SITEMAP_CUTOFF_DAYS)
+    return out
 
 
 _DATE_PAT = re.compile(r"(\d{4})[-/](\d{2})[-/](\d{2})")
@@ -156,6 +284,13 @@ def _chamber(domain: str) -> str:
     # matche aucun des blocs spécifiques plus haut.
     if "senat.fr" in d:
         return "Senat"
+    # R13-M (2026-04-21) : hautes juridictions ajoutées en publications.
+    if "conseil-etat.fr" in d:
+        return "CE"
+    if "conseil-constitutionnel.fr" in d:
+        return "CC"
+    if "courdecassation.fr" in d:
+        return "Cassation"
     # R13-G (2026-04-21) : fix "Www" affiché pour tous les ministères dont
     # l'URL commence par www. (www.defense.gouv.fr, www.justice.gouv.fr,
     # etc.). `d.split(".")[0]` retournait toujours "www" → badge "Www" sur
@@ -187,6 +322,15 @@ def _chamber(domain: str) -> str:
 
 
 def fetch_source(src: dict) -> list[Item]:
+    # R13-M (2026-04-21) : dispatch format rss / sitemap en amont du HTML
+    # classique. Permet d'activer Conseil d'État / Conseil Constitutionnel
+    # (RSS officiel) et CNOSF (sitemap.xml Drupal) sans connecteur dédié.
+    fmt = (src.get("format") or "html").lower()
+    if fmt == "rss":
+        return _from_rss_generic(src)
+    if fmt == "sitemap":
+        return _from_sitemap_generic(src)
+
     try:
         html = fetch_text(src["url"])
     except Exception as e:
