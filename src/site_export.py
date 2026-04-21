@@ -873,7 +873,14 @@ def _dedup(rows: list[dict]) -> list[dict]:
             "site_export : %d doublons (title+url) écartés", dropped,
         )
 
-    # Passe 2 — dédup dossiers législatifs par URL + sujet.
+    # Passe 2 — dédup dossiers législatifs par URL UNIQUEMENT.
+    # R13-L fix : la clé sémantique bag-of-words était trop agressive
+    # et collapsait des dossiers différents sur la même clé. On conserve
+    # seulement le dédup par URL (Sénat prioritaire en cas d'égalité).
+    # Le cas "JO 2030 en double (AN title + Sénat title)" est traité par
+    # le dédup implicite lors du matching AN vs Sénat via leurs URLs
+    # distinctes — on accepte temporairement que JO 2030 apparaisse 2x
+    # plutôt que de perdre 7/8 items comme observé.
     def _date_of(r: dict) -> str:
         return (r.get("published_at") or "")[:10]
 
@@ -883,48 +890,28 @@ def _dedup(rows: list[dict]) -> list[dict]:
     dosleg = [r for r in out if (r.get("category") or "") == "dossiers_legislatifs"]
     other = [r for r in out if (r.get("category") or "") != "dossiers_legislatifs"]
 
-    # 2a — dédup par URL : le plus récent gagne (Sénat prioritaire à date égale).
     by_url: dict[str, dict] = {}
     for r in dosleg:
         u = (r.get("url") or "").strip().lower()
         if not u:
-            # Pas d'URL → garde tel quel (on ne peut pas dédoublonner proprement).
             u = f"__nourl__{r.get('uid','')}"
         prev = by_url.get(u)
         if prev is None:
             by_url[u] = r
             continue
-        # Comparaison : plus récent d'abord, puis Sénat si égalité.
         if _date_of(r) > _date_of(prev):
             by_url[u] = r
         elif _date_of(r) == _date_of(prev) and _is_senat(r) and not _is_senat(prev):
             by_url[u] = r
 
-    # 2b — dédup par clé sémantique sur les rescapés de 2a.
-    by_subject: dict[str, dict] = {}
-    for r in by_url.values():
-        key = _dosleg_subject_key(r.get("title") or "")
-        if not key:
-            # Titre trop court / anormal → gardé sous clé unique uid
-            key = f"__uid__{r.get('uid','')}"
-        prev = by_subject.get(key)
-        if prev is None:
-            by_subject[key] = r
-            continue
-        if _date_of(r) > _date_of(prev):
-            by_subject[key] = r
-        elif _date_of(r) == _date_of(prev) and _is_senat(r) and not _is_senat(prev):
-            by_subject[key] = r
-
-    dedup_dosleg = list(by_subject.values())
+    dedup_dosleg = list(by_url.values())
     dropped_dosleg = len(dosleg) - len(dedup_dosleg)
     if dropped_dosleg:
         import logging
         logging.getLogger(__name__).info(
-            "site_export : %d doublons dossiers_legislatifs (URL+sujet) écartés",
+            "site_export : %d doublons dossiers_legislatifs (URL) écartés",
             dropped_dosleg,
         )
-    # Ré-assemble en préservant l'ordre date desc global.
     return _sort_by_date_desc(dedup_dosleg + other)
 
 
