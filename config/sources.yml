@@ -85,10 +85,16 @@ senat:
     # Le CSV ne fournit pas de date ni de statut de procédure : ces sources
     # complètent le flux AKN sur les dossiers anciens, mais le titre / la
     # date ne sont pas garantis.
+    # senat_dosleg : DÉSACTIVÉ en R11g-1 (2026-04-21).
+    # Produit 0 item depuis longtemps (le dosleg.zip était déjà vide à
+    # l'audit). Remplacé fonctionnellement par `senat_akn` (Akoma Ntoso)
+    # qui couvre les dossiers législatifs Sénat avec date + titre fiables.
+    # Conservé en config pour mémoire, réactivable si besoin.
     - id: senat_dosleg
       category: dossiers_legislatifs
       url: https://data.senat.fr/data/dosleg/dosleg.zip
       format: csv_zip
+      enabled: false
 
     - id: senat_ppl
       category: dossiers_legislatifs
@@ -130,10 +136,15 @@ senat:
       format: akn_discussion
       since_days: 90
 
+    # senat_questions : DÉSACTIVÉ en R11g-1 (2026-04-21).
+    # Produit 0 item depuis longtemps (doublon historique de
+    # `senat_questions_1an` qui couvre la fenêtre glissante 1 an sur CSV).
+    # Le zip complet questions.zip n'expose plus de CSV exploitable.
     - id: senat_questions
       category: questions
       url: https://data.senat.fr/data/questions/questions.zip
       format: csv_zip
+      enabled: false
 
     - id: senat_qg
       category: questions
@@ -266,15 +277,24 @@ ministeres:
       url: https://www.justice.gouv.fr/presse
       format: html
 
+    # min_sante + min_travail : DÉSACTIVÉS en R11g-4 (2026-04-21).
+    # Le serveur retourne une page "Request Rejected" (WAF/F5 ASM) pour TOUTE
+    # requête User-Agent = Mozilla, quel que soit le chemin — vérifié live :
+    #   /actualites/presse, /actualites, /, /presse → tous HTTP 200 avec 245 o
+    #   d'HTML "Request Rejected". Le scraper parse du HTML vide, d'où 0 items.
+    # Réactivation nécessitera soit un navigateur headless (Playwright), soit
+    # un flux officiel (RSS ou press-releases.xml) — à rechercher si besoin.
     - id: min_sante
       category: communiques
       url: https://sante.gouv.fr/actualites/presse
       format: html
+      enabled: false
 
     - id: min_travail
       category: communiques
       url: https://travail-emploi.gouv.fr/actualites/presse
       format: html
+      enabled: false
 
     - id: min_culture
       category: communiques
@@ -283,9 +303,12 @@ ministeres:
 
     - id: min_affaires_etrangeres
       category: communiques
-      # L'ancienne racine /salle-de-presse/ renvoyait 404. On cible la
-      # sous-page "communiqués techniques" qui agrège les actualités.
-      url: https://www.diplomatie.gouv.fr/fr/salle-de-presse/communiques-techniques/
+      # R11g-2 (2026-04-21) : refonte du site MEAE. L'arbo /salle-de-presse/
+      # a entièrement disparu (404 sur racine + toutes sous-pages). Le listing
+      # communiqués vit désormais sous /presse-et-ressources/decouvrir-et-
+      # informer/actualites/ (vérifié live : 200, 243 ko, 12 liens actualités
+      # sur la page d'accueil).
+      url: https://www.diplomatie.gouv.fr/fr/presse-et-ressources/decouvrir-et-informer/actualites/
       format: html
 
     - id: min_transition_ecologique
@@ -352,11 +375,23 @@ autorites:
       url: https://www.defenseurdesdroits.fr/fr/actualites
       format: html
 
+    # cnosf : DÉSACTIVÉ en R11g-4 (2026-04-21).
+    # Le site CNOSF est passé à Nuxt (SSR partiel) : la page /actualites
+    # charge bien (HTTP 200, 900 ko) mais les articles individuels sont
+    # rendus par JS côté client — html_generic ne trouve donc aucun
+    # sélecteur (0 matches sur `article a`, `h2 a`, `h3 a`). Le sitemap
+    # XML officiel (https://cnosf.franceolympique.com/sitemap.xml, 326 ko,
+    # Drupal Simple XML Sitemap) contient tous les articles avec date
+    # <lastmod> ; fix propre = ajouter un nouveau connecteur `sitemap`
+    # générique (comme elysee_sitemap mais sans la logique rubriques
+    # spécifique Élysée). Reporté — le CNOSF n'est pas une source critique
+    # sport pour la veille parlementaire (les communiqués institutionnels
+    # arrivent déjà via FranceOlympique + sports.gouv.fr).
     - id: cnosf
       category: communiques
-      # /cnosf/actus/ renvoyait 404 (ancien path). Nouveau path officiel.
       url: https://cnosf.franceolympique.com/actualites
       format: html
+      enabled: false
 
     - id: france_paralympique
       category: communiques
