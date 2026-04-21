@@ -14,7 +14,10 @@ from jinja2 import Template
 
 CATEGORY_LABELS = {
     "dossiers_legislatifs": "Dossiers législatifs",
-    "jorf": "JORF",
+    # R13-G (2026-04-21) : "Journal Officiel" — plus lisible que le sigle JORF
+    # dans les sommaires pliables du site. Les items gardent category="jorf"
+    # côté DB, c'est uniquement un libellé d'affichage.
+    "jorf": "Journal Officiel",
     "amendements": "Amendements",
     "questions": "Questions",
     "comptes_rendus": "Comptes rendus",

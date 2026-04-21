@@ -693,7 +693,10 @@ def _normalize_amendement(obj, src, cat):
     # parent pour que le matcher mots-clés (qui regarde aussi `title`) ait
     # accès au sujet du dossier depuis le titre lui-même, et pour que
     # l'utilisateur voie le contexte dans la liste des amendements.
-    title_bits = [f"Amendement n°{num}"]
+    # R13-G (2026-04-21) : "Amdt" au lieu de "Amendement" — titre plus court
+    # et lisible sur la page d'accueil (la chambre est déjà affichée via le
+    # tag .chamber, et le contexte catégorie est évident sur /items/amendements/).
+    title_bits = [f"Amdt n°{num}"]
     if statut:
         title_bits.append(f"[{statut}]")
     title_bits.append(f"— {auteur_label}")
@@ -1150,7 +1153,11 @@ def _normalize_question(obj, src, cat):
     # Choix demandé par l'utilisateur : nature + date + auteur (+groupe) +
     # sujet, SANS ministère (l'info ministère reste dans le summary pour le
     # matching et la consultation détaillée).
-    sujet_court = (rubrique or tete_analyse or analyse).strip()
+    # R13-G (2026-04-21) : Cyril veut l'analyse en premier — plus spécifique
+    # que la rubrique ("sports : nautiques") ou la tête d'analyse. L'analyse
+    # donne "Réforme de l'organisation du sport à l'école" là où la rubrique
+    # dirait juste "sports". Ordre : analyse > teteAnalyse > rubrique > texte.
+    sujet_court = (analyse or tete_analyse or rubrique).strip()
     if not sujet_court:
         sujet_court = _first_sentence(texte, max_len=100)
     sujet_court = sujet_court or "Question"
@@ -1209,6 +1216,10 @@ def _normalize_question(obj, src, cat):
         raw={"auteur_ref": auteur_ref, "auteur": auteur_label,
              "groupe": auteur_groupe, "ministere": ministere,
              "auteur_url": auteur_url,
+             # R13-G : stockés pour fixup in-memory côté site_export si on
+             # modifie la règle de priorité (analyse > rubrique vs inverse).
+             "analyse": analyse, "tete_analyse": tete_analyse,
+             "rubrique": rubrique,
              "path": "assemblee:question"},
     )
 

@@ -13,12 +13,18 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
 from . import amo_loader
 from .digest import CATEGORY_LABELS, CATEGORY_ORDER
+
+# R13-G (2026-04-21) : label de version système, affiché en sidebar pour que
+# Cyril puisse identifier rapidement quelle révision du pipeline a généré
+# la page en ligne. À incrémenter à chaque cumul de patches UX (R13-H, R14…).
+SYSTEM_VERSION_LABEL = "R13-G"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -35,6 +41,9 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     # - dossiers_legislatifs ajouté à STRICT_DATED_CATEGORIES (pas de fallback)
     # Résultat : seuls les dossiers avec une date de dépôt / promulgation
     # fiable et dans les 3 dernières années apparaissent.
+    # NB R13-G : la page d'accueil applique une sous-fenêtre plus courte
+    # (HOMEPAGE_WINDOW_DAYS_BY_CATEGORY ci-dessous) pour les dosleg, la
+    # page /items/dossiers_legislatifs/ garde les 3 ans complets.
     "dossiers_legislatifs": 1095,  # 3 ans
     # Agenda : on veut 3 mois pour voir les réunions passées récentes ET les
     # séances futures planifiées (ordre du jour de la session en cours).
@@ -62,6 +71,24 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
 #   - des « pages pivot » scrapées par html_generic (« Page suivante », « Presse »),
 #   - des agendas hebdo datés en fin de semaine à venir.
 STRICT_DATED_CATEGORIES = {"communiques", "dossiers_legislatifs"}
+
+# R13-G (2026-04-21) : sous-fenêtre appliquée UNIQUEMENT dans
+# `_write_home` (pas dans les pages /items/<cat>/). La fenêtre globale de
+# WINDOW_DAYS_BY_CATEGORY reste référentielle pour les pages dédiées —
+# la home est plus sélective pour ne pas noyer l'utilisateur dans du
+# vieux. Cyril (2026-04-21) : les dossiers législatifs affichés sur la
+# home doivent avoir été "mis à jour depuis moins de 6 mois", le reste
+# reste accessible depuis /items/dossiers_legislatifs/.
+HOMEPAGE_WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
+    "dossiers_legislatifs": 180,  # 6 mois (home) vs 1095j (page dédiée)
+}
+
+# R13-G : libellés humains pour les fenêtres par catégorie. Clé présente
+# → texte custom ("Mis à jour depuis moins de 6 mois"). Clé absente →
+# format générique "Depuis X jours" (remplace l'ancien "fenêtre X j").
+HOMEPAGE_WINDOW_LABEL_BY_CATEGORY: dict[str, str] = {
+    "dossiers_legislatifs": "Mis à jour depuis moins de 6 mois",
+}
 
 # R13-D (2026-04-21) — snippet par contexte :
 #
@@ -240,17 +267,25 @@ def _fix_cr_row(r: dict) -> None:
         if re.match(r"^\d{4}-\d{2}-\d{2}$", seance_iso):
             y, mo, dd = seance_iso.split("-")
             date_label = f"{dd}/{mo}/{y}"
-        # Chambre lisible (Senat→Sénat pour affichage)
-        cham_label = "Sénat" if cham in ("Senat", "Sénat") else cham
+        # R13-G (2026-04-21) : pour l'AN on retire la mention "AN" du titre
+        # (le badge <span class="chamber" data-chamber="AN"> suffit à
+        # identifier la chambre). Pour le Sénat on garde "Sénat" dans le
+        # titre — les deux CR Sénat (intégral vs analytique) coexistent et
+        # il est utile d'afficher la chambre en toutes lettres pour éviter
+        # toute ambiguïté sur les pages thématiques.
+        if cham in ("Senat", "Sénat"):
+            seance_prefix = "Séance Sénat du"
+        else:
+            seance_prefix = "Séance du"
         # Type de CR (intégral / analytique)
         type_label = "intégral"
         if "analytique" in title.lower():
             type_label = "analytique"
         if date_label and theme:
-            r["title"] = f"Séance {cham_label} du {date_label} — {theme}"[:220]
+            r["title"] = f"{seance_prefix} {date_label} — {theme}"[:220]
         elif date_label:
             r["title"] = (
-                f"Séance {cham_label} du {date_label} "
+                f"{seance_prefix} {date_label} "
                 f"— Compte rendu {type_label}"
             )[:220]
         elif cham == "AN":
@@ -259,6 +294,14 @@ def _fix_cr_row(r: dict) -> None:
             cref = m.group(0).upper() if m else ""
             if cref:
                 r["title"] = f"Compte rendu AN — séance {cref}"[:220]
+
+    # R13-G : CR AN existants titrés "Séance AN du …" → "Séance du …"
+    # (le badge .chamber affiche déjà "AN"). Idempotent : n'agit que si le
+    # titre commence exactement par "Séance AN du ". Ne touche PAS le Sénat.
+    if cham == "AN":
+        cur_title = r.get("title") or ""
+        if cur_title.startswith("Séance AN du "):
+            r["title"] = cur_title.replace("Séance AN du ", "Séance du ", 1)[:220]
 
     # --- Date publication recalée : pour trier correctement les CR sur la
     # page d'accueil, on remplace published_at par la date de séance
@@ -335,6 +378,23 @@ def _fix_question_row(r: dict) -> None:
                 # réécrire dans r pour qu'il soit propagé en aval.
                 r["raw"] = raw
 
+    # 4) R13-G (2026-04-21) : priorité d'affichage analyse > rubrique.
+    #    Les items pré-R13-G ont un titre "... : sport" (rubrique) là où
+    #    Cyril attend "... : Réforme du sport à l'école" (analyse). Si le
+    #    raw contient `analyse`, on remplace le suffixe "sujet" du titre.
+    if isinstance(raw, dict):
+        new_analyse = (raw.get("analyse") or raw.get("tete_analyse") or "").strip()
+        if new_analyse:
+            cur = r.get("title") or ""
+            # Le titre se termine par ": <sujet>" — on coupe au dernier ":"
+            # en conservant tout ce qui est avant. Idempotent (si analyse
+            # déjà dans le titre, le replace ne change rien).
+            m_colon = re.search(r"^(.*? : )(.+)$", cur)
+            if m_colon:
+                prefix, suffix = m_colon.group(1), m_colon.group(2).strip()
+                if suffix.lower() != new_analyse.lower():
+                    r["title"] = (prefix + new_analyse)[:220]
+
 
 _AMEND_DEPUTE_RE = re.compile(r"Député\s+(PA\d+)")
 
@@ -355,26 +415,77 @@ def _fix_amendement_row(r: dict) -> None:
     if (r.get("category") or "") != "amendements":
         return
     title = (r.get("title") or "")
-    if "Député PA" not in title:
-        return
     raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
     auteur_ref_raw = (
         (raw.get("auteur_ref") or "").strip() if isinstance(raw, dict) else ""
     )
 
-    def _resolve(match: re.Match) -> str:
-        # Priorité à auteur_ref du raw (canonique), fallback sur le code capturé.
-        ref = (
-            auteur_ref_raw
-            if auteur_ref_raw.startswith("PA")
-            else match.group(1)
-        )
-        resolved = amo_loader.resolve_acteur(ref) if ref else ""
-        return resolved or match.group(0)
+    # Étape 1 — Résolution "Député PAxxx" si présent (legacy). Ne touche pas
+    # au titre si le code n'y figure pas (early exit de l'ancienne logique,
+    # refactoré en condition pour que l'étape 2 s'applique quand même).
+    if "Député PA" in title:
+        def _resolve(match: re.Match) -> str:
+            # Priorité à auteur_ref du raw (canonique), fallback sur le code capturé.
+            ref = (
+                auteur_ref_raw
+                if auteur_ref_raw.startswith("PA")
+                else match.group(1)
+            )
+            resolved = amo_loader.resolve_acteur(ref) if ref else ""
+            return resolved or match.group(0)
 
-    new_title = _AMEND_DEPUTE_RE.sub(_resolve, title)
-    if new_title != title:
-        r["title"] = new_title[:220]
+        new_title = _AMEND_DEPUTE_RE.sub(_resolve, title)
+        if new_title != title:
+            r["title"] = new_title[:220]
+
+    # Étape 2 — R13-G (2026-04-21) : "Amendement n°X" → "Amdt n°X" pour
+    # les items ingérés avant la modif parser. Idempotent. S'applique même
+    # quand le titre ne contenait pas "Député PA" (cas auteur en clair).
+    t = r.get("title") or ""
+    if t.startswith("Amendement n°"):
+        r["title"] = ("Amdt n°" + t[len("Amendement n°"):])[:220]
+    elif " — Amendement n°" in t:
+        r["title"] = t.replace(" — Amendement n°", " — Amdt n°", 1)[:220]
+
+
+# R13-G : mapping domaine de ministère → badge (copie de html_generic._MIN_MAP).
+# Dupliqué volontairement ici pour que les items "chamber=Www" déjà en DB
+# (ingérés avant la correction parser) soient réécrits en mémoire à l'export
+# sans exiger de reset DB. Quand la DB sera exclusivement post-R13-G, ce
+# fixup ne fera plus rien (idempotent).
+_CHAMBER_WWW_FIXUP = {
+    # source_id → bon badge
+    "min_armees":               "MinARMEES",
+    "min_justice":              "MinJUSTICE",
+    "min_interieur":            "MinINTERIEUR",
+    "min_culture":              "MinCULTURE",
+    "min_education":            "MinEDUCATION",
+    "min_economie":             "MinECO",
+    "min_sante":                "MinSANTE",
+    "min_travail":              "MinTRAVAIL",
+    "min_affaires_etrangeres":  "MinAFFAIRES",
+    "min_enseignement_sup":     "MinESR",
+    "min_ruralite":             "MinCOHESION",
+    "min_transition_ecologique": "MinECOLOGIE",
+}
+
+
+def _fix_chamber_row(r: dict) -> None:
+    """Réécrit le champ `chamber="Www"` en badge ministériel correct.
+
+    R13-G (2026-04-21) — `html_generic._chamber` tombait sur le fallback
+    `d.split(".")[0].capitalize()` pour les URLs commençant par `www.`, ce
+    qui produisait "Www" pour la plupart des ministères (defense, justice,
+    interieur, culture, …). Cyril a signalé le cas defense → MinARMEES.
+    Le parser corrige maintenant les nouveaux items, ce fixup corrige les
+    items déjà en DB sans reset. Idempotent : n'agit que si chamber="Www".
+    """
+    if (r.get("chamber") or "") != "Www":
+        return
+    sid = (r.get("source_id") or "").strip()
+    mapped = _CHAMBER_WWW_FIXUP.get(sid)
+    if mapped:
+        r["chamber"] = mapped
 
 
 def _fix_dossier_row(r: dict) -> None:
@@ -658,6 +769,7 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
         _fix_agenda_row(r)
         _fix_dossier_row(r)
         _fix_amendement_row(r)
+        _fix_chamber_row(r)
     rows = _filter_window(rows)
     rows = _sort_by_date_desc(rows)
     # Dédup APRÈS tri par date : on garde la version la plus récente en cas
@@ -751,6 +863,35 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
         upcoming = upcoming[:8]
     (data / "sidebar_agenda.json").write_text(
         json.dumps(upcoming, ensure_ascii=False, indent=2, default=str),
+        encoding="utf-8",
+    )
+
+    # R13-G : méta sidebar — date de mise à jour + version système (label
+    # cumulé + hash commit court). Consommé par layouts/partials/sidebar.html.
+    # Le format de date_str colle à la demande Cyril : "XX/XX/XX à XXhXX"
+    # (Paris local, Hugo le ré-affiche tel quel). On calcule à partir de
+    # datetime.now() comme pour le reste du site (cohérent avec le footer).
+    meta_now = datetime.now()
+    short_sha = ""
+    try:
+        short_sha = subprocess.check_output(
+            ["git", "rev-parse", "--short=7", "HEAD"],
+            cwd=str(Path.cwd()),
+            stderr=subprocess.DEVNULL,
+            timeout=3,
+        ).decode("utf-8").strip()
+    except Exception:
+        short_sha = ""
+    system_version = (
+        f"{SYSTEM_VERSION_LABEL} · {short_sha}"
+        if short_sha else SYSTEM_VERSION_LABEL
+    )
+    (data / "meta.json").write_text(
+        json.dumps({
+            "updated_at_iso": meta_now.isoformat(timespec="seconds"),
+            "updated_at_human": meta_now.strftime("%d/%m/%y à %Hh%M"),
+            "system_version": system_version,
+        }, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
@@ -941,10 +1082,26 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         if cat not in by_cat:
             continue
         label = CATEGORY_LABELS.get(cat, cat)
-        window = _window_for(cat)
+        # R13-G : sous-fenêtre home (ex. dosleg 180j vs 1095j page dédiée).
+        # Si la catégorie y figure, on re-filtre le bucket avant l'affichage.
+        home_window = HOMEPAGE_WINDOW_DAYS_BY_CATEGORY.get(cat)
+        display_window = home_window if home_window is not None else _window_for(cat)
         # Tri explicite du bucket par date desc (plus récent en haut)
         bucket = _sort_by_date_desc(by_cat[cat])
+        if home_window is not None:
+            cutoff = datetime.now() - timedelta(days=home_window)
+            cutoff_iso = cutoff.strftime("%Y-%m-%dT%H:%M:%S")
+            bucket = [
+                it for it in bucket
+                if (it.get("published_at") or "") >= cutoff_iso
+            ]
         count = len(bucket)
+        # Libellé fenêtre : custom pour les catégories mappées (ex. dosleg),
+        # sinon format générique "Depuis X jours" (R13-G, remplace l'ancien
+        # "fenêtre X j" jugé technique par Cyril).
+        window_label = HOMEPAGE_WINDOW_LABEL_BY_CATEGORY.get(cat)
+        if window_label is None:
+            window_label = f"Depuis {display_window} jours"
         # <details> HTML brut — rendu nativement par tous les navigateurs,
         # pas de JS. `open` n'est PAS positionné par défaut → tout est plié.
         # Le summary contient le compteur et la fenêtre.
@@ -952,7 +1109,7 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         lines.append(
             f'<summary><span class="cat-label">{_escape(label)}</span>'
             f' <span class="cat-count">{count}</span>'
-            f' <span class="cat-window">fenêtre {window} j</span>'
+            f' <span class="cat-window">{_escape(window_label)}</span>'
             f' <a class="cat-all" href="/items/{cat}/">voir tout →</a>'
             f'</summary>'
         )

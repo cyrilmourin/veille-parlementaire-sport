@@ -151,8 +151,33 @@ def _chamber(domain: str) -> str:
         return "CPSF"
     if "cojop" in d:
         return "Alpes2030"
+    # R13-G (2026-04-21) : fix "Www" affiché pour tous les ministères dont
+    # l'URL commence par www. (www.defense.gouv.fr, www.justice.gouv.fr,
+    # etc.). `d.split(".")[0]` retournait toujours "www" → badge "Www" sur
+    # le site. Cyril a signalé le cas defense → MinARMEES ; on corrige
+    # l'ensemble avec un mapping explicite + un fallback qui strip "www.".
     if ".gouv.fr" in d:
-        return d.split(".")[0].capitalize()
+        # Premier segment du FQDN après avoir retiré le "www." éventuel.
+        key = d
+        if key.startswith("www."):
+            key = key[4:]
+        key = key.split(".gouv.fr")[0]
+        # Mapping des ministères connus — on privilégie un libellé Min{XXX}
+        # majuscule pour cohérence avec "MinSports" (déjà actif au-dessus).
+        _MIN_MAP = {
+            "defense":                "MinARMEES",
+            "justice":                "MinJUSTICE",
+            "interieur":              "MinINTERIEUR",
+            "culture":                "MinCULTURE",
+            "education":              "MinEDUCATION",
+            "economie":               "MinECO",
+            "sante":                  "MinSANTE",
+            "travail-emploi":         "MinTRAVAIL",
+            "diplomatie":             "MinAFFAIRES",
+            "enseignementsup-recherche": "MinESR",
+            "cohesion-territoires":   "MinCOHESION",
+        }
+        return _MIN_MAP.get(key, key.capitalize())
     return d
 
 
