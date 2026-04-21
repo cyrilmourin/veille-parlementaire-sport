@@ -175,6 +175,16 @@ senat:
       url: https://data.senat.fr/feed/actualites-rss.xml
       format: rss
 
+    # R13-J (2026-04-21) — demande Cyril : fusion agenda Sénat avec l'AN.
+    # Page HTML publique (www.senat.fr/agenda) qui liste les réunions des
+    # commissions, délégations et séance publique. Format html_generic —
+    # si le listing ne fournit pas d'items utilisables (SPA ou Cloudflare),
+    # on désactivera en R13-K.
+    - id: senat_agenda
+      category: agenda
+      url: https://www.senat.fr/agenda/
+      format: html
+
 # Journal officiel (JORF) — dump DILA OPENDATA (aucun credential nécessaire).
 # L'API PISTE/Légifrance est contournée : le dump XML quotidien DILA contient
 # les mêmes textes et est accessible sans authentification.

@@ -21,10 +21,11 @@ from typing import Iterable
 from . import amo_loader
 from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 
-# R13-G (2026-04-21) : label de version système, affiché en sidebar pour que
-# Cyril puisse identifier rapidement quelle révision du pipeline a généré
-# la page en ligne. À incrémenter à chaque cumul de patches UX (R13-H, R14…).
-SYSTEM_VERSION_LABEL = "R13-G"
+# R13-G (2026-04-21) : label de version système, affiché dans le header
+# (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
+# rapidement quelle révision du pipeline a généré la page en ligne. À
+# incrémenter à chaque cumul de patches UX.
+SYSTEM_VERSION_LABEL = "R13-J"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -335,12 +336,21 @@ def _fix_question_row(r: dict) -> None:
     n'apparaît plus, le `[sort]` non plus. L'info ministre / sort reste
     dans le summary pour matching et consultation.
 
+    R13-J (2026-04-21) : retire aussi la date dupliquée `· DD/MM/YYYY`
+    du titre (Cyril patch 3 — la date est déjà affichée en meta-line
+    sous le titre, avec le nouveau format "JJ mois complet AAAA").
+
     Résout aussi les `Député PAxxx` résiduels via le cache AMO. Idempotent.
     """
     if (r.get("category") or "") != "questions":
         return
-    title = (r.get("title") or "")
+    original_title = (r.get("title") or "")
+    title = original_title
     raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
+
+    # 0) R13-J : retire la date dupliquée du titre AN "Question écrite ·
+    #    12/04/2026 — Auteur (Groupe) : Sujet" → "Question écrite — …".
+    title = re.sub(r"\s*·\s*\d{2}/\d{2}/\d{4}(?=\s*—|\s|$)", "", title)
 
     # 1) Retire la séquence "→ ministère [sort] " du titre ancien Sénat
     new_title = _QTITLE_MIN_RE.sub("", title) if title else title
@@ -359,7 +369,7 @@ def _fix_question_row(r: dict) -> None:
     new_title = _QTITLE_COLON_FIX_RE.sub(") : ", new_title)
     # Double espace résiduel éventuel
     new_title = re.sub(r"\s{2,}", " ", new_title).strip()
-    if new_title != title:
+    if new_title != original_title:
         r["title"] = new_title[:220]
 
     # 3) Si raw.auteur commence encore par "Député PAxxx", on tente la
@@ -1297,6 +1307,24 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
             fm.append(f'auteur_groupe: "{auteur_groupe.replace(chr(34), chr(39))}"')
         if auteur_url:
             fm.append(f'auteur_url: "{auteur_url}"')
+        # R13-J (2026-04-21) — patch 16 : chip sort/état pour les amendements.
+        # Priorité `sort` (libellé final en séance / commission), fallback
+        # `etat` (transitoire). Slug normalisé pour ciblage CSS (accents
+        # retirés, lowercase, kebab-case).
+        if cat == "amendements" and isinstance(raw, dict):
+            sort_label = (raw.get("sort") or "").strip()
+            etat_label = (raw.get("etat") or "").strip()
+            chip_label = sort_label or etat_label
+            if chip_label:
+                try:
+                    from unidecode import unidecode as _uni
+                    slug = _uni(chip_label).lower()
+                    slug = re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
+                except Exception:
+                    slug = re.sub(r"[^a-z0-9]+", "-", chip_label.lower()).strip("-")
+                fm.append(
+                    f'sort_label: "{chip_label.replace(chr(34), chr(39))}"')
+                fm.append(f'sort_slug: "{slug}"')
         # Frontmatter étendu pour les dossiers législatifs (timeline).
         if cat == "dossiers_legislatifs" and actes_timeline:
             fm.append(f"nb_actes_utiles: {nb_actes_utiles}")

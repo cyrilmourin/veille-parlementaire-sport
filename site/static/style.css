@@ -123,9 +123,10 @@ a:hover { text-decoration: underline; }
 }
 .brand:hover { text-decoration: none; }
 .brand-logo {
-  width: 54px;
-  height: 54px;
-  flex: 0 0 54px;
+  /* R13-J (2026-04-21) : 54 → 90px pour plus de présence visuelle. */
+  width: 90px;
+  height: 90px;
+  flex: 0 0 90px;
   object-fit: contain;
   display: block;
 }
@@ -145,7 +146,8 @@ a:hover { text-decoration: underline; }
 .nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 18px;
+  align-items: center;
+  gap: 6px 10px;
   width: 100%;
   border-top: 1px solid rgba(255,255,255,0.12);
   padding-top: 10px;
@@ -155,9 +157,35 @@ a:hover { text-decoration: underline; }
   opacity: .9;
   font-size: 13px;
   font-weight: 500;
-  padding: 4px 2px;
+  /* R13-J (2026-04-21) : padding homogène pour que le hover rouge
+     (qui imite Rechercher) ait une surface cliquable cohérente. */
+  padding: 4px 10px;
+  border-radius: 4px;
 }
-.nav a:hover { opacity: 1; color: #fff; text-decoration: none; border-bottom: 1px solid var(--sl-red); }
+/* R13-J : hover rouge (type Rechercher) sur tous les items nav sauf
+   .nav-search lui-même (qui a son propre hover inverse). */
+.nav a:not(.nav-search):hover {
+  opacity: 1;
+  color: #fff;
+  text-decoration: none;
+  background: var(--sl-red);
+  border-bottom: 0;
+}
+
+/* R13-J : méta version/date dans le header, poussée à droite du menu nav. */
+.nav .nav-meta {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  font-style: italic;
+  color: rgba(238,232,209,0.75);
+  text-align: right;
+  line-height: 1.3;
+  padding: 2px 4px;
+}
+.nav .nav-meta-line { margin: 0; padding: 0; }
 
 /* ---------- Home ---------------------------------------------------------- */
 /* H3 d'accueil (sous-titre de positionnement) */
@@ -549,21 +577,10 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 1px 3px rgba(18, 37, 73, 0.05);
 }
 
-/* R13-G (2026-04-21) : bloc méta au-dessus de la recherche — date de
-   mise à jour + version système. Petit, italique, discret. */
-.side-meta {
-  margin-bottom: 10px;
-  padding: 0 2px;
-  font-size: 11.5px;
-  font-style: italic;
-  color: var(--muted);
-  line-height: 1.3;
-  text-align: right;
-}
-.side-meta-line {
-  margin: 0;
-  padding: 0;
-}
+/* R13-J (2026-04-21) : le bloc méta (date MAJ + version) a été déplacé
+   dans le header (.nav .nav-meta). .side-meta reste comme no-op pour
+   ne pas casser les anciens builds. */
+.side-meta { display: none; }
 
 /* Module recherche dans la sidebar.
    R13-G : plus de gradient (demande Cyril) — fond bleu Sideline uni,
@@ -1219,11 +1236,97 @@ a:hover { text-decoration: underline; }
   border-bottom: 0;
 }
 
+/* R13-J (2026-04-21) : agenda — chambre + titre inline sur la même ligne
+   (demande Cyril patch 5). */
+.agenda-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.agenda-row .chamber { flex: 0 0 auto; }
+.agenda-row .title { flex: 1 1 auto; }
+
+/* R13-J (2026-04-21) : cartouche blanc arrondi pour chaque occurrence
+   dans les pages de listing (questions, amendements, comptes-rendus,
+   publications, agenda, JORF, dossiers_legislatifs). Demande Cyril :
+   "même largeur d'un fond blanc borduré avec angles arrondis" comme
+   les thématiques de la home, mais sans menu dépliable. */
+.listing .items > li {
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin: 0 0 12px;
+  box-shadow: 0 1px 3px rgba(18, 37, 73, 0.04);
+}
+.listing .items { padding-left: 0; }
+.listing .items .title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sl-blue);
+}
+.listing .items .title:hover { color: var(--sl-red); }
+
+/* R13-J : date en gras + format long "JJ mois complet AAAA" (demande Cyril).
+   Appliqué à toutes les pages de listing. */
+.item-meta time.date,
+.listing .items .date,
+.home .content .date {
+  font-weight: 700;
+  color: var(--sl-red);
+}
+
+/* R13-J : auteur question inline dans le titre, même taille de police.
+   Placé AVANT le titre via .author-chip. */
+.auteur-inline {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sl-blue);
+  margin-right: 6px;
+}
+.auteur-inline:hover { color: var(--sl-red); }
+
+/* R13-J : chip sort amendement — couleurs sémantiques par valeur.
+   - rejeté / irrecevable : rouge / noir
+   - adopté : vert
+   - non soutenu : gris
+   - autre (en discussion, etc.) : bleu Sideline */
+.sort-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--sl-blue);
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.sort-chip[data-sort="rejete"],
+.sort-chip[data-sort="rejetee"],
+.sort-chip[data-sort="rejets"] { background: var(--sl-red); }
+.sort-chip[data-sort="adopte"],
+.sort-chip[data-sort="adoptee"] { background: var(--sl-green); }
+.sort-chip[data-sort="non-soutenu"],
+.sort-chip[data-sort="non-soutenue"] { background: var(--muted); }
+.sort-chip[data-sort="irrecevable"] { background: #1a1a1a; }
+.sort-chip[data-sort="retire"],
+.sort-chip[data-sort="retiree"] { background: #8a1a1a; }
+
+/* R13-J : badge "Retiré" pour les dossiers législatifs abandonnés. */
+.status[data-status="retire"],
+.status.status-retire { background: #8a1a1a; color: #fff; }
+
 /* ---------- Responsive ---------------------------------------------------- */
 @media (max-width: 640px) {
   .container { padding: 16px; }
   .site-header .container { flex-direction: column; align-items: flex-start; }
   .nav a:first-child { margin-left: 0; }
+  .nav .nav-meta { margin-left: 0; text-align: left; width: 100%; }
   h1 { font-size: 24px; letter-spacing: -0.3px; }
   h2 { font-size: 19px; letter-spacing: -0.3px; }
 }

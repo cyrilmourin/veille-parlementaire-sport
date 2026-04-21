@@ -630,20 +630,25 @@ def _normalize_amendement(obj, src, cat):
                                        "corps.exposeSommaire",  # fallback legacy
                                        default=""))
 
-    # Statut : sort en séance / en commission / "Irrecevable".
-    # Sur beaucoup d'amendements en cours de traitement, `cycleDeVie.sort`
-    # est un dict VIDE — la valeur utile est sur `etatDesTraitements.etat.libelle`
-    # (ex : "En traitement", "Tombe"). On privilégie `sort.libelle` (valeur
-    # finale après séance) puis `etatDesTraitements.etat.libelle` en fallback.
-    statut = _strip_html_text(_first(
+    # R13-J (2026-04-21) : on sépare sort (libellé final en séance) de
+    # état (transitoire). Cyril veut : chip coloré après la date, basé
+    # sur sort quand il est défini, sinon sur état. Le titre ne porte plus
+    # ni l'un ni l'autre.
+    sort_label = _strip_html_text(_first(
         root,
         "cycleDeVie.sort.libelle",
         "cycleDeVie.sort.sortEnSeance",
+        default=""
+    )) or ""
+    etat_label = _strip_html_text(_first(
+        root,
         "cycleDeVie.etatDesTraitements.etat.libelle",
         "cycleDeVie.etatDesTraitements.etat",
         "etat", "cycleDeVie.etat",
         default=""
     )) or ""
+    # statut conservé pour le summary de matching (compat. R11+).
+    statut = sort_label or etat_label
 
     # Contexte dossier (article, division)
     article = _text_of(_first(root, "pointeurFragmentTexte.division.articleDesignation",
@@ -693,12 +698,10 @@ def _normalize_amendement(obj, src, cat):
     # parent pour que le matcher mots-clés (qui regarde aussi `title`) ait
     # accès au sujet du dossier depuis le titre lui-même, et pour que
     # l'utilisateur voie le contexte dans la liste des amendements.
-    # R13-G (2026-04-21) : "Amdt" au lieu de "Amendement" — titre plus court
-    # et lisible sur la page d'accueil (la chambre est déjà affichée via le
-    # tag .chamber, et le contexte catégorie est évident sur /items/amendements/).
+    # R13-G : "Amdt" au lieu de "Amendement" (titre plus court).
+    # R13-J (2026-04-21) : le sort/état sort du titre et devient un chip
+    # coloré après la date dans la méta-line (patch 16).
     title_bits = [f"Amdt n°{num}"]
-    if statut:
-        title_bits.append(f"[{statut}]")
     title_bits.append(f"— {auteur_label}")
     if auteur_groupe and not auteur_groupe.startswith("PO"):
         title_bits.append(f"({auteur_groupe})")
@@ -726,7 +729,11 @@ def _normalize_amendement(obj, src, cat):
         summary=summary,
         raw={"path": "assemblee:amendement", "auteur_ref": auteur_ref,
              "groupe": auteur_groupe, "dossier": dossier_titre,
-             "texte_ref": texte_ref, "statut": statut, "numero": num},
+             "texte_ref": texte_ref,
+             # R13-J : sort / etat séparés pour que site_export puisse
+             # générer le chip coloré (sort > etat comme fallback).
+             "statut": statut, "sort": sort_label, "etat": etat_label,
+             "numero": num},
     )
 
 
@@ -1170,16 +1177,11 @@ def _normalize_question(obj, src, cat):
         "QM": "Question au ministre",
     }.get((m_uid.group(2).upper() if m_uid else ""), "Question")
 
-    date_label = ""
-    if date_pub:
-        try:
-            date_label = date_pub.strftime("%d/%m/%Y")
-        except Exception:
-            date_label = ""
-
+    # R13-J (2026-04-21) : date retirée du titre (déjà dans la meta-line en
+     # dessous). Auteur gardé dans le titre pour le matching keywords + affichage
+    # lisible ; le template affiche en plus un `.auteur-inline` cliquable avant
+    # le titre pour les templates qui exposent auteur_url.
     title_bits = [qtype_label]
-    if date_label:
-        title_bits.append(f"· {date_label}")
     title_bits.append(f"— {auteur_label}")
     if auteur_groupe:
         title_bits.append(f"({auteur_groupe})")

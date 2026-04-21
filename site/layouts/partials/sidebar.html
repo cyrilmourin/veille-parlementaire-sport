@@ -9,12 +9,7 @@
     2. Agenda — 8 prochains rendez-vous institutionnels, alimenté par
        site/data/sidebar_agenda.json.
 */}}
-{{ with site.Data.meta }}
-<div class="side-meta">
-  <p class="side-meta-line">Données M.A.J le {{ .updated_at_human }}</p>
-  <p class="side-meta-line">Version système : {{ .system_version }}</p>
-</div>
-{{ end }}
+{{/* R13-J (2026-04-21) : le bloc méta a été déplacé dans header.html. */}}
 
 <div class="side-card side-card--search">
   <h3 class="side-title">Recherche</h3>

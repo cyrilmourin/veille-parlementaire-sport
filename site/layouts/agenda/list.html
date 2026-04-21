@@ -1,14 +1,17 @@
 {{ define "main" }}
 {{/*
-  Page dédiée Agenda parlementaire.
+  Page dédiée Agenda parlementaire — R13-J (2026-04-21).
 
-  Le template générique _default/list.html trie toutes les catégories
-  en ByDate.Reverse (le + récent en haut). Pour l'Agenda ce n'est pas le
-  bon ordre : on veut voir les réunions À VENIR en premier (ordre
-  chronologique croissant), puis les réunions passées récentes en
-  complément (décroissant). On sépare donc l'affichage en 2 blocs.
-
-  Note : les items d'agenda datés "aujourd'hui" sont comptés dans "À venir".
+  - Deux blocs : "À venir" (chronologique croissant) + "Passé récent"
+    (décroissant), car trier toute la liste en ByDate.Reverse sépare mal
+    les réunions futures des passées.
+  - Patch 5 (R13-J) : titre SUR LA MÊME LIGNE que le tag chambre,
+    bloc `.agenda-row`.
+  - Patch 7 (R13-J) : pour les items AN, le lien pointe vers
+    https://www2.assemblee-nationale.fr/agendas/les-agendas (les liens
+    unitaires /dyn/17/reunions/RUANR... sont cassés). Pour les autres
+    chambres (Sénat, Matignon, MinSports…), on utilise `source_url`
+    si présent, sinon pas de lien.
 */}}
 {{ $today := now.Format "2006-01-02" }}
 {{ $upcoming := slice }}
@@ -32,17 +35,19 @@
   <ul class="items agenda-upcoming">
     {{ range sort $upcoming "Date" "asc" }}
       <li>
-        {{/* UX-A : sur la page agenda, les titres ne sont jamais cliquables.
-             Les pages externes (sites institutionnels) sont peu informatives —
-             l'utilisateur veut consulter l'agenda comme un calendrier, pas
-             chasser des liens. La source reste accessible sur la fiche
-             détaillée /items/agenda/<slug>/. Titre TOUJOURS en pleine
-             longueur ici (pas de troncature, contrairement à la sidebar). */}}
-        <span class="title no-link">{{ .Title }}</span>
+        <div class="agenda-row">
+          {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
+          {{ if eq (.Params.chamber | default "") "AN" }}
+            <a class="title" href="https://www2.assemblee-nationale.fr/agendas/les-agendas" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
+          {{ else if .Params.source_url }}
+            <a class="title" href="{{ .Params.source_url }}" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
+          {{ else }}
+            <span class="title no-link">{{ .Title }}</span>
+          {{ end }}
+        </div>
         <div class="item-meta">
           <span class="meta-main">
-            {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
-            {{ if not .Date.IsZero }} · <time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006 à 15h04" }}</time>{{ end }}
+            {{ if not .Date.IsZero }}<time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006 à 15h04" }}</time>{{ end }}
           </span>
           {{ with .Params.keywords }}
             <span class="meta-tags">
@@ -62,17 +67,19 @@
   <ul class="items agenda-past">
     {{ range (sort $past "Date" "desc") }}
       <li>
-        {{/* UX-A : sur la page agenda, les titres ne sont jamais cliquables.
-             Les pages externes (sites institutionnels) sont peu informatives —
-             l'utilisateur veut consulter l'agenda comme un calendrier, pas
-             chasser des liens. La source reste accessible sur la fiche
-             détaillée /items/agenda/<slug>/. Titre TOUJOURS en pleine
-             longueur ici (pas de troncature, contrairement à la sidebar). */}}
-        <span class="title no-link">{{ .Title }}</span>
+        <div class="agenda-row">
+          {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
+          {{ if eq (.Params.chamber | default "") "AN" }}
+            <a class="title" href="https://www2.assemblee-nationale.fr/agendas/les-agendas" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
+          {{ else if .Params.source_url }}
+            <a class="title" href="{{ .Params.source_url }}" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
+          {{ else }}
+            <span class="title no-link">{{ .Title }}</span>
+          {{ end }}
+        </div>
         <div class="item-meta">
           <span class="meta-main">
-            {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
-            {{ if not .Date.IsZero }} · <time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006 à 15h04" }}</time>{{ end }}
+            {{ if not .Date.IsZero }}<time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006 à 15h04" }}</time>{{ end }}
           </span>
           {{ with .Params.keywords }}
             <span class="meta-tags">

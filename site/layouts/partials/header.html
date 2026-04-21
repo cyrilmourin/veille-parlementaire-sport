@@ -1,7 +1,7 @@
 <header class="site-header">
   <div class="container">
     <a class="brand" href="/">
-      <img class="brand-logo" src="/sideline-logo.png" alt="Sideline Conseil" width="54" height="54"/>
+      <img class="brand-logo" src="/sideline-logo.png" alt="Sideline Conseil" width="90" height="90"/>
       <span class="brand-text">
         <span class="brand-kicker">SIDELINE CONSEIL</span>
         <span class="brand-title">Veille parlementaire sport</span>
@@ -10,7 +10,7 @@
     </a>
     <nav class="nav">
       <a href="/items/dossiers_legislatifs/">Dossiers</a>
-      <a href="/items/jorf/">JORF</a>
+      <a href="/items/jorf/">Journal Officiel</a>
       <a href="/items/amendements/">Amendements</a>
       <a href="/items/questions/">Questions</a>
       <a href="/items/comptes_rendus/">Comptes&nbsp;rendus</a>
@@ -18,6 +18,14 @@
       <a href="/items/agenda/">Agenda</a>
       <a href="/items/communiques/">Publications</a>
       <a href="/recherche/" class="nav-search">Rechercher</a>
+      {{/* R13-J (2026-04-21) : méta MAJ + version système, poussé à
+           droite en viewport large, retombe sous la nav en mobile. */}}
+      {{ with site.Data.meta }}
+      <span class="nav-meta" aria-label="Méta données de la veille">
+        <span class="nav-meta-line">Données M.A.J le {{ .updated_at_human }}</span>
+        <span class="nav-meta-line">Version système : {{ .system_version }}</span>
+      </span>
+      {{ end }}
     </nav>
   </div>
 </header>

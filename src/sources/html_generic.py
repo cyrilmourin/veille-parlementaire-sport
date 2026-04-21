@@ -151,6 +151,11 @@ def _chamber(domain: str) -> str:
         return "CPSF"
     if "cojop" in d:
         return "Alpes2030"
+    # R13-J (2026-04-21) : senat_agenda scraper via html_generic (pas de flux
+    # JSON/XML officiel pour l'agenda Sénat). Le domaine www.senat.fr ne
+    # matche aucun des blocs spécifiques plus haut.
+    if "senat.fr" in d:
+        return "Senat"
     # R13-G (2026-04-21) : fix "Www" affiché pour tous les ministères dont
     # l'URL commence par www. (www.defense.gouv.fr, www.justice.gouv.fr,
     # etc.). `d.split(".")[0]` retournait toujours "www" → badge "Www" sur

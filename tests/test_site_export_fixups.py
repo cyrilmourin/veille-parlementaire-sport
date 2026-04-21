@@ -417,8 +417,9 @@ def test_fix_question_row_swaps_rubrique_for_analyse():
         }
         _fix_question_row(r)
     assert "Financement des équipements sportifs scolaires" in r["title"]
-    # Le préfixe (type + date + auteur + groupe + ":") est conservé.
-    assert r["title"].startswith("Question écrite · 12/04/2026 — Mme X (LFI) : ")
+    # R13-J : date retirée du titre — préfixe = type + auteur + groupe + ":".
+    assert r["title"].startswith("Question écrite — Mme X (LFI) : ")
+    assert "12/04/2026" not in r["title"]
 
 
 def test_fix_question_row_uses_tete_analyse_fallback():
@@ -436,6 +437,21 @@ def test_fix_question_row_uses_tete_analyse_fallback():
         }
         _fix_question_row(r)
     assert "Tête d'analyse plus descriptive" in r["title"]
+
+
+def test_fix_question_row_removes_duplicate_date_r13j():
+    """R13-J patch 3 : la date dupliquée "· DD/MM/YYYY" est retirée du titre
+    (la date reste affichée par le template dans la meta-line)."""
+    with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
+        r = {
+            "category": "questions",
+            "title": "Question écrite · 12/04/2026 — Mme Y (LFI) : sport scolaire",
+            "raw": {"auteur": "Mme Y", "auteur_ref": "PA1"},
+        }
+        _fix_question_row(r)
+    assert "12/04/2026" not in r["title"]
+    assert "Question écrite" in r["title"]
+    assert "Mme Y" in r["title"]
 
 
 def test_fix_question_row_noop_if_no_analyse():
