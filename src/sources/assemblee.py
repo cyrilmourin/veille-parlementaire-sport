@@ -1177,14 +1177,12 @@ def _normalize_question(obj, src, cat):
         "QM": "Question au ministre",
     }.get((m_uid.group(2).upper() if m_uid else ""), "Question")
 
-    # R13-J (2026-04-21) : date retirée du titre (déjà dans la meta-line en
-     # dessous). Auteur gardé dans le titre pour le matching keywords + affichage
-    # lisible ; le template affiche en plus un `.auteur-inline` cliquable avant
-    # le titre pour les templates qui exposent auteur_url.
+    # R13-L (2026-04-21) : auteur retiré du titre (il est déjà affiché
+    # AVANT le titre via .auteur-inline cliquable). Le groupe est aussi
+    # retiré pour éviter la duplication. Format final : "Question écrite
+    # : {sujet_court}" — le template ajoute la barre verticale entre
+    # l'auteur et le titre : "Nom Prénom | Question écrite : sujet".
     title_bits = [qtype_label]
-    title_bits.append(f"— {auteur_label}")
-    if auteur_groupe:
-        title_bits.append(f"({auteur_groupe})")
     title_bits.append(f": {sujet_court}")
     title = " ".join(title_bits)[:220]
 
@@ -1397,15 +1395,21 @@ def _normalize_agenda(obj, src, cat):
 
     # --- DATE : le XSD AN définit `timeStampDebut` (S majuscule).
     # On essaie les variantes + fallback deep-find + SeanceID.DateSeance.
+    # R13-L (2026-04-21) : ajout fallback `cycleDeVie.chrono.creation` pour
+    # les items agenda non-séance / non-commission qui n'ont pas de
+    # `timeStampDebut` mais exposent bien la date de création du rendez-vous.
     dt_raw = _first(
         root,
         "timeStampDebut", "timestampDebut",
         "timeStampDebutReunion", "timestampDebutReunion",
-        "dateReunion", default=None,
+        "dateReunion",
+        "cycleDeVie.chrono.creation",
+        default=None,
     )
     if dt_raw in (None, ""):
         dt_raw = _deep_find(root, "timeStampDebut", "timestampDebut",
-                            "DateSeance", "dateSeance")
+                            "DateSeance", "dateSeance",
+                            "creation")
     dt = parse_iso(_text_of(dt_raw)) if dt_raw else None
 
     # --- LIEU : lieuAN_type = {code, libelleCourt, libelleLong}.
@@ -1436,6 +1440,28 @@ def _normalize_agenda(obj, src, cat):
     # --- TITRE : libellé d'ODJ ou d'audition, filtré du bruit.
     titles = _collect_agenda_titles(root)
     main_title = titles[0] if titles else ""
+
+    # R13-L (2026-04-21) : fallback sur le 1er item de l'ordre du jour —
+    # la structure XSD agenda AN pose les items ODJ sous
+    # `ODJ.convocationODJ.item` (texte envoyé aux députés) ou
+    # `ODJ.resumeODJ.item` (résumé publié). Ces items sont souvent
+    # très parlants (ex. "Audition conjointe sur le sport-santé —
+    # Société française des professionnels en activité physique
+    # adaptée"). Quand `main_title` est vide, on les utilise pour
+    # enrichir le titre avec le sujet réel de la réunion.
+    if not main_title:
+        odj_candidates = []
+        for path in ("ODJ.resumeODJ.item", "ODJ.convocationODJ.item"):
+            node = _first(root, path, default=None)
+            if isinstance(node, list):
+                for it in node:
+                    s = _text_of(it) if it else ""
+                    if isinstance(s, str) and _is_agenda_title_candidate(s):
+                        odj_candidates.append(s.strip().lstrip("-—•").strip())
+            elif isinstance(node, str) and _is_agenda_title_candidate(node):
+                odj_candidates.append(node.strip().lstrip("-—•").strip())
+        if odj_candidates:
+            main_title = odj_candidates[0][:180]
 
     if is_seance:
         quant = _text_of(_deep_find(root, "quantieme") or "")

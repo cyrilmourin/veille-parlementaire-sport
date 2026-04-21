@@ -44,11 +44,17 @@ def test_fix_question_row_strips_ministere_and_sort():
         "raw": {},
     }
     _fix_question_row(r)
-    # Plus de → ministère ni [sort], espacement propre autour du colon
+    # Plus de → ministère ni [sort], espacement propre autour du colon.
+    # R13-L (2026-04-21) : l'auteur + groupe sont aussi retirés du titre
+    # (affichés maintenant via .auteur-inline, barre verticale séparateur).
     assert "→" not in r["title"]
     assert "[En cours]" not in r["title"]
     assert "Sports, jeunesse et vie associative" not in r["title"]
-    assert "M. Cyril Pellevat (Les Indépendants) : Gouvernance" in r["title"]
+    assert "Gouvernance du comité" in r["title"]
+    # Nouvelle forme : "Question … n°1054S : Gouvernance …"
+    assert "Question de +1 an sans réponse n°1054S" in r["title"]
+    assert "Cyril Pellevat" not in r["title"]
+    assert "(Les Indépendants)" not in r["title"]
 
 
 def test_fix_question_row_resolves_deputy_code():
@@ -73,19 +79,21 @@ def test_fix_question_row_resolves_deputy_code():
 
 
 def test_fix_question_row_is_idempotent():
-    """Appliquer 2 fois ne change rien au titre."""
+    """Appliquer 2 fois ne change rien au titre (hors 1re normalisation R13-L)."""
     with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
         r = {
             "category": "questions",
             "title": "Question écrite n°14369 — M. Jean Dupont (RN) : sports",
             "raw": {},
         }
-        before = r["title"]
         _fix_question_row(r)
         after_first = r["title"]
         _fix_question_row(r)
         after_second = r["title"]
-    assert before == after_first == after_second
+    # R13-L : 1re passe retire "— M. Jean Dupont (RN)", 2e passe doit être no-op.
+    assert after_first == after_second
+    assert "M. Jean Dupont" not in after_first
+    assert "sports" in after_first
 
 
 def test_fix_question_row_ignores_other_categories():
@@ -96,7 +104,8 @@ def test_fix_question_row_ignores_other_categories():
 
 
 def test_fix_question_row_handles_unknown_deputy():
-    """Si le cache AMO n'a pas la clé, on laisse le code tel quel sans crash."""
+    """Si le cache AMO n'a pas la clé et R13-L retire auteur/groupe, le titre
+    résultant ne contient plus le code — on garde juste le sujet."""
     with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
         r = {
             "category": "questions",
@@ -104,8 +113,10 @@ def test_fix_question_row_handles_unknown_deputy():
             "raw": {"auteur": "Député PA999999", "auteur_ref": "PA999999"},
         }
         _fix_question_row(r)
-    # Titre conservé tel quel (résolution a échoué, pas de remplacement)
-    assert "Député PA999999" in r["title"]
+    # R13-L : l'auteur (incluant Député PAxxx) est retiré du titre.
+    assert "Député PA999999" not in r["title"]
+    assert "Question écrite n°1" in r["title"]
+    assert "sujet" in r["title"]
 
 
 # ---------- _load : recalcul snippet (UX-E) --------------------------------
@@ -417,9 +428,10 @@ def test_fix_question_row_swaps_rubrique_for_analyse():
         }
         _fix_question_row(r)
     assert "Financement des équipements sportifs scolaires" in r["title"]
-    # R13-J : date retirée du titre — préfixe = type + auteur + groupe + ":".
-    assert r["title"].startswith("Question écrite — Mme X (LFI) : ")
+    # R13-L : auteur + groupe retirés du titre aussi (affichés via .auteur-inline).
+    assert r["title"].startswith("Question écrite : ")
     assert "12/04/2026" not in r["title"]
+    assert "Mme X" not in r["title"]
 
 
 def test_fix_question_row_uses_tete_analyse_fallback():
@@ -440,8 +452,8 @@ def test_fix_question_row_uses_tete_analyse_fallback():
 
 
 def test_fix_question_row_removes_duplicate_date_r13j():
-    """R13-J patch 3 : la date dupliquée "· DD/MM/YYYY" est retirée du titre
-    (la date reste affichée par le template dans la meta-line)."""
+    """R13-J patch 3 + R13-L : la date dupliquée ET l'auteur sont retirés
+    du titre (affichés séparément en meta-line + .auteur-inline)."""
     with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
         r = {
             "category": "questions",
@@ -451,7 +463,9 @@ def test_fix_question_row_removes_duplicate_date_r13j():
         _fix_question_row(r)
     assert "12/04/2026" not in r["title"]
     assert "Question écrite" in r["title"]
-    assert "Mme Y" in r["title"]
+    # R13-L : auteur retiré du titre (affiché via .auteur-inline).
+    assert "Mme Y" not in r["title"]
+    assert "sport scolaire" in r["title"]
 
 
 def test_fix_question_row_noop_if_no_analyse():

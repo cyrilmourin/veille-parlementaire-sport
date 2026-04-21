@@ -538,11 +538,11 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
             # demande utilisateur : le ministre interrogé n'a pas de valeur
             # dans le titre (l'info reste disponible dans le summary pour
             # matching + consultation détaillée).
+            # R13-L (2026-04-21) : auteur + groupe retirés du titre (affichés
+            # AVANT le titre via .auteur-inline). Format final : "Question
+            # écrite n°X : sujet" — le template ajoute une barre verticale
+            # entre .auteur-inline et .title.
             title_bits = [f"{qtype_label} n°{uid}"]
-            if auteur:
-                title_bits.append(f"— {auteur}")
-            if groupe:
-                title_bits.append(f"({groupe})")
             title_bits.append(f": {sujet}")
             summary = " — ".join(p for p in [
                 auteur, groupe,

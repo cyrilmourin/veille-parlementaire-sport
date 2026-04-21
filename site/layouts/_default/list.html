@@ -11,8 +11,10 @@
     {{ range (.Paginate .Pages.ByDate.Reverse).Pages }}
       <li>
         {{/* R13-J : auteur (lien fiche député/sénateur) inline AVANT le titre,
-             même taille de police. Fixup patch 9. Ouverture nouvel onglet. */}}
-        {{ if .Params.auteur_url }}<a class="auteur-inline" href="{{ .Params.auteur_url }}" target="_blank" rel="noopener noreferrer" title="Fiche {{ .Params.auteur }}">{{ .Params.auteur }}</a>{{ else if .Params.auteur }}<span class="auteur-inline">{{ .Params.auteur }}</span>{{ end }}
+             même taille de police. Fixup patch 9. Ouverture nouvel onglet.
+             R13-L : barre verticale séparateur entre auteur et titre
+             (demande Cyril). Visible uniquement si auteur présent. */}}
+        {{ if .Params.auteur_url }}<a class="auteur-inline" href="{{ .Params.auteur_url }}" target="_blank" rel="noopener noreferrer" title="Fiche {{ .Params.auteur }}">{{ .Params.auteur }}</a><span class="auteur-sep"> | </span>{{ else if .Params.auteur }}<span class="auteur-inline">{{ .Params.auteur }}</span><span class="auteur-sep"> | </span>{{ end }}
         {{ if .Params.source_url }}
         <a href="{{ .Params.source_url }}" class="title" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
         {{ else }}

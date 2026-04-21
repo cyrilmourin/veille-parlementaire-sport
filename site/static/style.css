@@ -1279,14 +1279,19 @@ a:hover { text-decoration: underline; }
 }
 
 /* R13-J : auteur question inline dans le titre, même taille de police.
-   Placé AVANT le titre via .author-chip. */
+   Placé AVANT le titre via .auteur-inline.
+   R13-L : barre verticale séparateur .auteur-sep entre auteur et titre. */
 .auteur-inline {
   font-size: 15px;
   font-weight: 600;
   color: var(--sl-blue);
-  margin-right: 6px;
 }
 .auteur-inline:hover { color: var(--sl-red); }
+.auteur-sep {
+  color: var(--muted);
+  font-weight: 400;
+  margin: 0 4px;
+}
 
 /* R13-J : chip sort amendement — couleurs sémantiques par valeur.
    - rejeté / irrecevable : rouge / noir

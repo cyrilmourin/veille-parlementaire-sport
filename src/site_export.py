@@ -46,11 +46,11 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     # (HOMEPAGE_WINDOW_DAYS_BY_CATEGORY ci-dessous) pour les dosleg, la
     # page /items/dossiers_legislatifs/ garde les 3 ans complets.
     "dossiers_legislatifs": 1095,  # 3 ans
-    # Agenda : on veut 3 mois pour voir les réunions passées récentes ET les
-    # séances futures planifiées (ordre du jour de la session en cours).
-    # 30j coupait trop court : une réunion annoncée 6 semaines à l'avance
-    # ou passée depuis 5 semaines disparaissait du site.
-    "agenda": 90,
+    # Agenda : R13-L (2026-04-21) — retour à 30j (Cyril : "tu peux te
+    # contenter des 30 derniers jours et futurs"). Les séances futures
+    # ne sont pas filtrées par `published_at >= cutoff` (elles sont > now
+    # donc > cutoff), donc 30j garde tout le futur + les 30 derniers jours.
+    "agenda": 30,
     # Publications (communiqués de presse, actualités ministères / autorités
     # indépendantes) : 3 mois. Au-delà la page perd en pertinence opérationnelle.
     "communiques": 90,
@@ -353,6 +353,23 @@ def _fix_question_row(r: dict) -> None:
     #    12/04/2026 — Auteur (Groupe) : Sujet" → "Question écrite — …".
     title = re.sub(r"\s*·\s*\d{2}/\d{2}/\d{4}(?=\s*—|\s|$)", "", title)
 
+    # 0bis) R13-L (2026-04-21) : retire l'auteur + groupe du titre
+    #       (demande Cyril : l'auteur est déjà affiché comme .auteur-inline
+    #       cliquable AVANT le titre, avec une barre verticale séparateur).
+    #       Pattern : "Question ... — {Auteur} ({Groupe}) : {sujet}" →
+    #       "Question ... : {sujet}". Idempotent.
+    title = re.sub(
+        r"\s+—\s+[A-ZÀ-Ÿ][^()—]+?\s*\([^)]+\)\s*:\s*",
+        " : ",
+        title,
+    )
+    # Sans groupe entre parenthèses (cas rare Sénat) :
+    title = re.sub(
+        r"\s+—\s+(?:M\.|Mme|Mlle)\s+[^:]+?\s*:\s*",
+        " : ",
+        title,
+    )
+
     # 1) Retire la séquence "→ ministère [sort] " du titre ancien Sénat
     new_title = _QTITLE_MIN_RE.sub("", title) if title else title
 
@@ -508,17 +525,49 @@ def _fix_dossier_row(r: dict) -> None:
     mais la DB contient des items pre-patch non normalisés. On capitalise
     en mémoire à l'export pour ne pas exiger un reset DB. Idempotent,
     préserve les sigles déjà en majuscules (CNIL, PJL, etc.).
+
+    R13-L (2026-04-21) : détecte aussi les dossiers retirés pour afficher
+    le badge "Retiré" (fond rouge foncé). Critères :
+      - `raw.is_retire` True (flag explicite posé par le parser si dispo)
+      - OR `raw.status_label` contient "retrait" (cas où le parser AN a
+        mappé un codeActe de type retrait → status_label "... retrait")
+      - OR un acte dans `raw.actes_timeline` a `libelle` contenant
+        "retrait" (AN codeActe ANRETRAIT / similaire).
     """
     if (r.get("category") or "") != "dossiers_legislatifs":
         return
     title = (r.get("title") or "")
-    if not title:
+    if title:
+        # Si la 1re lettre est déjà en majuscule ou non-alphabétique, on skip.
+        first = title[0]
+        if first.isalpha() and first.islower():
+            r["title"] = (first.upper() + title[1:])[:220]
+
+    # R13-L : détection d'un dossier retiré → réécrit status_label="Retiré".
+    raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
+    if not isinstance(raw, dict):
         return
-    # Si la 1re lettre est déjà en majuscule ou non-alphabétique, on skip
-    first = title[0]
-    if not first.isalpha() or first.isupper():
-        return
-    r["title"] = (first.upper() + title[1:])[:220]
+    status_label = (raw.get("status_label") or "").strip()
+    is_retire = False
+    if raw.get("is_retire") is True:
+        is_retire = True
+    elif "retrait" in status_label.lower() or "retiré" in status_label.lower():
+        is_retire = True
+    else:
+        timeline = raw.get("actes_timeline")
+        if isinstance(timeline, list):
+            for acte in timeline:
+                if not isinstance(acte, dict):
+                    continue
+                lib = str(acte.get("libelle") or "").lower()
+                code = str(acte.get("code") or "").lower()
+                if "retrait" in lib or "retrait" in code:
+                    is_retire = True
+                    break
+    if is_retire:
+        raw["status_label"] = "Retiré"
+        raw["is_retire"] = True
+        r["raw"] = raw
 
 
 def _fix_agenda_row(r: dict) -> None:
@@ -722,16 +771,67 @@ def _filter_window(rows: list[dict]) -> list[dict]:
     return kept
 
 
-def _dedup(rows: list[dict]) -> list[dict]:
-    """Déduplication par (title, url) — filet de sécurité au-delà du hash_key.
+_DOSLEG_STRIP_PREFIX_RE = re.compile(
+    r"^(?:projet de loi(?:\s+(?:organique|constitutionnelle|de finances(?:\s+rectificative)?|de financement(?:\s+de\s+la\s+s[ée]curit[ée]\s+sociale)?))?|"
+    r"proposition de loi(?:\s+organique|\s+constitutionnelle)?|"
+    r"proposition de r[ée]solution(?:\s+europ[ée]enne)?|"
+    r"pjl|ppl|pplo|ppr)\s+",
+    re.IGNORECASE,
+)
+_DOSLEG_STRIP_CONNECTORS_RE = re.compile(
+    r"^(?:relatif[e]?s?\s+[àa]|relative[s]?\s+[àa]|visant\s+[àa]|portant|tendant\s+[àa]|ayant\s+pour\s+objet|concernant|autorisant|approuvant|de\s+modernisation\s+de|pour\s+l['e])",
+    re.IGNORECASE,
+)
 
-    Le store déduplique déjà par (source_id, uid), mais il arrive qu'un même
-    dossier législatif (ou une même question) soit référencé sous plusieurs
-    UIDs différents selon le chemin dans le JSON AN (ex : un dossier a un uid
-    au niveau racine ET un uid dans dossier.uid, stockés comme 2 items).
-    On garde la 1re occurrence (la plus récente, car rows est déjà trié
-    par date desc à ce stade).
+
+def _dosleg_subject_key(title: str) -> str:
+    """Clé normalisée pour détecter qu'un dossier AN et un dossier Sénat
+    décrivent le même projet/proposition de loi.
+
+    R13-L (2026-04-21) — Cyril voit par exemple :
+      - "Projet de loi relatif à l'organisation des jeux Olympiques..."
+      - "Jeux Olympiques et Paralympiques 2030 (PJL)"
+
+    On normalise : (1) lowercase + unidecode, (2) retire les préfixes
+    type de texte ("projet de loi", "PJL", etc.), (3) retire les
+    connecteurs grammaticaux ("relatif à", "visant à", etc.), (4)
+    ne garde que [a-z0-9\s] avec espaces compressés.
     """
+    if not title:
+        return ""
+    try:
+        from unidecode import unidecode as _uni
+        s = _uni(title).lower()
+    except Exception:
+        s = title.lower()
+    # Coupe au 1er caractère de ponctuation forte (suffixes "(PJL)" etc.)
+    for sep in ("(", " - ", " — ", " – ", " : "):
+        if sep in s:
+            s = s.split(sep, 1)[0]
+    # Retire préfixes type de texte + connecteurs grammaticaux
+    s = _DOSLEG_STRIP_PREFIX_RE.sub("", s).strip()
+    s = _DOSLEG_STRIP_CONNECTORS_RE.sub("", s).strip()
+    # Ne garde que lettres + chiffres + espaces
+    s = re.sub(r"[^a-z0-9\s]+", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    # Limite de taille pour éviter les hash sur titres très longs
+    return s[:80]
+
+
+def _dedup(rows: list[dict]) -> list[dict]:
+    """Déduplication multi-passes.
+
+    1. (title, url) : filet de sécurité au-delà du hash_key — couvre les
+       items référencés sous plusieurs UIDs dans un même dump.
+
+    2. R13-L (2026-04-21) — dossiers législatifs :
+       a. Dédup par URL exacte : garde la version la plus récente.
+       b. Dédup par clé sémantique (`_dosleg_subject_key`) : garde la plus
+          récente, avec priorité Sénat en cas d'égalité de date.
+
+    `rows` est déjà trié par date desc à ce stade.
+    """
+    # Passe 1 — (title, url)
     seen: set[tuple[str, str]] = set()
     out = []
     dropped = 0
@@ -750,7 +850,60 @@ def _dedup(rows: list[dict]) -> list[dict]:
         logging.getLogger(__name__).info(
             "site_export : %d doublons (title+url) écartés", dropped,
         )
-    return out
+
+    # Passe 2 — dédup dossiers législatifs par URL + sujet.
+    def _date_of(r: dict) -> str:
+        return (r.get("published_at") or "")[:10]
+
+    def _is_senat(r: dict) -> bool:
+        return (r.get("chamber") or "").lower() in ("senat", "sénat")
+
+    dosleg = [r for r in out if (r.get("category") or "") == "dossiers_legislatifs"]
+    other = [r for r in out if (r.get("category") or "") != "dossiers_legislatifs"]
+
+    # 2a — dédup par URL : le plus récent gagne (Sénat prioritaire à date égale).
+    by_url: dict[str, dict] = {}
+    for r in dosleg:
+        u = (r.get("url") or "").strip().lower()
+        if not u:
+            # Pas d'URL → garde tel quel (on ne peut pas dédoublonner proprement).
+            u = f"__nourl__{r.get('uid','')}"
+        prev = by_url.get(u)
+        if prev is None:
+            by_url[u] = r
+            continue
+        # Comparaison : plus récent d'abord, puis Sénat si égalité.
+        if _date_of(r) > _date_of(prev):
+            by_url[u] = r
+        elif _date_of(r) == _date_of(prev) and _is_senat(r) and not _is_senat(prev):
+            by_url[u] = r
+
+    # 2b — dédup par clé sémantique sur les rescapés de 2a.
+    by_subject: dict[str, dict] = {}
+    for r in by_url.values():
+        key = _dosleg_subject_key(r.get("title") or "")
+        if not key:
+            # Titre trop court / anormal → gardé sous clé unique uid
+            key = f"__uid__{r.get('uid','')}"
+        prev = by_subject.get(key)
+        if prev is None:
+            by_subject[key] = r
+            continue
+        if _date_of(r) > _date_of(prev):
+            by_subject[key] = r
+        elif _date_of(r) == _date_of(prev) and _is_senat(r) and not _is_senat(prev):
+            by_subject[key] = r
+
+    dedup_dosleg = list(by_subject.values())
+    dropped_dosleg = len(dosleg) - len(dedup_dosleg)
+    if dropped_dosleg:
+        import logging
+        logging.getLogger(__name__).info(
+            "site_export : %d doublons dossiers_legislatifs (URL+sujet) écartés",
+            dropped_dosleg,
+        )
+    # Ré-assemble en préservant l'ordre date desc global.
+    return _sort_by_date_desc(dedup_dosleg + other)
 
 
 def _group(rows: list[dict], key: str) -> dict[str, list[dict]]:
@@ -1176,16 +1329,15 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
         label = CATEGORY_LABELS.get(cat, cat)
         count = len(by_cat.get(cat, []))
         window = _window_for(cat)
-        # R13-K (2026-04-21) : `type: <cat>` UNIQUEMENT pour agenda et
-        # dossiers_legislatifs qui ont un layout spécifique voulu
-        # (blocs "À venir/Passé récent" + single dossier législatif).
-        # Pour les CR / publications / questions / amendements / JORF, on
-        # reste sur _default/list.html (liste plate sans groupement).
-        # Cyril (R13-K) : plus de séparation AN/Sénat sur les CR, plus de
-        # "Compte rendu intégral/analytique" badge. De plus, le `type:
-        # communiques` semblait empêcher Hugo d'indexer les 12 .md sous
-        # /items/communiques/ (seuls 3 affichés) — voir R13-K note.
-        SPECIFIC_LAYOUT_CATS = {"agenda", "dossiers_legislatifs"}
+        # R13-K/L (2026-04-21) : `type: <cat>` UNIQUEMENT pour agenda qui
+        # a un layout spécifique voulu (blocs "À venir / Passé récent").
+        # Pour dosleg : Cyril a signalé que seul 1 item sur 9 s'affichait
+        # avec `type: "dossiers_legislatifs"` — Hugo semble filtrer les
+        # pages sans `date:` valide (cas des senat_promulguees avec
+        # published_at=null). Retour à _default/list.html qui garde tout.
+        # On perd le layout dossiers_legislatifs/list.html (cards dédiées)
+        # temporairement jusqu'à cadrage du pourquoi Hugo filtrait.
+        SPECIFIC_LAYOUT_CATS = {"agenda"}
         lines = [
             "---",
             f'title: "{label}"',
@@ -1337,10 +1489,14 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         # Priorité `sort` (libellé final en séance / commission), fallback
         # `etat` (transitoire). Slug normalisé pour ciblage CSS (accents
         # retirés, lowercase, kebab-case).
+        # R13-L : fallback aussi sur `statut` pour les items legacy ingérés
+        # avant la séparation sort/etat (Cyril ne voyait pas le badge vert
+        # "Adopté" sur les anciens amendements).
         if cat == "amendements" and isinstance(raw, dict):
             sort_label = (raw.get("sort") or "").strip()
             etat_label = (raw.get("etat") or "").strip()
-            chip_label = sort_label or etat_label
+            statut_legacy = (raw.get("statut") or "").strip()
+            chip_label = sort_label or etat_label or statut_legacy
             if chip_label:
                 try:
                     from unidecode import unidecode as _uni

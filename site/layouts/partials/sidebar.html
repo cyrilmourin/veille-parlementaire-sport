@@ -44,12 +44,10 @@
             {{ end }}
           </div>
           <div class="side-body">
-            {{ with .chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
-            {{/* R13-G : plus de troncature côté template — la limite
-                 visuelle à 3 lignes est gérée via CSS (.side-title-link
-                 { -webkit-line-clamp: 3 }). Permet d'afficher plus de
-                 contenu par occurrence tout en gardant la sidebar ordonnée. */}}
-            <a href="/items/agenda/" class="side-title-link" title="{{ .title }}">{{ .title }}</a>
+            {{/* R13-L (2026-04-21) : chambre + titre INLINE sur la même
+                 ligne (demande Cyril, pas de retour chariot entre les deux).
+                 Titre limité à 3 lignes via CSS (line-clamp). */}}
+            {{ with .chamber }}<span class="chamber side-chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }} <a href="/items/agenda/" class="side-title-link" title="{{ .title }}">{{ .title }}</a>
           </div>
         </li>
       {{ end }}
