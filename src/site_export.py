@@ -108,7 +108,8 @@ SNIPPET_LEN_BY_CATEGORY: dict[str, int] = {
     "communiques": 500,
     "amendements": 250,
     "questions": 250,
-    "comptes_rendus": 250,
+    # R13-K (2026-04-21) : CR 250 → 500 (au moins double demandé par Cyril).
+    "comptes_rendus": 500,
     "agenda": 250,
     # dossiers_legislatifs : clé absente = pas de snippet sur la page
     # dédiée (demande user — les cartes dosleg portent déjà titre, type,
@@ -1175,13 +1176,23 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
         label = CATEGORY_LABELS.get(cat, cat)
         count = len(by_cat.get(cat, []))
         window = _window_for(cat)
-        # R13-J (2026-04-21) : `type: <cat>` force Hugo à résoudre le layout
-        # `layouts/<cat>/list.html` (ex. agenda/list.html avec blocs "À venir"
-        # / "Passé récent") au lieu de retomber sur _default/list.html.
+        # R13-K (2026-04-21) : `type: <cat>` UNIQUEMENT pour agenda et
+        # dossiers_legislatifs qui ont un layout spécifique voulu
+        # (blocs "À venir/Passé récent" + single dossier législatif).
+        # Pour les CR / publications / questions / amendements / JORF, on
+        # reste sur _default/list.html (liste plate sans groupement).
+        # Cyril (R13-K) : plus de séparation AN/Sénat sur les CR, plus de
+        # "Compte rendu intégral/analytique" badge. De plus, le `type:
+        # communiques` semblait empêcher Hugo d'indexer les 12 .md sous
+        # /items/communiques/ (seuls 3 affichés) — voir R13-K note.
+        SPECIFIC_LAYOUT_CATS = {"agenda", "dossiers_legislatifs"}
         lines = [
             "---",
             f'title: "{label}"',
-            f'type: "{cat}"',
+        ]
+        if cat in SPECIFIC_LAYOUT_CATS:
+            lines.append(f'type: "{cat}"')
+        lines += [
             f'description: "Veille {label.lower()} — {count} items sur {window} jours glissants."',
             "---",
             "",
@@ -1205,6 +1216,17 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         # qui ferait apparaître la date du jour pour les items sans date fiable.
         published_at = r.get("published_at") or ""
         source_url = (r.get("url") or "").replace('"', "")
+        # R13-K (2026-04-21) : pour les comptes rendus, on ajoute un
+        # text-fragment (#:~:text=<kw>) sur le 1er mot-clé matché. Permet
+        # au navigateur (Chrome, Edge, Safari 16.4+) de sauter directement
+        # à la 1re occurrence du kw dans la page AN/Sénat. Firefox le
+        # dégrade silencieusement (URL normale). Pas d'ancre si pas de kw.
+        if cat == "comptes_rendus" and source_url and "#" not in source_url:
+            kws = r.get("matched_keywords") or []
+            if kws:
+                from urllib.parse import quote
+                fragment = quote(str(kws[0]), safe="")
+                source_url = f"{source_url}#:~:text={fragment}"
         # R13-D : snippet tronqué à la taille demandée pour la page
         # thématique. Si la catégorie n'est pas dans le dict → snippet vide
         # (ex. dossiers_legislatifs : pas d'extrait sur la page dédiée).
