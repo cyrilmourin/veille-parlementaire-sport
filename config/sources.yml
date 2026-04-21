@@ -257,11 +257,19 @@ ministeres:
     # sports.gouv.fr termine par -1787 et suit le ministre en poste).
     # La page publie des agendas hebdomadaires (PDF) + rendez-vous du
     # jour, scrapés comme listing standard via html_generic.
+    # R13-N (2026-04-21) — DÉSACTIVÉ. La page /organisation/la-ministre/agenda/
+    # est la page "biographie" de la ministre (7 liens sont scrapés, aucun
+    # n'est un événement). Le vrai agenda est
+    # https://www.sports.gouv.fr/agenda-previsionnel-de-marina-ferrari-1787
+    # mais c'est une PAGE UNIQUE hebdomadaire (bulletin "Agenda prévisionnel
+    # de Marina Ferrari pour la semaine du X avril 2026") — nécessite un
+    # scraper dédié (1 item/semaine = la page fetchée). Reporté en R13-O.
     - id: min_sports_agenda
       category: agenda
       url: https://www.sports.gouv.fr/organisation/la-ministre/agenda/
       format: html
       poids: 3
+      enabled: false
 
     # Education + Intérieur + Economie : Cloudflare challenge JS (403).
     # À ré-activer si un flux RSS officiel est confirmé ou si on introduit

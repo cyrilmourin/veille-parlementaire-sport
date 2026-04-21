@@ -978,6 +978,11 @@ def _normalize_dosleg(obj, src, cat):
     # sur /items/dossiers_legislatifs/<slug>/ (affichage chronologique
     # des étapes procédurales avec leurs dates).
     actes_timeline: list[dict] = []
+    # R13-N (2026-04-21) : flag retrait détecté si un acte du dossier porte
+    # un code d'abandon (RETRAIT, RENV, CADUCITE) ou un libellé explicite
+    # ("Retrait", "Retirée", "Caducité"). Utilisé en aval par _fix_dossier_row
+    # pour afficher le badge "Retiré" en rouge foncé.
+    has_retire = False
     if isinstance(chrono, (dict, list)):
         for acte in _iter_actes(chrono):
             nb_actes_total += 1
@@ -989,6 +994,17 @@ def _normalize_dosleg(obj, src, cat):
                 continue
             code = str(acte.get("codeActe") or "")
             xsi = str(acte.get("@xsi:type") or "")
+            libelle_acte_raw = str(acte.get("libelleActe") or "")
+            # R13-N : détection retrait sur code + libellé.
+            low_code = code.upper()
+            low_lib = libelle_acte_raw.lower()
+            if (
+                "RETRAIT" in low_code or "RENVOI" in low_code
+                or "CADUCITE" in low_code or "CADUQUE" in low_code
+                or "retrait" in low_lib or "caducité" in low_lib
+                or "caduque" in low_lib or "retirée" in low_lib
+            ):
+                has_retire = True
             mapping = _map_code_acte(code, xsi)
             if mapping["is_promulgation"]:
                 has_promulgation = True
@@ -1054,6 +1070,8 @@ def _normalize_dosleg(obj, src, cat):
             "stage": last_mapping.get("stage", ""),
             "step": last_mapping.get("step", ""),
             "is_promulgated": has_promulgation,
+            # R13-N : flag retrait détecté par scan des codes/libellés actes.
+            "is_retire": has_retire,
             # Timeline pour la maquette AN-like — borner à 40 étapes pour
             # garder le JSON raisonnable (certains dossiers ont 70+ actes).
             "actes_timeline": actes_timeline[-40:],
