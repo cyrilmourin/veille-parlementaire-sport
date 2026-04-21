@@ -25,8 +25,12 @@
             {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
             {{ with .Params.status_label }} · <span class="status{{ if $.Params.is_promulgated }} status-promulgated{{ end }}{{ if eq . "Retiré" }} status-retire{{ end }}">{{ . }}</span>{{ end }}
             {{ if not .Date.IsZero }} · <time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ printf "%d %s %d" .Date.Day (index $monthsFR (int .Date.Month)) .Date.Year }}</time>{{ end }}
-            {{/* R13-J : chip sort/état juste APRÈS la date pour les amendements. */}}
-            {{ with .Params.sort_label }} · <span class="sort-chip" data-sort="{{ $.Params.sort_slug | default "" }}">{{ . }}</span>{{ end }}
+            {{/* R13-J : chip sort/état juste APRÈS la date pour les amendements.
+                 R13-O (2026-04-21) : fix data-sort qui restait vide. Le `with`
+                 changeait le contexte `.` vers la valeur de sort_label, donc
+                 `$.Params.sort_slug` fonctionnait mais apparemment Hugo le
+                 vidait à l'output. Utilisation de `if` + accès direct. */}}
+            {{ if .Params.sort_label }} · <span class="sort-chip" data-sort="{{ .Params.sort_slug | default "" }}">{{ .Params.sort_label }}</span>{{ end }}
           </span>
           {{ with .Params.keywords }}
             <span class="meta-tags">

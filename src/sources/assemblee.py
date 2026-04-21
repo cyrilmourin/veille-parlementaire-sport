@@ -699,12 +699,12 @@ def _normalize_amendement(obj, src, cat):
     # accès au sujet du dossier depuis le titre lui-même, et pour que
     # l'utilisateur voie le contexte dans la liste des amendements.
     # R13-G : "Amdt" au lieu de "Amendement" (titre plus court).
-    # R13-J (2026-04-21) : le sort/état sort du titre et devient un chip
-    # coloré après la date dans la méta-line (patch 16).
+    # R13-J : le sort/état sort du titre et devient un chip coloré après
+    # la date dans la méta-line (patch 16).
+    # R13-O (2026-04-21) : auteur + groupe retirés du titre — ils sont
+    # déjà affichés AVANT le titre via .auteur-inline (cliquable vers la
+    # fiche député AN). Cohérent avec le traitement des questions R13-L.
     title_bits = [f"Amdt n°{num}"]
-    title_bits.append(f"— {auteur_label}")
-    if auteur_groupe and not auteur_groupe.startswith("PO"):
-        title_bits.append(f"({auteur_groupe})")
     if article:
         title_bits.append(f"· art. {article}")
     if dossier_titre:
@@ -728,6 +728,10 @@ def _normalize_amendement(obj, src, cat):
                                        "cycleDeVie.dateSaisie", default=None)),
         summary=summary,
         raw={"path": "assemblee:amendement", "auteur_ref": auteur_ref,
+             # R13-O (2026-04-21) : auteur stocké en raw pour que le
+             # frontmatter Hugo l'expose en .Params.auteur → rendu
+             # cliquable via .auteur-inline devant le titre.
+             "auteur": auteur_label,
              "groupe": auteur_groupe, "dossier": dossier_titre,
              "texte_ref": texte_ref,
              # R13-J : sort / etat séparés pour que site_export puisse

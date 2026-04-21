@@ -258,67 +258,44 @@ def test_fix_amendement_row_resolves_deputy_code_from_raw_ref():
         }
         _fix_amendement_row(r)
     assert "Député PA794130" not in r["title"]
-    assert "Mme Clémence Guetté" in r["title"]
-    # R13-G : "Amendement n°" → "Amdt n°" en sortie du fixup.
+    # R13-O : auteur retiré du titre (affiché via .auteur-inline). On
+    # vérifie juste que le code PA ne réapparaît plus, pas que le nom y est.
     assert "Amdt n°57" in r["title"]
     assert "Amendement" not in r["title"]
     assert "art. ARTICLE 5" in r["title"]
 
 
 def test_fix_amendement_row_falls_back_to_captured_code_if_no_raw_ref():
-    """Sans raw.auteur_ref, on retombe sur le code PAxxxx capturé dans le title."""
+    """R13-O : l'auteur est toujours retiré du titre. Le code PAxxxx
+    disparaît aussi via l'étape "retire — Auteur" du fixup."""
     with patch("src.site_export.amo_loader.resolve_acteur") as m:
-        m.side_effect = lambda ref: (
-            "M. Hadrien Clouet" if ref == "PA795746" else ""
-        )
+        m.return_value = ""
         r = {
             "category": "amendements",
             "title": "Amendement n°52 [Discuté] — Député PA795746 · art. 5",
-            "raw": {"numero": "52"},  # pas d'auteur_ref
+            "raw": {"numero": "52"},
         }
         _fix_amendement_row(r)
     assert "Député PA795746" not in r["title"]
-    assert "M. Hadrien Clouet" in r["title"]
+    assert "[Discuté]" not in r["title"]
+    assert "Amdt n°52" in r["title"]
 
 
-def test_fix_amendement_row_noop_when_already_resolved():
-    """Si le titre ne contient pas "Député PAxxxx", AMO n'est pas appelé.
-    R13-G : le fixup applique quand même "Amendement n°" → "Amdt n°".
-    """
-    with patch("src.site_export.amo_loader.resolve_acteur") as m:
+def test_fix_amendement_row_removes_author_r13o():
+    """R13-O : l'auteur et le statut inline sont retirés du titre."""
+    with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
         r = {
             "category": "amendements",
             "title": "Amendement n°10 [Discuté] — Mme Sandrine Rousseau · art. 3",
             "raw": {"auteur_ref": "PA720892"},
         }
         _fix_amendement_row(r)
-    m.assert_not_called()
-    # R13-G : "Amendement n°" est renommé en "Amdt n°" même sans résolution AMO.
-    assert r["title"] == "Amdt n°10 [Discuté] — Mme Sandrine Rousseau · art. 3"
+    assert r["title"] == "Amdt n°10 · art. 3"
 
 
-def test_fix_amendement_row_keeps_title_if_cache_miss():
-    """Si le cache AMO ne connaît pas la clé, on garde le code brut (pas un None).
-    R13-G : "Amendement n°" devient "Amdt n°" en sortie.
-    """
-    with patch("src.site_export.amo_loader.resolve_acteur") as m:
-        m.return_value = ""  # miss
-        r = {
-            "category": "amendements",
-            "title": "Amendement n°99 — Député PA999999 · art. 1",
-            "raw": {"auteur_ref": "PA999999"},
-        }
-        _fix_amendement_row(r)
-    assert "Député PA999999" in r["title"]  # code AMO inchangé (pas résolu)
-    assert "Amdt n°99" in r["title"]  # préfixe renommé
-    assert "Amendement" not in r["title"]
-
-
-def test_fix_amendement_row_renames_amendement_to_amdt_idempotent():
-    """R13-G : "Amendement n°" → "Amdt n°" même sans "Député PAxxxx".
-    Appliquer 2 fois ne double pas le renommage.
-    """
-    with patch("src.site_export.amo_loader.resolve_acteur") as m:
+def test_fix_amendement_row_idempotent_r13o():
+    """Appliquer 2 fois laisse le titre stable."""
+    with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
         r = {
             "category": "amendements",
             "title": "Amendement n°1 — M. Dupont · art. 2",
@@ -328,21 +305,20 @@ def test_fix_amendement_row_renames_amendement_to_amdt_idempotent():
         after_first = r["title"]
         _fix_amendement_row(r)
         after_second = r["title"]
-    m.assert_not_called()
-    assert after_first == "Amdt n°1 — M. Dupont · art. 2"
-    assert after_second == after_first  # idempotent
+    assert after_first == "Amdt n°1 · art. 2"
+    assert after_second == after_first
 
 
 def test_fix_amendement_row_amdt_alone_noop():
-    """Un titre déjà en "Amdt n°" n'est pas doublement renommé."""
-    with patch("src.site_export.amo_loader.resolve_acteur"):
+    """Un titre déjà nettoyé (Amdt sans auteur/statut) n'est pas modifié."""
+    with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
         r = {
             "category": "amendements",
-            "title": "Amdt n°1 — M. Dupont · art. 2",
+            "title": "Amdt n°1 · art. 2",
             "raw": {"auteur_ref": "PA111"},
         }
         _fix_amendement_row(r)
-    assert r["title"] == "Amdt n°1 — M. Dupont · art. 2"
+    assert r["title"] == "Amdt n°1 · art. 2"
 
 
 def test_fix_amendement_row_ignores_other_categories():

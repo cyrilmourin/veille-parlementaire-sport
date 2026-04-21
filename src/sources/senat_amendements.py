@@ -213,12 +213,11 @@ def _build_item(
     uid_src = f"{sid}:{session_csv}:{num}:{route}:{numero}"
     uid = hashlib.sha1(uid_src.encode()).hexdigest()[:16]
 
-    # Titre : "Amdt n°42 rect. — M. DUPONT · sur « Titre dossier »"
-    # R13-G (2026-04-21) : "Amdt" au lieu de "Amendement" — cohérent avec
-    # l'AN (voir src/sources/assemblee.py::_normalize_amendement).
+    # Titre : "Amdt n°42 rect. · sur « Titre dossier »"
+    # R13-G : "Amdt" au lieu de "Amendement".
+    # R13-O (2026-04-21) : auteur retiré du titre (affiché avant via
+    # .auteur-inline côté template). Cohérent avec R13-L sur les questions.
     title_bits = [f"Amdt n°{numero}"]
-    if auteur:
-        title_bits.append(f"— {auteur}")
     if titre_dossier:
         tr = titre_dossier[:80].rstrip()
         if len(titre_dossier) > 80:

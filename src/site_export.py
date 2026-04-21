@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R13-N"
+SYSTEM_VERSION_LABEL = "R13-O"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -474,6 +474,26 @@ def _fix_amendement_row(r: dict) -> None:
         r["title"] = ("Amdt n°" + t[len("Amendement n°"):])[:220]
     elif " — Amendement n°" in t:
         r["title"] = t.replace(" — Amendement n°", " — Amdt n°", 1)[:220]
+
+    # Étape 3 — R13-O (2026-04-21) : retire l'auteur + groupe + statut
+    # éventuel du titre. Cyril : l'auteur est déjà affiché AVANT le titre
+    # via .auteur-inline, comme pour les questions. Idempotent.
+    t = r.get("title") or ""
+    # 3a) Retire "[Discuté]" / "[Non soutenu]" / etc. (ancien sort inline).
+    t = re.sub(r"\s*\[[^\]]+\]", "", t)
+    # 3b) Retire "— Auteur (Groupe)" juste après "Amdt n°X".
+    # Patterns couverts :
+    #   "Amdt n°12 — M. Dupont (LFI) · art. 3 · sur …"
+    #   "Amdt n°12 rect. — Mme Y · art. 3"
+    # La regex s'arrête au premier `·` (séparateur vers article / dossier).
+    t = re.sub(
+        r"(Amdt n°[^—·]+?)\s*—\s+[^·]+?(?=\s*·|$)",
+        r"\1 ",
+        t,
+    )
+    t = re.sub(r"\s{2,}", " ", t).strip()
+    if t != r.get("title"):
+        r["title"] = t[:220]
 
 
 # R13-G : mapping domaine de ministère → badge (copie de html_generic._MIN_MAP).
