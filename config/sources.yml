@@ -251,30 +251,25 @@ executif:
       url: https://www.elysee.fr/agenda
       format: elysee_agenda_html
 
-    # Matignon + info.gouv.fr : protégés par Cloudflare challenge JS
-    # (Cf-Mitigated: challenge, 403 systématique sur httpx, y compris
-    # sur `/sitemap.xml` et `/rss/actualites.xml` — vérifié R15,
-    # 2026-04-22, cf. audit §1.3). Aucun RSS officiel équivalent
-    # identifié. Aucun dataset open data équivalent trouvé sur
-    # data.gouv.fr. Sources désactivées tant qu'on n'a pas de
-    # contournement (Playwright / stealth / Chrome MCP).
-    - id: matignon_actualites
-      category: communiques
-      url: https://www.gouvernement.fr/actualite
-      format: html
-      enabled: false
-
-    - id: matignon_agenda
-      category: agenda
-      url: https://www.gouvernement.fr/agenda
-      format: html
-      enabled: false
-
+    # R18 (2026-04-22) — Cloudflare challenge JS débloqué via curl_cffi
+    # (TLS fingerprint Chrome120 dans _common._fetch_bytes_impersonate).
+    # Les URLs /actualite de gouvernement.fr redirigent toutes vers
+    # info.gouv.fr (fusion 2024). On consolide sur le domaine cible.
+    # Historique : cf. R15/R16 (enabled: false) — levée par `impersonate: true`.
     - id: info_gouv_actualites
       category: communiques
-      url: https://www.info.gouv.fr/actualite
+      url: https://www.info.gouv.fr/toute-l-actualite
       format: html
-      enabled: false
+      impersonate: true
+
+    # info.gouv — section spécifique PM (Premier Ministre).
+    - id: matignon_actualites
+      category: communiques
+      url: https://www.info.gouv.fr/suivre-l-actualite-du-premier-ministre
+      format: html
+      impersonate: true
+      chamber: Matignon
+      title_prefix: "PM —"
 
     # R15 (2026-04-22) — Agenda public du ministre de l'Éducation
     # nationale. Dataset data.gouv.fr `fr-en-agenda-ministre-education-
@@ -349,36 +344,47 @@ ministeres:
       title_prefix: "MinSports —"
       poids: 3
 
-    # Education + Intérieur + Economie : Cloudflare challenge JS (403).
-    # À ré-activer si un flux RSS officiel est confirmé ou si on introduit
-    # un fallback Playwright pour les sources marquées needs_js.
+    # R18 (2026-04-22) — Education + Intérieur + Economie : Cloudflare
+    # challenge JS débloqué via `impersonate: true` (curl_cffi).
+    # Vérifié live 2026-04-22 : pages presse accessibles en 50/96/93 Ko.
+    # Ministère Economie : /espace-presse redirige vers presse.economie.gouv.fr
+    # — on tape direct sur le sous-domaine canonique.
     - id: min_education
       category: communiques
       url: https://www.education.gouv.fr/presse
       format: html
-      enabled: false
+      impersonate: true
+      chamber: MinEduc
+      title_prefix: "MinEduc —"
 
     - id: min_interieur
       category: communiques
       url: https://www.interieur.gouv.fr/actualites/presse
       format: html
-      enabled: false
+      impersonate: true
+      chamber: MinInterieur
+      title_prefix: "MinInt —"
 
     - id: min_economie
       category: communiques
-      url: https://www.economie.gouv.fr/espace-presse
+      url: https://presse.economie.gouv.fr/
       format: html
-      enabled: false
+      impersonate: true
+      chamber: MinEcon
+      title_prefix: "MinEcon —"
 
     - id: min_justice
       category: communiques
+      # R18 (2026-04-22) — Ajout `impersonate: true` : le site passe déjà en
+      # 200 OK sur httpx standard la plupart du temps mais le challenge CF
+      # sporadique justifie de sécuriser via curl_cffi (cohérent avec les
+      # autres ministères).
       # R16 (2026-04-22) — Site plus en maintenance (levé entre R15 et
       # R16). /presse redirige 301 → /espace-presse. On tape direct sur
-      # l'URL canonique pour éviter le redirect (cause probable du 0
-      # items intermittent sur R15). Page réelle : 160 Ko, DSFR-based,
-      # listing /actualites/espace-presse/... + liens PDF communiqués.
+      # l'URL canonique pour éviter le redirect.
       url: https://www.justice.gouv.fr/espace-presse
       format: html
+      impersonate: true
 
     # min_sante + min_travail : DÉSACTIVÉS en R11g-4 (2026-04-21).
     # Le serveur retourne une page "Request Rejected" (WAF/F5 ASM) pour TOUTE
@@ -502,8 +508,17 @@ autorites:
       url: https://qpc360.conseil-constitutionnel.fr/rss/actualites
       format: rss
 
+    # R18+ (2026-04-22) — recatégorisé de `jorf` vers `communiques` :
+    # les décisions du Conseil constitutionnel appartiennent à la veille
+    # institutionnelle sport (publications officielles), pas au JO. Plus
+    # de doublon avec `dila_jorf` puisque les deux sources vivent dans
+    # des catégories différentes. Le flux qpc360 contient aussi des arrêts
+    # Cour de cassation et ordonnances (jurisprudence hors scope) mais le
+    # `KeywordMatcher` les filtre automatiquement s'ils ne contiennent
+    # aucun mot-clé sport (vérifié : les 10 items pré-purge avaient tous
+    # `matched_keywords=[]` et n'étaient donc pas exportés).
     - id: conseil_constit_decisions
-      category: jorf
+      category: communiques
       url: https://qpc360.conseil-constitutionnel.fr/rss/decisions
       format: rss
 

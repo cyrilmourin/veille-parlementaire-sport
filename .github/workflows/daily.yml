@@ -4,6 +4,19 @@ on:
   schedule:
     # 08:00 Europe/Paris (= 06:00 UTC en été, 07:00 en hiver — on planifie à 06:00 UTC)
     - cron: "0 6 * * *"
+  # R18 (2026-04-22) : auto-deploy à chaque push de code sur main pour que
+  # les releases (R17, R18…) n'aient plus besoin d'un lancement manuel via
+  # workflow_dispatch. On ignore les chemins qui bouclent (commits du bot
+  # `veille-bot` qui push data/last_digest.html + data/*.json à la fin de
+  # chaque run) et la doc qui n'impacte pas le site.
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'data/**'
+      - '**.md'
+      - 'docs/**'
+      - 'HANDOFF*'
+      - 'README*'
   workflow_dispatch:
     inputs:
       since_days:

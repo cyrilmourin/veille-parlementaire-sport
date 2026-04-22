@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R17"
+SYSTEM_VERSION_LABEL = "R18"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -825,21 +825,15 @@ _DOSLEG_STOPWORDS = {
 }
 
 
-def _dosleg_subject_key(title: str) -> str:
-    """Clé normalisée pour détecter qu'un dossier AN et un dossier Sénat
-    décrivent le même projet/proposition de loi.
-
-    R13-L (2026-04-21) — Cyril voit par exemple :
-      - "Projet de loi relatif à l'organisation des jeux Olympiques..."
-      - "Jeux Olympiques et Paralympiques 2030 (PJL)"
-
-    On normalise : (1) lowercase + unidecode, (2) retire les préfixes
-    type de texte ("projet de loi", "PJL", etc.), (3) retire les
-    connecteurs grammaticaux ("relatif à", "visant à", etc.), (4)
-    ne garde que [a-z0-9 \\s] avec espaces compressés.
+def _dosleg_word_set(title: str) -> set[str]:
+    """R18 (2026-04-22) — retourne l'ensemble des mots significatifs d'un
+    titre de dossier législatif (≥3 chars, hors stopwords). Sert de base
+    au dedup sémantique par intersection (plus robuste que l'égalité de
+    bag-of-words trié qui fait manquer les titres avec un mot en plus/
+    moins entre les versions AN et Sénat).
     """
     if not title:
-        return ""
+        return set()
     try:
         from unidecode import unidecode as _uni
         s = _uni(title).lower()
@@ -855,15 +849,89 @@ def _dosleg_subject_key(title: str) -> str:
     # Ne garde que lettres + chiffres + espaces
     s = re.sub(r"[^a-z0-9\s]+", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
-    # R13-L : approche bag-of-words triée pour matcher
-    # "projet de loi relatif à l'organisation des jeux Olympiques et
-    # Paralympiques de 2030" == "Jeux Olympiques et Paralympiques de 2030 (PJL)".
-    # On retire stopwords (mots-outils + type-de-loi), puis on trie les
-    # mots significatifs ≥ 3 chars. Deux titres décrivant le même dossier
-    # ont alors la même clé canonique.
     words = s.split()
-    significant = sorted({w for w in words if len(w) >= 3 and w not in _DOSLEG_STOPWORDS})
-    return " ".join(significant)[:80]
+    return {w for w in words if len(w) >= 3 and w not in _DOSLEG_STOPWORDS}
+
+
+def _dosleg_subject_key(title: str) -> str:
+    """Clé normalisée pour détecter qu'un dossier AN et un dossier Sénat
+    décrivent le même projet/proposition de loi.
+
+    R13-L (2026-04-21) — Cyril voit par exemple :
+      - "Projet de loi relatif à l'organisation des jeux Olympiques..."
+      - "Jeux Olympiques et Paralympiques 2030 (PJL)"
+
+    Implémentation : délègue à `_dosleg_word_set` + tri + join. Gardée
+    pour compat logs/affichage — le dedup passe désormais par
+    l'intersection des ensembles (R18).
+    """
+    return " ".join(sorted(_dosleg_word_set(title)))[:80]
+
+
+def _is_dosleg_url(url: str) -> bool:
+    """R18 (2026-04-22) — True si l'URL pointe vers une fiche-dossier
+    législatif officielle (Sénat `/dossier-legislatif/`, AN `/dossiers/`).
+    Utilisé comme tiebreak secondaire dans `_dedup` : à date et chambre
+    égales, on garde l'entrée avec l'URL dosleg officielle plutôt qu'un
+    amendement/compte rendu qui aurait atterri dans la catégorie.
+    """
+    if not url:
+        return False
+    u = url.lower()
+    return "/dossier-legislatif/" in u or "/dossiers/" in u
+
+
+# R18+ (2026-04-22) — extraction d'identifiants de procédure législative
+# depuis une URL. Utilisé par `_dedup` passe 2c pour fusionner AN↔Sénat.
+# AN : `/dyn/17/dossiers/DLR5L17N52100` → `dlr5l17n52100`
+# Sénat : `/dossier-legislatif/pjl24-630.html` → `pjl24-630`
+# Sénat (fallback) : `/leg/pjl24-630.html`, `/rap/…` sont hors scope ici.
+_AN_DOSSIER_ID_RE = re.compile(r"/dossiers?/([A-Za-z0-9]{6,})", re.IGNORECASE)
+_SENAT_DOSSIER_ID_RE = re.compile(
+    r"/dossier-legislatif/([A-Za-z0-9_-]+?)(?:\.html|/|$|[?#])",
+    re.IGNORECASE,
+)
+
+
+def _extract_dossier_ids_from_url(url: str) -> set[str]:
+    """Extrait les identifiants AN/Sénat reconnaissables dans une URL.
+    Retourne un set (vide si aucun match). Normalisé lowercase.
+    """
+    ids: set[str] = set()
+    if not url:
+        return ids
+    m = _AN_DOSSIER_ID_RE.search(url)
+    if m:
+        ids.add(m.group(1).lower())
+    m = _SENAT_DOSSIER_ID_RE.search(url)
+    if m:
+        ids.add(m.group(1).lower())
+    return ids
+
+
+def _item_dossier_ids(row: dict) -> set[str]:
+    """R18+ (2026-04-22) — rassemble tous les identifiants de procédure
+    législative qu'un item contribue au graphe de dedup.
+
+    Sources :
+      - `raw["dossier_id"]` (AN uid ou Sénat signet/numéro, selon parser)
+      - `raw["signet"]` (Sénat AKN uniquement)
+      - ID AN/Sénat extrait de `url`
+      - ID AN extrait de `raw["url_an"]` (croisement Sénat→AN : un dossier
+        Sénat expose souvent une URL vers sa contrepartie AN dans le FRBR)
+    """
+    raw = row.get("raw") if isinstance(row.get("raw"), dict) else {}
+    ids: set[str] = set()
+    for k in ("dossier_id", "signet"):
+        v = raw.get(k)
+        if isinstance(v, str) and v.strip():
+            ids.add(v.strip().lower())
+    ids |= _extract_dossier_ids_from_url(row.get("url") or "")
+    url_an = raw.get("url_an")
+    if isinstance(url_an, str) and url_an:
+        ids |= _extract_dossier_ids_from_url(url_an)
+    ids.discard("")
+    return ids
 
 
 def _dedup(rows: list[dict]) -> list[dict]:
@@ -939,6 +1007,32 @@ def _dedup(rows: list[dict]) -> list[dict]:
             s = s[:-1]
         return s
 
+    def _prefer(a: dict, b: dict) -> dict:
+        """R18 (2026-04-22) — tiebreak uniformisé pour les dédups dosleg.
+        Ordre de priorité :
+          1. date de publication desc
+          2. chambre Sénat (visibilité navette)
+          3. URL dossier-législatif officielle (/dossier-legislatif/ ou /dossiers/)
+          4. a (item rencontré le premier).
+        """
+        da, db = _date_of(a), _date_of(b)
+        if da > db:
+            return a
+        if db > da:
+            return b
+        sa, sb = _is_senat(a), _is_senat(b)
+        if sa and not sb:
+            return a
+        if sb and not sa:
+            return b
+        ua = _is_dosleg_url(a.get("url") or "")
+        ub = _is_dosleg_url(b.get("url") or "")
+        if ua and not ub:
+            return a
+        if ub and not ua:
+            return b
+        return a
+
     dosleg = [r for r in out if (r.get("category") or "") == "dossiers_legislatifs"]
     other = [r for r in out if (r.get("category") or "") != "dossiers_legislatifs"]
 
@@ -952,45 +1046,112 @@ def _dedup(rows: list[dict]) -> list[dict]:
         if prev is None:
             by_url[u] = r
             continue
-        if _date_of(r) > _date_of(prev):
-            by_url[u] = r
-        elif _date_of(r) == _date_of(prev) and _is_senat(r) and not _is_senat(prev):
-            by_url[u] = r
+        by_url[u] = _prefer(prev, r)
     step1 = list(by_url.values())
     dropped_url = len(dosleg) - len(step1)
 
-    # 2b) dédup sémantique strict (cross-chambre AN/Sénat même dossier)
-    def _sig_count(key: str) -> int:
-        return len(key.split()) if key else 0
+    # 2b) R18 (2026-04-22) — dédup sémantique par INTERSECTION de mots.
+    # Auparavant (R17) : clé bag-of-words triée, comparaison par égalité
+    # stricte → manquait le cas où AN et Sénat ont quasi-les-mêmes mots
+    # mais avec un substantif supplémentaire côté AN (« loi pour l'héritage
+    # des jeux olympiques... » vs « jeux olympiques paralympiques 2030 »).
+    # Nouveau : deux items sont considérés comme le même dossier si leurs
+    # ensembles de mots significatifs partagent ≥ 3 mots ET qu'au moins
+    # l'un des deux a ≥ 4 mots ET que la plus longue des deux clés fait
+    # ≥ 25 chars (protège les dossiers courts contre les faux positifs).
+    # Complexité O(n²) sur les dosleg — acceptable (quelques dizaines).
+    INTERSECTION_MIN = 5
+    WORDS_MIN = 4
+    KEY_LEN_MIN = 25
 
-    by_sem: dict[str, dict] = {}
-    kept_no_key: list[dict] = []
+    groups: list[list[dict]] = []
+    word_sets: list[set[str]] = []
+    keys: list[str] = []
     for r in step1:
-        key = _dosleg_subject_key(r.get("title") or "")
-        # Seuil : ≥ 4 mots significatifs ET clé d'au moins 25 chars.
-        # En dessous, on ne prend pas le risque d'un faux positif —
-        # l'item sort du dédup sémantique et passe tel quel.
-        if _sig_count(key) < 4 or len(key) < 25:
-            kept_no_key.append(r)
+        ws = _dosleg_word_set(r.get("title") or "")
+        key = " ".join(sorted(ws))[:80]
+        matched_idx = -1
+        if len(ws) >= WORDS_MIN and len(key) >= KEY_LEN_MIN:
+            # Cherche un groupe existant qui matche par intersection
+            for i, gws in enumerate(word_sets):
+                if len(gws) < WORDS_MIN:
+                    continue
+                if max(len(keys[i]), len(key)) < KEY_LEN_MIN:
+                    continue
+                inter = ws & gws
+                if len(inter) >= INTERSECTION_MIN:
+                    matched_idx = i
+                    break
+        if matched_idx == -1:
+            groups.append([r])
+            word_sets.append(ws)
+            keys.append(key)
+        else:
+            groups[matched_idx].append(r)
+            # Agrège le word_set du groupe (pour matcher les items suivants
+            # même si un synonyme est introduit au fil des occurrences).
+            word_sets[matched_idx] = word_sets[matched_idx] | ws
+
+    dedup_dosleg: list[dict] = []
+    for grp in groups:
+        if len(grp) == 1:
+            dedup_dosleg.append(grp[0])
             continue
-        prev = by_sem.get(key)
-        if prev is None:
-            by_sem[key] = r
-            continue
-        if _date_of(r) > _date_of(prev):
-            by_sem[key] = r
-        elif _date_of(r) == _date_of(prev) and _is_senat(r) and not _is_senat(prev):
-            by_sem[key] = r
-    dedup_dosleg = list(by_sem.values()) + kept_no_key
+        winner = grp[0]
+        for cand in grp[1:]:
+            winner = _prefer(winner, cand)
+        dedup_dosleg.append(winner)
     dropped_sem = len(step1) - len(dedup_dosleg)
 
-    if dropped_url or dropped_sem:
+    # 2c) R18+ (2026-04-22) — dédup par identifiant de procédure législative.
+    # Plus robuste que la sémantique : si un item AN et un item Sénat
+    # partagent un identifiant canonique (AN DLR5L17N52100, Sénat pjl24-630),
+    # on les fusionne même si leurs titres diffèrent beaucoup. La
+    # correspondance AN↔Sénat passe par `raw["url_an"]` (exposé par le
+    # parser senat_akn via l'alias FRBR "url-AN" du .akn.xml). Algorithme :
+    #   - Chaque item contribue un set d'IDs (raw.dossier_id, raw.signet,
+    #     IDs extraits des URLs connues).
+    #   - On regroupe par intersection non-vide, en parcours séquentiel.
+    #   - Tiebreak : `_prefer()` (date desc → Sénat → URL dosleg).
+    groups_id: list[list[dict]] = []
+    group_ids: list[set[str]] = []
+    for r in dedup_dosleg:
+        ids = _item_dossier_ids(r)
+        if not ids:
+            # Pas d'ID exploitable — item garde sa place, pas de fusion ici.
+            groups_id.append([r])
+            group_ids.append(set())
+            continue
+        matched = -1
+        for i, gids in enumerate(group_ids):
+            if gids and (ids & gids):
+                matched = i
+                break
+        if matched == -1:
+            groups_id.append([r])
+            group_ids.append(set(ids))
+        else:
+            groups_id[matched].append(r)
+            group_ids[matched] |= ids
+
+    final_dosleg: list[dict] = []
+    for grp in groups_id:
+        if len(grp) == 1:
+            final_dosleg.append(grp[0])
+            continue
+        winner = grp[0]
+        for cand in grp[1:]:
+            winner = _prefer(winner, cand)
+        final_dosleg.append(winner)
+    dropped_id = len(dedup_dosleg) - len(final_dosleg)
+
+    if dropped_url or dropped_sem or dropped_id:
         import logging
         logging.getLogger(__name__).info(
-            "site_export : %d dosleg dédupés (URL canon) + %d (sémantique)",
-            dropped_url, dropped_sem,
+            "site_export : %d dosleg dédupés (URL canon) + %d (sémantique) + %d (dossier_id)",
+            dropped_url, dropped_sem, dropped_id,
         )
-    return _sort_by_date_desc(dedup_dosleg + other)
+    return _sort_by_date_desc(final_dosleg + other)
 
 
 def _group(rows: list[dict], key: str) -> dict[str, list[dict]]:

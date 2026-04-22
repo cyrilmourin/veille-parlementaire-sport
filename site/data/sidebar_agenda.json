@@ -5,7 +5,7 @@
     "uid": "2e8b186729bc2c9c",
     "category": "agenda",
     "chamber": "MinSports",
-    "title": "MinSports — 08h30 — Entretien avec Stéphanie RIST, ministre de la Santé, des Familles et de l’Autonomie",
+    "title": "08h30 — Entretien avec Stéphanie RIST, ministre de la Santé, des Familles et de l’Autonomie",
     "url": "https://www.sports.gouv.fr/agenda-previsionnel-de-marina-ferrari-1787",
     "published_at": "2026-04-23T08:30:00",
     "summary": "Entretien avec Stéphanie RIST, ministre de la Santé, des Familles et de l’Autonomie\nLieu : Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème",
@@ -22,8 +22,8 @@
       "slot_raw": "08h30",
       "location": "Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème"
     },
-    "inserted_at": "2026-04-22T09:24:16",
-    "snippet": "…vec Stéphanie RIST, ministre de la Santé, des Familles et de l’Autonomie Lieu : Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème"
+    "inserted_at": "2026-04-22T21:29:04",
+    "snippet": "Entretien avec Stéphanie RIST, ministre de la Santé, des Familles et de l’Autonomie Lieu : Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème"
   },
   {
     "hash_key": "min_sports_agenda::65136bb44f49ef16",
@@ -31,7 +31,7 @@
     "uid": "65136bb44f49ef16",
     "category": "agenda",
     "chamber": "MinSports",
-    "title": "MinSports — 09h30 — Premier comité de pilotage du Mois de l’activité physique (MAPS) et de la Fête du Sport",
+    "title": "09h30 — Premier comité de pilotage du Mois de l’activité physique (MAPS) et de la Fête du Sport",
     "url": "https://www.sports.gouv.fr/agenda-previsionnel-de-marina-ferrari-1787",
     "published_at": "2026-04-23T09:30:00",
     "summary": "Premier comité de pilotage du Mois de l’activité physique (MAPS) et de la Fête du Sport\nLieu : Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème",
@@ -48,8 +48,8 @@
       "slot_raw": "09h30",
       "location": "Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème"
     },
-    "inserted_at": "2026-04-22T09:24:16",
-    "snippet": "…de pilotage du Mois de l’activité physique (MAPS) et de la Fête du Sport Lieu : Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème"
+    "inserted_at": "2026-04-22T21:29:04",
+    "snippet": "Premier comité de pilotage du Mois de l’activité physique (MAPS) et de la Fête du Sport Lieu : Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème"
   },
   {
     "hash_key": "min_sports_agenda::0fd90c9c118fd16c",
@@ -57,7 +57,7 @@
     "uid": "0fd90c9c118fd16c",
     "category": "agenda",
     "chamber": "MinSports",
-    "title": "MinSports — 14h00 — Conférence de presse bilan 2025 de Signal-Sports",
+    "title": "14h00 — Conférence de presse bilan 2025 de Signal-Sports",
     "url": "https://www.sports.gouv.fr/agenda-previsionnel-de-marina-ferrari-1787",
     "published_at": "2026-04-23T14:00:00",
     "summary": "Conférence de presse bilan 2025 de Signal-Sports\nLieu : Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème",
@@ -74,7 +74,7 @@
       "slot_raw": "14h00",
       "location": "Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème"
     },
-    "inserted_at": "2026-04-22T09:24:16",
+    "inserted_at": "2026-04-22T21:29:04",
     "snippet": "Conférence de presse bilan 2025 de Signal-Sports Lieu : Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème"
   },
   {
@@ -83,7 +83,7 @@
     "uid": "66860784884b0888",
     "category": "agenda",
     "chamber": "MinSports",
-    "title": "MinSports — 16h00 — Entretien avec Benjamin BLAVIER, délégué général du Centre Français des Fonds et Fondations (CFF), et Nicolas MITTON, directeur des affaires publiques",
+    "title": "16h00 — Entretien avec Benjamin BLAVIER, délégué général du Centre Français des Fonds et Fondations (CFF), et Nicolas MITTON, directeur des affaires publiques",
     "url": "https://www.sports.gouv.fr/agenda-previsionnel-de-marina-ferrari-1787",
     "published_at": "2026-04-23T16:00:00",
     "summary": "Entretien avec Benjamin BLAVIER, délégué général du Centre Français des Fonds et Fondations (CFF), et Nicolas MITTON, directeur des affaires publiques\nLieu : Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème",
@@ -100,7 +100,7 @@
       "slot_raw": "16h00",
       "location": "Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème"
     },
-    "inserted_at": "2026-04-22T09:24:16",
-    "snippet": "…et Fondations (CFF), et Nicolas MITTON, directeur des affaires publiques Lieu : Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème"
+    "inserted_at": "2026-04-22T21:29:04",
+    "snippet": "…délégué général du Centre Français des Fonds et Fondations (CFF), et Nicolas MITTON, directeur des affaires publiques Lieu : Ministère des Sports, de la Jeunesse et de la Vie associative – Paris 13ème"
   }
 ]

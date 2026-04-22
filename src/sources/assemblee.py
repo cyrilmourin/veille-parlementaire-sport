@@ -1065,6 +1065,10 @@ def _normalize_dosleg(obj, src, cat):
         )[:500],
         raw={
             "path": "assemblee:dossier",
+            # R18+ (2026-04-22) : identifiant canonique AN (ex. DLR5L17N52100).
+            # Utilisé par la passe 2c de site_export._dedup pour fusionner
+            # la fiche AN avec sa contrepartie Sénat via url_an.
+            "dossier_id": uid,
             "nb_actes": nb_actes_total,
             "nb_actes_utiles": nb_actes_utiles,
             "status_label": status_label,

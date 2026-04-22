@@ -435,6 +435,12 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
             # Si la source est "promulguees", on marque le flag pour que le
             # badge passe en vert côté template.
             raw = dict(r)
+            # R18+ (2026-04-22) : identifiant canonique Sénat (ex. pjl24-630).
+            # Permet à site_export._dedup (passe 2c) de fusionner les CSV
+            # avec leurs contreparties senat_akn ou AN. Pas de url_an côté
+            # CSV (absent des colonnes) — le mapping AN se fera via
+            # senat_akn qui a l'alias url-AN dans le FRBR.
+            raw["dossier_id"] = str(uid)
             if sid == "senat_promulguees":
                 raw["is_promulgated"] = True
                 raw.setdefault("status_label", "Promulguée")

@@ -437,6 +437,12 @@ def fetch_akn_index(src: dict) -> list[Item]:
                 "is_promulgated": bool(data.get("has_promulgation")),
                 "akn_url": u,
                 "signet": data.get("signet", ""),
+                # R18+ (2026-04-22) : expose dossier_id + url_an pour que
+                # site_export._dedup puisse fusionner AN↔Sénat par identifiant
+                # (passe 2c). dossier_id = signet côté Sénat ; url_an permet
+                # d'extraire l'ID AN associé (ex. DLR5L17N52100).
+                "dossier_id": data.get("signet", ""),
+                "url_an": data.get("url_an", ""),
             },
         )
         # Dédup dossier : on remplace si on trouve plus récent.

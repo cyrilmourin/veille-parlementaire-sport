@@ -84,11 +84,17 @@ def _install_fake_client(monkeypatch, responses):
 # ---------- Politique de retry -----------------------------------------------
 
 def test_fetch_bytes_does_not_retry_on_404(monkeypatch, caplog):
-    """Un 404 ne doit pas déclencher 3×retry (cas R11d)."""
+    """Un 404 ne doit pas déclencher 3×retry (cas R11d).
+
+    R18 (2026-04-22) — la décoration @retry tenacity a été déplacée de
+    `fetch_bytes` vers `_fetch_bytes_httpx` (la fonction publique est
+    désormais un simple dispatcher httpx/curl_cffi selon `impersonate`).
+    On patche donc `_fetch_bytes_httpx.retry_with(...)`.
+    """
     client = _install_fake_client(monkeypatch, [_FakeResp(404)])
     with caplog.at_level(logging.ERROR, logger="src.sources._common"):
         with pytest.raises(httpx.HTTPStatusError):
-            _common.fetch_bytes.retry_with(
+            _common._fetch_bytes_httpx.retry_with(
                 stop=_common.stop_after_attempt(2)
             )("https://example.test/missing")
     # 1 seul appel HTTP, pas 2 (no retry sur 4xx)

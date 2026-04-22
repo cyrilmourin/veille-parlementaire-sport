@@ -90,6 +90,54 @@ def _raise_for_status_loud(r: httpx.Response) -> None:
     r.raise_for_status()
 
 
+# R18 (2026-04-22) : TLS-fingerprint Chrome via curl_cffi. Certains
+# ministères (education, interieur, economie, justice, info.gouv/matignon)
+# filtrent sur le TLS handshake (Cloudflare "bot fight") et répondent 403
+# à httpx standard. curl_cffi re-signe le handshake avec l'empreinte d'un
+# vrai Chrome 120 → passe. Import paresseux pour que le module reste
+# importable même si curl_cffi n'est pas installé (fallback sur httpx).
+_CURL_CFFI_AVAILABLE: bool | None = None
+_curl_cffi_requests = None
+
+
+def _try_import_curl_cffi():
+    """Import paresseux + mémoïsé. Retourne le module `requests` de
+    curl_cffi ou None si indisponible. Ne log qu'une fois."""
+    global _CURL_CFFI_AVAILABLE, _curl_cffi_requests
+    if _CURL_CFFI_AVAILABLE is not None:
+        return _curl_cffi_requests
+    try:
+        from curl_cffi import requests as _cc_requests  # type: ignore
+        _curl_cffi_requests = _cc_requests
+        _CURL_CFFI_AVAILABLE = True
+        log.info("curl_cffi disponible — fallback TLS impersonate activé")
+    except ImportError:
+        _CURL_CFFI_AVAILABLE = False
+        log.warning(
+            "curl_cffi non installé — sources avec impersonate=True "
+            "utiliseront httpx (risque de 403 Cloudflare)"
+        )
+    return _curl_cffi_requests
+
+
+def _fetch_bytes_impersonate(url: str, timeout: float = 30.0) -> bytes:
+    """Fetch via curl_cffi avec signature TLS Chrome120.
+
+    Sans retry tenacity (le TLS fingerprinting est déterministe : si ça
+    passe, ça passera ; si ça échoue, c'est le WAF qui nous a blacklistés
+    et un retry ne changera rien). Fallback httpx si curl_cffi absent.
+    """
+    cc = _try_import_curl_cffi()
+    if cc is None:
+        return fetch_bytes(url)  # fallback httpx
+    log.info("GET (impersonate chrome120) %s", url)
+    r = cc.get(url, impersonate="chrome120", timeout=timeout)
+    if r.status_code >= 400:
+        log.error("HTTP %d sur GET (impersonate) %s", r.status_code, url)
+        r.raise_for_status()
+    return r.content
+
+
 # Retry "léger" pour le scraping HTML : 2 tentatives suffisent. Une source
 # morte ne mérite pas 3×60s = 3 min de latence dans la pipeline. On ne retry
 # PAS sur 4xx (cf. `_is_retryable`).
@@ -98,12 +146,25 @@ def _raise_for_status_loud(r: httpx.Response) -> None:
     wait=wait_exponential(min=1, max=5),
     retry=retry_if_exception(_is_retryable),
 )
-def fetch_bytes(url: str) -> bytes:
+def _fetch_bytes_httpx(url: str) -> bytes:
+    """Implémentation httpx. Séparée pour permettre le switch impersonate."""
     log.info("GET %s", url)
     with _client() as c:
         r = c.get(url)
         _raise_for_status_loud(r)
         return r.content
+
+
+def fetch_bytes(url: str, impersonate: bool = False) -> bytes:
+    """Récupère les bytes d'une URL.
+
+    `impersonate=True` → passe par curl_cffi avec signature TLS Chrome120.
+    Utile pour les sites protégés par Cloudflare qui bloquent httpx en
+    403 (education.gouv.fr, interieur.gouv.fr, info.gouv.fr, …).
+    """
+    if impersonate:
+        return _fetch_bytes_impersonate(url)
+    return _fetch_bytes_httpx(url)
 
 
 # Retry "lourd" pour les dumps AN/Sénat : 3 tentatives, backoff large, timeout
@@ -122,8 +183,8 @@ def fetch_bytes_heavy(url: str) -> bytes:
         return r.content
 
 
-def fetch_text(url: str) -> str:
-    return fetch_bytes(url).decode("utf-8", errors="replace")
+def fetch_text(url: str, impersonate: bool = False) -> str:
+    return fetch_bytes(url, impersonate=impersonate).decode("utf-8", errors="replace")
 
 
 def unzip_members(payload: bytes) -> Iterable[tuple[str, bytes]]:

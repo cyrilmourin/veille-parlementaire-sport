@@ -16,6 +16,11 @@ dependencies = [
   "python-dateutil>=2.9",
   "unidecode>=1.3",
   "rich>=13.7",
+  # R18 (2026-04-22) : curl_cffi fait des requêtes avec la signature TLS
+  # de Chrome — passe les protections Cloudflare JS-challenge (ministères
+  # education/interieur/economie/justice + info.gouv, qui bloquent httpx
+  # standard en 403). Fallback silencieux dans _common si import KO.
+  "curl_cffi>=0.7",
 ]
 
 [project.optional-dependencies]

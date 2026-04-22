@@ -331,8 +331,11 @@ def fetch_source(src: dict) -> list[Item]:
     if fmt == "sitemap":
         return _from_sitemap_generic(src)
 
+    # R18 : `impersonate=True` dans le YAML → fetch via curl_cffi pour passer
+    # les protections Cloudflare (education/interieur/economie/info.gouv…).
+    impersonate = bool(src.get("impersonate", False))
     try:
-        html = fetch_text(src["url"])
+        html = fetch_text(src["url"], impersonate=impersonate)
     except Exception as e:
         log.warning("HTML KO %s : %s", src["id"], e)
         return []

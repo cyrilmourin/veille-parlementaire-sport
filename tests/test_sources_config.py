@@ -33,6 +33,8 @@ _KNOWN_FORMATS = {
     "senat_agenda_daily",
     "data_gouv_agenda",
     "min_sports_agenda_hebdo",
+    # R16 (2026-04-22) — parser dédié agenda Élysée (HTML DSFR)
+    "elysee_agenda_html",
 }
 
 
