@@ -9,13 +9,17 @@
       </span>
     </a>
     <nav class="nav">
-      <a href="/items/dossiers_legislatifs/">Dossiers</a>
-      <a href="/items/jorf/">Journal Officiel</a>
+      {{/* R15 (2026-04-22) : ordre reclassé par « cycle de vie »
+           législatif/institutionnel : du dépôt (Dossiers - Lois)
+           jusqu'à la publication finale (JORF), puis les flux
+           d'information plus diffus (Nominations, Publications). */}}
+      <a href="/items/dossiers_legislatifs/">Dossiers&nbsp;-&nbsp;Lois</a>
       <a href="/items/amendements/">Amendements</a>
       <a href="/items/questions/">Questions</a>
       <a href="/items/comptes_rendus/">Comptes&nbsp;rendus</a>
-      <a href="/items/nominations/">Nominations</a>
       <a href="/items/agenda/">Agenda</a>
+      <a href="/items/jorf/">JORF</a>
+      <a href="/items/nominations/">Nominations</a>
       <a href="/items/communiques/">Publications</a>
       <a href="/recherche/" class="nav-search">Rechercher</a>
       {{/* R13-J (2026-04-21) : méta MAJ + version système, poussé à

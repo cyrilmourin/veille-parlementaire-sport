@@ -173,15 +173,22 @@ senat:
       url: https://data.senat.fr/feed/actualites-rss.xml
       format: rss
 
-    # R13-J (2026-04-21) — demande Cyril : fusion agenda Sénat avec l'AN.
-    # Page HTML publique (www.senat.fr/agenda) qui liste les réunions des
-    # commissions, délégations et séance publique. Format html_generic —
-    # si le listing ne fournit pas d'items utilisables (SPA ou Cloudflare),
-    # on désactivera en R13-K.
+    # R15 (2026-04-22) — scraper dédié agenda Sénat. Remplace l'ancien
+    # format `html` qui tombait sur la SPA AngularJS (0 item). Itère la
+    # fenêtre J-7 → J+30 et fetche la vue imprimable quotidienne
+    # `/agenda/Global/agl{DDMMYYYY}Print.html` qui agrège toutes les
+    # sections (1 requête / jour au lieu de 7).
+    #
+    # NB : selon l'audit R15 §1.2, le serveur peut renvoyer 404 +
+    # "Accès restreint" sur ces sub-paths depuis certaines IP — le
+    # handler loggue et continue (fenêtre partielle plutôt que crash).
     - id: senat_agenda
       category: agenda
       url: https://www.senat.fr/agenda/
-      format: html
+      format: senat_agenda_daily
+      before_days: 7
+      after_days: 30
+      printable: true
 
 # Journal officiel (JORF) — dump DILA OPENDATA (aucun credential nécessaire).
 # L'API PISTE/Légifrance est contournée : le dump XML quotidien DILA contient
@@ -216,9 +223,12 @@ executif:
       format: html
 
     # Matignon + info.gouv.fr : protégés par Cloudflare challenge JS
-    # (Cf-Mitigated: challenge, 403 systématique sur httpx). Aucun RSS
-    # officiel équivalent identifié. Sources désactivées tant qu'on n'a
-    # pas de contournement (Playwright ou flux RSS confirmé).
+    # (Cf-Mitigated: challenge, 403 systématique sur httpx, y compris
+    # sur `/sitemap.xml` et `/rss/actualites.xml` — vérifié R15,
+    # 2026-04-22, cf. audit §1.3). Aucun RSS officiel équivalent
+    # identifié. Aucun dataset open data équivalent trouvé sur
+    # data.gouv.fr. Sources désactivées tant qu'on n'a pas de
+    # contournement (Playwright / stealth / Chrome MCP).
     - id: matignon_actualites
       category: communiques
       url: https://www.gouvernement.fr/actualite
@@ -236,6 +246,44 @@ executif:
       url: https://www.info.gouv.fr/actualite
       format: html
       enabled: false
+
+    # R15 (2026-04-22) — Agenda public du ministre de l'Éducation
+    # nationale. Dataset data.gouv.fr `fr-en-agenda-ministre-education-
+    # nationale` via portail OpenDataSoft data.education.gouv.fr.
+    # Schéma {uid, dtstart, dtend, description} — PAS de summary ni
+    # agenda (le handler `data_gouv_agenda` utilise `description`
+    # comme contenu principal en fallback).
+    # Vérifié live 2026-04-22 : 126 events 2026, last_modified 2026-04-21.
+    # Contournement propre du blocage Cloudflare sur education.gouv.fr.
+    - id: min_educ_agenda
+      category: agenda
+      url: https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-agenda-ministre-education-nationale/exports/json
+      format: data_gouv_agenda
+      chamber: MinEduc
+      since_days: 90
+      title_prefix: "MinEduc —"
+
+    # R15 (2026-04-22) — Agenda public du ministre de l'Enseignement
+    # supérieur, de la Recherche et de l'Innovation. Dataset data.gouv.fr
+    # `fr-esr-agenda-ministre` (~4788 entrées, màj théoriquement hebdo).
+    # Utilise le connecteur `data_gouv_agenda` qui consomme le JSON
+    # iCal-like exposé par OpenDataSoft (portail data.enseignementsup-
+    # recherche.gouv.fr). Contournement propre du blocage Cloudflare
+    # sur education.gouv.fr.
+    #
+    # ⚠  Le flux upstream s'est arrêté le 22 octobre 2025 (pas d'event
+    # après cette date). Cause probable : changement de ministre ou
+    # publication interrompue. La source produit 0 item tant que le
+    # flux reprend (visible via l'alerte "0 items sans erreur" du
+    # dispatcher). On laisse enabled pour détecter automatiquement la
+    # reprise.
+    - id: min_esr_agenda
+      category: agenda
+      url: https://data.enseignementsup-recherche.gouv.fr/api/explore/v2.1/catalog/datasets/fr-esr-agenda-ministre/exports/json
+      format: data_gouv_agenda
+      chamber: MinESR
+      since_days: 90
+      title_prefix: "MinESR —"
 
 ministeres:
   # Scraping des espaces presse / listings actualités (RSS non disponible partout)
@@ -257,19 +305,20 @@ ministeres:
     # sports.gouv.fr termine par -1787 et suit le ministre en poste).
     # La page publie des agendas hebdomadaires (PDF) + rendez-vous du
     # jour, scrapés comme listing standard via html_generic.
-    # R13-N (2026-04-21) — DÉSACTIVÉ. La page /organisation/la-ministre/agenda/
-    # est la page "biographie" de la ministre (7 liens sont scrapés, aucun
-    # n'est un événement). Le vrai agenda est
-    # https://www.sports.gouv.fr/agenda-previsionnel-de-marina-ferrari-1787
-    # mais c'est une PAGE UNIQUE hebdomadaire (bulletin "Agenda prévisionnel
-    # de Marina Ferrari pour la semaine du X avril 2026") — nécessite un
-    # scraper dédié (1 item/semaine = la page fetchée). Reporté en R13-O.
+    # R13-N (2026-04-21) — DÉSACTIVÉ (ancien). La page /organisation/la-ministre/agenda/
+    # est la page "biographie" de la ministre (7 liens, aucun événement).
+    # Le vrai agenda est publié chaque semaine sur une page au slug
+    # changeant (`/agenda-previsionnel-de-<nom-ministre>-<noeud>`).
+    # R15 (2026-04-22) : scraper dédié livré — cf. src/sources/min_sports.py.
+    # Le handler suit le lien courant depuis la home (URL stable) puis
+    # parse les <h5> par jour et les <p> des créneaux (1 item = 1 créneau).
     - id: min_sports_agenda
       category: agenda
-      url: https://www.sports.gouv.fr/organisation/la-ministre/agenda/
-      format: html
+      url: https://www.sports.gouv.fr/
+      format: min_sports_agenda_hebdo
+      chamber: MinSports
+      title_prefix: "MinSports —"
       poids: 3
-      enabled: false
 
     # Education + Intérieur + Economie : Cloudflare challenge JS (403).
     # À ré-activer si un flux RSS officiel est confirmé ou si on introduit
@@ -365,10 +414,14 @@ autorites:
       format: html
       poids: 3
 
+    # R15 (2026-04-22) — AFLD : passage en RSS officiel (WordPress).
+    # La page /actualites/ en HTML ne remontait qu'1 item (le lien de nav
+    # "Actualités") — le feed RSS donne 4 articles 2026 récents avec
+    # dates ISO + catégorie propre.
     - id: afld
       category: communiques
-      url: https://www.afld.fr/actualites/
-      format: html
+      url: https://www.afld.fr/feed/
+      format: rss
 
     - id: arcom
       category: communiques
@@ -390,10 +443,13 @@ autorites:
       format: html
       enabled: false
 
+    # R15 (2026-04-22) — Défenseur des droits : passage en RSS officiel.
+    # /rss.xml renvoie un flux valide (49 Ko, dates ISO 2026-04 récentes)
+    # alors que le scraping HTML capte ~30 items dont beaucoup de nav.
     - id: defenseur_droits
       category: communiques
-      url: https://www.defenseurdesdroits.fr/fr/actualites
-      format: html
+      url: https://www.defenseurdesdroits.fr/rss.xml
+      format: rss
 
     # R13-M (2026-04-21) — Cyril : ajout des 3 hautes juridictions en
     # publications. RSS officiels confirmés pour CE et CC (QPC360).
@@ -414,10 +470,20 @@ autorites:
       url: https://qpc360.conseil-constitutionnel.fr/rss/decisions
       format: rss
 
+    # R15 (2026-04-22) — Cour de cassation : site protégé par anti-bot
+    # JavaScript (redirection `window.location.href=/redirect_XXXX/`
+    # sur TOUS les endpoints /, /actualites, /rss, /feed, /sitemap.xml).
+    # Même technologie que vie-publique.fr — insurmontable en pur HTTP.
+    # Pas de dataset data.gouv.fr d'actualités Cour de cassation (seul
+    # `Jurisprudence pseudonymisée` existe, mais pas de métadonnées
+    # d'actualité/communiqué). Les décisions de principe atterrissent
+    # au JORF (capturées par `dila_jorf`), donc la perte est limitée.
+    # Réactiver si un flux RSS officiel est annoncé ou via Playwright.
     - id: cour_cassation
       category: communiques
       url: https://www.courdecassation.fr/toutes-les-actualites
       format: html
+      enabled: false
 
     # R13-M (2026-04-21) — réactivation CNOSF via sitemap.xml Drupal.
     # Le site CNOSF est Nuxt (rendu JS côté client pour /actualites), donc
@@ -436,13 +502,30 @@ autorites:
       url: https://france-paralympique.fr/actualites/
       format: html
 
-    - id: alpes_2030
+    - id: alpes_2030_cojop
       category: communiques
-      # cojop.fr : domaine inexistant (DNS KO). Le COJOP Alpes 2030
-      # (créé le 18/02/2025, président Edgar Grospiron) n'a pas encore
-      # publié de site web officiel au moment de ce commit. Les actualités
-      # Alpes 2030 sont captées via min_sports_presse + cnosf. Source
-      # désactivée en attendant la mise en ligne du site officiel COJOP.
+      # cojop.fr : domaine inexistant (DNS KO) au 2026-04-22. Le COJOP
+      # Alpes 2030 (créé le 18/02/2025, président Edgar Grospiron) n'a
+      # pas encore publié de site web officiel. À réactiver quand la
+      # mise en ligne du site officiel COJOP sera faite.
       url: https://cojop.fr/
       format: html
       enabled: false
+
+    # R15 (2026-04-22) : l'actualité Alpes 2030 officielle est hébergée
+    # sur olympics.com/cio/jeux-olympiques/alpes-francaises-2030 (CIO),
+    # mais le domaine est protégé par Akamai Bot Manager (403 sur toute
+    # requête HTTP directe, y compris avec Sec-Fetch-* complets). On
+    # contourne via Google News RSS qui agrège les mentions « Alpes
+    # 2030 » / « Alpes françaises 2030 » depuis la presse FR (L'Équipe,
+    # Le Dauphiné Libéré, Ouest-France, Presse Agence, Sport Business
+    # Club…). 100 items récents au test initial, renouvelé quotidien.
+    # Limites : médias tiers (pas de communiqué CIO direct), risque
+    # faible de bruit avec « Alpes 2030 » générique car le sigle est
+    # très identifié aux JO d'hiver.
+    - id: alpes_2030_news
+      category: communiques
+      url: https://news.google.com/rss/search?q=%22Alpes+2030%22+OR+%22Alpes+fran%C3%A7aises+2030%22&hl=fr&gl=FR&ceid=FR:fr
+      format: rss
+      chamber: Alpes2030
+      poids: 2

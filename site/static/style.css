@@ -158,8 +158,10 @@ a:hover { text-decoration: underline; }
   font-size: 13px;
   font-weight: 500;
   /* R13-J (2026-04-21) : padding homogène pour que le hover rouge
-     (qui imite Rechercher) ait une surface cliquable cohérente. */
-  padding: 4px 10px;
+     (qui imite Rechercher) ait une surface cliquable cohérente.
+     R15 (2026-04-22) : padding H réduit 10→5px pour que les 9 entrées
+     + méta tiennent sur une ligne en viewport desktop standard. */
+  padding: 4px 5px;
   border-radius: 4px;
 }
 /* R13-J : hover rouge (type Rechercher) sur tous les items nav sauf
@@ -1233,7 +1235,9 @@ a:hover { text-decoration: underline; }
 /* Lien recherche dans le header (accent subtil) */
 .nav a.nav-search {
   background: var(--sl-red);
-  padding: 4px 10px;
+  /* R15 (2026-04-22) : padding H aligné sur les autres entrées (5px)
+     pour conserver une hauteur visuelle homogène après la refonte. */
+  padding: 4px 5px;
   border-radius: 4px;
   opacity: 1;
 }

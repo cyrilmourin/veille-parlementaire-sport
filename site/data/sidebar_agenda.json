@@ -1,0 +1,48 @@
+[
+  {
+    "hash_key": "matignon_agenda::https://www.gouvernement.fr/organisation/delegation-jeux-olympiques-paralympiques-paris-2024",
+    "source_id": "matignon_agenda",
+    "uid": "https://www.gouvernement.fr/organisation/delegation-jeux-olympiques-paralympiques-paris-2024",
+    "category": "agenda",
+    "chamber": "Matignon",
+    "title": "Délégation interministérielle aux jeux olympiques et paralympiques (DIJOP)",
+    "url": "https://www.gouvernement.fr/organisation/delegation-jeux-olympiques-paralympiques-paris-2024",
+    "published_at": null,
+    "summary": "",
+    "matched_keywords": [
+      "DIJOP",
+      "jeux olympiques"
+    ],
+    "keyword_families": [
+      "acteur",
+      "evenement"
+    ],
+    "raw": {},
+    "inserted_at": "2026-04-20T09:30:30",
+    "snippet": "Délégation interministérielle aux jeux olympiques et paralympiques (DIJOP)"
+  },
+  {
+    "hash_key": "an_agenda::RUANR5L17S2025IDC456192",
+    "source_id": "an_agenda",
+    "uid": "RUANR5L17S2025IDC456192",
+    "category": "agenda",
+    "chamber": "AN",
+    "title": "Réunion",
+    "url": "",
+    "published_at": null,
+    "summary": "Organe : PO866672 — http://schemas.assemblee-nationale.fr/referentiel http://www.w3.org/2001/XMLSchema-instance reunionCommission_type RUANR5L17S2025IDC456192 2025-06-04T17:00:00.000+02:00 2025-06-04T17:50:00.000+02:00 SLAN33SDS4223 Salle 4223 – Commission des affaires étrangères,  9 rue de Bourgogne, 2ème étage Confirmé 2025-05-06T00:00:00.000+02:00 PO866672 PA794278 absent PA610968 absent PA795084 absent PA796118 absent PA335999 absent PA795362 absent PA796106 absent PA720430 absent PA840889 absent PA721410 absent PA642695 présent PA794094 absent PA841131 absent PA793134 absent PA840075 absent PA795864 absent PA719118 absent PA795136 absent PA719914 absent PA840119 absent PA608826 absent PA607193 absent PA267042 absent PA795120 absent PA841139 absent PA722358 absent PA266797 absent PA840947 absent PA608416 absent PA267200 absent PA720354 absent PA335054 absent PA720846 absent PA795516 absent PA721004 absent PA721984 présent PA345722 absent PA794426 présent PA642988 absent PA793904 absent PA842141 absent PA720146 absent PA842271 absent PA841931 absent PA795664 absent PA841107 absent PA817211 absent PA795966 absent PA793254 absent PA341981 absent PA841955 absent PA722252 absent PA794570 absent PA720138 absent PA841845 absent PA795982 absent PA841243 absent PA794954 absent PA340343 absent PA796050 absent PA795808 absent PA720952 absent PA719550 absent PA722336 absent PA719822 absent PA793816 absent PA794494 absent PA794946 absent PA796078 absent false true true –\tTable ronde, ouverte à la presse, réunissant des entreprises de télécommunications :\ro\tFédération française des télécoms (FFT) : M. Patrick Guyonneau, président de la commission sécurité de la FFT, directeur de la sécurité d’Orange France, M. Matthieu Hennebo, directeur cybersécurité d’Altice France et M. Corentin Durand, responsable des affaires publiques de Bouygues Telecom :\ro\tIliad-Free : M. Patrice Millecamps, directeur des obligations légales et Mme Ombeline Bartin, directrice des relations extérieures",
+    "matched_keywords": [
+      "FFT"
+    ],
+    "keyword_families": [
+      "federation"
+    ],
+    "raw": {
+      "path": "assemblee:reunion",
+      "organe": "PO866672",
+      "lieu": ""
+    },
+    "inserted_at": "2026-04-20T09:30:30",
+    "snippet": "…t des entreprises de télécommunications : o Fédération française des télécoms (FFT) : M."
+  }
+]

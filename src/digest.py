@@ -92,6 +92,7 @@ def build_html(rows: list[dict], site_url: str) -> tuple[str, int]:
     # la volée depuis summary, comme côté site_export. Idempotent.
     from .keywords import KeywordMatcher
     from .site_export import (
+        SNIPPET_LEN_BY_CATEGORY,
         _fix_agenda_row, _fix_cr_row, _fix_dossier_row, _fix_question_row,
     )
     _matcher = KeywordMatcher("config/keywords.yml")
@@ -134,7 +135,10 @@ def build_html(rows: list[dict], site_url: str) -> tuple[str, int]:
         if not snippet:
             haystack = (r.get("summary") or title_fixed or "").strip()
             if haystack:
-                snippet = _matcher.build_snippet(haystack)
+                # R14 : même logique que site_export — longueur pilotée
+                # par catégorie pour que les valeurs > 320 prennent effet.
+                _target = SNIPPET_LEN_BY_CATEGORY.get(r.get("category") or "", 800)
+                snippet = _matcher.build_snippet(haystack, max_len=_target)
         item = {
             "title": title_fixed, "url": url_fixed,
             "summary": r.get("summary") or "",

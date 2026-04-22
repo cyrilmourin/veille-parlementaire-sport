@@ -14,12 +14,36 @@ from typing import Callable
 import yaml
 
 from .models import Item
-from .sources import assemblee, dila_jorf, elysee, html_generic, piste, senat  # noqa: F401
+from .sources import (  # noqa: F401
+    assemblee,
+    data_gouv,
+    dila_jorf,
+    elysee,
+    html_generic,
+    min_sports,
+    piste,
+    senat,
+)
 
 log = logging.getLogger(__name__)
 
 # Table de routage : (groupe, format) -> fonction fetch_source
 ROUTER: list[tuple[Callable[[dict, dict], bool], Callable[[dict], list[Item]]]] = [
+    # data.gouv.fr — routage par format (traverse les groupes YAML).
+    # R15 (2026-04-22) : agendas ministériels bloqués par Cloudflare sur
+    # gouvernement.fr/info.gouv.fr → contournement via data.gouv.fr
+    # quand un dataset open data est disponible (cf. data_gouv.py).
+    (
+        lambda group, src: src.get("format", "").startswith("data_gouv_"),
+        data_gouv.fetch_source,
+    ),
+    # Ministère des Sports — agenda hebdo de la ministre (scraper HTML
+    # dédié, cf. `min_sports.py`). Route par format pour rester dans
+    # le groupe `ministeres` sans forker la topologie YAML.
+    (
+        lambda group, src: src.get("format", "").startswith("min_sports_"),
+        min_sports.fetch_source,
+    ),
     # Assemblée nationale — zips JSON
     (lambda group, src: group == "assemblee_nationale", assemblee.fetch_source),
     # Sénat — CSV/ZIP/RSS

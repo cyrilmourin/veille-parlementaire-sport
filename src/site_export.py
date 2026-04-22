@@ -733,10 +733,16 @@ def _load(rows: list[dict]) -> list[dict]:
             r["keyword_families"] = []
         # Snippet : reconstruit à la volée depuis summary (ou title en fallback)
         # pour les items matchés. On ne stocke pas en DB — UX-E commentaire.
+        # R14 : passe explicitement la longueur cible par catégorie à
+        # `build_snippet` pour qu'il produise le bon gabarit dès la source
+        # (avant, le défaut interne à 320 plafonnait tout et rendait les
+        # valeurs > 320 de SNIPPET_LEN_BY_CATEGORY inopérantes — cf. R13-K
+        # où le passage CR 250→500 n'avait aucun effet visible).
         if r.get("matched_keywords") and not r.get("snippet"):
             haystack = (r.get("summary") or r.get("title") or "").strip()
             if haystack:
-                r["snippet"] = _matcher.build_snippet(haystack)
+                _target = SNIPPET_LEN_BY_CATEGORY.get(r.get("category") or "", 800)
+                r["snippet"] = _matcher.build_snippet(haystack, max_len=_target)
         # `raw` est stocké en TEXT JSON dans la DB — on le parse pour exposer
         # les champs enrichis (notamment status_label pour les dossiers
         # législatifs, cf. assemblee._normalize_dosleg).
@@ -1390,9 +1396,22 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         slug = _slugify(f"{r.get('source_id','')}-{r.get('uid','')}-{r.get('title','')[:40]}")
         fp = d / f"{slug}.md"
         title = (r.get("title") or "").replace('"', "'")
-        # Date réelle de publication uniquement — pas de fallback inserted_at,
-        # qui ferait apparaître la date du jour pour les items sans date fiable.
-        published_at = r.get("published_at") or ""
+        # R15 (2026-04-22) : on distingue désormais deux dates.
+        #   - `published_at_real` : date officielle de la publication (si
+        #     disponible). Utilisée pour les affichages templates via le
+        #     champ `published_at_real` du frontmatter.
+        #   - `frontmatter_date` : toujours renseigné — fallback sur
+        #     `inserted_at` pour éviter le filtre silencieux Hugo qui
+        #     masque les items `type: <cat>` sans `date:` dans le
+        #     frontmatter (cf. audit agenda R15 : 6411/6412 items AN
+        #     agenda étaient perdus à cause de ce filtre).
+        # Le tri côté site_export (_sort_by_date_desc) continue à se
+        # baser sur `published_at` brut de la DB — l'ordre d'affichage
+        # reste donc inchangé pour les items qui en ont une vraie.
+        published_at_real = r.get("published_at") or ""
+        _inserted_at = r.get("inserted_at") or ""
+        frontmatter_date = published_at_real or _inserted_at
+        has_real_date = bool(published_at_real)
         source_url = (r.get("url") or "").replace('"', "")
         # R13-K (2026-04-21) : pour les comptes rendus, on ajoute un
         # text-fragment (#:~:text=<kw>) sur le 1er mot-clé matché. Permet
@@ -1405,22 +1424,17 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
                 from urllib.parse import quote
                 fragment = quote(str(kws[0]), safe="")
                 source_url = f"{source_url}#:~:text={fragment}"
-        # R13-D : snippet tronqué à la taille demandée pour la page
-        # thématique. Si la catégorie n'est pas dans le dict → snippet vide
-        # (ex. dossiers_legislatifs : pas d'extrait sur la page dédiée).
+        # R13-D / R14 : la longueur du snippet est désormais imposée en
+        # amont dans `_load` via `build_snippet(..., max_len=target)`.
+        # Ici on ne fait plus que :
+        #   1. Sanitizer pour le frontmatter YAML (guillemets + newlines).
+        #   2. Gérer l'absence de clé dans SNIPPET_LEN_BY_CATEGORY →
+        #      snippet vide (ex. dossiers_legislatifs : pas d'extrait sur la
+        #      page dédiée, les cartes portent déjà titre/type/date/statut).
+        # Le troncage défensif au dernier espace a été retiré : redondant
+        # depuis que build_snippet respecte max_len par catégorie.
         _snip_raw = (r.get("snippet") or "").replace('"', "'").replace("\n", " ")
-        _snip_len = SNIPPET_LEN_BY_CATEGORY.get(cat)
-        if _snip_len is None:
-            snippet = ""
-        elif len(_snip_raw) > _snip_len:
-            # Tronque sans couper un mot (recherche dernier espace dans la zone)
-            cut = _snip_raw[:_snip_len].rstrip()
-            last_space = cut.rfind(" ")
-            if last_space > _snip_len - 50:
-                cut = cut[:last_space].rstrip()
-            snippet = cut + "…"
-        else:
-            snippet = _snip_raw
+        snippet = _snip_raw if cat in SNIPPET_LEN_BY_CATEGORY else ""
         # Remonte les champs enrichis depuis `raw` pour les dossiers
         # législatifs (status_label + is_promulgated injectés par
         # assemblee._normalize_dosleg). Permet à list.html d'afficher le
@@ -1492,8 +1506,15 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
             "---",
             f'title: "{title}"',
         ]
-        if published_at:
-            fm.append(f"date: {published_at}")
+        # R15 : `date:` toujours émise (fallback `inserted_at`) pour
+        # éviter le filtre silencieux Hugo sur les items sans date
+        # officielle. Templates doivent lire `published_at_real` /
+        # `has_real_date` pour savoir si la date affichée est fiable.
+        if frontmatter_date:
+            fm.append(f"date: {frontmatter_date}")
+        if published_at_real:
+            fm.append(f"published_at_real: {published_at_real}")
+        fm.append(f"has_real_date: {str(has_real_date).lower()}")
         fm += [
             f"category: {cat}",
             f'chamber: "{r.get("chamber") or ""}"',

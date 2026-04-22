@@ -152,6 +152,15 @@ def fetch_source(src: dict) -> list[Item]:
             # dump bulk ameli.zip est un dump PostgreSQL, non exploitable.
             from .senat_amendements import fetch_source as fetch_amdt_per_texte
             return fetch_amdt_per_texte(src)
+        if fmt == "senat_agenda_daily":
+            # R15 (2026-04-22) : scraper dédié qui itère sur une fenêtre
+            # de dates et récupère les pages quotidiennes de l'agenda
+            # Sénat (`/agenda/<Section>/agl{DDMMYYYY}.html`).
+            # NB : le serveur bloque actuellement ces paths en sandbox
+            # (404 + "Accès restreint") — cf. audit R15 §1.2. Le handler
+            # loggue l'échec et retourne 0 item plutôt que de crasher,
+            # pour qu'on puisse déployer sans bloquer le reste du pipeline.
+            return _fetch_agenda_daily(src)
     except Exception as e:
         log.exception("Sénat %s KO: %s", sid, e)
     return []
@@ -586,3 +595,257 @@ def _normalize_rss(src, text: str) -> list[Item]:
             raw={},
         ))
     return out
+
+
+# -----------------------------------------------------------------------------
+# R15 (2026-04-22) — Scraper Agenda Sénat quotidien
+# -----------------------------------------------------------------------------
+#
+# L'index `https://www.senat.fr/agenda` est une SPA AngularJS qui charge :
+#   - `cal.json` (index jours avec items par section)
+#   - `{Section}/agl{DDMMYYYY}.html` (page par section et par jour)
+#   - `Global/agl{DDMMYYYY}Print.html` (vue imprimable tout-en-un)
+#
+# Sections observées dans le menu SPA :
+#   Seance, Commissions, Missions, Delegation, Senat (bureau +
+#   conférence des Présidents), GroupesPolitiques, Divers, President,
+#   International, Delai
+#
+# Approche du handler :
+#   1. Itère une fenêtre [J - before_days, J + after_days].
+#   2. Pour chaque jour, tente de récupérer la page "print" globale
+#      (1 requête/jour au lieu de 1/section).
+#   3. Parse le HTML → extrait les blocs d'évènements (titre, heure, lieu,
+#      organe) et produit un Item par évènement avec published_at = jour.
+#
+# Contrainte serveur actuelle (avril 2026) : le Sénat renvoie 404 +
+# "Accès restreint" sur ces sub-paths depuis les IP non reconnues.
+# Le handler ne crashe pas — il loggue en warning et retourne une liste
+# vide. Une fois le blocage levé (test en CI ou Chrome MCP local), les
+# items seront émis sans autre changement.
+# -----------------------------------------------------------------------------
+
+# Sections agenda Sénat par ordre de priorité métier pour le sport.
+# `Commissions` + `Missions` = cœur de cible (sport-santé, dopage, etc.).
+# `Delegation` = délégations thématiques (dont délégation droits des
+# femmes, parfois sport). `Seance` = séance publique plénière.
+_SENAT_AGENDA_SECTIONS = (
+    "Seance",
+    "Commissions",
+    "Missions",
+    "Delegation",
+    "Senat",
+    "GroupesPolitiques",
+    "Divers",
+)
+
+
+def _senat_agenda_url(section: str, dt: datetime, *, printable: bool = False) -> str:
+    """Construit l'URL d'une page d'agenda quotidienne Sénat.
+
+    Format `DDMMYYYY` (ex. `22042026` pour le 22 avril 2026).
+    Si `printable=True`, retourne la variante `/Global/agl{date}Print.html`
+    qui agrège toutes les sections en une page.
+    """
+    stamp = dt.strftime("%d%m%Y")
+    if printable:
+        return f"https://www.senat.fr/agenda/Global/agl{stamp}Print.html"
+    return f"https://www.senat.fr/agenda/{section}/agl{stamp}.html"
+
+
+# Bloc contenu principal de la page quotidienne Sénat. Le HTML encapsule
+# la liste d'évènements dans `<div id="content">…</div>`.
+_SENAT_CONTENT_RE = re.compile(
+    r'<div[^>]+id=["\']content["\'][^>]*>(?P<body>.*?)</div>',
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Événement unitaire : on accepte toute section `<section class="event">`
+# ou `<div class="event-item">` (deux variantes observées sur miroirs).
+_SENAT_EVENT_RE = re.compile(
+    r'<(?:section|div|article)[^>]+class=["\'][^"\']*(?:event|reunion|seance)[^"\']*["\'][^>]*>'
+    r'(?P<body>.*?)'
+    r'</(?:section|div|article)>',
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Titre événement : <h[2-4]>…</h[2-4]> ou <a class="titre">…</a>
+_SENAT_EVENT_TITLE_RE = re.compile(
+    r'<(?:h[234]|a[^>]+class=["\'][^"\']*titre[^"\']*["\'])[^>]*>(?P<t>.*?)</(?:h[234]|a)>',
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Horaire dans un libellé : "14h30", "14:30", "de 14h à 16h".
+_SENAT_TIME_RE = re.compile(
+    r'(?P<h>\d{1,2})\s*[h:]\s*(?P<m>\d{0,2})'
+)
+
+# Lieu — on cherche les balises `class="lieu"`, `<address>`, `<em>Salle…`.
+_SENAT_LIEU_RE = re.compile(
+    r'<(?:[a-z]+)[^>]+class=["\'][^"\']*lieu[^"\']*["\'][^>]*>(?P<l>.*?)</',
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Tags HTML pour strip
+_HTML_TAG_STRIP_RE = re.compile(r'<[^>]+>')
+_WS_COLLAPSE_RE = re.compile(r'\s+')
+
+
+def _strip_html(text: str) -> str:
+    """Retire les balises HTML + unescape les entités + collapse whitespace."""
+    if not text:
+        return ""
+    text = _HTML_TAG_STRIP_RE.sub(' ', text)
+    text = html.unescape(text)
+    text = _WS_COLLAPSE_RE.sub(' ', text).strip()
+    return text
+
+
+def _parse_senat_event_block(body: str, day: datetime, section: str) -> dict | None:
+    """Extrait {title, lieu, heure, summary} d'un bloc `<section class="event">`.
+
+    Tolérant aux variations : si le titre est absent ou trop court,
+    on retourne None (bloc inutilisable, ex. bandeau de navigation
+    capturé par erreur).
+    """
+    title_m = _SENAT_EVENT_TITLE_RE.search(body)
+    title = _strip_html(title_m.group("t")) if title_m else ""
+    if len(title) < 5:
+        return None
+
+    # Heure : on cherche dans le texte dépouillé pour éviter les faux positifs
+    # dans les attributs HTML.
+    text = _strip_html(body)
+    time_m = _SENAT_TIME_RE.search(text)
+    time_str = ""
+    event_dt = day
+    if time_m:
+        try:
+            h = int(time_m.group("h"))
+            mm = int(time_m.group("m") or "0")
+            if 0 <= h <= 23 and 0 <= mm <= 59:
+                time_str = f"{h:02d}h{mm:02d}"
+                event_dt = day.replace(hour=h, minute=mm)
+        except ValueError:
+            pass
+
+    lieu_m = _SENAT_LIEU_RE.search(body)
+    lieu = _strip_html(lieu_m.group("l")) if lieu_m else ""
+
+    summary_parts = []
+    if time_str:
+        summary_parts.append(time_str)
+    if lieu:
+        summary_parts.append(f"Lieu : {lieu}")
+    summary_parts.append(text[:800])
+    summary = " — ".join(summary_parts)
+
+    return {
+        "title": title[:220],
+        "lieu": lieu,
+        "heure": time_str,
+        "section": section,
+        "summary": summary[:2000],
+        "event_dt": event_dt,
+    }
+
+
+def _parse_senat_agenda_page(html_body: str, day: datetime, section: str) -> list[dict]:
+    """Parse une page quotidienne Sénat et renvoie les events extraits."""
+    m = _SENAT_CONTENT_RE.search(html_body)
+    if not m:
+        return []
+    content = m.group("body")
+    events = []
+    for evt_m in _SENAT_EVENT_RE.finditer(content):
+        parsed = _parse_senat_event_block(evt_m.group("body"), day, section)
+        if parsed:
+            events.append(parsed)
+    return events
+
+
+def _iter_date_window(before_days: int, after_days: int):
+    """Yield les datetime jour par jour sur la fenêtre glissante."""
+    base = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    for delta in range(-before_days, after_days + 1):
+        yield base + timedelta(days=delta)
+
+
+def _fetch_agenda_daily(src: dict) -> list[Item]:
+    """Itère la fenêtre de dates et scrape l'agenda Sénat jour par jour.
+
+    Paramètres YAML supportés (cf. `sources.yml`) :
+        before_days: 7     # J-7 par défaut
+        after_days:  30    # J+30 par défaut
+        sections: [...]    # filtre de sections, par défaut toutes
+        printable: true    # utilise la vue `Global/agl*Print.html`
+                           # (1 requête/jour au lieu de 1/section)
+
+    En cas d'échec HTTP (404/403/timeout), on continue sur les autres
+    jours : on préfère une fenêtre partielle plutôt que rien. Le handler
+    loggue le nombre de fetches réussis vs échoués pour faciliter le
+    diagnostic en CI.
+    """
+    sid = src["id"]
+    cat = src.get("category", "agenda")
+    before_days = int(src.get("before_days", 7))
+    after_days = int(src.get("after_days", 30))
+    sections = tuple(src.get("sections") or _SENAT_AGENDA_SECTIONS)
+    printable = bool(src.get("printable", True))
+
+    items: list[Item] = []
+    ok, ko = 0, 0
+
+    for day in _iter_date_window(before_days, after_days):
+        day_iso = day.date().isoformat()
+        if printable:
+            urls = [(None, _senat_agenda_url("", day, printable=True))]
+        else:
+            urls = [(s, _senat_agenda_url(s, day)) for s in sections]
+
+        for section, url in urls:
+            try:
+                body = fetch_text(url)
+            except Exception as e:
+                ko += 1
+                log.debug("Sénat agenda %s — fetch KO %s : %s", sid, url, e)
+                continue
+            # Détection page "Accès restreint" (retournée en HTTP 404
+            # avec 101Ko de template TYPO3) — on traite comme un KO
+            # silencieux sans polluer les stats.
+            if "Accès restreint" in body or "Accès non autorisé" in body:
+                ko += 1
+                log.debug("Sénat agenda %s — accès restreint %s", sid, url)
+                continue
+            events = _parse_senat_agenda_page(
+                body, day, section or "Global",
+            )
+            ok += 1 if events else 0
+            for idx, ev in enumerate(events):
+                uid = hashlib.sha1(
+                    f"{sid}:{day_iso}:{ev['section']}:{idx}:{ev['title']}"
+                    .encode("utf-8")
+                ).hexdigest()[:16]
+                items.append(Item(
+                    source_id=sid,
+                    uid=uid,
+                    category=cat,
+                    chamber="Senat",
+                    title=ev["title"],
+                    url=url,
+                    published_at=ev["event_dt"],
+                    summary=ev["summary"],
+                    raw={
+                        "path": "senat:agenda_daily",
+                        "section": ev["section"],
+                        "lieu": ev["lieu"],
+                        "heure": ev["heure"],
+                        "day": day_iso,
+                    },
+                ))
+
+    log.info(
+        "Sénat %s : %d items (fenêtre %dj + %dj, %d pages ok, %d échecs)",
+        sid, len(items), before_days, after_days, ok, ko,
+    )
+    return items

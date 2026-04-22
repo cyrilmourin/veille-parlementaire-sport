@@ -104,7 +104,7 @@ class KeywordMatcher:
         return out
 
     def build_snippet(self, original_text: str, window: int = 80,
-                      max_len: int = 320) -> str:
+                      max_len: int = 800) -> str:
         """Extrait une phrase contenant le 1er mot-clé trouvé.
 
         On repart d'une fenêtre brute ~`window` chars de part et d'autre
@@ -112,6 +112,14 @@ class KeywordMatcher:
         (`. `, `! `, `? `, `\\n`) pour produire un extrait lisible plutôt
         qu'une troncation arbitraire. Cap à `max_len` pour éviter les
         paragraphes entiers.
+
+        R14 : défaut remonté de 320 → 800 pour laisser de la marge aux
+        appelants qui veulent des extraits longs (ex. `comptes_rendus`
+        demandé à 500 chars par Cyril en R13-K). Les appelants conscients
+        de leur catégorie (site_export, digest) passent explicitement
+        `max_len=SNIPPET_LEN_BY_CATEGORY[cat]` pour éviter de payer les
+        800 chars systématiquement. Le défaut 800 sert de filet pour les
+        appels sans contexte (p.ex. `KeywordMatcher.apply`).
 
         R13-C : dépollue l'HTML en amont (tags + entités) — sinon le
         snippet affiche `&#x00E9;put&#x00E9;.es` au lieu de `député.es`
