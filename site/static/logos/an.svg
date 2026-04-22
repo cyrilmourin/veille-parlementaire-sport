@@ -1,18 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" width="56" height="56" role="img" aria-label="Assemblée nationale">
-  <!-- Cadre bleu Sideline -->
-  <rect width="56" height="56" rx="6" fill="#122549"/>
-  <!-- Bande tricolore bas (France) -->
-  <rect x="6" y="42" width="14" height="6" fill="#0055A4"/>
-  <rect x="20" y="42" width="14" height="6" fill="#FFFFFF"/>
-  <rect x="34" y="42" width="16" height="6" fill="#EF4135"/>
-  <!-- Texte AN -->
-  <text x="28" y="30"
-        text-anchor="middle"
-        dominant-baseline="middle"
-        font-family="Montserrat, Arial, sans-serif"
-        font-size="20"
-        font-weight="900"
-        fill="#FFFFFF"
-        letter-spacing="1">AN</text>
+  <!-- Fond gris clair (couleur fond logo officiel) -->
+  <rect width="56" height="56" fill="#D5D5D5"/>
+  <!-- Fronton triangulaire noir (toit du Palais Bourbon) -->
+  <polygon points="6,16 28,8 50,16 50,20 6,20" fill="#000000"/>
+  <!-- Entablement noir (barre sous le fronton) -->
+  <rect x="6" y="19" width="44" height="2.5" fill="#000000"/>
+  <!-- Colonnade : 9 colonnes tricolores (3 bleues, 3 noires, 3 rouges) -->
+  <!-- Colonnes bleues (gauche) -->
+  <rect x="9"  y="22" width="2" height="16" fill="#0055A4"/>
+  <rect x="13" y="22" width="2" height="16" fill="#0055A4"/>
+  <rect x="17" y="22" width="2" height="16" fill="#0055A4"/>
+  <!-- Colonnes noires (centre) -->
+  <rect x="21" y="22" width="2" height="16" fill="#000000"/>
+  <rect x="25" y="22" width="2" height="16" fill="#000000"/>
+  <rect x="29" y="22" width="2" height="16" fill="#000000"/>
+  <!-- Colonnes rouges (droite) -->
+  <rect x="33" y="22" width="2" height="16" fill="#EF4135"/>
+  <rect x="37" y="22" width="2" height="16" fill="#EF4135"/>
+  <rect x="41" y="22" width="2" height="16" fill="#EF4135"/>
+  <!-- Soubassement noir -->
+  <polygon points="4,38 52,38 48,42 8,42" fill="#000000"/>
+  <rect x="4" y="41" width="48" height="1.5" fill="#000000"/>
+  <!-- Texte ASSEMBLÉE NATIONALE (bleu profond) -->
+  <text x="28" y="48" text-anchor="middle" font-family="Montserrat, Arial, sans-serif"
+        font-size="5.5" font-weight="900" fill="#1A3A7A" letter-spacing="0.3">ASSEMBLÉE</text>
+  <text x="28" y="53.5" text-anchor="middle" font-family="Montserrat, Arial, sans-serif"
+        font-size="5" font-weight="900" fill="#1A3A7A" letter-spacing="0.3">NATIONALE</text>
 </svg>
