@@ -179,9 +179,16 @@ senat:
     # `/agenda/Global/agl{DDMMYYYY}Print.html` qui agrège toutes les
     # sections (1 requête / jour au lieu de 7).
     #
-    # NB : selon l'audit R15 §1.2, le serveur peut renvoyer 404 +
-    # "Accès restreint" sur ces sub-paths depuis certaines IP — le
-    # handler loggue et continue (fenêtre partielle plutôt que crash).
+    # R16 (2026-04-22) — DÉSACTIVÉ. Diagnostic confirmé :
+    #   - `/agenda/` → HTTP 403 "Accès restreint" (WAF Sénat bloque tous
+    #     les UA scrapers, y compris UA Chrome complet).
+    #   - `/agenda/Global/aglDDMMYYYYPrint.html` → HTTP 404 "Page
+    #     introuvable" (URL inexistante côté serveur, pas juste restreinte).
+    #   - Aucun endpoint JSON/iCal agenda public identifié.
+    # Réactivation nécessiterait soit un contournement WAF (Playwright +
+    # stealth), soit un accord avec la DSI Sénat. Compensation partielle :
+    # `senat_theme_sport_rss` (ci-dessous) remonte les textes législatifs
+    # / rapports / avis thème "Sports" (non agenda mais même écosystème).
     - id: senat_agenda
       category: agenda
       url: https://www.senat.fr/agenda/
@@ -189,6 +196,18 @@ senat:
       before_days: 7
       after_days: 30
       printable: true
+      enabled: false
+
+    # R16 (2026-04-22) — Flux RSS Sénat thème "Sports" (N=31).
+    # Vérifié live 2026-04-22 : 200 OK, 10 Ko, ~15 entrées (textes n°51
+    # "JOP 2030", avis n°144 "Budget 2026 Sport", rapports des commissions
+    # thématiques). Compensation au blocage du scraper agenda : on capte
+    # au moins les travaux parlementaires Sénat tagués Sport en entrée
+    # de catégorie dossiers_legislatifs.
+    - id: senat_theme_sport_rss
+      category: dossiers_legislatifs
+      url: https://www.senat.fr/themes/rss/therss31.xml
+      format: rss
 
 # Journal officiel (JORF) — dump DILA OPENDATA (aucun credential nécessaire).
 # L'API PISTE/Légifrance est contournée : le dump XML quotidien DILA contient
@@ -207,20 +226,30 @@ dila:
 # Exécutif — flux RSS quand disponibles, sinon scraping structuré
 executif:
   sources:
-    - id: elysee_sitemap
+    # R16 (2026-04-22) — L'ancien `elysee_sitemap` utilisait
+    # /sitemap.static.xml : 200 OK mais ne contient que 10 URLs de
+    # navigation (home, lettre-information, agenda, les-dossiers,
+    # recherche, etc.) — aucune publication. Les 5 autres sitemaps
+    # (publication, sp, dossier, space, president) exposent 15000+ URLs
+    # historiques mais sans `<lastmod>` réel (tous datés 2026-03-18,
+    # jour de la refonte) → impossible de filtrer par récence.
+    # Solution : flux RSS officiel `/feed` (34 Ko, items récents, vrai
+    # pubDate). Limité à ~10 derniers items mais c'est le bon flux
+    # canonique pour l'actualité.
+    - id: elysee_feed
       category: communiques
-      url: https://www.elysee.fr/sitemap.static.xml
-      format: sitemap
-      rubriques:
-        - communique-de-presse
-        - declaration
-        - conseil-des-ministres
-        - discours
+      url: https://www.elysee.fr/feed
+      format: rss
 
+    # R16 (2026-04-22) — Agenda Élysée. Le scraping HTML générique ne
+    # trouvait pas la grille d'événements (0 items R15). Le handler dédié
+    # `elysee_agenda_html` connaît la structure : <li class="newsBlock-
+    # grid-item"> / <a class="newsBlock-grid-link"> avec date FR en texte
+    # et titre dans <span>.
     - id: elysee_agenda
       category: agenda
       url: https://www.elysee.fr/agenda
-      format: html
+      format: elysee_agenda_html
 
     # Matignon + info.gouv.fr : protégés par Cloudflare challenge JS
     # (Cf-Mitigated: challenge, 403 systématique sur httpx, y compris
@@ -343,7 +372,12 @@ ministeres:
 
     - id: min_justice
       category: communiques
-      url: https://www.justice.gouv.fr/presse
+      # R16 (2026-04-22) — Site plus en maintenance (levé entre R15 et
+      # R16). /presse redirige 301 → /espace-presse. On tape direct sur
+      # l'URL canonique pour éviter le redirect (cause probable du 0
+      # items intermittent sur R15). Page réelle : 160 Ko, DSFR-based,
+      # listing /actualites/espace-presse/... + liens PDF communiqués.
+      url: https://www.justice.gouv.fr/espace-presse
       format: html
 
     # min_sante + min_travail : DÉSACTIVÉS en R11g-4 (2026-04-21).
@@ -372,12 +406,15 @@ ministeres:
 
     - id: min_affaires_etrangeres
       category: communiques
-      # R11g-2 (2026-04-21) : refonte du site MEAE. L'arbo /salle-de-presse/
-      # a entièrement disparu (404 sur racine + toutes sous-pages). Le listing
-      # communiqués vit désormais sous /presse-et-ressources/decouvrir-et-
-      # informer/actualites/ (vérifié live : 200, 243 ko, 12 liens actualités
-      # sur la page d'accueil).
-      url: https://www.diplomatie.gouv.fr/fr/presse-et-ressources/decouvrir-et-informer/actualites/
+      # R16 (2026-04-22) : MEAE a refactoré l'arbo de nouveau.
+      # /presse-et-ressources/decouvrir-et-informer/actualites/ renvoie
+      # un 301 -> /presse/decouvrir-et-s-informer/actualites (scheme https
+      # préservé, vérifié curl + httpx). On tape désormais directement sur
+      # l'URL canonique pour éviter toute chaîne de redirect susceptible
+      # de basculer en http:// côté server (cause probable du 0 items R15).
+      # Page réelle : 241 Ko, 12 cartes a.fr-card__link (DSFR), 95 pages
+      # de listing d'actualités (~1140 items historiques).
+      url: https://www.diplomatie.gouv.fr/fr/presse/decouvrir-et-s-informer/actualites
       format: html
 
     - id: min_transition_ecologique

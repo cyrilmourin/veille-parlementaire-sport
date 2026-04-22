@@ -836,7 +836,7 @@ def _dosleg_subject_key(title: str) -> str:
     On normalise : (1) lowercase + unidecode, (2) retire les préfixes
     type de texte ("projet de loi", "PJL", etc.), (3) retire les
     connecteurs grammaticaux ("relatif à", "visant à", etc.), (4)
-    ne garde que [a-z0-9\s] avec espaces compressés.
+    ne garde que [a-z0-9 \\s] avec espaces compressés.
     """
     if not title:
         return ""

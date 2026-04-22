@@ -1,12 +1,12 @@
 ---
 title: Veille Parlementaire Sport — Handoff
 maintainer: Cyril Mourin
-last_updated: 2026-04-22 (matin, après R13-H → R13-O)
+last_updated: 2026-04-22 (fin d'après-midi, après R13-O → R15 → R16)
 ---
 
 # Handoff — Veille Parlementaire Sport
 
-Ce document est le point d'entrée pour reprendre le projet sans contexte préalable. Il résume l'architecture, l'état au **2026-04-22 (matin, après R13-H → R13-O)**, les décisions prises, ce qu'il reste à faire et les pièges connus.
+Ce document est le point d'entrée pour reprendre le projet sans contexte préalable. Il résume l'architecture, l'état au **2026-04-22 (fin d'après-midi, après R13-O → R15 → R16)**, les décisions prises, ce qu'il reste à faire et les pièges connus.
 
 À lire dans l'ordre : §1 (quoi) → §2 (comment ça tourne) → §3 (où on en est) → §4 (décisions) → §5 (TODO) → §6 (pièges) → §7 (autonomie sandbox) → §9 (historique).
 
@@ -90,13 +90,18 @@ Depuis R11b : un second cache `data/an_texte_to_dossier.json` mappe `texteLegisl
 
 ---
 
-## 3. État au 2026-04-22 (matin, après R13-H → R13-O)
+## 3. État au 2026-04-22 (fin d'après-midi, après R13-O → R15 → R16)
 
 ### 3.1 Dernier commit et version prod
 
-Tout pushé sur `origin/main`. Version système affichée en header (dans `.nav-meta`) : **R13-O · {short_sha}**.
+**⚠  À la date de cette note, 34 commits locaux n'ont pas encore été poussés vers `origin/main`.** Le site en ligne tourne donc sur une version antérieure à R13-O. Un push manuel est requis pour déployer R15 + R16 (cf. §5.0 / §7). Tant que le push n'a pas eu lieu, les workflows schedule continuent de tourner sur la version déjà déployée.
+
+Version système affichée en header (dans `.nav-meta`) après R15 : **R15 · {short_sha}** (sera `R16` après déploiement).
 
 ```
+(non pushé) R16 — fix 6 sources à 0 items + Élysée RSS + agenda newsBlock
+7950d1f R15 — agendas ministériels + scraper min_sports dédié + menu reclassé
+81cfbfb docs(HANDOFF): refonte État / Décisions / TODO / Pièges + cumul historique R13-H → R13-O
 62528a1 R13-O-logos — SVG plus fidèles aux logos officiels AN + Sénat
 ca892bf R13-O — amendements : auteur retiré du titre + fix sort_slug vert
 e26ca0d R13-N — détection retrait dosleg + désactivation min_sports_agenda
@@ -105,6 +110,32 @@ d002faa R13-L bump SYSTEM_VERSION_LABEL → R13-L
 600bb03 R13-L — questions format, dedup dosleg, agenda 30j, sidebar inline, chip Adopte fallback statut
 481ab76 R13-K — CR liste plate + snippet 500 + text-fragment + fix publications manquantes
 ```
+
+### 3.0 Ce que R15 + R16 ont apporté
+
+**R15 (`7950d1f`)** — Agendas ministériels + scraper dédié MinSports + menu reclassé.
+- Ajout `min_educ_agenda` (dataset OpenDataSoft `fr-en-agenda-ministre-education-nationale` via `data.education.gouv.fr`, contournement propre du blocage Cloudflare sur `education.gouv.fr`).
+- Ajout `min_esr_agenda` (dataset OpenDataSoft `fr-esr-agenda-ministre`). Flux upstream arrêté le 22 octobre 2025 — source laissée `enabled: true` pour détection automatique de la reprise.
+- Nouveau scraper `src/sources/min_sports.py::min_sports_agenda_hebdo` : suit le lien courant depuis `sports.gouv.fr/` (URL stable indépendante du titulaire), parse `<h5>` par jour + `<p>` par créneau (1 item = 1 créneau).
+- Nouveau handler `data_gouv_agenda` dans `src/sources/data_gouv.py` : consomme les exports JSON iCal-like d'OpenDataSoft avec schéma `{uid, dtstart, dtend, description}` (pas de `summary`, description utilisée en contenu principal).
+- Fix `store.upsert_many` : `ON CONFLICT (hash_key) DO UPDATE` — les items re-ingérés après patch parser mettent maintenant à jour leur ligne au lieu d'être silencieusement ignorés. Limite l'obligation du `reset_db=1` aux refactos lourds.
+
+**R16 (pending push)** — Correction des 6 sources à 0 items identifiées par l'audit R15.
+
+Diagnostic repris avec `curl -I` / `curl -L` + inspection BeautifulSoup live (2026-04-22 matin) :
+
+| Source R15 | Diagnostic | Fix R16 |
+|---|---|---|
+| `senat_agenda` | `/agenda/` → HTTP 403 "Accès restreint" (WAF Sénat bloque UA Chrome); `/agenda/Global/aglDDMMYYYYPrint.html` → HTTP 404. Pas de JSON/iCal public identifié. | **Désactivé** (`enabled: false`) + doc explicite. Compensation : nouvelle source `senat_theme_sport_rss` (flux RSS thème "Sports" N=31 : `/themes/rss/therss31.xml`, ~15 entrées, textes législatifs + rapports + avis) → classée en `dossiers_legislatifs`. |
+| `elysee_sitemap` | `/sitemap.static.xml` → 200 OK mais 10 URLs de nav seulement (home, agenda, recherche…). `sitemap.publication.xml` → 15184 URLs mais `<lastmod>` tous identiques (`2026-03-18`, artefact de régénération), aucun filtre temporel possible. | **Remplacé** par `elysee_feed` (`/feed`, RSS 2.0 34 Ko, vrai `<pubDate>`). `elysee.fetch_source` délègue maintenant à `_from_rss_generic` (feedparser) pour ce format, cohérence avec CE/CC/Cassation. |
+| `elysee_agenda` | Page 200 OK, 296 Ko, grille rendue serveur via `<li class="newsBlock-grid-item">` + `<a class="newsBlock-grid-link">` (date FR en texte + titre dans `<span>`). Sélecteurs html_generic ne matchaient pas. | **Nouveau handler** `elysee.fetch_source::_from_agenda_html` (format `elysee_agenda_html`) : parse les `a.newsBlock-grid-link`, date via `_DATE_FR_PAT` ("17 avril 2026") ou fallback URL `/YYYY/MM/DD/`. Testé live : 8 items agenda présidentiel extraits correctement. |
+| `min_esr_agenda` | Flux upstream toujours arrêté (last event 22 octobre 2025). | **Inchangé** — laissé `enabled: true` avec doc claire, détection automatique de la reprise. |
+| `min_justice` | Ancien URL `/presse` → 301 → `/espace-presse`. Site **plus en maintenance** (levé entre R15 et R16). Listing DSFR standard à 160 Ko, liens `/actualites/espace-presse/...` + communiqués PDF. | **URL canonique** `/espace-presse` (évite le redirect 301, cause probable des `0 items` intermittents en R15). |
+| `min_affaires_etrangeres` | Ancien URL `/fr/presse-et-ressources/decouvrir-et-informer/actualites/` → 301 → `/fr/presse/decouvrir-et-s-informer/actualites`. 241 Ko, 12 cartes `a.fr-card__link` DSFR (95 pages de listing = ~1140 items historiques). | **URL canonique** directe `/fr/presse/decouvrir-et-s-informer/actualites` pour éviter toute chaîne de redirect susceptible de basculer en `http://` côté serveur. |
+
+Également corrigé en R16 : `SyntaxWarning` sur `src/site_export.py:839` (`\s` non échappé dans une docstring) → remplacé par `\\s`.
+
+**Nombre attendu en production R16 :** 6 sources à 0 items R15 → 3 ré-activées (elysee_agenda, min_justice, min_affaires_etrangeres) + 1 remplacée (elysee_feed au lieu d'elysee_sitemap) + 1 compensée (senat_theme_sport_rss pour senat_agenda) + 1 laissée en détection (min_esr_agenda).
 
 **122 tests verts** — 91 baseline + 10 R13-E + 15 R13-G + 5 R13-H (agenda Réunion PO) + 1 R13-J (date dupliquée questions).
 
@@ -203,18 +234,43 @@ Chambres visibles : AN, Sénat (violet), MinSports (doré), MinARMEES, CPSF, CE,
 
 ## 5. TODO
 
+### 5.0 À faire MAINTENANT (push R15 + R16)
+
+**34 commits locaux sont en attente de push.** Tant que le push n'est pas fait, le site en ligne `https://veille.sideline-conseil.fr` tourne sur une version antérieure à R13-O et le run schedule de 06:00 UTC n'a pas les fixes R15 + R16. Procédure :
+
+```
+cd "~/Documents/Claude/Projects/Veille Parlementaire/veille-parlementaire-sport"
+rm -f .git/index.lock
+git add config/sources.yml src/sources/elysee.py src/site_export.py HANDOFF.md
+git commit -m "R16 — fix 6 sources 0 items : elysee RSS + agenda dedie + MEAE/Justice canoniques + senat_agenda disabled"
+git push origin main
+```
+
+Déclenchement manuel du workflow (déploie immédiatement sans attendre 06:00 UTC) :
+
+```
+export GH_TOKEN=$(cat data/cache/.ghtoken)
+~/bin/gh workflow run daily.yml --ref main -f since_days=1
+```
+
+Vérifier le run :
+
+```
+~/bin/gh run list --workflow daily.yml --limit 3
+```
+
 ### 5.1 À faire (priorité haute)
 
 1. **Actes_timeline vide pour certains dosleg** — le dossier laïcité 2025-07-09 signalé par Cyril comme retiré le 9 juillet 2025 a `raw.actes_timeline = []` en DB, donc `_fix_dossier_row` ne peut pas détecter le retrait même avec le flag `raw.is_retire` en place côté parser. Cause probable : structure JSON différente pour les dossiers pré-XVIIe ou dossiers retirés tôt. À investiguer sur le JSON source.
 2. **Patch 12 — CR → ancre texte précise** — le text-fragment `#:~:text=<kw>` via URL fonctionne sur Chrome/Edge/Safari mais pas Firefox. Explorer en R14 : (a) scraper les paragraphes `<paragraphe id="X">` du XML Syceron à l'ingestion pour stocker une ancre absolue ; (b) proxy Hugo qui injecte l'ancre côté notre domaine. Préférence (a) si XSD stable.
 3. **Dédup sémantique dosleg via `texteLegislatifRef`** — exposer ce champ dans le parser AN (`_normalize_dosleg.raw["texte_ref"]`) et le Sénat équivalent (`akn_discussion.xml`). Permettra de dédupliquer le doublon JO 2030 sans fausses fusions.
-4. **min_sports_agenda scraper dédié** — la page `/agenda-previsionnel-de-marina-ferrari-1787` est un bulletin hebdo (1 page, pas un listing). Source désactivée en R13-N. Scraper à écrire : 1 item par fetch = la semaine courante (titre H1 + date extraite du H2).
+4. ~~**min_sports_agenda scraper dédié**~~ — **Résolu R15**. Scraper dédié livré dans `src/sources/min_sports.py` (format `min_sports_agenda_hebdo`), URL stable `sports.gouv.fr/`, 1 item = 1 créneau.
 
 ### 5.2 À faire (priorité moyenne)
 
 - **Procédure législative** — maîtriser dépôt → commission → séance → adoption → CC → promulgation avant de patcher `_map_code_acte` et le `status_label`. Débloquerait le patch "JO 2030 affiché Conseil Constit côté AN alors que promulgué".
 - **Cache AMO évolutif** — fusionner le dump historique `/17/` avec `AMO10_deputes_actifs_mandats_actifs_organes_divises_XVII.json.zip` (organes actifs, mis à jour en quasi temps-réel) pour résoudre les POxxx / PAxxx ultra-récents absents du dump historique. Le fixup actuel (fallback date de séance) couvre le pire cas mais moins informatif qu'une résolution native.
-- **Agenda commissions Sénat** — `senat_agenda` pointe sur www.senat.fr/agenda/ via html_generic, à surveiller au prochain cycle. Si 0 items utilisables : connecteur spécifique ou Akoma Ntoso.
+- **Agenda Sénat** — ~~`senat_agenda` pointe sur www.senat.fr/agenda/ via html_generic~~ **R16** : désactivé (`enabled: false`). `/agenda/` → 403 WAF, `/agenda/Global/aglDDMMYYYYPrint.html` → 404. Réactivation nécessiterait soit contournement WAF (Playwright stealth), soit accord DSI Sénat. Compensation partielle via `senat_theme_sport_rss` (ne remonte pas l'agenda mais les travaux parlementaires tagués Sport). À surveiller tous les 1-2 mois pour détecter un éventuel retour du endpoint.
 - **Liste `EXPECTED_ZERO_HIT_SOURCES`** — blanchir les sources qui ne publient pas tous les jours (weekend Sénat, ministères en pause estivale) pour que le récap WARNING de `run_all` reste signalant.
 - **Logos AN/Sénat officiels** — Cyril a fourni les PNG officiels, mais le sandbox ne peut pas lire les fichiers attachés aux messages. Les SVG actuels sont stylisés maison (façade tricolore AN, arcs dôme Sénat). Si besoin de remplacement fidèle, déposer directement dans `site/static/logos/an.svg` et `/senat.svg`.
 
@@ -265,6 +321,13 @@ Chambres visibles : AN, Sénat (violet), MinSports (doré), MinARMEES, CPSF, CE,
 - **`STRICT_DATED_CATEGORIES = {"communiques", "dossiers_legislatifs"}`** — pas de fallback `inserted_at`. Élimine les rapports Sénat CSV sans date, pages pivot html_generic, agendas hebdo datés en fin de semaine à venir. Pour les dosleg : `senat_promulguees` (11 items matchés sport) sont filtrés car `published_at = None`.
 - **ANS timeouts intermittents** — `_common.fetch` absorbe les `ConnectTimeout` via soft-fail.
 - **`MinARMEES` et autres ministères via fallback `www.`** (R13-G patch 17) — `html_generic._chamber` strip "www." et mappe les domaines connus (defense → MinARMEES, justice → MinJUSTICE, etc.). Sinon `Www` apparaissait comme chambre.
+
+### 6.5b Sources gouv.fr — pièges réseau (R16)
+
+- **Redirects 301 qui changent de scheme** — Certains sites `.gouv.fr` renvoient un 301 vers un path sans trailing slash qui transite par `http://` avant de remonter en `https://`. `httpx follow_redirects=True` gère mais pas toujours proprement (ça a produit des `0 items` intermittents en R15 sur MEAE + Justice). **Règle** : dès qu'un `curl -I -L` montre un redirect 301 gouv.fr, remplacer l'URL dans `sources.yml` par la destination canonique directe. Observé sur `diplomatie.gouv.fr`, `justice.gouv.fr` en R16.
+- **Sitemap Élysée `<lastmod>` factice** — Les 6 sitemaps elysee.fr (static + publication + sp + dossier + space + president) ont tous leurs `<lastmod>` identiques (`2026-03-18T02:00:09+00:00`, jour de la refonte du site). Impossible de filtrer par récence via le mécanisme sitemap. Utiliser `/feed` (RSS 2.0 officiel) à la place. Découvert R16.
+- **Sénat WAF agenda** — `www.senat.fr/agenda/` renvoie 403 "Accès restreint" pour tout UA scraping, y compris UA Chrome complet. Les sub-paths `/Global/agl{DDMMYYYY}Print.html` renvoient 404 ("Page introuvable"). Pas de JSON/iCal agenda public. Source désactivée en R16.
+- **TYPO3/Drupal refontes silencieuses** — Les ministères refactorent leur CMS sans annonce ni redirect garanti (Justice en maintenance puis levée, MEAE 301 vers nouvelle arbo). Routine : `scripts/audit_sources.py` en hebdo pour détecter les passages à 0 items / 404.
 
 ### 6.6 Politique fetch HTTP (R11e)
 
@@ -330,6 +393,8 @@ Le sandbox peut déclencher et suivre les workflows sans intervention manuelle :
 
 | Tag | Description | Commit |
 |---|---|---|
+| R16 | Correction des 6 sources à 0 items identifiées par R15. `senat_agenda` désactivé (403 WAF + 404 sub-paths), compensé par `senat_theme_sport_rss` (flux RSS thème 31). `elysee_sitemap` (10 URLs nav seulement) remplacé par `elysee_feed` (RSS `/feed`). `elysee_agenda` : handler dédié `_from_agenda_html` qui connaît `a.newsBlock-grid-link` + date FR texte. `min_justice` : URL canonique `/espace-presse` (plus de maintenance). `min_affaires_etrangeres` : URL canonique directe pour éviter le 301. Fix SyntaxWarning `site_export.py:839` (`\\s` au lieu de `\s` dans docstring). | (pending push) |
+| R15 | Agendas ministériels : `min_educ_agenda` (dataset OpenDataSoft `fr-en-agenda-ministre-education-nationale` via `data.education.gouv.fr`, contournement du Cloudflare `education.gouv.fr`), `min_esr_agenda` (`fr-esr-agenda-ministre`, flux arrêté upstream). Scraper dédié `min_sports.py::min_sports_agenda_hebdo` (URL stable `sports.gouv.fr/`, parse bulletin hebdo `<h5>`/`<p>`). Handler `data_gouv_agenda` dans `data_gouv.py` (schéma OpenDataSoft `{uid, dtstart, dtend, description}`). `store.upsert_many` : `ON CONFLICT (hash_key) DO UPDATE` (re-ingestion sans reset_db). Menu reclassé. | `7950d1f` |
 | R13-O-logos | SVG reconstruits plus fidèles aux logos officiels AN + Sénat (Cyril a fourni les PNG en image, sandbox ne pouvait pas lire les fichiers joints). AN : façade Palais Bourbon tricolore + texte bleu. Sénat : arcs dôme + bandes tricolores + texte serif noir. | `62528a1` |
 | R13-O | Amendements : auteur retiré du titre (affiché avant via `.auteur-inline` cliquable comme pour questions) dans parsers AN + Sénat + fixup legacy. Fix `data-sort` vide qui empêchait le chip "Adopté" de passer en vert : passage de `{{ with .Params.sort_label }}` à `{{ if }}` pour ne pas altérer le contexte `.` d'accès à `sort_slug`. | `ca892bf` |
 | R13-N | Parser dosleg AN : nouveau flag `raw.is_retire` détecté par scan des codeActe / libelleActe pour patterns `RETRAIT` / `CADUCITE` / `RENVOI` / "retirée". Se propage dans raw → `_fix_dossier_row` pose `status_label="Retiré"` → CSS `.status-retire` (fond rouge foncé). Limitation : certains dosleg pré-2026 ingèrent `actes_timeline = []`, la détection ne peut rien faire (cas laïcité 2025-07-09). min_sports_agenda désactivé (source non exploitable, bulletin hebdo unique). | `e26ca0d` |
