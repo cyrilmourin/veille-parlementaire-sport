@@ -552,17 +552,15 @@ autorites:
     # R15 (2026-04-22) : l'actualité Alpes 2030 officielle est hébergée
     # sur olympics.com/cio/jeux-olympiques/alpes-francaises-2030 (CIO),
     # mais le domaine est protégé par Akamai Bot Manager (403 sur toute
-    # requête HTTP directe, y compris avec Sec-Fetch-* complets). On
-    # contourne via Google News RSS qui agrège les mentions « Alpes
-    # 2030 » / « Alpes françaises 2030 » depuis la presse FR (L'Équipe,
-    # Le Dauphiné Libéré, Ouest-France, Presse Agence, Sport Business
-    # Club…). 100 items récents au test initial, renouvelé quotidien.
-    # Limites : médias tiers (pas de communiqué CIO direct), risque
-    # faible de bruit avec « Alpes 2030 » générique car le sigle est
-    # très identifié aux JO d'hiver.
+    # requête HTTP directe). R17 (2026-04-22) : désactivé sur demande
+    # Cyril — pas de source Google News / presse tierce dans la veille
+    # institutionnelle. Le périmètre reste « officiel » (Parlement / Gouv /
+    # JORF / AAI). On retentera olympics.com plus tard (navigateur headless
+    # ou partenariat CIO) si besoin d'un canal Alpes 2030 dédié.
     - id: alpes_2030_news
       category: communiques
       url: https://news.google.com/rss/search?q=%22Alpes+2030%22+OR+%22Alpes+fran%C3%A7aises+2030%22&hl=fr&gl=FR&ceid=FR:fr
       format: rss
       chamber: Alpes2030
       poids: 2
+      enabled: false

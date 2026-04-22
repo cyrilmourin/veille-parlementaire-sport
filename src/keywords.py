@@ -103,15 +103,25 @@ class KeywordMatcher:
                 out.append(canonical)
         return out
 
-    def build_snippet(self, original_text: str, window: int = 80,
+    def build_snippet(self, original_text: str, window: int | None = None,
                       max_len: int = 800) -> str:
         """Extrait une phrase contenant le 1er mot-clé trouvé.
 
-        On repart d'une fenêtre brute ~`window` chars de part et d'autre
-        du match, puis on étend aux bornes de phrase les plus proches
-        (`. `, `! `, `? `, `\\n`) pour produire un extrait lisible plutôt
-        qu'une troncation arbitraire. Cap à `max_len` pour éviter les
-        paragraphes entiers.
+        On vise un extrait de longueur ~`max_len` centré sur le match,
+        en raffinant aux bornes de phrase (`. `, `! `, `? `, `\\n`) quand
+        elles existent. `window` (si fourni) fixe la fenêtre brute
+        initiale de part et d'autre du match avant raffinage ; par défaut
+        on prend `max_len // 2` pour que les textes peu/pas ponctués
+        (CR AN, dumps plats) livrent tout de même un extrait proche de
+        `max_len`. Cap final à `max_len`.
+
+        R17 (2026-04-22) — fix extraits CR trop courts. Avant : `window`
+        fixe à 80 chars ; pour les comptes rendus qui contiennent peu
+        de points/!/?, le raffinage aux bornes de phrase ne trouvait
+        rien à étendre → l'extrait restait à ~160 chars même avec
+        `max_len=500`. Désormais la fenêtre brute suit `max_len`, donc
+        un appel `max_len=500` livre réellement ~500 chars quand la
+        matière est là.
 
         R14 : défaut remonté de 320 → 800 pour laisser de la marge aux
         appelants qui veulent des extraits longs (ex. `comptes_rendus`
@@ -128,29 +138,48 @@ class KeywordMatcher:
         original_text = _clean_html(original_text)
         if not original_text:
             return ""
+        # Fenêtre brute = max_len/2 par défaut. On garde ce calcul même quand
+        # `window` est passé explicitement (pour les tests / appels legacy) :
+        # dans ce cas on prend le max des deux pour ne pas régresser les
+        # extraits courts.
+        effective_window = max(window or 0, max_len // 2)
         haystack_norm = _normalize(original_text)
         m = self._pattern.search(haystack_norm)
         if not m:
-            return original_text.strip()[: 2 * window].strip()
+            return original_text.strip()[: max_len].strip()
         pos = m.start()
         end = m.end()
         # Fenêtre initiale large
-        start_cut = max(0, pos - window)
-        end_cut = min(len(original_text), end + window)
+        start_cut = max(0, pos - effective_window)
+        end_cut = min(len(original_text), end + effective_window)
 
-        # Étend start_cut en arrière jusqu'à la dernière borne de phrase
-        # (on ne dépasse pas pos - max_len/2 pour garder le contexte proche).
-        back_limit = max(0, pos - max_len // 2)
+        # Raffinage : si on trouve une borne de phrase dans la fenêtre,
+        # on la préfère (évite de couper en plein milieu d'un mot). On
+        # garde la PREMIÈRE borne (la plus éloignée en arrière) qui laisse
+        # au moins 60% de la fenêtre — les suivantes seraient trop proches
+        # du match et donneraient un extrait court sur des textes peu
+        # ponctués (CR AN avec « M. Dupond »).
+        back_limit = max(0, pos - effective_window)
+        min_back_span = int(effective_window * 0.6)
         for boundary in re.finditer(r"[\.\!\?\n]\s+", original_text[back_limit:pos]):
-            # On garde la dernière occurrence avant pos → on met à jour à chaque itération
-            start_cut = back_limit + boundary.end()
+            candidate_start = back_limit + boundary.end()
+            if pos - candidate_start >= min_back_span:
+                start_cut = candidate_start
+                break  # première borne "lointaine" suffit
 
-        # Étend end_cut en avant jusqu'à la prochaine borne de phrase
-        # (cap à end + max_len/2 pour éviter d'engloutir tout le texte).
-        fwd_limit = min(len(original_text), end + max_len // 2)
+        fwd_limit = min(len(original_text), end + effective_window)
         fwd_match = re.search(r"[\.\!\?](?:\s|$)", original_text[end:fwd_limit])
         if fwd_match:
-            end_cut = end + fwd_match.end()
+            # R17 (2026-04-22) : n'accepte la borne de phrase que si elle
+            # tombe après une proportion suffisante de max_len. Sinon on
+            # a affaire à une fausse coupure type « M. Dupond » (abréviation)
+            # qui flingue les CR AN. Seuil : au moins 60% de max_len
+            # atteint — en dessous, on préfère la fenêtre brute.
+            candidate_end = end + fwd_match.end()
+            approx_len = candidate_end - start_cut
+            if approx_len >= int(max_len * 0.6):
+                end_cut = candidate_end
+            # sinon on reste sur end_cut = end + effective_window
 
         snippet = original_text[start_cut:end_cut].strip()
         # Cap final (au cas où une phrase gigantesque)

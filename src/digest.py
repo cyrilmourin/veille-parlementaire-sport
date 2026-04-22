@@ -13,16 +13,22 @@ from typing import Iterable
 from jinja2 import Template
 
 CATEGORY_LABELS = {
+    # R17 (2026-04-22) : l'ordre de ce dict est la source de vérité pour
+    # l'affichage accueil (`CATEGORY_ORDER`). Il doit rester aligné sur
+    # le menu de navigation (`site/layouts/partials/header.html`) sur
+    # demande Cyril — cohérence UX entre la home et les pages dédiées.
+    # Ordre menu : Dossiers / Amendements / Questions / CR / Agenda /
+    # JORF / Nominations / Publications.
     "dossiers_legislatifs": "Dossiers législatifs",
+    "amendements": "Amendements",
+    "questions": "Questions",
+    "comptes_rendus": "Comptes rendus",
+    "agenda": "Agenda",
     # R13-G (2026-04-21) : "Journal Officiel" — plus lisible que le sigle JORF
     # dans les sommaires pliables du site. Les items gardent category="jorf"
     # côté DB, c'est uniquement un libellé d'affichage.
     "jorf": "Journal Officiel",
-    "amendements": "Amendements",
-    "questions": "Questions",
-    "comptes_rendus": "Comptes rendus",
     "nominations": "Nominations",
-    "agenda": "Agenda",
     "communiques": "Publications",
 }
 

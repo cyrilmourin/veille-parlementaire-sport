@@ -688,6 +688,11 @@ a:hover { text-decoration: underline; }
   gap: 10px;
   padding: 8px 0;
   border-bottom: 1px dashed var(--line);
+  /* R17 (2026-04-22) : centre verticalement la pastille date (courte) par
+     rapport au corps titre + cartouche (multi-lignes). Avant, la date
+     collait en haut du <li>, mauvaise lisibilité quand le titre fait 3+
+     lignes. align-items:center est appliqué à chaque cellule de la grille. */
+  align-items: center;
 }
 .side-item:last-child { border-bottom: 0; }
 .side-date time {

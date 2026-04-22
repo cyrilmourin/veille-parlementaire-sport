@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R13-O"
+SYSTEM_VERSION_LABEL = "R17"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -899,26 +899,53 @@ def _dedup(rows: list[dict]) -> list[dict]:
             "site_export : %d doublons (title+url) écartés", dropped,
         )
 
-    # Passe 2 — dédup dossiers législatifs par URL UNIQUEMENT.
-    # R13-L fix : la clé sémantique bag-of-words était trop agressive
-    # et collapsait des dossiers différents sur la même clé. On conserve
-    # seulement le dédup par URL (Sénat prioritaire en cas d'égalité).
-    # Le cas "JO 2030 en double (AN title + Sénat title)" est traité par
-    # le dédup implicite lors du matching AN vs Sénat via leurs URLs
-    # distinctes — on accepte temporairement que JO 2030 apparaisse 2x
-    # plutôt que de perdre 7/8 items comme observé.
+    # Passe 2 — dédup dossiers législatifs.
+    # R17 (2026-04-22) — refonte : Cyril observait 4 occurrences d'un même
+    # dossier (JO 2030) dans le top : 1 AN, 2 variantes Sénat, 1 loi
+    # promulguée. Diagnostic :
+    #   - les 2 variantes Sénat partagent la MÊME URL `pjl24-630.html` mais
+    #     avec scheme différent (http:// vs https://) → dédup URL lowercase
+    #     les laissait passer.
+    #   - AN et Sénat du même projet ont 2 URLs distinctes (chambres
+    #     différentes) → dédup URL ne peut pas les fusionner.
+    #
+    # Stratégie :
+    #   a. Dédup URL normalisée : strip scheme + host + trailing slash →
+    #      fusionne les 2 Sénat (pjl24-630.html).
+    #   b. Dédup sémantique (clé bag-of-words sur titre) AVEC SEUIL STRICT :
+    #      ≥ 4 mots significatifs ET clé ≥ 25 chars, pour éviter la casse
+    #      R13-L où des dossiers courts collapsaient (« esport responsable »,
+    #      « sport santé » avaient trop peu de mots signifiants → mêmes clés
+    #      presque vides). En dessous du seuil, on NE dédupe pas.
+    #   Tiebreak : date publication desc ; à égalité, chambre Sénat
+    #   prioritaire (chaînage navette plus visible côté Sénat).
+    import re as _re
     def _date_of(r: dict) -> str:
         return (r.get("published_at") or "")[:10]
 
     def _is_senat(r: dict) -> bool:
         return (r.get("chamber") or "").lower() in ("senat", "sénat")
 
+    def _url_canon(u: str) -> str:
+        """Canonicalise une URL pour dédup : strip scheme, lowercase host,
+        enlève trailing slash et fragments. Rien de plus (pas de normalisation
+        de query — qui distingue parfois des dossiers distincts)."""
+        if not u:
+            return ""
+        s = u.strip().lower()
+        s = _re.sub(r"^https?://", "", s)
+        s = s.split("#", 1)[0]
+        if s.endswith("/"):
+            s = s[:-1]
+        return s
+
     dosleg = [r for r in out if (r.get("category") or "") == "dossiers_legislatifs"]
     other = [r for r in out if (r.get("category") or "") != "dossiers_legislatifs"]
 
+    # 2a) dédup URL canonicalisée
     by_url: dict[str, dict] = {}
     for r in dosleg:
-        u = (r.get("url") or "").strip().lower()
+        u = _url_canon(r.get("url") or "")
         if not u:
             u = f"__nourl__{r.get('uid','')}"
         prev = by_url.get(u)
@@ -929,14 +956,39 @@ def _dedup(rows: list[dict]) -> list[dict]:
             by_url[u] = r
         elif _date_of(r) == _date_of(prev) and _is_senat(r) and not _is_senat(prev):
             by_url[u] = r
+    step1 = list(by_url.values())
+    dropped_url = len(dosleg) - len(step1)
 
-    dedup_dosleg = list(by_url.values())
-    dropped_dosleg = len(dosleg) - len(dedup_dosleg)
-    if dropped_dosleg:
+    # 2b) dédup sémantique strict (cross-chambre AN/Sénat même dossier)
+    def _sig_count(key: str) -> int:
+        return len(key.split()) if key else 0
+
+    by_sem: dict[str, dict] = {}
+    kept_no_key: list[dict] = []
+    for r in step1:
+        key = _dosleg_subject_key(r.get("title") or "")
+        # Seuil : ≥ 4 mots significatifs ET clé d'au moins 25 chars.
+        # En dessous, on ne prend pas le risque d'un faux positif —
+        # l'item sort du dédup sémantique et passe tel quel.
+        if _sig_count(key) < 4 or len(key) < 25:
+            kept_no_key.append(r)
+            continue
+        prev = by_sem.get(key)
+        if prev is None:
+            by_sem[key] = r
+            continue
+        if _date_of(r) > _date_of(prev):
+            by_sem[key] = r
+        elif _date_of(r) == _date_of(prev) and _is_senat(r) and not _is_senat(prev):
+            by_sem[key] = r
+    dedup_dosleg = list(by_sem.values()) + kept_no_key
+    dropped_sem = len(step1) - len(dedup_dosleg)
+
+    if dropped_url or dropped_sem:
         import logging
         logging.getLogger(__name__).info(
-            "site_export : %d doublons dossiers_legislatifs (URL) écartés",
-            dropped_dosleg,
+            "site_export : %d dosleg dédupés (URL canon) + %d (sémantique)",
+            dropped_url, dropped_sem,
         )
     return _sort_by_date_desc(dedup_dosleg + other)
 
@@ -1089,6 +1141,24 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
         upcoming = _sort_by_date_desc(agenda_rows)[:8]
     else:
         upcoming = upcoming[:8]
+    # R17 (2026-04-22) : le cartouche chamber (badge "MINSPORTS") est affiché
+    # à côté du titre dans la sidebar — pas besoin de répéter « MinSports — »
+    # en tête du titre. Idem pour toute autre chambre qui se retrouverait
+    # préfixée dans le title (Elysee, Senat, AN, etc.). On strippe un
+    # préfixe exact « <Chamber> — » / « <Chamber> - » au début du titre.
+    def _strip_chamber_prefix_tit(r: dict) -> dict:
+        title = (r.get("title") or "").strip()
+        chamber = (r.get("chamber") or "").strip()
+        if not title or not chamber:
+            return r
+        for sep in (" — ", " – ", " - "):
+            pref = f"{chamber}{sep}"
+            if title.lower().startswith(pref.lower()):
+                r = dict(r)
+                r["title"] = title[len(pref):].lstrip()
+                break
+        return r
+    upcoming = [_strip_chamber_prefix_tit(r) for r in upcoming]
     (data / "sidebar_agenda.json").write_text(
         json.dumps(upcoming, ensure_ascii=False, indent=2, default=str),
         encoding="utf-8",
@@ -1147,10 +1217,22 @@ def _recent(rows: list[dict], hours: int = 24) -> list[dict]:
     """Items publiés (officiellement) dans les dernières `hours` heures.
     On utilise strictement `published_at` ici — pas `inserted_at` —
     pour que la zone 'dernières 24h' reflète la publication institutionnelle
-    réelle, pas la date à laquelle le scraper a inséré en base."""
+    réelle, pas la date à laquelle le scraper a inséré en base.
+
+    R17 (2026-04-22) — demande Cyril : la zone « Dernières 24h » sur
+    la page d'accueil doit rester focalisée sur l'actualité législative
+    utile. On exclut donc :
+      - `agenda`   : les rendez-vous à venir sont déjà listés dans la
+                      sidebar « Agenda » ; pas de redondance sur la home.
+      - `communiques` (Publications) : volume élevé, bruite le haut de
+                      page qui doit tenir en coup d'œil.
+    """
     cutoff = datetime.utcnow() - timedelta(hours=hours)
+    excluded_cats = {"agenda", "communiques"}
     out = []
     for r in rows:
+        if (r.get("category") or "") in excluded_cats:
+            continue
         dt = _parse_dt(r.get("published_at"))
         if dt and dt >= cutoff:
             out.append(r)
