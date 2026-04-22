@@ -584,6 +584,29 @@ a:hover { text-decoration: underline; }
    ne pas casser les anciens builds. */
 .side-meta { display: none; }
 
+/* R17 (2026-04-22) : module image-only "Sideline Conseil" dans la sidebar.
+   Hérite de .side-card pour la bordure + border-radius identiques au module
+   Recherche. On annule le padding et on ajoute overflow:hidden pour que
+   l'image épouse les angles arrondis. display:block pour que l'ancre prenne
+   toute la largeur du module. */
+.side-card--brand {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  line-height: 0;               /* supprime le gap inline-block sous l'img */
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.side-card--brand:hover,
+.side-card--brand:focus-visible {
+  box-shadow: 0 2px 8px rgba(18, 37, 73, 0.12);
+  transform: translateY(-1px);
+}
+.side-card--brand img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 /* Module recherche dans la sidebar.
    R13-G : plus de gradient (demande Cyril) — fond bleu Sideline uni,
    police crème pour cohérence avec le header. */

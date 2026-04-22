@@ -11,6 +11,17 @@
 */}}
 {{/* R13-J (2026-04-21) : le bloc méta a été déplacé dans header.html. */}}
 
+{{/*
+  R17 (2026-04-22) : module image-only "Sideline Conseil" — juste la bannière
+  cliquable vers sideline-conseil.fr. Hérite de .side-card (bordure + radius
+  identiques au module Recherche) + modifier .side-card--brand qui :
+    - supprime le padding pour que l'image touche les bords
+    - ajoute overflow:hidden pour que l'image soit clippée par le border-radius
+*/}}
+<a class="side-card side-card--brand" href="https://sideline-conseil.fr" target="_blank" rel="noopener" aria-label="Site Sideline Conseil (nouvel onglet)">
+  <img src="/sideline-banner.png" alt="Sideline Conseil" loading="lazy"/>
+</a>
+
 <div class="side-card side-card--search">
   <h3 class="side-title">Recherche</h3>
   <p class="side-caption">Tous les contenus de la veille (30 jours)</p>
