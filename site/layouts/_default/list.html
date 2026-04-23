@@ -14,7 +14,15 @@
              même taille de police. Fixup patch 9. Ouverture nouvel onglet.
              R13-L : barre verticale séparateur entre auteur et titre
              (demande Cyril). Visible uniquement si auteur présent. */}}
-        {{ if .Params.auteur_url }}<a class="auteur-inline" href="{{ .Params.auteur_url }}" target="_blank" rel="noopener noreferrer" title="Fiche {{ .Params.auteur }}">{{ .Params.auteur }}</a><span class="auteur-sep"> | </span>{{ else if .Params.auteur }}<span class="auteur-inline">{{ .Params.auteur }}</span><span class="auteur-sep"> | </span>{{ end }}
+        {{/* R23-B (2026-04-23) : sigle groupe parlementaire en inline après
+             l'auteur, tooltip `title=""` avec le libellé long quand fourni.
+             R23-C (2026-04-23) : photo portrait miniature (28x28) AVANT
+             l'auteur quand dispo. `onerror` masque l'image si 404 (acteur
+             inconnu ou photo absente). `loading="lazy"` + decoding="async"
+             évitent le blocage de rendu. `alt=""` pour ne pas doubler
+             l'info avec .auteur-inline (accessibilité lecteurs d'écran). */}}
+        {{ with .Params.auteur_photo_url }}<img class="auteur-photo" src="{{ . }}" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" width="28" height="28">{{ end }}
+        {{ if .Params.auteur_url }}<a class="auteur-inline" href="{{ .Params.auteur_url }}" target="_blank" rel="noopener noreferrer" title="Fiche {{ .Params.auteur }}">{{ .Params.auteur }}</a>{{ with .Params.auteur_groupe }} <span class="auteur-groupe"{{ with $.Params.auteur_groupe_long }} title="{{ . }}"{{ end }}>({{ . }})</span>{{ end }}<span class="auteur-sep"> | </span>{{ else if .Params.auteur }}<span class="auteur-inline">{{ .Params.auteur }}</span>{{ with .Params.auteur_groupe }} <span class="auteur-groupe"{{ with $.Params.auteur_groupe_long }} title="{{ . }}"{{ end }}>({{ . }})</span>{{ end }}<span class="auteur-sep"> | </span>{{ end }}
         {{ if .Params.source_url }}
         <a href="{{ .Params.source_url }}" class="title" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
         {{ else }}

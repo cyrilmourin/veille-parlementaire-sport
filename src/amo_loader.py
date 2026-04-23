@@ -221,6 +221,71 @@ def resolve_groupe(pa_uid: str) -> str:
     return rec.get("groupe", "") or ""
 
 
+def resolve_groupe_ref(pa_uid: str) -> str:
+    """Renvoie l'identifiant POxxx du groupe politique d'un acteur, ou "".
+
+    R23-B (2026-04-23) : le cache AMO stocke `groupe_ref` en plus de
+    l'abrégé (`groupe`). Ce ref permet ensuite d'appeler
+    `resolve_organe(po_uid, prefer_long=True)` pour récupérer le libellé
+    long (tooltip au hover côté templates).
+    """
+    if not pa_uid or not isinstance(pa_uid, str):
+        return ""
+    data = load_cache()
+    rec = data["acteurs"].get(pa_uid.strip())
+    if not rec:
+        return ""
+    return rec.get("groupe_ref", "") or ""
+
+
+def build_photo_url_an(pa_uid: str, *, legislature: int = 17) -> str:
+    """Construit l'URL de la photo portrait d'un député AN à partir d'un PAxxx.
+
+    R23-C (2026-04-23) — pattern déterministe observé sur
+    assemblee-nationale.fr :
+
+        https://www.assemblee-nationale.fr/tribun/{LEG}/photos/{digits}.jpg
+
+    où `{digits}` sont les chiffres du PAxxx (sans le préfixe "PA") et
+    `{LEG}` est la législature en cours (17 depuis juillet 2024). Testé
+    et validé sur des acteurs récents (ex: PA841947, PA793708 — HTTP 200).
+
+    Renvoie "" si `pa_uid` n'est pas un PAxxx valide — les templates
+    décideront de ne pas émettre la balise `<img>` dans ce cas.
+
+    Aucune requête HTTP effectuée : l'URL est juste construite. La
+    robustesse (image absente → 404) est gérée par le template via
+    `onerror` et par la politique du navigateur qui ne bloque pas la page.
+    """
+    if not pa_uid or not isinstance(pa_uid, str):
+        return ""
+    uid = pa_uid.strip()
+    if not uid.startswith("PA"):
+        return ""
+    digits = uid[2:]
+    if not digits.isdigit():
+        return ""
+    return (
+        f"https://www.assemblee-nationale.fr/tribun/"
+        f"{int(legislature)}/photos/{digits}.jpg"
+    )
+
+
+def resolve_groupe_long(pa_uid: str) -> str:
+    """Renvoie le libellé LONG du groupe politique d'un acteur, ou "".
+
+    R23-B (2026-04-23) : utilisé pour le tooltip `title=""` au hover.
+    Combine `groupe_ref` (PO du groupe) + `resolve_organe(prefer_long=True)`.
+    Renvoie "" si l'acteur est inconnu OU si le cache n'a pas le
+    `groupe_ref` (ex: acteurs ingérés avant R23-B — le cache peut être
+    régénéré via scripts/refresh_amo_cache.py).
+    """
+    ref = resolve_groupe_ref(pa_uid)
+    if not ref:
+        return ""
+    return resolve_organe(ref, prefer_long=True)
+
+
 def resolve_qualites(pa_uid: str, limit: int = 3) -> list[str]:
     """Renvoie les qualités notables (président, rapporteur…) d'un acteur."""
     if not pa_uid or not isinstance(pa_uid, str):

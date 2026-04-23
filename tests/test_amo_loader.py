@@ -77,6 +77,66 @@ def test_resolve_groupe(amo_cache):
     assert amo_loader.resolve_groupe("PA999") == ""
 
 
+# ---------- R23-B : groupe_ref + libellé long du groupe ---------------------
+
+def test_resolve_groupe_ref(amo_cache):
+    """PAxxx → POxxx du groupe, pour ensuite résoudre le libellé long."""
+    assert amo_loader.resolve_groupe_ref("PA720770") == "PO800538"
+    # PA123 n'a pas groupe_ref dans la fixture → vide.
+    assert amo_loader.resolve_groupe_ref("PA123") == ""
+    assert amo_loader.resolve_groupe_ref("") == ""
+    assert amo_loader.resolve_groupe_ref("NOT_A_PA") == ""
+
+
+def test_resolve_groupe_long(amo_cache):
+    """Combine resolve_groupe_ref + resolve_organe(prefer_long=True)."""
+    assert amo_loader.resolve_groupe_long("PA720770") == (
+        "La France insoumise - Nouveau Front populaire"
+    )
+    # Acteur sans groupe_ref → vide (pipeline tolérant).
+    assert amo_loader.resolve_groupe_long("PA123") == ""
+    # Acteur inconnu → vide.
+    assert amo_loader.resolve_groupe_long("PA000000") == ""
+
+
+# ---------- R23-C : URL photo portrait AN ---------------------------------
+
+def test_build_photo_url_an_pattern():
+    """Pattern déterministe /tribun/17/photos/<digits>.jpg."""
+    assert amo_loader.build_photo_url_an("PA841947") == (
+        "https://www.assemblee-nationale.fr/tribun/17/photos/841947.jpg"
+    )
+    assert amo_loader.build_photo_url_an("PA793708") == (
+        "https://www.assemblee-nationale.fr/tribun/17/photos/793708.jpg"
+    )
+
+
+def test_build_photo_url_an_custom_legislature():
+    """Législature paramétrable (au cas où on traite des items archivés)."""
+    url = amo_loader.build_photo_url_an("PA720770", legislature=16)
+    assert url == (
+        "https://www.assemblee-nationale.fr/tribun/16/photos/720770.jpg"
+    )
+
+
+def test_build_photo_url_an_empty_or_invalid():
+    """Entrées invalides → chaîne vide (pipeline tolérant)."""
+    assert amo_loader.build_photo_url_an("") == ""
+    assert amo_loader.build_photo_url_an(None) == ""  # type: ignore[arg-type]
+    # Préfixe incorrect.
+    assert amo_loader.build_photo_url_an("PO800538") == ""
+    # Mix lettres / chiffres.
+    assert amo_loader.build_photo_url_an("PA12AB") == ""
+    assert amo_loader.build_photo_url_an("PAxxxx") == ""
+
+
+def test_build_photo_url_an_accepts_whitespace():
+    """Le parser livre parfois des PAxxx avec espaces parasites."""
+    assert amo_loader.build_photo_url_an("  PA123  ") == (
+        "https://www.assemblee-nationale.fr/tribun/17/photos/123.jpg"
+    )
+
+
 def test_resolve_qualites(amo_cache):
     qs = amo_loader.resolve_qualites("PA720770")
     assert qs == ["Rapporteure — Affaires culturelles"]

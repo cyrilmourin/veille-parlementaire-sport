@@ -608,11 +608,25 @@ def _normalize_amendement(obj, src, cat):
             auteur_groupe = amo_loader.resolve_groupe(auteur_ref) or ""
     if not auteur_label:
         auteur_label = f"Député {auteur_ref}" if auteur_ref else "Auteur inconnu"
-    # Résout aussi le groupe si on n'a qu'un POxxx
+    # R23-B (2026-04-23) : on mémorise le PO du groupe pour pouvoir
+    # ensuite récupérer le libellé LONG (tooltip au hover). Le parcours
+    # est double : soit signataires.auteur.groupePolitiqueRef est déjà
+    # un POxxx, soit on le résout via le cache AMO (champ groupe_ref
+    # du `acteurs`).
+    auteur_groupe_ref = (
+        auteur_groupe if auteur_groupe and auteur_groupe.startswith("PO")
+        else (amo_loader.resolve_groupe_ref(auteur_ref) if auteur_ref else "")
+    )
+    # Résout aussi le groupe si on n'a qu'un POxxx → libellé abrégé pour affichage.
     if auteur_groupe and auteur_groupe.startswith("PO"):
         groupe_lib = amo_loader.resolve_organe(auteur_groupe, prefer_long=False)
         if groupe_lib:
             auteur_groupe = groupe_lib
+    # R23-B : libellé long pour le tooltip. "" si cache incomplet.
+    auteur_groupe_long = (
+        amo_loader.resolve_organe(auteur_groupe_ref, prefer_long=True)
+        if auteur_groupe_ref else ""
+    )
 
     # Dispositif + exposé sommaire (matériel pertinent pour matching mots-clés).
     # Paths réels validés sur JSON unitaire AN : `corps.contenuAuteur.dispositif`
@@ -750,7 +764,17 @@ def _normalize_amendement(obj, src, cat):
              # frontmatter Hugo l'expose en .Params.auteur → rendu
              # cliquable via .auteur-inline devant le titre.
              "auteur": auteur_label,
-             "groupe": auteur_groupe, "dossier": dossier_titre,
+             "groupe": auteur_groupe,
+             # R23-B (2026-04-23) : libellé long pour tooltip hover
+             # (ex : sigle "LFI-NFP" + title="La France insoumise - …")
+             "groupe_long": auteur_groupe_long,
+             # R23-C (2026-04-23) : photo portrait du député. URL déterministe
+             # depuis PAxxx — pattern /tribun/17/photos/<digits>.jpg.
+             "auteur_photo_url": (
+                 amo_loader.build_photo_url_an(auteur_ref)
+                 if auteur_ref else ""
+             ),
+             "dossier": dossier_titre,
              "texte_ref": texte_ref,
              # R13-J : sort / etat séparés pour que site_export puisse
              # générer le chip coloré (sort > etat comme fallback).
@@ -1189,11 +1213,24 @@ def _normalize_question(obj, src, cat):
                 auteur_groupe = amo_loader.resolve_groupe(auteur_ref)
     if not auteur_label:
         auteur_label = f"Député {auteur_ref}" if auteur_ref else "Auteur"
+    # R23-B (2026-04-23) : on mémorise le PO du groupe AVANT d'écraser
+    # auteur_groupe avec son libellé abrégé. Double chemin possible :
+    # 1) `auteur.groupePolitiqueRef` contenait déjà un POxxx brut,
+    # 2) on résout le PO via le cache AMO (acteurs[*].groupe_ref).
+    auteur_groupe_ref = (
+        auteur_groupe if auteur_groupe and auteur_groupe.startswith("PO")
+        else (amo_loader.resolve_groupe_ref(auteur_ref) if auteur_ref else "")
+    )
     # Résout le groupe si c'est un POxxx (groupePolitiqueRef brut)
     if auteur_groupe and auteur_groupe.startswith("PO"):
         groupe_lib = amo_loader.resolve_organe(auteur_groupe, prefer_long=False)
         if groupe_lib:
             auteur_groupe = groupe_lib
+    # R23-B : libellé long pour tooltip hover côté template.
+    auteur_groupe_long = (
+        amo_loader.resolve_organe(auteur_groupe_ref, prefer_long=True)
+        if auteur_groupe_ref else ""
+    )
 
     # Ministère : XSD → `minInt` (TexteAbregeable_type, abrege+developpe).
     ministere = _text_of(_first(root,
@@ -1261,7 +1298,15 @@ def _normalize_question(obj, src, cat):
         published_at=date_pub,
         summary=summary,
         raw={"auteur_ref": auteur_ref, "auteur": auteur_label,
-             "groupe": auteur_groupe, "ministere": ministere,
+             "groupe": auteur_groupe,
+             # R23-B (2026-04-23) : libellé long pour tooltip hover
+             "groupe_long": auteur_groupe_long,
+             # R23-C (2026-04-23) : photo portrait du député AN.
+             "auteur_photo_url": (
+                 amo_loader.build_photo_url_an(auteur_ref)
+                 if auteur_ref else ""
+             ),
+             "ministere": ministere,
              "auteur_url": auteur_url,
              # R13-G : stockés pour fixup in-memory côté site_export si on
              # modifie la règle de priorité (analyse > rubrique vs inverse).

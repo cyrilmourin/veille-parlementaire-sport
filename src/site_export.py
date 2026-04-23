@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R23a"
+SYSTEM_VERSION_LABEL = "R23c"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -1910,6 +1910,8 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         nb_actes_utiles = 0
         auteur_label = ""
         auteur_groupe = ""
+        auteur_groupe_long = ""
+        auteur_photo_url = ""
         auteur_url = ""
         if isinstance(raw, dict):
             status_label = (raw.get("status_label") or "").strip()
@@ -1932,6 +1934,13 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
             # pour rendre l'auteur cliquable vers la fiche député.
             auteur_label = (raw.get("auteur") or "").strip()
             auteur_groupe = (raw.get("groupe") or "").strip()
+            # R23-B (2026-04-23) : libellé long pour tooltip hover.
+            # Peuplé par parser AN (amendements + questions) ; vide sur
+            # les items Sénat ou items AN ingérés avant R23-B (fallback
+            # via amo_loader.resolve_groupe_long plus bas).
+            auteur_groupe_long = (raw.get("groupe_long") or "").strip()
+            # R23-C (2026-04-23) : URL portrait du député/sénateur.
+            auteur_photo_url = (raw.get("auteur_photo_url") or "").strip()
             auteur_url = (raw.get("auteur_url") or "").strip()
             # Ré-résolution à l'export : certains items (pre-patch AMO) ont
             # été ingérés avant que le cache PA→nom soit rempli et gardent
@@ -1954,6 +1963,21 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
                 grp_lib = amo_loader.resolve_organe(auteur_groupe, prefer_long=False)
                 if grp_lib:
                     auteur_groupe = grp_lib
+            # R23-B (2026-04-23) : backfill du libellé long pour les items
+            # AN ingérés avant le patch parser (raw.groupe_long inexistant).
+            # On passe par amo_loader.resolve_groupe_long(PA) qui utilise
+            # groupe_ref du cache AMO. Pas de réseau, pas de latence.
+            if not auteur_groupe_long and auteur_ref.startswith("PA"):
+                auteur_groupe_long = (
+                    amo_loader.resolve_groupe_long(auteur_ref) or ""
+                )
+            # R23-C (2026-04-23) : backfill de l'URL photo pour les items
+            # AN ingérés avant le patch parser. Pattern déterministe depuis
+            # PAxxx → /tribun/17/photos/<digits>.jpg. Pas de réseau.
+            if not auteur_photo_url and auteur_ref.startswith("PA"):
+                auteur_photo_url = (
+                    amo_loader.build_photo_url_an(auteur_ref) or ""
+                )
             # URL fiche député : reconstruit si manquant mais acteurRef connu.
             if not auteur_url and auteur_ref.startswith("PA") and auteur_ref[2:].isdigit():
                 auteur_url = f"https://www.assemblee-nationale.fr/dyn/deputes/{auteur_ref}"
@@ -2019,6 +2043,17 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
             fm.append(f'auteur: "{auteur_label.replace(chr(34), chr(39))}"')
         if auteur_groupe:
             fm.append(f'auteur_groupe: "{auteur_groupe.replace(chr(34), chr(39))}"')
+        # R23-B (2026-04-23) : exposé pour tooltip hover dans le template.
+        # On ne l'émet que s'il diffère du sigle, pour éviter du bruit HTML
+        # (ex : un item Sénat où groupe == groupe_long).
+        if auteur_groupe_long and auteur_groupe_long != auteur_groupe:
+            fm.append(
+                f'auteur_groupe_long: "{auteur_groupe_long.replace(chr(34), chr(39))}"'
+            )
+        # R23-C (2026-04-23) : exposé pour rendu portrait miniature dans
+        # le template list.html / single.html.
+        if auteur_photo_url:
+            fm.append(f'auteur_photo_url: "{auteur_photo_url}"')
         if auteur_url:
             fm.append(f'auteur_url: "{auteur_url}"')
         # R13-J (2026-04-21) — patch 16 : chip sort/état pour les amendements.

@@ -612,6 +612,36 @@ a:hover { text-decoration: underline; }
   font-style: italic;
   margin-left: 4px;
 }
+/* R23-B (2026-04-23) : curseur d'aide quand le tooltip libellé long
+   (title="…") est présent — indique visuellement qu'il y a plus d'info
+   au hover. Géré via l'attribut [title] pour ne pas s'afficher sur les
+   items Sénat / legacy sans libellé long. */
+.auteur-groupe[title] {
+  cursor: help;
+  border-bottom: 1px dotted var(--muted);
+}
+
+/* R23-C (2026-04-23) : miniature portrait parlementaire en début
+   d'item (listes) et en grande taille sur la fiche détail. Format carré
+   arrondi demandé par Cyril (border-radius 6px, pas round pour éviter
+   l'effet "pastille"). */
+.auteur-photo {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 6px;
+  background: var(--sl-grey-100, #eee);
+  /* Petit contour pour lisibilité sur fond clair */
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.auteur-photo-lg {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  margin-right: 10px;
+}
 
 /* ---------- Pagination inline (listings) ----------------------------- */
 .pagination-inline {
