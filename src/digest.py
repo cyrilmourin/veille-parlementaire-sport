@@ -46,6 +46,7 @@ EMAIL_TEMPLATE = Template(r"""<!DOCTYPE html>
       <div style="opacity:.8;margin-top:10px;font-size:13px;">{{ date_human }} — {{ total }} nouveauté{{ 's' if total > 1 else '' }}</div>
     </td></tr>
     <tr><td style="padding:24px 28px;">
+    {{ health_block|safe }}
     {% if total == 0 %}
       <p style="margin:0;color:#5c6577;">Aucun nouvel item sur les 24 dernières heures. Les sources ont bien été collectées ;
       la veille reste active sur <a href="{{ site_url }}" style="color:#DA4431;">{{ site_url }}</a>.</p>
@@ -92,7 +93,15 @@ EMAIL_TEMPLATE = Template(r"""<!DOCTYPE html>
 </body></html>""")
 
 
-def build_html(rows: list[dict], site_url: str) -> tuple[str, int]:
+def build_html(
+    rows: list[dict],
+    site_url: str,
+    health_block: str = "",
+) -> tuple[str, int]:
+    """Construit l'email HTML. `health_block` (R29) est du HTML pré-rendu
+    injecté en tête du contenu, vide par défaut pour ne pas polluer les
+    mails quotidiens où tout va bien. Produit par `monitoring.render_digest_block`.
+    """
     # UX-E : le schéma SQL n'a jamais persisté `snippet` (cf. store.SCHEMA),
     # donc r.get("snippet") est toujours vide en lecture DB. On rebuild à
     # la volée depuis summary, comme côté site_export. Idempotent.
@@ -164,6 +173,7 @@ def build_html(rows: list[dict], site_url: str) -> tuple[str, int]:
         categories=[(c, CATEGORY_LABELS[c]) for c in CATEGORY_ORDER],
         buckets=buckets,
         site_url=site_url,
+        health_block=health_block,
     )
     return html, sum(len(v) for v in buckets.values())
 

@@ -23,7 +23,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import digest, normalize, ping_state, site_export
+from . import digest, monitoring, normalize, ping_state, site_export
 from . import ping as ping_mod
 from .assemblee_organes import BYPASS_ORGANE_LABEL, is_sport_relevant_organe
 from .keywords import KeywordMatcher
@@ -38,6 +38,9 @@ SQLITE_PATH = ROOT / "data" / "veille.sqlite3"
 SITE_ROOT = ROOT / "site"
 DIGEST_OUT = ROOT / "data" / "last_digest.html"
 PING_STATE_PATH = ROOT / "data" / "ping_state.json"
+# R29 (2026-04-24) — état santé pipeline, versionné comme ping_state.json.
+# Comparé entre runs pour détecter ERR_PERSIST / FORMAT_DRIFT / FEED_STALE.
+PIPELINE_HEALTH_PATH = ROOT / "data" / "pipeline_health.json"
 
 DEFAULT_TO = os.environ.get("DIGEST_TO", "cyrilmourin@sideline-conseil.fr")
 DEFAULT_SITE_URL = os.environ.get("SITE_URL", "https://veille.sideline-conseil.fr")
@@ -143,6 +146,18 @@ def run(since_days: int = 1, send: bool = True, verbose: bool = False) -> int:
     # 1. Fetch toutes les sources
     items, fetch_stats = normalize.run_all(CONFIG_SOURCES)
 
+    # 1bis. R29 (2026-04-24) — santé pipeline : compare l'état J avec J-1
+    # et émet des alertes ciblées (ERR_PERSIST, FORMAT_DRIFT, FEED_STALE).
+    # On ne flag PAS les sources à 0 item — normal sur notre scope réduit.
+    # L'état est persisté dans data/pipeline_health.json (committé en fin
+    # de workflow GHA, cf. daily.yml step `git add data/...`).
+    previous_health = monitoring.load_state(PIPELINE_HEALTH_PATH)
+    new_health, health_alerts = monitoring.compute_state_and_alerts(
+        previous_health, fetch_stats, items,
+    )
+    monitoring.save_state(PIPELINE_HEALTH_PATH, new_health)
+    monitoring.log_alerts(health_alerts)
+
     # 2. Matching mots-clés
     matcher = KeywordMatcher(CONFIG_KEYWORDS)
     matcher.apply(items)
@@ -171,8 +186,12 @@ def run(since_days: int = 1, send: bool = True, verbose: bool = False) -> int:
     digest_rows = store.fetch_matched_since(since, only_matched=True)
     log.info("Digest : %d items matchés sur les %d derniers jours", len(digest_rows), since_days)
 
-    # 5. Email HTML
-    html, total = digest.build_html(digest_rows, DEFAULT_SITE_URL)
+    # 5. Email HTML — avec le bloc « Santé du pipeline » R29 en tête
+    # (rendu vide si health_alerts est vide : pas de spam quotidien).
+    health_block = monitoring.render_digest_block(health_alerts)
+    html, total = digest.build_html(
+        digest_rows, DEFAULT_SITE_URL, health_block=health_block,
+    )
     digest.save_html(html, DIGEST_OUT)
     log.info("Digest HTML écrit : %s (%d items)", DIGEST_OUT, total)
 
