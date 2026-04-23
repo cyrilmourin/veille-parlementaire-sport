@@ -3,9 +3,11 @@ name: Veille parlementaire sport — daily
 on:
   schedule:
     # R22f (2026-04-23) : 04:00 Europe/Paris (= 02:00 UTC en été, 03:00 en hiver).
+    # Digest email complet + rebuild/deploy Hugo.
     - cron: "0 2 * * *"
-    # R24 (2026-04-23) : ping 17h30 Paris lun-ven (= 15h30 UTC en été).
-    # Déclenche python -m src.main ping — email uniquement si nouveautés.
+    # R24 (2026-04-23) → R24b (2026-04-23) : 17h30 Paris lun-ven (= 15h30 UTC).
+    # Refetch + export + rebuild/deploy Hugo + ping (email court si nouveautés
+    # depuis le matin, dedupe via data/ping_state.json). Pas de digest complet.
     - cron: "30 15 * * 1-5"
   # R18 (2026-04-22) : auto-deploy à chaque push de code sur main pour que
   # les releases (R17, R18…) n'aient plus besoin d'un lancement manuel via
@@ -56,14 +58,13 @@ jobs:
   collect-and-publish:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # R24 (2026-04-23) : ne tourne PAS sur le cron 17h30 (qui est réservé
-    # au job ping-afternoon). Tourne sur :
-    # - le cron matin "0 2 * * *"
-    # - push sur main
-    # - workflow_dispatch manuel
-    # On filtre via github.event.schedule pour que seul le cron matin
-    # déclenche le pipeline complet.
-    if: github.event_name != 'schedule' || github.event.schedule == '0 2 * * *'
+    # R24b (2026-04-23) : tourne sur les DEUX crons (04h00 et 17h30) +
+    # push main + workflow_dispatch. Le cron matin envoie le digest email
+    # complet ; le cron 17h30 ne fait PAS de digest complet (--no-email)
+    # mais envoie le ping court après fetch (dedupe via ping_state.json).
+    # Le site Hugo est rebuild + redeploy dans les deux cas.
+    # Le job ping-afternoon dédié (R24) a été retiré : tout le setup
+    # Hugo/deploy-pages/cache AMO est mutualisé ici.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -137,7 +138,18 @@ jobs:
           SINCE="${{ github.event.inputs.since_days || '1' }}"
           NOEMAIL=""
           if [ "${{ github.event.inputs.no_email }}" = "1" ]; then NOEMAIL="--no-email"; fi
-          python -m src.main run --since "$SINCE" $NOEMAIL -v
+          # R24b (2026-04-23) : sur le cron 17h30, on fait un run SANS
+          # digest email complet (évite de doubler le mail du matin) puis
+          # un ping qui envoie un email court UNIQUEMENT si des nouveautés
+          # sont apparues depuis le matin (dedupe via data/ping_state.json).
+          # Le site Hugo est ensuite rebuild + redeploy (steps suivants).
+          if [ "${{ github.event.schedule }}" = "30 15 * * 1-5" ]; then
+            echo "=== Cron 17h30 : run --no-email (refetch + export) + ping (email court si nouveautés) ==="
+            python -m src.main run --since "$SINCE" --no-email -v
+            python -m src.main ping -v
+          else
+            python -m src.main run --since "$SINCE" $NOEMAIL -v
+          fi
 
       - name: Upload last digest as artifact
         uses: actions/upload-artifact@v4
@@ -227,55 +239,8 @@ jobs:
           git diff --cached --quiet || git commit -m "chore: snapshot digest $(date -u +%Y-%m-%dT%H:%MZ)"
           git push || true
 
-  # ── Job ping 17h30 ─────────────────────────────────────────────────────────
-  # R24 (2026-04-23) : s'exécute uniquement sur le cron 15h30 UTC (lun-ven).
-  # Lit la DB depuis le cache, compare avec ping_state.json du matin,
-  # envoie un email court si nouveautés dans les 4 catégories prioritaires.
-  ping-afternoon:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # Ne tourne que sur le cron 17h30, pas sur push ni workflow_dispatch
-    if: github.event_name == 'schedule' && github.event.schedule == '30 15 * * 1-5'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: pip install -e .
-
-      - name: Restore SQLite cache (read-only)
-        uses: actions/cache@v4
-        with:
-          path: data/veille.sqlite3
-          key: veille-sqlite-v3-never-match
-          restore-keys: |
-            veille-sqlite-v3-
-
-      - name: Run ping
-        env:
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          SMTP_FROM: ${{ secrets.SMTP_FROM }}
-          DIGEST_TO: ${{ secrets.DIGEST_TO }}
-          SITE_URL: "https://veille.sideline-conseil.fr"
-        run: python -m src.main ping -v
-
-      # Commit du ping_state.json si modifié (les nouveaux UIDs notifiés
-      # sont mergés dans pinged_uids). Sans ça, un redémarrage du job
-      # re-notifierait les mêmes items.
-      - name: Commit ping_state.json if changed
-        if: always()
-        run: |
-          git config user.name "veille-bot"
-          git config user.email "veille-bot@sideline-conseil.fr"
-          git add data/ping_state.json 2>/dev/null || true
-          git diff --cached --quiet || git commit -m "chore: ping_state $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push || true
+  # ── Job ping-afternoon retiré (R24b, 2026-04-23) ─────────────────────────
+  # L'ancien job read-only de 17h30 a été fusionné dans `collect-and-publish`
+  # ci-dessus : désormais le cron "30 15 * * 1-5" déclenche un refetch
+  # complet + ping court (dedupe ping_state.json) + rebuild Hugo + redeploy
+  # Pages. Le site est donc à jour matin ET soir.
