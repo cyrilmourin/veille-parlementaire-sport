@@ -2,8 +2,9 @@ name: Veille parlementaire sport — daily
 
 on:
   schedule:
-    # 08:00 Europe/Paris (= 06:00 UTC en été, 07:00 en hiver — on planifie à 06:00 UTC)
-    - cron: "0 6 * * *"
+    # R22f (2026-04-23) : 04:00 Europe/Paris (= 02:00 UTC en été, 03:00 en hiver
+    # — on planifie à 02:00 UTC, alignement heure d'été par défaut comme avant).
+    - cron: "0 2 * * *"
   # R18 (2026-04-22) : auto-deploy à chaque push de code sur main pour que
   # les releases (R17, R18…) n'aient plus besoin d'un lancement manuel via
   # workflow_dispatch. On ignore les chemins qui bouclent (commits du bot
