@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R22i"
+SYSTEM_VERSION_LABEL = "R23a"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -1812,6 +1812,42 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
         (d / "_index.md").write_text("\n".join(lines), encoding="utf-8")
 
 
+def _amendement_chip(raw: dict) -> tuple[str, str]:
+    """Calcule le libellé + slug du chip coloré pour un amendement AN.
+
+    R23-A (2026-04-23) — extrait de `_write_item_pages` pour être testable
+    en isolation. Priorité, du plus précis au plus transitoire :
+
+        1. `raw.sort`        — libellé final en séance ("Tombé", "Adopté"…)
+        2. `raw.sous_etat`   — sousEtat de etatDesTraitements (proxy fiable
+                                quand `sort` est vide mais la décision est
+                                prise ; ex : "Tombé", "Adopté sans modif")
+        3. `raw.etat`        — état transitoire ("Discuté", "En traitement")
+        4. `raw.statut`      — fallback historique pre-R13-J
+
+    Retourne (label, slug). Les deux sont vides si aucun champ n'est
+    renseigné. Le slug est normalisé (accents retirés, lowercase,
+    kebab-case) pour ciblage CSS.
+    """
+    if not isinstance(raw, dict):
+        return "", ""
+    sort_label = (raw.get("sort") or "").strip()
+    sous_etat_label = (raw.get("sous_etat") or "").strip()
+    etat_label = (raw.get("etat") or "").strip()
+    statut_legacy = (raw.get("statut") or "").strip()
+    chip_label = (sort_label or sous_etat_label
+                  or etat_label or statut_legacy)
+    if not chip_label:
+        return "", ""
+    try:
+        from unidecode import unidecode as _uni
+        slug = _uni(chip_label).lower()
+        slug = re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
+    except Exception:
+        slug = re.sub(r"[^a-z0-9]+", "-", chip_label.lower()).strip("-")
+    return chip_label, slug
+
+
 def _write_item_pages(items_dir: Path, rows: list[dict]):
     # On évite l'explosion du nombre de fichiers : on garde les 500 plus récents.
     rows_sorted = _sort_by_date_desc(rows)
@@ -1992,21 +2028,18 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         # R13-L : fallback aussi sur `statut` pour les items legacy ingérés
         # avant la séparation sort/etat (Cyril ne voyait pas le badge vert
         # "Adopté" sur les anciens amendements).
-        if cat == "amendements" and isinstance(raw, dict):
-            sort_label = (raw.get("sort") or "").strip()
-            etat_label = (raw.get("etat") or "").strip()
-            statut_legacy = (raw.get("statut") or "").strip()
-            chip_label = sort_label or etat_label or statut_legacy
+        # R23-A (2026-04-23) : logique extraite dans `_amendement_chip()`
+        # (testable en isolation). `sous_etat` inséré entre `sort` et
+        # `etat` — beaucoup d'amendements ont `sort=""` mais
+        # `etatDesTraitements.sousEtat.libelle="Tombé"` / "Adopté sans
+        # modif" — on privilégie cette info à `etat` (transitoire, souvent
+        # "Discuté") quand `sort` est vide.
+        if cat == "amendements":
+            chip_label, chip_slug = _amendement_chip(raw or {})
             if chip_label:
-                try:
-                    from unidecode import unidecode as _uni
-                    slug = _uni(chip_label).lower()
-                    slug = re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
-                except Exception:
-                    slug = re.sub(r"[^a-z0-9]+", "-", chip_label.lower()).strip("-")
                 fm.append(
                     f'sort_label: "{chip_label.replace(chr(34), chr(39))}"')
-                fm.append(f'sort_slug: "{slug}"')
+                fm.append(f'sort_slug: "{chip_slug}"')
         # Frontmatter étendu pour les dossiers législatifs (timeline).
         if cat == "dossiers_legislatifs" and actes_timeline:
             fm.append(f"nb_actes_utiles: {nb_actes_utiles}")

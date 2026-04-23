@@ -21,6 +21,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT))
 
 from src.site_export import (  # noqa: E402
+    _amendement_chip,
     _fix_agenda_row,
     _fix_amendement_row,
     _fix_chamber_row,
@@ -411,6 +412,67 @@ def test_fix_amendement_row_ignores_other_categories():
     }
     _fix_amendement_row(r)
     assert r["title"] == "Question — Député PA123"  # inchangé
+
+
+# ---------- _amendement_chip (R23-A — sort prime sous_etat > etat) ----------
+
+def test_amendement_chip_prefers_sort_over_sous_etat_and_etat():
+    """R23-A : `sort` non vide gagne toujours, peu importe le reste."""
+    label, slug = _amendement_chip({
+        "sort": "Adopté",
+        "sous_etat": "Tombé",
+        "etat": "Discuté",
+        "statut": "Légacy",
+    })
+    assert label == "Adopté"
+    assert slug == "adopte"
+
+
+def test_amendement_chip_falls_back_to_sous_etat_when_sort_empty():
+    """R23-A : regression directe — avant R23-A, on tombait sur "Discuté"
+    (etat) alors que sousEtat était "Tombé". On prouve que sous_etat passe
+    devant etat quand sort est vide."""
+    label, slug = _amendement_chip({
+        "sort": "",
+        "sous_etat": "Tombé",
+        "etat": "Discuté",
+    })
+    assert label == "Tombé"
+    assert slug == "tombe"
+
+
+def test_amendement_chip_falls_back_to_etat_when_sort_and_sous_etat_empty():
+    label, slug = _amendement_chip({
+        "sort": "",
+        "sous_etat": "",
+        "etat": "En traitement",
+    })
+    assert label == "En traitement"
+    assert slug == "en-traitement"
+
+
+def test_amendement_chip_falls_back_to_statut_legacy():
+    """Items ingérés avant la séparation sort/etat (pre-R13-J) n'ont que
+    `raw.statut`. On garde le fallback final sur ce champ."""
+    label, slug = _amendement_chip({"statut": "Adopté"})
+    assert label == "Adopté"
+    assert slug == "adopte"
+
+
+def test_amendement_chip_empty_when_no_field_set():
+    assert _amendement_chip({}) == ("", "")
+    assert _amendement_chip({"sort": "", "etat": ""}) == ("", "")
+
+
+def test_amendement_chip_slug_handles_accents_and_spaces():
+    label, slug = _amendement_chip({"sort": "Adopté sans modif."})
+    assert label == "Adopté sans modif."
+    assert slug == "adopte-sans-modif"
+
+
+def test_amendement_chip_noop_on_non_dict():
+    assert _amendement_chip(None) == ("", "")  # type: ignore[arg-type]
+    assert _amendement_chip("rejeté") == ("", "")  # type: ignore[arg-type]
 
 
 # ---------- _load : recapitalize matched_keywords (R13-B backfill) ----------

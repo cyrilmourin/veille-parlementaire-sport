@@ -634,10 +634,28 @@ def _normalize_amendement(obj, src, cat):
     # état (transitoire). Cyril veut : chip coloré après la date, basé
     # sur sort quand il est défini, sinon sur état. Le titre ne porte plus
     # ni l'un ni l'autre.
+    # R23-A (2026-04-23) : l'API AN renvoie `cycleDeVie.sort` comme STRING
+    # directe (ex : "Tombé", "Adopté", "Retiré"), pas comme dict avec
+    # .libelle. L'ancien path `cycleDeVie.sort.libelle` ne matchait JAMAIS
+    # → tous les amendements affichaient leur `etat` (transitoire, souvent
+    # "Discuté") à la place du sort final. On lit désormais `cycleDeVie.sort`
+    # en direct ; `_strip_html_text` gère aussi le cas dict historique
+    # `{"libelle": "..."}` donc la chaîne reste rétro-compatible.
     sort_label = _strip_html_text(_first(
         root,
-        "cycleDeVie.sort.libelle",
-        "cycleDeVie.sort.sortEnSeance",
+        "cycleDeVie.sort",               # forme string actuelle (API AN)
+        "cycleDeVie.sort.libelle",       # fallback forme dict legacy
+        "cycleDeVie.sort.sortEnSeance",  # fallback très ancien
+        default=""
+    )) or ""
+    # R23-A : `cycleDeVie.etatDesTraitements.sousEtat.libelle` porte souvent
+    # un libellé plus précis que `etat` (ex : sousEtat="Tombé" quand
+    # etat="Discuté"). On l'expose comme fallback intermédiaire entre sort
+    # et etat dans la chaîne du chip site.
+    sous_etat_label = _strip_html_text(_first(
+        root,
+        "cycleDeVie.etatDesTraitements.sousEtat.libelle",
+        "cycleDeVie.etatDesTraitements.sousEtat",
         default=""
     )) or ""
     etat_label = _strip_html_text(_first(
@@ -648,7 +666,7 @@ def _normalize_amendement(obj, src, cat):
         default=""
     )) or ""
     # statut conservé pour le summary de matching (compat. R11+).
-    statut = sort_label or etat_label
+    statut = sort_label or sous_etat_label or etat_label
 
     # Contexte dossier (article, division)
     article = _text_of(_first(root, "pointeurFragmentTexte.division.articleDesignation",
@@ -736,7 +754,10 @@ def _normalize_amendement(obj, src, cat):
              "texte_ref": texte_ref,
              # R13-J : sort / etat séparés pour que site_export puisse
              # générer le chip coloré (sort > etat comme fallback).
-             "statut": statut, "sort": sort_label, "etat": etat_label,
+             # R23-A : sousEtat ajouté comme fallback intermédiaire (utile
+             # quand sort="" mais sousEtat="Tombé" / "Adopté sans modif").
+             "statut": statut, "sort": sort_label,
+             "sous_etat": sous_etat_label, "etat": etat_label,
              "numero": num},
     )
 
