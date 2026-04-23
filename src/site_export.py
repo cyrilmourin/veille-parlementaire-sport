@@ -2150,7 +2150,9 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
                 )
             # R23-C (2026-04-23) : backfill de l'URL photo pour les items
             # AN ingérés avant le patch parser. Pattern déterministe depuis
-            # PAxxx → /tribun/17/photos/<digits>.jpg. Pas de réseau.
+            # PAxxx → /dyn/static/tribun/17/photos/carre/<digits>.jpg
+            # (corrigé en R23-C2 ; ancien pattern /tribun/LEG/photos/N.jpg
+            # renvoyait 404). Pas de réseau.
             if not auteur_photo_url and auteur_ref.startswith("PA"):
                 auteur_photo_url = (
                     amo_loader.build_photo_url_an(auteur_ref) or ""

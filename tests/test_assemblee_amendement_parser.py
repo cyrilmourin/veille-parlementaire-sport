@@ -228,8 +228,13 @@ def test_parser_groupe_long_empty_when_cache_has_no_ref():
 # ---------- R23-C : photo portrait AN persistée dans raw ------------------
 
 def test_parser_persists_auteur_photo_url_from_pa_ref():
-    """PA123456 → URL déterministe /tribun/17/photos/123456.jpg persistée
-    dans raw pour que site_export l'expose en frontmatter."""
+    """PA123456 → URL déterministe AN, persistée dans raw pour que
+    site_export l'expose en frontmatter.
+
+    R23-C2 (2026-04-23) : le pattern historique /tribun/{LEG}/photos/{N}.jpg
+    renvoyait 404 (domaine migré). Pattern réel observé :
+    /dyn/static/tribun/{LEG}/photos/carre/{N}.jpg.
+    """
     obj = _base_amendement(
         sort_node="Adopté",
         etat_node={"libelle": "Discuté"},
@@ -237,7 +242,7 @@ def test_parser_persists_auteur_photo_url_from_pa_ref():
     items = _run(obj)
     raw = items[0].raw
     assert raw["auteur_photo_url"] == (
-        "https://www.assemblee-nationale.fr/tribun/17/photos/123456.jpg"
+        "https://www.assemblee-nationale.fr/dyn/static/tribun/17/photos/carre/123456.jpg"
     )
 
 

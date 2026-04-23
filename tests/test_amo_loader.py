@@ -102,12 +102,17 @@ def test_resolve_groupe_long(amo_cache):
 # ---------- R23-C : URL photo portrait AN ---------------------------------
 
 def test_build_photo_url_an_pattern():
-    """Pattern déterministe /tribun/17/photos/<digits>.jpg."""
+    """Pattern déterministe /dyn/static/tribun/17/photos/carre/<digits>.jpg.
+
+    R23-C2 (2026-04-23) : l'URL historique /tribun/{LEG}/photos/{N}.jpg
+    renvoie 404 sur l'AN (le domaine a migré). Le pattern réel servi par
+    les fiches député est /dyn/static/tribun/{LEG}/photos/carre/{N}.jpg.
+    """
     assert amo_loader.build_photo_url_an("PA841947") == (
-        "https://www.assemblee-nationale.fr/tribun/17/photos/841947.jpg"
+        "https://www.assemblee-nationale.fr/dyn/static/tribun/17/photos/carre/841947.jpg"
     )
     assert amo_loader.build_photo_url_an("PA793708") == (
-        "https://www.assemblee-nationale.fr/tribun/17/photos/793708.jpg"
+        "https://www.assemblee-nationale.fr/dyn/static/tribun/17/photos/carre/793708.jpg"
     )
 
 
@@ -115,7 +120,7 @@ def test_build_photo_url_an_custom_legislature():
     """Législature paramétrable (au cas où on traite des items archivés)."""
     url = amo_loader.build_photo_url_an("PA720770", legislature=16)
     assert url == (
-        "https://www.assemblee-nationale.fr/tribun/16/photos/720770.jpg"
+        "https://www.assemblee-nationale.fr/dyn/static/tribun/16/photos/carre/720770.jpg"
     )
 
 
@@ -133,7 +138,7 @@ def test_build_photo_url_an_empty_or_invalid():
 def test_build_photo_url_an_accepts_whitespace():
     """Le parser livre parfois des PAxxx avec espaces parasites."""
     assert amo_loader.build_photo_url_an("  PA123  ") == (
-        "https://www.assemblee-nationale.fr/tribun/17/photos/123.jpg"
+        "https://www.assemblee-nationale.fr/dyn/static/tribun/17/photos/carre/123.jpg"
     )
 
 

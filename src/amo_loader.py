@@ -241,14 +241,21 @@ def resolve_groupe_ref(pa_uid: str) -> str:
 def build_photo_url_an(pa_uid: str, *, legislature: int = 17) -> str:
     """Construit l'URL de la photo portrait d'un député AN à partir d'un PAxxx.
 
-    R23-C (2026-04-23) — pattern déterministe observé sur
-    assemblee-nationale.fr :
+    R23-C (2026-04-23) + R23-C2 (2026-04-23, fix URL) — pattern
+    déterministe observé sur assemblee-nationale.fr :
 
-        https://www.assemblee-nationale.fr/tribun/{LEG}/photos/{digits}.jpg
+        https://www.assemblee-nationale.fr/dyn/static/tribun/{LEG}/photos/carre/{digits}.jpg
 
     où `{digits}` sont les chiffres du PAxxx (sans le préfixe "PA") et
     `{LEG}` est la législature en cours (17 depuis juillet 2024). Testé
-    et validé sur des acteurs récents (ex: PA841947, PA793708 — HTTP 200).
+    et validé par fetch direct sur des acteurs recents (HTTP 200).
+
+    Historique : le pattern initial de R23-C
+    `/tribun/{LEG}/photos/{digits}.jpg` produisait des 404 sur le site
+    public — c'etait un ancien chemin, maintenant redirige vers /dyn/
+    static/tribun/LEG/photos/carre/. Les <img> avaient donc
+    `onerror='this.style.display=none'` qui masquait systematiquement
+    la photo.
 
     Renvoie "" si `pa_uid` n'est pas un PAxxx valide — les templates
     décideront de ne pas émettre la balise `<img>` dans ce cas.
@@ -266,8 +273,8 @@ def build_photo_url_an(pa_uid: str, *, legislature: int = 17) -> str:
     if not digits.isdigit():
         return ""
     return (
-        f"https://www.assemblee-nationale.fr/tribun/"
-        f"{int(legislature)}/photos/{digits}.jpg"
+        f"https://www.assemblee-nationale.fr/dyn/static/tribun/"
+        f"{int(legislature)}/photos/carre/{digits}.jpg"
     )
 
 

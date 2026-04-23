@@ -768,8 +768,10 @@ def _normalize_amendement(obj, src, cat):
              # R23-B (2026-04-23) : libellé long pour tooltip hover
              # (ex : sigle "LFI-NFP" + title="La France insoumise - …")
              "groupe_long": auteur_groupe_long,
-             # R23-C (2026-04-23) : photo portrait du député. URL déterministe
-             # depuis PAxxx — pattern /tribun/17/photos/<digits>.jpg.
+             # R23-C (2026-04-23) / R23-C2 (2026-04-23) : photo portrait
+             # du député. URL déterministe depuis PAxxx — pattern
+             # /dyn/static/tribun/17/photos/carre/<digits>.jpg (corrigé
+             # en R23-C2 ; ancien /tribun/LEG/photos/N.jpg était 404).
              "auteur_photo_url": (
                  amo_loader.build_photo_url_an(auteur_ref)
                  if auteur_ref else ""
