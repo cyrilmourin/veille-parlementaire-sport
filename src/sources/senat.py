@@ -566,10 +566,20 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
                 f"Sort : {sort}" if sort else "",
                 texte, titre,
             ] if p)[:2000]
+            # R22i (2026-04-23) : la colonne CSV Sénat s'appelle exactement
+            # `URL Question` et livre du `http://…/base/YYYY/qSEQYYMM<num>.html`.
+            # Avant R22i, `_pick(r, "URL", "url", "lien")` ne matchait pas et on
+            # tombait sur le fallback `.../base/{uid}.html` qui renvoie un 404
+            # côté senat.fr (pattern inexistant). On lit donc la bonne colonne
+            # en priorité et on force https://. Le fallback historique est
+            # conservé pour ceintures-bretelles mais ne devrait plus servir.
+            url_csv = _pick(r, "URL Question", "URL", "url", "lien") or ""
+            if url_csv.startswith("http://"):
+                url_csv = "https://" + url_csv[len("http://"):]
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
                 title=" ".join(title_bits)[:220],
-                url=(_pick(r, "URL", "url", "lien")
+                url=(url_csv
                      or f"https://www.senat.fr/questions/base/{uid}.html"),
                 published_at=parse_iso(_pick(r, "Date de publication JO",
                                               "date", "datePublication",

@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R22g"
+SYSTEM_VERSION_LABEL = "R22i"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -340,6 +340,16 @@ _QTITLE_MIN_RE = re.compile(
 _QTITLE_COLON_FIX_RE = re.compile(r"\)\s*:\s*")
 _QTITLE_DEPUTE_RE = re.compile(r"Député\s+(PA\d+)")
 
+# R22i (2026-04-23) : pattern legacy cassé pour les URLs des questions Sénat.
+# Format vu en DB : `https://www.senat.fr/questions/base/{uid}.html` (ex.
+# `.../base/1054S.html`) — ce n'est PAS une URL valide côté senat.fr, la vraie
+# URL contient un segment YYYY et le préfixe `qSEQ…` (ex.
+# `.../base/2026/qSEQ26041054S.html`). On réécrit depuis `raw["URL Question"]`
+# dans `_fix_question_row` pour les items ingérés avant R22i.
+_SENAT_QUESTION_LEGACY_URL_RE = re.compile(
+    r"^https?://www\.senat\.fr/questions/base/[^/]+\.html$"
+)
+
 
 def _fix_question_row(r: dict) -> None:
     """Réécrit en mémoire le titre des items `questions` ingérés avec
@@ -435,6 +445,27 @@ def _fix_question_row(r: dict) -> None:
                 prefix, suffix = m_colon.group(1), m_colon.group(2).strip()
                 if suffix.lower() != new_analyse.lower():
                     r["title"] = (prefix + new_analyse)[:220]
+
+    # 4bis) R22i (2026-04-23) : répare l'URL des questions Sénat ingérées
+    #       avant R22i. Le parser tombait sur le fallback
+    #       `https://www.senat.fr/questions/base/{uid}.html` qui renvoie un
+    #       404 côté senat.fr. La vraie URL est dans `raw["URL Question"]`
+    #       (colonne CSV), en `http://…/base/YYYY/qSEQYYMM<num>.html`.
+    #       `upsert_many` ne re-renormalise pas l'URL des hash_key existants,
+    #       d'où la rustine ici. Idempotent : ne touche que si l'URL courante
+    #       correspond au pattern legacy cassé et si raw["URL Question"] est
+    #       exploitable.
+    src_id = (r.get("source_id") or "")
+    if src_id in {"senat_qg", "senat_questions_1an", "senat_questions"}:
+        cur_url = (r.get("url") or "")
+        if _SENAT_QUESTION_LEGACY_URL_RE.match(cur_url):
+            raw_url = ""
+            if isinstance(raw, dict):
+                raw_url = (raw.get("URL Question") or raw.get("URL") or "").strip()
+            if raw_url.startswith("http://"):
+                raw_url = "https://" + raw_url[len("http://"):]
+            if raw_url.startswith("https://www.senat.fr/questions/base/"):
+                r["url"] = raw_url
 
     # 5) R19-C (2026-04-23) : retire du summary le préfixe redondant
     #    "{Auteur} ({Groupe}) — " (ou "Député PAxxx (Groupe) — "), puisque

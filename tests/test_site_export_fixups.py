@@ -119,6 +119,88 @@ def test_fix_question_row_handles_unknown_deputy():
     assert "sujet" in r["title"]
 
 
+# ---------- _fix_question_row (R22i : URL legacy Sénat questions) ----------
+
+def test_fix_question_row_rewrites_broken_senat_url_from_raw():
+    """R22i : les items `senat_qg` / `senat_questions_1an` ingérés avant R22i
+    ont une URL construite au format `.../base/{uid}.html` qui renvoie 404.
+    La vraie URL est livrée dans la colonne CSV `URL Question` (stockée en
+    raw) et suit le pattern `.../base/YYYY/qSEQ…<num>.html`. Le fixup doit
+    la réécrire et forcer https://."""
+    r = {
+        "category": "questions",
+        "source_id": "senat_questions_1an",
+        "title": "Question de +1 an sans réponse n°1054S : Gouvernance …",
+        "url": "https://www.senat.fr/questions/base/1054S.html",
+        "raw": {
+            "Numéro": "1054S",
+            "Référence": "SEQ26041054S",
+            "URL Question": "http://www.senat.fr/questions/base/2026/qSEQ26041054S.html",
+        },
+    }
+    _fix_question_row(r)
+    assert r["url"] == "https://www.senat.fr/questions/base/2026/qSEQ26041054S.html"
+
+
+def test_fix_question_row_rewrites_broken_senat_url_for_senat_qg():
+    """Même fix, source_id = senat_qg."""
+    r = {
+        "category": "questions",
+        "source_id": "senat_qg",
+        "title": "Question au gouvernement n°0001G : …",
+        "url": "https://www.senat.fr/questions/base/0001G.html",
+        "raw": {
+            "URL Question": "http://www.senat.fr/questions/base/2024/qSEQ24100001G.html",
+        },
+    }
+    _fix_question_row(r)
+    assert r["url"] == "https://www.senat.fr/questions/base/2024/qSEQ24100001G.html"
+
+
+def test_fix_question_row_keeps_url_when_raw_url_missing():
+    """Si raw["URL Question"] est absent, on laisse l'URL legacy telle
+    quelle (pas de pire que ce qu'on avait, et surtout pas d'erreur)."""
+    r = {
+        "category": "questions",
+        "source_id": "senat_qg",
+        "title": "Question au gouvernement n°0001G : …",
+        "url": "https://www.senat.fr/questions/base/0001G.html",
+        "raw": {},
+    }
+    _fix_question_row(r)
+    assert r["url"] == "https://www.senat.fr/questions/base/0001G.html"
+
+
+def test_fix_question_row_noop_when_url_already_correct():
+    """Idempotent : si l'URL est déjà au format canonique, pas de
+    réécriture."""
+    good = "https://www.senat.fr/questions/base/2026/qSEQ26041054S.html"
+    r = {
+        "category": "questions",
+        "source_id": "senat_questions_1an",
+        "title": "Question …",
+        "url": good,
+        "raw": {"URL Question": "http://www.senat.fr/questions/base/2026/qSEQ26041054S.html"},
+    }
+    _fix_question_row(r)
+    assert r["url"] == good
+
+
+def test_fix_question_row_noop_for_an_questions():
+    """Le fixup URL R22i ne s'applique pas aux questions AN (source_id
+    différent, URLs assemblee-nationale.fr)."""
+    an_url = "https://questions.assemblee-nationale.fr/q17/17-12345QE.htm"
+    r = {
+        "category": "questions",
+        "source_id": "an_questions",
+        "title": "Question écrite n°12345 : sujet",
+        "url": an_url,
+        "raw": {},
+    }
+    _fix_question_row(r)
+    assert r["url"] == an_url
+
+
 # ---------- _load : recalcul snippet (UX-E) --------------------------------
 
 def test_load_rebuilds_snippet_from_summary():
