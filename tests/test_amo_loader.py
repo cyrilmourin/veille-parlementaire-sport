@@ -142,6 +142,54 @@ def test_build_photo_url_an_accepts_whitespace():
     )
 
 
+# ---------- R23-C5 : URL photo portrait Sénat -----------------------------
+
+def test_build_photo_url_senat_pattern_sans_schema():
+    """CSV Sénat livre /Fiche Sénateur/ sous la forme `//www.senat.fr/senfic/<slug>.html`.
+    Le slug est extrait et injecté dans /senimg/<slug>_carre.jpg."""
+    assert amo_loader.build_photo_url_senat(
+        "//www.senat.fr/senfic/wattebled_dany19585h.html"
+    ) == "https://www.senat.fr/senimg/wattebled_dany19585h_carre.jpg"
+
+
+def test_build_photo_url_senat_pattern_avec_schema():
+    """L'URL fiche peut aussi arriver full https (cas legacy / autres sources)."""
+    assert amo_loader.build_photo_url_senat(
+        "https://www.senat.fr/senfic/richard_olivia21038e.html"
+    ) == "https://www.senat.fr/senimg/richard_olivia21038e_carre.jpg"
+
+
+def test_build_photo_url_senat_pattern_http():
+    """Schema http accepté (old cache)."""
+    assert amo_loader.build_photo_url_senat(
+        "http://www.senat.fr/senfic/pluchet_kristina22777w.html"
+    ) == "https://www.senat.fr/senimg/pluchet_kristina22777w_carre.jpg"
+
+
+def test_build_photo_url_senat_sans_www():
+    """Variante sans `www.` tolérée (cas rare mais protégé)."""
+    assert amo_loader.build_photo_url_senat(
+        "//senat.fr/senfic/someone_xyz12345a.html"
+    ) == "https://www.senat.fr/senimg/someone_xyz12345a_carre.jpg"
+
+
+def test_build_photo_url_senat_empty_or_invalid():
+    assert amo_loader.build_photo_url_senat("") == ""
+    assert amo_loader.build_photo_url_senat(None) == ""  # type: ignore[arg-type]
+    # URL qui n'a pas la forme /senfic/<slug>.html
+    assert amo_loader.build_photo_url_senat(
+        "https://www.senat.fr/senateurs/liste.html"
+    ) == ""
+    assert amo_loader.build_photo_url_senat("not a url") == ""
+
+
+def test_build_photo_url_senat_accepts_whitespace():
+    """Les CSV peuvent avoir des espaces autour de l'URL."""
+    assert amo_loader.build_photo_url_senat(
+        "  //www.senat.fr/senfic/wattebled_dany19585h.html  "
+    ) == "https://www.senat.fr/senimg/wattebled_dany19585h_carre.jpg"
+
+
 def test_resolve_qualites(amo_cache):
     qs = amo_loader.resolve_qualites("PA720770")
     assert qs == ["Rapporteure — Affaires culturelles"]

@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -276,6 +277,55 @@ def build_photo_url_an(pa_uid: str, *, legislature: int = 17) -> str:
         f"https://www.assemblee-nationale.fr/dyn/static/tribun/"
         f"{int(legislature)}/photos/carre/{digits}.jpg"
     )
+
+
+# R23-C5 (2026-04-23) : une fiche Senat de la forme
+# `//www.senat.fr/senfic/<slug>.html` donne le slug senateur, qu'on
+# transforme en URL photo `https://www.senat.fr/senimg/<slug>_carre.jpg`.
+# Le slug est du type `wattebled_dany19585h` (nom_prenomIDH). La regex
+# accepte les URLs avec ou sans schema, avec www. ou sans, et tolere
+# les majuscules (certaines fiches legacy sont capitalisees).
+_SENAT_SENFIC_RE = re.compile(
+    r"^(?:https?:)?//(?:www\.)?senat\.fr/senfic/([a-zA-Z0-9_-]+)\.html?$",
+    re.IGNORECASE,
+)
+
+
+def build_photo_url_senat(fiche_senateur_url: str) -> str:
+    """Construit l'URL photo d'un sénateur à partir de son URL `senfic`.
+
+    R23-C5 (2026-04-23) — pattern déterministe observé sur senat.fr,
+    extrait du HTML des fiches sénateur :
+
+        https://www.senat.fr/senimg/{slug}_carre.jpg
+
+    où `{slug}` est le slug de la fiche (ex. `wattebled_dany19585h`).
+    L'entrée attendue est la valeur de la colonne "Fiche Sénateur" des
+    CSV amendements Sénat, qui arrive typiquement sous la forme
+    `//www.senat.fr/senfic/wattebled_dany19585h.html` (pas de schema).
+
+    Tests réseau effectués (23 avril 2026) :
+      - /senimg/wattebled_dany19585h_carre.jpg → HTTP 200
+      - /senimg/richard_olivia21038e_carre.jpg → HTTP 200
+
+    Renvoie "" si :
+      - l'entrée est vide / None / pas une string ;
+      - l'URL n'a pas le format attendu (`/senfic/<slug>.html`).
+
+    Aucune requête HTTP effectuée : l'URL est juste construite. La
+    robustesse (image absente → 404) est gérée par le template via
+    `onerror`.
+    """
+    if not fiche_senateur_url or not isinstance(fiche_senateur_url, str):
+        return ""
+    url = fiche_senateur_url.strip()
+    if not url:
+        return ""
+    m = _SENAT_SENFIC_RE.match(url)
+    if not m:
+        return ""
+    slug = m.group(1)
+    return f"https://www.senat.fr/senimg/{slug}_carre.jpg"
 
 
 def resolve_groupe_long(pa_uid: str) -> str:

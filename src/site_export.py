@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R23g"
+SYSTEM_VERSION_LABEL = "R23h"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -1738,28 +1738,36 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
 
 
 def _recent(rows: list[dict], hours: int = 24) -> list[dict]:
-    """Items publiés (officiellement) dans les dernières `hours` heures.
-    On utilise strictement `published_at` ici — pas `inserted_at` —
-    pour que la zone 'dernières 24h' reflète la publication institutionnelle
-    réelle, pas la date à laquelle le scraper a inséré en base.
+    """Items publiés aujourd'hui ou hier (calendrier Paris), indépendamment
+    de l'heure exacte. On couvre ainsi les publications matinales de la
+    veille qui tombaient hors fenêtre stricte 24h selon l'heure du build.
 
-    R17 (2026-04-22) — demande Cyril : la zone « Dernières 24h » sur
-    la page d'accueil doit rester focalisée sur l'actualité législative
-    utile. On exclut donc :
-      - `agenda`   : les rendez-vous à venir sont déjà listés dans la
-                      sidebar « Agenda » ; pas de redondance sur la home.
-      - `communiques` (Publications) : volume élevé, bruite le haut de
-                      page qui doit tenir en coup d'œil.
+    R24 (2026-04-23) — passage de fenêtre horaire stricte (24h glissantes)
+    à fenêtre calendaire (jour J + jour J-1 en heure Paris). Titre
+    « Dernières 24 h » conservé tel quel (demande Cyril).
+
+    Catégories exclues (inchangé depuis R17) :
+      - `agenda`      : déjà dans la sidebar.
+      - `communiques` : volume élevé, bruite le haut de page.
     """
-    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    import zoneinfo
+    tz_paris = zoneinfo.ZoneInfo("Europe/Paris")
+    today_paris = datetime.now(tz_paris).date()
+    yesterday_paris = today_paris - timedelta(days=1)
     excluded_cats = {"agenda", "communiques"}
     out = []
     for r in rows:
         if (r.get("category") or "") in excluded_cats:
             continue
         dt = _parse_dt(r.get("published_at"))
-        if dt and dt >= cutoff:
-            out.append(r)
+        if dt:
+            # Convertit en date Paris pour comparaison calendaire
+            try:
+                dt_paris = dt.replace(tzinfo=zoneinfo.ZoneInfo("UTC")).astimezone(tz_paris).date()
+            except Exception:
+                dt_paris = dt.date()
+            if dt_paris >= yesterday_paris:
+                out.append(r)
     return out
 
 
@@ -1898,7 +1906,7 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         for it in recent[:30]:
             lines.append(_fmt_item_line(it, with_tags=False))
     else:
-        lines.append("_Aucune nouveauté dans les dernières 24 heures — la collecte reste active._")
+        lines.append("_Aucune nouveauté depuis 24h._")
     lines.append("")
     lines.append("</div>")
     lines.append("")
