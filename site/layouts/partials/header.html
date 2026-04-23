@@ -4,15 +4,18 @@
       <img class="brand-logo" src="/sideline-logo.png" alt="Sideline Conseil" width="90" height="90"/>
       <span class="brand-text">
         <span class="brand-kicker">SIDELINE CONSEIL</span>
-        <span class="brand-title">Veille parlementaire sport</span>
+        <span class="brand-title">Veille institutionnelle Sport</span>
         <span class="brand-tagline">Voir clair. Jouer juste.</span>
       </span>
     </a>
-    <nav class="nav">
-      {{/* R15 (2026-04-22) : ordre reclassé par « cycle de vie »
-           législatif/institutionnel : du dépôt (Dossiers - Lois)
-           jusqu'à la publication finale (JORF), puis les flux
-           d'information plus diffus (Nominations, Publications). */}}
+    {{/* R21 — menu hamburger mobile : bouton visible uniquement sur mobile,
+         nav masquée par défaut sur mobile et dépliée au clic. */}}
+    <button class="nav-toggle" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="main-nav">
+      <span class="nav-toggle-bar"></span>
+      <span class="nav-toggle-bar"></span>
+      <span class="nav-toggle-bar"></span>
+    </button>
+    <nav class="nav" id="main-nav">
       <a href="/items/dossiers_legislatifs/">Dossiers&nbsp;-&nbsp;Lois</a>
       <a href="/items/amendements/">Amendements</a>
       <a href="/items/questions/">Questions</a>
@@ -22,8 +25,6 @@
       <a href="/items/nominations/">Nominations</a>
       <a href="/items/communiques/">Publications</a>
       <a href="/recherche/" class="nav-search">Rechercher</a>
-      {{/* R13-J (2026-04-21) : méta MAJ + version système, poussé à
-           droite en viewport large, retombe sous la nav en mobile. */}}
       {{ with site.Data.meta }}
       <span class="nav-meta" aria-label="Méta données de la veille">
         <span class="nav-meta-line">Données M.A.J le {{ .updated_at_human }}</span>
@@ -33,3 +34,15 @@
     </nav>
   </div>
 </header>
+<script>
+(function(){
+  var btn = document.querySelector('.nav-toggle');
+  var nav = document.getElementById('main-nav');
+  if (!btn || !nav) return;
+  btn.addEventListener('click', function(){
+    var open = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+    nav.classList.toggle('nav--open', !open);
+  });
+})();
+</script>

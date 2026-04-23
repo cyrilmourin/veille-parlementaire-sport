@@ -1560,13 +1560,10 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
     # par Hugo si `date > now()` au moment du build (fuseau navigateur vs UTC).
     lines = [
         "---",
-        f'title: "Veille parlementaire sport — {now:%Y-%m-%d}"',
+        f'title: "Veille institutionnelle Sport — {now:%Y-%m-%d}"',
         f'date: {now:%Y-%m-%d}',
         'description: "Veille institutionnelle du sport — actualisée quotidiennement par Sideline Conseil."',
         "---",
-        "",
-        f"**{len(rows)} publications officielles** dans la fenêtre glissante.",
-        "Dernière mise à jour : " + now.strftime("%A %d %B %Y — %H:%M").capitalize() + ".",
         "",
     ]
 
