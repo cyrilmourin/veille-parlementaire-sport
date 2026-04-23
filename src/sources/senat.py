@@ -584,6 +584,13 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
             url_csv = _pick(r, "URL Question", "URL", "url", "lien") or ""
             if url_csv.startswith("http://"):
                 url_csv = "https://" + url_csv[len("http://"):]
+            # R23-D2 (2026-04-23) : clé stable `texte_question` exposée côté
+            # site_export pour construire le snippet depuis le corps réel
+            # (et non depuis `summary` qui préfixe Destinataire/Rubrique/Sort
+            # et écrasait souvent l'extrait affiché). Le CSV Sénat livre le
+            # corps dans la colonne "Texte".
+            if texte:
+                r["texte_question"] = texte
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
                 title=" ".join(title_bits)[:220],

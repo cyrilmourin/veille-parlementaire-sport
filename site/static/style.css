@@ -900,6 +900,26 @@ a:hover { text-decoration: underline; }
   border-bottom: 2px solid var(--sl-red);
 }
 .cr-chamber[data-chamber="AN"] { border-bottom-color: var(--sl-blue); }
+
+/* R23-E (2026-04-23) — logo chambre SVG sur la liste des CR (remplace
+   le badge texte .chamber sur `comptes_rendus/list.html`). Le logo est
+   un carré 22x22 avec un leger border-radius et un filet discret pour
+   se detacher sur fond creme. Fallback gracieux : si l'asset 404 (ne
+   devrait pas arriver avec les SVG locaux), onerror masque l'img et on
+   retombe visuellement sur la date (l'info reste dans le h2.cr-chamber
+   de la section). */
+.chamber-logo {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  vertical-align: middle;
+  object-fit: contain;
+  border-radius: 3px;
+  background: #fff;
+  padding: 1px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  margin-right: 2px;
+}
 .section-count {
   color: var(--muted);
   font-size: 13px;

@@ -1312,6 +1312,11 @@ def _normalize_question(obj, src, cat):
              # modifie la règle de priorité (analyse > rubrique vs inverse).
              "analyse": analyse, "tete_analyse": tete_analyse,
              "rubrique": rubrique,
+             # R23-D2 (2026-04-23) : corps nettoyé de la question pour que
+             # site_export construise un snippet issu du VRAI texte (pas des
+             # métadonnées « Destinataire : X — Rubrique : sports — … »
+             # qui polluaient le début du summary).
+             "texte_question": texte,
              "path": "assemblee:question"},
     )
 

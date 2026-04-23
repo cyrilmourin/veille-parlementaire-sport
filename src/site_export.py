@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R23d"
+SYSTEM_VERSION_LABEL = "R23e"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -817,6 +817,24 @@ def _load(rows: list[dict]) -> list[dict]:
         # où le passage CR 250→500 n'avait aucun effet visible).
         if r.get("matched_keywords") and not r.get("snippet"):
             haystack = (r.get("summary") or r.get("title") or "").strip()
+            # R23-D2 (2026-04-23) : pour les questions parlementaires, on
+            # préfère le CORPS de la question (`raw.texte_question`) comme
+            # haystack pour le snippet. Avant R23-D2, on utilisait `summary`
+            # qui commençait par « Auteur (Groupe) — Destinataire : X —
+            # Rubrique : sports — Analyse : Y — <texte> » : le matcher
+            # tombait souvent sur l'occurrence « sports » du préfixe Rubrique
+            # et rendait un extrait centré sur les métadonnées au lieu du
+            # vrai texte de la question. Fallback propre sur summary si le
+            # corps n'est pas disponible (items legacy, fiches mal formées).
+            if r.get("category") == "questions":
+                try:
+                    _raw_q = json.loads(r.get("raw") or "{}")
+                except Exception:
+                    _raw_q = {}
+                _texte_q = (_raw_q.get("texte_question") or "").strip() \
+                    if isinstance(_raw_q, dict) else ""
+                if _texte_q:
+                    haystack = _texte_q
             # R19-G (2026-04-23) : pour les comptes rendus AN, on retire le
             # préambule de métadonnées Syceron (identifiants techniques
             # `CRSANR5L17...`, `RUANR...`, `SCR5A...`, timestamps ISO,
