@@ -166,6 +166,14 @@ def _from_sitemap_generic(src: dict) -> list[Item]:
         ))
     log.info("%s : %d items sitemap (cutoff %dj)", src["id"], len(out),
              _RSS_SITEMAP_CUTOFF_DAYS)
+    # R22e-2 : enrichissement meta description (opt-in par source).
+    # Les sitemaps XML ne donnent que <loc>+<lastmod> → summary="" toujours.
+    # Activer fetch_meta permet au matcher de voir le corps de l'article
+    # (CNOSF : slug reconstitué ne suffit pas toujours au matching).
+    if src.get("fetch_meta"):
+        limit = int(src.get("fetch_meta_limit", 60))
+        impersonate = bool(src.get("impersonate", False))
+        _enrich_with_meta(out, impersonate=impersonate, limit=limit)
     return out
 
 
@@ -183,6 +191,16 @@ _DATE_FR_PAT = re.compile(
     + "|".join(_MONTHS_FR.keys())
     + r")\s+(\d{4})\b",
     re.IGNORECASE,
+)
+# R22e-1 (2026-04-23) : format numérique FR "16/04/2026" (jour d'abord).
+# ANJ /communiques-de-presse expose les dates en <li> sous la forme
+# `<a>titre</a> (16/04/2026)` → _DATE_FR_PAT (mois littéral) et _DATE_PAT
+# (année d'abord) ne matchaient pas → 120/131 items ANJ avaient
+# published_at=None. Aussi usité par d'autres sites FR (AFP, préfectures).
+# On accepte aussi "16.04.2026" (séparateur point) et "16-04-2026"
+# (séparateur tiret avec année à 4 chiffres en 3e position).
+_DATE_FR_NUMERIC_PAT = re.compile(
+    r"\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})\b"
 )
 
 
@@ -272,6 +290,25 @@ def _extract_date(a, url: str) -> datetime | None:
                 return datetime(year, month, day)
             except ValueError:
                 pass
+    # 3bis. Format numérique français "DD/MM/YYYY" (ANJ, AFP, préfectures).
+    #       R22e-1 (2026-04-23). On place APRÈS le format littéral pour
+    #       éviter qu'une date du type "16 avril 2026" soit mal lue par
+    #       cette regex moins précise (le séparateur de _DATE_FR_NUMERIC
+    #       n'accepte que /.- donc pas de risque réel de collision, mais
+    #       l'ordre reflète la priorité sémantique).
+    for text in texts:
+        m = _DATE_FR_NUMERIC_PAT.search(text)
+        if m:
+            day = int(m.group(1))
+            month = int(m.group(2))
+            year = int(m.group(3))
+            # Garde-fou : rejette si jour > 31 ou mois > 12 (évite de
+            # matcher un ID "1234/56/7890" qui aurait la bonne forme).
+            if 1 <= day <= 31 and 1 <= month <= 12:
+                try:
+                    return datetime(year, month, day)
+                except ValueError:
+                    pass
     # 4. Format ISO dans le texte (filet)
     for text in texts:
         m = _DATE_PAT.search(text)
@@ -358,6 +395,73 @@ def _chamber(domain: str) -> str:
     return d
 
 
+# R22e-2 (2026-04-23) : enrichissement `summary` via meta description
+# de la page article. Motivation : les listings HTML (ANJ, ministères,
+# AAI…) n'exposent qu'un <a> + titre, pas de chapo → le KeywordMatcher
+# ne travaille que sur le titre et rate les articles dont le sujet sport
+# ne figure que dans le corps. Exemple : ANJ "Bilan 2025 du marché des
+# jeux d'argent" ne cite pas "paris sportifs" dans le titre mais dans
+# la balise <meta name="description"> ("…les paris sportifs en ligne
+# dont le chiffre d'affaires a progressé de plus de 10%…").
+#
+# Activation par flag `fetch_meta: true` dans sources.yml (opt-in, pour
+# ne pas tripler le volume de requêtes des sources qui marchent déjà).
+# Borne `fetch_meta_limit` (défaut 60) : on enrichit les N premiers items
+# du listing (les plus récents) pour capper le coût réseau par run.
+_META_DESC_RE = re.compile(
+    r'<meta[^>]+(?:name|property)=["\'](?:description|og:description|twitter:description)'
+    r'["\'][^>]+content=["\']([^"\']+)["\']',
+    re.IGNORECASE,
+)
+# Certains sites mettent l'attribut `content` avant `name` → regex symétrique.
+_META_DESC_RE_REV = re.compile(
+    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:name|property)=["\']'
+    r'(?:description|og:description|twitter:description)["\']',
+    re.IGNORECASE,
+)
+
+
+def _extract_meta_description(html: str) -> str:
+    """Extrait la balise <meta name=description> (ou og/twitter fallback).
+
+    Parcourt dans l'ordre : description (standard) > og:description >
+    twitter:description. Renvoie "" si aucune balise trouvée ou si le
+    contenu est trop court (< 30 chars — probablement du boilerplate).
+    """
+    for rx in (_META_DESC_RE, _META_DESC_RE_REV):
+        m = rx.search(html)
+        if m:
+            desc = m.group(1).strip()
+            # Décode les entités HTML basiques (&amp; &#x27; …)
+            import html as _html_lib
+            desc = _html_lib.unescape(desc)
+            if len(desc) >= 30:
+                return desc[:2000]
+    return ""
+
+
+def _enrich_with_meta(items: list[Item], *, impersonate: bool, limit: int = 60) -> None:
+    """Enrichit `item.summary` in-place pour les N premiers items sans
+    summary, via un fetch ciblé de la page article + extraction meta.
+    """
+    fetched = 0
+    for it in items:
+        if fetched >= limit:
+            break
+        if it.summary:
+            continue
+        try:
+            page = fetch_text(it.url, impersonate=impersonate)
+        except Exception as e:
+            log.debug("fetch_meta KO %s : %s", it.url, e)
+            continue
+        desc = _extract_meta_description(page)
+        if desc:
+            it.summary = desc
+            fetched += 1
+    log.info("fetch_meta : %d items enrichis (limite %d)", fetched, limit)
+
+
 def fetch_source(src: dict) -> list[Item]:
     # R13-M (2026-04-21) : dispatch format rss / sitemap en amont du HTML
     # classique. Permet d'activer Conseil d'État / Conseil Constitutionnel
@@ -412,4 +516,8 @@ def fetch_source(src: dict) -> list[Item]:
                 title=title, url=url, published_at=dt, summary="",
             ))
     log.info("%s : %d items", src["id"], len(out))
+    # R22e-2 : enrichissement meta description (opt-in par source).
+    if src.get("fetch_meta"):
+        limit = int(src.get("fetch_meta_limit", 60))
+        _enrich_with_meta(out, impersonate=impersonate, limit=limit)
     return out

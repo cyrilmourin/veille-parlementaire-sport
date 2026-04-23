@@ -266,6 +266,9 @@ executif:
       url: https://www.info.gouv.fr/toute-l-actualite
       format: html
       impersonate: true
+      # R22e-2 (2026-04-23) : enrichissement meta description (opt-in).
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     # info.gouv — section spécifique PM (Premier Ministre).
     - id: matignon_actualites
@@ -275,6 +278,8 @@ executif:
       impersonate: true
       chamber: Matignon
       title_prefix: "PM —"
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     # R15 (2026-04-22) — Agenda public du ministre de l'Éducation
     # nationale. Dataset data.gouv.fr `fr-en-agenda-ministre-education-
@@ -322,12 +327,16 @@ ministeres:
       url: https://www.sports.gouv.fr/espace-presse
       format: html
       poids: 3           # priorité maximale (ministère cœur de cible)
+      fetch_meta: true
+      fetch_meta_limit: 60
 
     - id: min_sports_actualites
       category: communiques
       url: https://www.sports.gouv.fr/actualites-et-evenements
       format: html
       poids: 3
+      fetch_meta: true
+      fetch_meta_limit: 60
 
     # Agenda prévisionnel de la ministre des Sports.
     # URL stable indépendante du titulaire du portefeuille (l'ID slug
@@ -361,6 +370,8 @@ ministeres:
       impersonate: true
       chamber: MinEduc
       title_prefix: "MinEduc —"
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     - id: min_interieur
       category: communiques
@@ -369,6 +380,8 @@ ministeres:
       impersonate: true
       chamber: MinInterieur
       title_prefix: "MinInt —"
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     - id: min_economie
       category: communiques
@@ -377,6 +390,8 @@ ministeres:
       impersonate: true
       chamber: MinEcon
       title_prefix: "MinEcon —"
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     - id: min_justice
       category: communiques
@@ -390,6 +405,8 @@ ministeres:
       url: https://www.justice.gouv.fr/espace-presse
       format: html
       impersonate: true
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     # min_sante + min_travail : DÉSACTIVÉS en R11g-4 (2026-04-21).
     # Le serveur retourne une page "Request Rejected" (WAF/F5 ASM) pour TOUTE
@@ -414,6 +431,8 @@ ministeres:
       category: communiques
       url: https://www.culture.gouv.fr/Presse
       format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     - id: min_affaires_etrangeres
       category: communiques
@@ -427,27 +446,37 @@ ministeres:
       # de listing d'actualités (~1140 items historiques).
       url: https://www.diplomatie.gouv.fr/fr/presse/decouvrir-et-s-informer/actualites
       format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     - id: min_transition_ecologique
       category: communiques
       url: https://www.ecologie.gouv.fr/presse
       format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     - id: min_armees
       category: communiques
       url: https://www.defense.gouv.fr/actualites
       format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     - id: min_ruralite
       category: communiques
       url: https://www.cohesion-territoires.gouv.fr/presse
       format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     - id: min_enseignement_sup
       category: communiques
       # /fr/presse redirige vers /404. Nouveau slug stable : /fr/espace-presse-50621.
       url: https://www.enseignementsup-recherche.gouv.fr/fr/espace-presse-50621
       format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     # R19+ (2026-04-23) — Rapports IGESR (Inspection générale de l'éducation,
     # du sport et de la recherche). Page Drupal listant les rapports, pas de
@@ -467,6 +496,8 @@ ministeres:
       category: communiques
       url: https://www.enseignementsup-recherche.gouv.fr/fr/rapport-igesr
       format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
 
 autorites:
   sources:
@@ -480,6 +511,8 @@ autorites:
       url: https://www.agencedusport.fr/actualites
       format: html
       poids: 3
+      fetch_meta: true
+      fetch_meta_limit: 60
 
     # R15 (2026-04-22) — AFLD : passage en RSS officiel (WordPress).
     # La page /actualites/ en HTML ne remontait qu'1 item (le lien de nav
@@ -509,12 +542,22 @@ autorites:
       category: communiques
       url: https://www.arcom.fr/actualites
       format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     - id: anj
       category: communiques
       # /actualites renvoyait 404. Page officielle confirmée.
       url: https://anj.fr/communiques-de-presse
       format: html
+      # R22e-2 (2026-04-23) : le listing ANJ est un accordéon Drupal
+      # `<li><a>titre</a> (DD/MM/YYYY)</li>` — aucun chapo. Les pages
+      # article exposent un <meta name="description"> très riche qui cite
+      # régulièrement "paris sportifs en ligne" / "paris hippiques" dans
+      # les bilans macro. Sans cet enrichissement, des publications comme
+      # "Bilan 2025 du marché des jeux d'argent" ne matchent aucun keyword.
+      fetch_meta: true
+      fetch_meta_limit: 60
 
     # R22 (2026-04-23) — Cour des comptes : passage en RSS officiel.
     # La page HTML /fr/publications était en timeout chronique depuis R15
@@ -581,6 +624,8 @@ autorites:
       category: communiques
       url: https://www.autoritedelaconcurrence.fr/fr/communiques-de-presse
       format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     # R13-M (2026-04-21) — réactivation CNOSF via sitemap.xml Drupal.
     # Le site CNOSF est Nuxt (rendu JS côté client pour /actualites), donc
@@ -598,11 +643,17 @@ autorites:
       url: https://cnosf.franceolympique.com/sitemap.xml
       format: sitemap
       url_filter: ["/"]
+      # R22e-2 (2026-04-23) : sitemap sans chapo → enrichissement meta
+      # description pour que le matcher ait autre chose que le slug reconstitué.
+      fetch_meta: true
+      fetch_meta_limit: 60
 
     - id: france_paralympique
       category: communiques
       url: https://france-paralympique.fr/actualites/
       format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
 
     - id: alpes_2030_cojop
       category: communiques
