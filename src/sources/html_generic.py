@@ -294,12 +294,14 @@ def _chamber(domain: str) -> str:
     if "senat.fr" in d:
         return "Senat"
     # R13-M (2026-04-21) : hautes juridictions ajoutées en publications.
+    # R22 (2026-04-23) : Cassation sortie du scope (site JS-only, pas de
+    # flux officiel) — mapping retiré. AdlC ajoutée en remplacement.
     if "conseil-etat.fr" in d:
         return "CE"
     if "conseil-constitutionnel.fr" in d:
         return "CC"
-    if "courdecassation.fr" in d:
-        return "Cassation"
+    if "autoritedelaconcurrence.fr" in d:
+        return "AdlC"
     # R13-G (2026-04-21) : fix "Www" affiché pour tous les ministères dont
     # l'URL commence par www. (www.defense.gouv.fr, www.justice.gouv.fr,
     # etc.). `d.split(".")[0]` retournait toujours "www" → badge "Www" sur

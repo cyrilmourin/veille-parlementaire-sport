@@ -516,14 +516,17 @@ autorites:
       url: https://anj.fr/communiques-de-presse
       format: html
 
-    - id: cour_comptes
+    # R22 (2026-04-23) — Cour des comptes : passage en RSS officiel.
+    # La page HTML /fr/publications était en timeout chronique depuis R15
+    # (Drupal rendu lourd, 3×60s perdues par run). Le feed RSS officiel
+    # /rss/publications (redirigé 301 vers /fr/rss/publications) remonte
+    # ~30 items récents avec pubDate RFC 822 et descriptions HTML échappées.
+    # Vérifié live 2026-04-23 : HTTP 200, 13 Ko, items 2026-04 daily.
+    # Domaine déjà mappé `ccomptes.fr` → CourComptes dans _chamber().
+    - id: ccomptes_publications
       category: communiques
-      # ccomptes.fr : ConnectTimeout chronique (3×60s = 3 min perdues par
-      # run). À ré-activer après vérification manuelle du host, ou
-      # basculement sur un flux RSS officiel si disponible.
-      url: https://www.ccomptes.fr/fr/publications
-      format: html
-      enabled: false
+      url: https://www.ccomptes.fr/rss/publications
+      format: rss
 
     # R15 (2026-04-22) — Défenseur des droits : passage en RSS officiel.
     # /rss.xml renvoie un flux valide (49 Ko, dates ISO 2026-04 récentes)
@@ -561,20 +564,23 @@ autorites:
       url: https://qpc360.conseil-constitutionnel.fr/rss/decisions
       format: rss
 
-    # R15 (2026-04-22) — Cour de cassation : site protégé par anti-bot
-    # JavaScript (redirection `window.location.href=/redirect_XXXX/`
-    # sur TOUS les endpoints /, /actualites, /rss, /feed, /sitemap.xml).
-    # Même technologie que vie-publique.fr — insurmontable en pur HTTP.
-    # Pas de dataset data.gouv.fr d'actualités Cour de cassation (seul
-    # `Jurisprudence pseudonymisée` existe, mais pas de métadonnées
-    # d'actualité/communiqué). Les décisions de principe atterrissent
-    # au JORF (capturées par `dila_jorf`), donc la perte est limitée.
-    # Réactiver si un flux RSS officiel est annoncé ou via Playwright.
-    - id: cour_cassation
+    # R22 (2026-04-23) — Autorité de la concurrence : scraping HTML des
+    # communiqués de presse. Pas de flux RSS officiel exposé (404 sur toutes
+    # les variantes /rss, /feed, /actualites/rss). La page Drupal
+    # /fr/communiques-de-presse liste ~15 items récents avec la structure :
+    #   <div class="views-row">
+    #     <div class="search-index__header">
+    #       <time>16 avril 2026</time>
+    #       <h2><a href="/fr/communiques-de-presse/...">Titre</a></h2>
+    # → sélecteur "h2 a" de html_generic capte le <a>, _extract_date trouve
+    # la date française "16 avril 2026" dans le texte voisin (rayon 2 ancêtres).
+    # Domaine mappé `autoritedelaconcurrence.fr` → AdlC dans _chamber().
+    # Data.gouv.fr expose 2 datasets (sanctions 2009+, décisions 1988+) mais
+    # orientés archive structurée, pas actualité → on reste sur le HTML.
+    - id: autorite_concurrence
       category: communiques
-      url: https://www.courdecassation.fr/toutes-les-actualites
+      url: https://www.autoritedelaconcurrence.fr/fr/communiques-de-presse
       format: html
-      enabled: false
 
     # R13-M (2026-04-21) — réactivation CNOSF via sitemap.xml Drupal.
     # Le site CNOSF est Nuxt (rendu JS côté client pour /actualites), donc
