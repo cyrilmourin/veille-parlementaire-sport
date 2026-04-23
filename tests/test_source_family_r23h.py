@@ -1,13 +1,12 @@
-"""Tests R23-H (2026-04-23) + R23-O (2026-04-23) : helper `_source_family`
-utilise cote site_export pour poser `family_source` dans le frontmatter
-des items.
+"""Tests R23-H (2026-04-23) + R23-O (2026-04-23) + R25-F (2026-04-23) :
+helper `_source_family` utilise cote site_export pour poser `family_source`
+dans le frontmatter des items.
 
-5 familles stables + bucket "autres" (R23-O : split ancien `operateurs`
-en deux sous-familles `operateurs_publics` et `mouvement_sportif`) :
+5 familles stables + bucket "autres" :
   - parlement (AN, Senat)
   - gouvernement (Matignon, Elysee, ministeres)
-  - autorites (ANJ, AFLD, ARCOM, AdlC, CC, CE, DDD, Cour des comptes, IGESR)
-  - operateurs_publics (ANS, INSEP, INJEP — opérateurs publics de l'État)
+  - autorites (ANJ, ARCOM, AdlC, CC, CE, DDD, Cour des comptes)
+  - operateurs_publics (ANS, INSEP, INJEP, AFLD [R25-F], IGESR [R25-F])
   - mouvement_sportif (CNOSF, CPSF / France paralympique, FDSF)
   - jorf (DILA / journal officiel) — page dédiée, retiré du filtre UI
 """
@@ -68,10 +67,6 @@ def test_family_anj():
     assert _source_family("anj", "ANJ") == "autorites"
 
 
-def test_family_afld():
-    assert _source_family("afld", "AFLD") == "autorites"
-
-
 def test_family_arcom():
     assert _source_family("arcom", "ARCOM") == "autorites"
 
@@ -92,11 +87,7 @@ def test_family_ccomptes():
     assert _source_family("ccomptes_publications", "CourComptes") == "autorites"
 
 
-def test_family_igesr():
-    assert _source_family("igesr_rapports", "MinESR") == "autorites"
-
-
-# ---------- operateurs_publics (R23-O) -----------------------------------
+# ---------- operateurs_publics (R23-O + R25-F) ---------------------------
 
 def test_family_ans():
     assert _source_family("ans", "ANS") == "operateurs_publics"
@@ -108,6 +99,16 @@ def test_family_injep():
 
 def test_family_insep():
     assert _source_family("insep", "INSEP") == "operateurs_publics"
+
+
+def test_family_afld():
+    """R25-F (2026-04-23) : AFLD = EPA sport, pas AAI → operateurs_publics."""
+    assert _source_family("afld", "AFLD") == "operateurs_publics"
+
+
+def test_family_igesr():
+    """R25-F (2026-04-23) : IGESR = inspection État, reclassée opérateurs."""
+    assert _source_family("igesr_rapports", "MinESR") == "operateurs_publics"
 
 
 # ---------- mouvement_sportif (R23-O) ------------------------------------

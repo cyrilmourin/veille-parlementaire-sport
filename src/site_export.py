@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R23h"
+SYSTEM_VERSION_LABEL = "R25"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -119,10 +119,10 @@ HOMEPAGE_SNIPPET_CATEGORIES = {"questions", "amendements", "comptes_rendus"}
 SNIPPET_LEN_BY_CATEGORY: dict[str, int] = {
     "jorf": 500,
     "communiques": 500,
-    "amendements": 250,
+    # R25-B (2026-04-23) : amendements 250 -> 500, CR 500 -> 800 (Cyril).
+    "amendements": 500,
     "questions": 250,
-    # R13-K (2026-04-21) : CR 250 → 500 (au moins double demandé par Cyril).
-    "comptes_rendus": 500,
+    "comptes_rendus": 800,
     "agenda": 250,
     # dossiers_legislatifs : clé absente = pas de snippet sur la page
     # dédiée (demande user — les cartes dosleg portent déjà titre, type,
@@ -389,6 +389,32 @@ def _fix_question_row(r: dict) -> None:
         title,
     )
 
+    # 0quater) R25-C (2026-04-23) : dédup QAG vs question écrite.
+    #          Cyril a signalé la question n°0701G apparaissant sous le
+    #          libellé « Question écrite n°0701G » — impossible, le suffixe
+    #          « G » dans la numérotation Sénat indique une Question au
+    #          Gouvernement (QAG), jamais une question écrite (suffixe « S »).
+    #          Origine du bug : le CSV `senat_questions_1an` (ou certains
+    #          dumps historiques) contient parfois des QAG avec le label
+    #          "Question écrite", ce qui double avec l'entrée réelle du
+    #          CSV `senat_qg`. On remappe ici le libellé sur le suffixe
+    #          « G » pour rétablir la cohérence. La passe `_dedup` (title,
+    #          url) écarte ensuite le doublon si les deux rows existent.
+    #          Idempotent. Pattern large pour couvrir toute variation de
+    #          libellé Question * (écrite, orale sans débat, etc.) qui
+    #          aurait un numéro en G.
+    m_qag = re.match(r"^(Question[^\n]*?)\s+n°\s*(\d+G)\b", title)
+    if m_qag:
+        label_found = m_qag.group(1).strip()
+        num_g = m_qag.group(2)
+        if label_found.lower() != "question au gouvernement":
+            title = re.sub(
+                r"^Question[^\n]*?\s+n°\s*\d+G\b",
+                f"Question au gouvernement n°{num_g}",
+                title,
+                count=1,
+            )
+
     # 0bis) R13-L (2026-04-21) : retire l'auteur + groupe du titre
     #       (demande Cyril : l'auteur est déjà affiché comme .auteur-inline
     #       cliquable AVANT le titre, avec une barre verticale séparateur).
@@ -550,6 +576,123 @@ def _strip_cr_an_preamble(haystack: str, max_prefix: int = 600) -> str:
     return haystack
 
 
+# R23-N (2026-04-23) — enrichissement des questions Sénat par le cache
+# amendements Sénat pour exposer `auteur_photo_url` + `auteur_url`.
+#
+# Contexte :
+#   - Les CSV « amendements » Sénat contiennent une colonne « Fiche Sénateur »
+#     (cf. src/sources/senat_amendements.py) qui permet de construire
+#     l'URL du portrait carré via amo_loader.build_photo_url_senat().
+#   - Les CSV « questions » Sénat (senat_qg, senat_questions, senat_questions_1an)
+#     n'ont PAS cette colonne — on ne peut donc pas peupler auteur_photo_url
+#     à l'ingestion. D'où l'absence de portrait sur /items/questions/ côté
+#     Sénat, alors que les portraits AN étaient déjà servis via amo_loader
+#     (cache local PA→photo) et que les portraits Sénat sur amendements
+#     fonctionnent depuis R23-C5.
+#
+# Approche : on indexe les rows d'amendements Sénat par un nom d'auteur
+# normalisé (accent-free, civilité retirée, tokens triés). Puis on re-passe
+# sur les rows de questions Sénat et on injecte auteur_photo_url / auteur_url
+# quand le nom matche. Coût nul en réseau : toute l'info est déjà en mémoire.
+
+_CIV_TOKENS = {"m.", "mme", "mlle", "dr", "pr", "m", "mme.", "mlle."}
+
+
+def _normalize_auteur_name_senat(name: str) -> str:
+    """Normalise un nom de parlementaire pour lookup :
+    - passe en minuscules sans accents,
+    - retire la civilité (M. / Mme / Mlle / Dr / Pr),
+    - découpe en tokens, supprime tokens vides, trie alphabétiquement.
+
+    Résultat : « M. Dany WATTEBLED » et « WATTEBLED Dany » donnent tous
+    deux la même clé `"dany wattebled"`. Insensible à l'ordre nom/prénom
+    (le CSV Sénat livre tantôt "Nom Prénom", tantôt "Prénom Nom" selon
+    la source).
+    """
+    if not name:
+        return ""
+    from unidecode import unidecode
+    s = unidecode(name).lower().strip()
+    # Retire ponctuation courante (points des civilités, virgules).
+    s = re.sub(r"[.,;]", " ", s)
+    tokens = [t for t in s.split() if t and t not in _CIV_TOKENS]
+    if not tokens:
+        return ""
+    return " ".join(sorted(tokens))
+
+
+def _build_senat_photo_cache(rows: list[dict]) -> dict[str, tuple[str, str]]:
+    """Scanne les rows d'amendements Sénat et construit un index
+    `{clé_nom_normalisée: (auteur_photo_url, auteur_url)}` utilisable
+    pour enrichir les questions Sénat.
+
+    Les rows en entrée sont le retour de `_load(rows)` : `raw` est déjà
+    parsé en dict et contient `auteur`, `auteur_url`, `auteur_photo_url`
+    tels qu'exposés par le parser senat_amendements.
+    """
+    cache: dict[str, tuple[str, str]] = {}
+    for r in rows:
+        if (r.get("category") or "") != "amendements":
+            continue
+        if (r.get("chamber") or "") != "Senat":
+            continue
+        raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
+        photo = (raw.get("auteur_photo_url") or "").strip()
+        fiche = (raw.get("auteur_url") or "").strip()
+        if not photo and not fiche:
+            continue
+        auteur = (raw.get("auteur") or "").strip()
+        key = _normalize_auteur_name_senat(auteur)
+        if not key:
+            continue
+        # Si plusieurs rows pour le même sénateur, la première suffit
+        # (même slug senfic → même portrait).
+        cache.setdefault(key, (photo, fiche))
+    return cache
+
+
+def _enrich_senat_question_photo(r: dict, cache: dict[str, tuple[str, str]]) -> None:
+    """Injecte `auteur_photo_url` / `auteur_url` dans raw pour une question
+    Sénat dont l'auteur est connu via les amendements de la même période.
+
+    Idempotent : ne touche pas aux rows déjà pourvus d'une photo, ne
+    touche pas aux rows non-Sénat, ne touche pas aux rows dont le nom
+    n'est pas dans le cache.
+    """
+    if (r.get("category") or "") != "questions":
+        return
+    if (r.get("chamber") or "") != "Senat":
+        return
+    if not cache:
+        return
+    raw = r.get("raw") if isinstance(r.get("raw"), dict) else None
+    if not isinstance(raw, dict):
+        return
+    # Déjà enrichi (par amo_loader ou run précédent) : ne rien faire.
+    if (raw.get("auteur_photo_url") or "").strip():
+        return
+    # Reconstruit le nom depuis les colonnes CSV Sénat si dispo, sinon
+    # tombe sur raw["auteur"] (rarement peuplé pour les questions, mais
+    # un _fix_question_row futur pourrait l'être).
+    civ = (raw.get("Civilité") or raw.get("civilite") or "").strip()
+    prenom = (raw.get("Prénom") or raw.get("prenom") or "").strip()
+    nom = (raw.get("Nom") or raw.get("nom") or "").strip()
+    full = (raw.get("auteur") or "").strip()
+    candidate = " ".join(p for p in [civ, prenom, nom] if p).strip() or full
+    key = _normalize_auteur_name_senat(candidate)
+    if not key:
+        return
+    hit = cache.get(key)
+    if not hit:
+        return
+    photo, fiche = hit
+    if photo:
+        raw["auteur_photo_url"] = photo
+    if fiche and not raw.get("auteur_url"):
+        raw["auteur_url"] = fiche
+    r["raw"] = raw
+
+
 # R23-H (2026-04-23) — Regroupement des sources en 5 familles pour le
 # filtre UI exposé sur les pages /items/agenda/ et /items/communiques/.
 # Retourne un slug stable utilisé en `data-family-source` côté template.
@@ -559,12 +702,14 @@ def _strip_cr_an_preamble(haystack: str, max_prefix: int = 600) -> str:
 #   2. gouvernement        : Élysée, Matignon, info.gouv, ministères
 #                            (préfixes `elysee_`, `matignon_`,
 #                            `info_gouv_`, `min_`), agendas ministériels.
-#   3. operateurs_publics  : établissements/services publics sport
-#                            (ANS, INSEP, INJEP) rattachés aux ministères.
-#   4. autorites           : AAI + hautes juridictions + inspections
-#                            (AFLD, ARCOM, ANJ, Autorité concurrence,
-#                            Défenseur droits, Conseil d'État, Conseil
-#                            constitutionnel, Cour des comptes, IGESR).
+#   3. operateurs_publics  : établissements/services publics rattachés
+#                            aux ministères Sports / ESR (ANS, INSEP,
+#                            INJEP, AFLD [R25-F : EPA sport],
+#                            IGESR [R25-F : inspection État]).
+#   4. autorites           : AAI + hautes juridictions (ARCOM, ANJ,
+#                            Autorité concurrence, Défenseur droits,
+#                            Conseil d'État, Conseil constitutionnel,
+#                            Cour des comptes).
 #   5. mouvement_sportif   : associations / fondations sport (CNOSF,
 #                            CPSF/France paralympique, FDSF).
 #
@@ -589,10 +734,9 @@ _SOURCE_FAMILY_BY_PREFIX = (
     ("dila_jorf", "jorf"),
 )
 _SOURCE_FAMILY_BY_ID = {
-    # Autorités administratives indépendantes + hautes juridictions +
-    # inspections (R23-O : regroupées dans le bucket "autorites" à la
-    # demande de Cyril, plutôt qu'éclatées AAI vs Juridictions).
-    "afld": "autorites",
+    # Autorités administratives indépendantes + hautes juridictions
+    # (R23-O : regroupées dans le bucket "autorites" à la demande de
+    # Cyril, plutôt qu'éclatées AAI vs Juridictions).
     "anj": "autorites",
     "arcom": "autorites",
     "autorite_concurrence": "autorites",
@@ -601,7 +745,13 @@ _SOURCE_FAMILY_BY_ID = {
     "conseil_etat": "autorites",
     "defenseur_droits": "autorites",
     "ccomptes_publications": "autorites",
-    "igesr_rapports": "autorites",
+    # R25-F (2026-04-23) : AFLD et IGESR ne sont pas des autorités
+    # indépendantes : AFLD = EPA rattaché au ministère des Sports,
+    # IGESR = inspection interministérielle (service État). Ils vont
+    # désormais dans "operateurs_publics" pour matcher la lecture
+    # métier de Cyril (filtre Publications + Agenda).
+    "afld": "operateurs_publics",
+    "igesr_rapports": "operateurs_publics",
     # R23-O : opérateurs publics (établissements / services publics
     # rattachés aux ministères Sports / Jeunesse). Séparés du mouvement
     # sportif associatif pour donner deux boutons distincts au filtre.
@@ -1587,6 +1737,12 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # publication visible. On le fait AVANT _fix_* (évite du travail inutile
     # sur des items qu'on va jeter de toute façon).
     rows = _filter_disabled_sources(rows)
+    # R23-N (2026-04-23) : cache nom_auteur_normalisé → (photo, fiche) bâti
+    # depuis les amendements Sénat. Utilisé pour enrichir les questions Sénat
+    # qui, à l'ingestion, n'ont pas de colonne « Fiche Sénateur » exploitable.
+    # Bâti une seule fois avant la boucle, coût mémoire négligeable (~quelques
+    # centaines de clés).
+    senat_photo_cache = _build_senat_photo_cache(rows)
     for r in rows:
         _fix_cr_row(r)
         _fix_question_row(r)
@@ -1594,6 +1750,7 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
         _fix_dossier_row(r)
         _fix_amendement_row(r)
         _fix_chamber_row(r)
+        _enrich_senat_question_photo(r, senat_photo_cache)
     rows = _filter_window(rows)
     rows = _sort_by_date_desc(rows)
     # Dédup APRÈS tri par date : on garde la version la plus récente en cas

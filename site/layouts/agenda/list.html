@@ -42,7 +42,7 @@
     <button type="button" class="sff-btn" data-sff="parlement" aria-pressed="false">Parlement</button>
     <button type="button" class="sff-btn" data-sff="gouvernement" aria-pressed="false">Gouvernement</button>
     <button type="button" class="sff-btn" data-sff="operateurs_publics" aria-pressed="false">Opérateurs publics</button>
-    <button type="button" class="sff-btn" data-sff="autorites" aria-pressed="false">Autres Autorités</button>
+    <button type="button" class="sff-btn" data-sff="autorites" aria-pressed="false">Autres autorités</button>
     <button type="button" class="sff-btn" data-sff="mouvement_sportif" aria-pressed="false">Mouvement sportif</button>
   </nav>
 
@@ -52,7 +52,7 @@
     {{ range sort $upcoming "Date" "asc" }}
       <li{{ with .Params.family_source }} data-family-source="{{ . }}"{{ end }}>
         <div class="agenda-row">
-          {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
+          {{ with .Params.chamber }}{{ partial "chamber-badge.html" . }}{{ end }}
           {{ if eq (.Params.chamber | default "") "AN" }}
             <a class="title" href="https://www2.assemblee-nationale.fr/agendas/les-agendas" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
           {{ else if .Params.source_url }}
@@ -84,7 +84,7 @@
     {{ range (sort $past "Date" "desc") }}
       <li{{ with .Params.family_source }} data-family-source="{{ . }}"{{ end }}>
         <div class="agenda-row">
-          {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
+          {{ with .Params.chamber }}{{ partial "chamber-badge.html" . }}{{ end }}
           {{ if eq (.Params.chamber | default "") "AN" }}
             <a class="title" href="https://www2.assemblee-nationale.fr/agendas/les-agendas" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
           {{ else if .Params.source_url }}

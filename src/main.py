@@ -41,6 +41,58 @@ PING_STATE_PATH = ROOT / "data" / "ping_state.json"
 DEFAULT_TO = os.environ.get("DIGEST_TO", "cyrilmourin@sideline-conseil.fr")
 DEFAULT_SITE_URL = os.environ.get("SITE_URL", "https://veille.sideline-conseil.fr")
 
+# R25-H (2026-04-23) — bypass du filtre mots-clés pour les sources
+# 100% sport : tout le flux institutionnel doit remonter au site et au
+# digest même si un titre/chapô n'accroche aucun keyword (on ne veut pas
+# rater une publi ANS sur un appel à projet juste parce que le terme
+# "sport" n'apparaît pas dans le titre).
+#
+# Scope (demande Cyril) : publications uniquement (category == "communiques"),
+# sources dont le cœur de métier EST déjà le sport :
+#   - Opérateurs publics sport : ANS, INSEP, INJEP, AFLD
+#   - Mouvement sportif RUP    : CNOSF, CPSF/France paralympique, FDSF
+#   - MinSports (presse + actu) : tout le ministère est dans le scope
+#
+# Les autres sources (autorités généralistes type ARCOM/ANJ, autres
+# ministères) gardent le filtre keywords — sinon on inonde le digest
+# avec des communiqués hors sujet.
+#
+# Implémentation : on injecte un pseudo-keyword "(flux complet)" après
+# matcher.apply pour les items concernés qui ont matched_keywords vide.
+# Cela suffit à passer le filtre `matched_keywords != '[]'` dans
+# store.fetch_matched_since(). Le libellé est visible côté site comme
+# un kw-tag — voulu : Cyril saura que l'item est remonté "au titre de
+# la source" et pas d'un mot-clé métier.
+BYPASS_KEYWORDS_SOURCES: set[str] = {
+    "ans",
+    "insep",
+    "injep",
+    "afld",
+    "cnosf",
+    "france_paralympique",
+    "fdsf",
+    "min_sports_actualites",
+    "min_sports_presse",
+}
+BYPASS_KEYWORD_LABEL = "(flux complet)"
+
+
+def _apply_source_bypass(items) -> int:
+    """R25-H : injecte le pseudo-keyword sur items de sources bypass sans match.
+
+    Opère in-place. Retourne le nombre d'items enrichis (pour le log)."""
+    enriched = 0
+    for it in items:
+        if getattr(it, "matched_keywords", None):
+            continue
+        source_id = (getattr(it, "source_id", "") or "").strip().lower()
+        category = (getattr(it, "category", "") or "").strip().lower()
+        if source_id in BYPASS_KEYWORDS_SOURCES and category == "communiques":
+            it.matched_keywords = [BYPASS_KEYWORD_LABEL]
+            # keyword_families reste vide : ce n'est pas un match thématique.
+            enriched += 1
+    return enriched
+
 
 def _setup_logging(verbose: bool = False):
     logging.basicConfig(
@@ -61,8 +113,15 @@ def run(since_days: int = 1, send: bool = True, verbose: bool = False) -> int:
     # 2. Matching mots-clés
     matcher = KeywordMatcher(CONFIG_KEYWORDS)
     matcher.apply(items)
+    # R25-H (2026-04-23) — bypass keywords pour sources 100% sport
+    # (ANS, INSEP, INJEP, AFLD, CNOSF, CPSF, FDSF, MinSports). Voir
+    # BYPASS_KEYWORDS_SOURCES en tête de module.
+    bypassed = _apply_source_bypass(items)
     matched = [it for it in items if it.matched_keywords]
-    log.info("Matching : %d items matchés sur %d", len(matched), len(items))
+    log.info(
+        "Matching : %d items matchés sur %d (dont %d via bypass source)",
+        len(matched), len(items), bypassed,
+    )
 
     # 3. Persist
     store = Store(SQLITE_PATH)
@@ -124,6 +183,9 @@ def dry(verbose: bool = False) -> int:
     items, stats = normalize.run_all(CONFIG_SOURCES)
     matcher = KeywordMatcher(CONFIG_KEYWORDS)
     matcher.apply(items)
+    # R25-H : même règle de bypass qu'en mode run, pour que `dry` reflète
+    # fidèlement ce qui serait persisté et affiché sur le site.
+    _apply_source_bypass(items)
     matched = [it for it in items if it.matched_keywords]
     log.info("=== Dry-run ===")
     log.info("Total items : %d", len(items))

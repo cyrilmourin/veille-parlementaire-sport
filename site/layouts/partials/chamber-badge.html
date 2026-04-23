@@ -1,0 +1,28 @@
+{{/*
+  R25-D (2026-04-23) — partiel `chamber-badge`.
+
+  Rend un <span class="chamber" data-chamber="…">…</span> en remplaçant
+  le libellé visible par une forme longue lisible pour certaines valeurs
+  (demande Cyril : Conseil d'État, Conseil Constitutionnel, Cour des
+  Comptes — les codes courts "CE" / "CC" / "CourComptes" ne parlent pas
+  au lecteur humain).
+
+  Le `data-chamber` reste la valeur courte pour :
+    - continuer de cibler les règles CSS `.chamber[data-chamber="…"]`
+      (palette R25-E),
+    - garder une clé stable pour les filtres JS éventuels.
+
+  Paramètre attendu : le string chamber passé tel quel comme contexte
+  (dot) — ex. `{{ partial "chamber-badge.html" "CE" }}`.
+
+  Si la valeur n'est pas dans le mapping long, on retombe sur le code
+  court tel quel (comportement historique).
+*/}}
+{{ $labels := dict
+  "CE"          "Conseil d'État"
+  "CC"          "Conseil Constitutionnel"
+  "CourComptes" "Cour des Comptes"
+}}
+{{ $chamber := . }}
+{{ $display := index $labels $chamber | default $chamber -}}
+<span class="chamber" data-chamber="{{ $chamber }}">{{ $display }}</span>

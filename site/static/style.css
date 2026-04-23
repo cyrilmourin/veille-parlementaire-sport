@@ -324,7 +324,7 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--line);
 }
 .home .content ul li:last-child { border-bottom: none; }
-.home .content ul li a { color: var(--sl-blue); font-weight: 600; }
+.home .content ul li a { font-family: var(--font-title); color: var(--sl-blue); font-weight: 600; }
 .home .content ul li a:hover { color: var(--sl-red); text-decoration: none; }
 .home .content ul li small {
   display: block;
@@ -368,6 +368,61 @@ a:hover { text-decoration: underline; }
   background: #d7b800;
   color: #1b2235;
 }
+
+/* ----------------------------------------------------------------------- */
+/* R25-E (2026-04-23) — Palette couleurs fixes par chamber.
+   Avant : seuls AN / Senat / MinSports avaient une couleur dédiée, tout
+   le reste retombait sur --muted (gris). Cyril veut des couleurs fixes
+   pour chaque badge afin d'améliorer la lisibilité des listings denses.
+   Choix visuel :
+     * Gouvernement & ministères : gamme bleu marine / marine foncé
+       (couleur institutionnelle), nuancée par département.
+     * Autorités (AAI + hautes juridictions) : teintes chaudes et
+       bordeaux pour trancher avec le gouvernement (rôle contre-pouvoir).
+     * Opérateurs publics sport : palette orange / rouge vif (énergie).
+     * Mouvement sportif : bleu olympique + paralympique + vert FDSF.
+     * JORF / Alpes2030 : vert foncé + bleu montagne.
+   Les valeurs peuvent être ajustées plus tard (demande explicite Cyril :
+   "Les couleurs doivent être fixées, je les changeraient ensuite"). */
+
+/* ---- Gouvernement ---- */
+.chamber[data-chamber="Matignon"]        { background: #1b3b6f; color: #fff; }
+.chamber[data-chamber="Elysee"]          { background: #0e2d5a; color: #fff; }
+.chamber[data-chamber="MinARMEES"]       { background: #2c5f2d; color: #fff; }
+.chamber[data-chamber="MinJUSTICE"]      { background: #7b1e1e; color: #fff; }
+.chamber[data-chamber="MinINTERIEUR"]    { background: #424651; color: #fff; }
+.chamber[data-chamber="MinCULTURE"]      { background: #b34a6f; color: #fff; }
+.chamber[data-chamber="MinEDUCATION"]    { background: #1e5aa8; color: #fff; }
+.chamber[data-chamber="MinECO"]          { background: #0d7b68; color: #fff; }
+.chamber[data-chamber="MinSANTE"]        { background: #6a4e9e; color: #fff; }
+.chamber[data-chamber="MinTRAVAIL"]      { background: #d46b08; color: #fff; }
+.chamber[data-chamber="MinAFFAIRES"]     { background: #4a7a96; color: #fff; }
+.chamber[data-chamber="MinESR"]          { background: #805ad5; color: #fff; }
+.chamber[data-chamber="MinCOHESION"]     { background: #8a4e45; color: #fff; }
+
+/* ---- Autorités administratives indépendantes + hautes juridictions ---- */
+.chamber[data-chamber="ARCOM"]           { background: #e56b1f; color: #fff; }
+.chamber[data-chamber="ANJ"]             { background: #c3174d; color: #fff; }
+.chamber[data-chamber="AdlC"]            { background: #2d5f7f; color: #fff; }
+.chamber[data-chamber="CE"]              { background: #314b82; color: #fff; }
+.chamber[data-chamber="CC"]              { background: #8b1f3f; color: #fff; }
+.chamber[data-chamber="DDD"]             { background: #1d7355; color: #fff; }
+.chamber[data-chamber="CourComptes"]     { background: #4a3f2c; color: #fff; }
+
+/* ---- Opérateurs publics sport (ANS, INSEP, INJEP, AFLD) ---- */
+.chamber[data-chamber="AFLD"]            { background: #c84a4a; color: #fff; }
+.chamber[data-chamber="ANS"]             { background: #eb5f28; color: #fff; }
+.chamber[data-chamber="INJEP"]           { background: #008478; color: #fff; }
+.chamber[data-chamber="INSEP"]           { background: #e6005b; color: #fff; }
+
+/* ---- Mouvement sportif (CNOSF, CPSF, FDSF) ---- */
+.chamber[data-chamber="CNOSF"]           { background: #0055a4; color: #fff; }
+.chamber[data-chamber="CPSF"]            { background: #3e7bb7; color: #fff; }
+.chamber[data-chamber="FDSF"]            { background: #00a651; color: #fff; }
+
+/* ---- Autres (Alpes2030 COJOP, JORF) ---- */
+.chamber[data-chamber="Alpes2030"]       { background: #6c8bc4; color: #fff; }
+.chamber[data-chamber="JORF"]            { background: #0d6b40; color: #fff; }
 
 /* ---------- Badge statut procédural (dossiers législatifs) -------------- */
 /* Affiche l'étape de navette du dossier : "1ère lecture · commission",
@@ -484,6 +539,7 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--line);
 }
 .items li a.title {
+  font-family: var(--font-title);
   font-weight: 600;
   color: var(--sl-blue);
   font-size: 15.5px;
@@ -491,6 +547,7 @@ a:hover { text-decoration: underline; }
 .items li a.title:hover { color: var(--sl-red); text-decoration: none; }
 /* Item sans URL publique (ex : réunions AN) : rendu titre en texte simple */
 .items li .title.no-link {
+  font-family: var(--font-title);
   font-weight: 600;
   color: var(--sl-blue);
   font-size: 15.5px;
@@ -1516,6 +1573,7 @@ a:hover { text-decoration: underline; }
 }
 .listing .items { padding-left: 0; }
 .listing .items .title {
+  font-family: var(--font-title);
   font-size: 15px;
   font-weight: 700;
   color: var(--sl-blue);
@@ -1535,6 +1593,7 @@ a:hover { text-decoration: underline; }
    Placé AVANT le titre via .auteur-inline.
    R13-L : barre verticale séparateur .auteur-sep entre auteur et titre. */
 .auteur-inline {
+  font-family: var(--font-title);
   font-size: 15px;
   font-weight: 600;
   color: var(--sl-blue);

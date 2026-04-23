@@ -22,6 +22,8 @@ sys.path.insert(0, str(_ROOT))
 
 from src.site_export import (  # noqa: E402
     _amendement_chip,
+    _build_senat_photo_cache,
+    _enrich_senat_question_photo,
     _fix_agenda_row,
     _fix_amendement_row,
     _fix_chamber_row,
@@ -29,6 +31,7 @@ from src.site_export import (  # noqa: E402
     _fix_dossier_row,
     _fix_question_row,
     _load,
+    _normalize_auteur_name_senat,
     _strip_cr_an_preamble,
 )
 
@@ -824,3 +827,216 @@ def test_strip_cr_an_preamble_marker_beyond_max_prefix_ignored():
     prefix = "x" * 700
     raw = prefix + "Présidence de M. X."
     assert _strip_cr_an_preamble(raw) == raw
+
+
+# ---------- R23-N : cache photo Sénat depuis amendements -------------------
+
+def test_normalize_auteur_name_senat_basic():
+    """Ordre nom/prénom indifférent, civilité retirée."""
+    k1 = _normalize_auteur_name_senat("M. Dany WATTEBLED")
+    k2 = _normalize_auteur_name_senat("WATTEBLED Dany")
+    k3 = _normalize_auteur_name_senat("Dany Wattebled")
+    assert k1 == k2 == k3 == "dany wattebled"
+
+
+def test_normalize_auteur_name_senat_strips_accents():
+    """Les accents ne bloquent pas le matching (Mélanie Vogel/Vogel Mélanie)."""
+    k1 = _normalize_auteur_name_senat("Mme Mélanie VOGEL")
+    k2 = _normalize_auteur_name_senat("Vogel Mélanie")
+    assert k1 == k2 == "melanie vogel"
+
+
+def test_normalize_auteur_name_senat_empty():
+    assert _normalize_auteur_name_senat("") == ""
+    assert _normalize_auteur_name_senat("M.") == ""
+
+
+def test_build_senat_photo_cache_indexes_amendements_only():
+    """Le cache ne prend que les rows amendements Sénat avec photo non vide."""
+    rows = [
+        {
+            "category": "amendements",
+            "chamber": "Senat",
+            "raw": {
+                "auteur": "WATTEBLED Dany",
+                "auteur_url": "https://www.senat.fr/senfic/wattebled_dany19585h.html",
+                "auteur_photo_url": "https://www.senat.fr/senimg/wattebled_dany19585h_carre.jpg",
+            },
+        },
+        # Row amendement AN : ignoré (chamber != Senat).
+        {
+            "category": "amendements",
+            "chamber": "AN",
+            "raw": {
+                "auteur": "WATTEBLED Dany",
+                "auteur_photo_url": "autre.jpg",
+            },
+        },
+        # Row Sénat question : ignoré (pas amendement).
+        {
+            "category": "questions",
+            "chamber": "Senat",
+            "raw": {"auteur": "WATTEBLED Dany", "auteur_photo_url": "x.jpg"},
+        },
+    ]
+    cache = _build_senat_photo_cache(rows)
+    assert "dany wattebled" in cache
+    assert cache["dany wattebled"][0].endswith("_carre.jpg")
+    # Une seule entrée — ni AN, ni question n'ont alimenté le cache.
+    assert len(cache) == 1
+
+
+def test_build_senat_photo_cache_skips_rows_without_photo():
+    rows = [{
+        "category": "amendements",
+        "chamber": "Senat",
+        "raw": {"auteur": "DUPONT Jean", "auteur_photo_url": "", "auteur_url": ""},
+    }]
+    assert _build_senat_photo_cache(rows) == {}
+
+
+def test_enrich_senat_question_photo_injects_from_cache():
+    """Une question Sénat avec nom en cache reçoit photo + fiche."""
+    cache = {
+        "dany wattebled": (
+            "https://www.senat.fr/senimg/wattebled_dany19585h_carre.jpg",
+            "https://www.senat.fr/senfic/wattebled_dany19585h.html",
+        )
+    }
+    r = {
+        "category": "questions",
+        "chamber": "Senat",
+        "raw": {
+            "Civilité": "M.",
+            "Prénom": "Dany",
+            "Nom": "WATTEBLED",
+        },
+    }
+    _enrich_senat_question_photo(r, cache)
+    assert r["raw"]["auteur_photo_url"].endswith("_carre.jpg")
+    assert r["raw"]["auteur_url"].endswith(".html")
+
+
+def test_enrich_senat_question_photo_noop_if_already_populated():
+    """Idempotent : si la photo est déjà présente, on ne touche à rien."""
+    cache = {"dany wattebled": ("nouveau.jpg", "nouvelle_fiche.html")}
+    r = {
+        "category": "questions",
+        "chamber": "Senat",
+        "raw": {
+            "Prénom": "Dany",
+            "Nom": "WATTEBLED",
+            "auteur_photo_url": "existant.jpg",
+            "auteur_url": "existant.html",
+        },
+    }
+    _enrich_senat_question_photo(r, cache)
+    assert r["raw"]["auteur_photo_url"] == "existant.jpg"
+    assert r["raw"]["auteur_url"] == "existant.html"
+
+
+def test_enrich_senat_question_photo_ignores_non_senat():
+    """Les questions AN ne sont pas enrichies depuis le cache Sénat."""
+    cache = {"jean dupont": ("senat.jpg", "senat.html")}
+    r = {
+        "category": "questions",
+        "chamber": "AN",
+        "raw": {"Prénom": "Jean", "Nom": "DUPONT"},
+    }
+    _enrich_senat_question_photo(r, cache)
+    assert "auteur_photo_url" not in r["raw"]
+
+
+def test_enrich_senat_question_photo_uses_auteur_fallback():
+    """Si Civilité/Prénom/Nom sont absents, on tombe sur raw["auteur"]."""
+    cache = {"dany wattebled": ("p.jpg", "f.html")}
+    r = {
+        "category": "questions",
+        "chamber": "Senat",
+        "raw": {"auteur": "M. Dany WATTEBLED"},
+    }
+    _enrich_senat_question_photo(r, cache)
+    assert r["raw"]["auteur_photo_url"] == "p.jpg"
+
+
+def test_enrich_senat_question_photo_miss_returns_silently():
+    """Nom inconnu du cache → aucun changement, pas d'exception."""
+    cache = {"autre personne": ("x", "y")}
+    r = {
+        "category": "questions",
+        "chamber": "Senat",
+        "raw": {"Prénom": "Dany", "Nom": "WATTEBLED"},
+    }
+    _enrich_senat_question_photo(r, cache)
+    assert "auteur_photo_url" not in r["raw"]
+
+
+# ---------- R25-C : dédup QAG vs question écrite (numéro en « G ») ----------
+
+def test_fix_question_row_rewrites_question_ecrite_G_to_qag():
+    """n°0701G + label "Question écrite" → "Question au gouvernement n°0701G"."""
+    with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
+        r = {
+            "category": "questions",
+            "title": "Question écrite n°0701G : Financement du sport",
+            "raw": {},
+        }
+        _fix_question_row(r)
+    assert r["title"].startswith("Question au gouvernement n°0701G")
+    assert "Question écrite" not in r["title"]
+
+
+def test_fix_question_row_rewrites_1an_prefix_G_to_qag():
+    """Legacy préfixe "Question de +1 an sans réponse" sur numéro en G :
+    R23-D le réécrit d'abord en "Question écrite", puis R25-C le remappe
+    en "Question au gouvernement" vu le suffixe G."""
+    with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
+        r = {
+            "category": "questions",
+            "title": "Question de +1 an sans réponse n°0701G : sujet",
+            "raw": {},
+        }
+        _fix_question_row(r)
+    assert r["title"].startswith("Question au gouvernement n°0701G")
+    assert "+1 an" not in r["title"]
+    assert "Question écrite" not in r["title"]
+
+
+def test_fix_question_row_keeps_question_ecrite_S_suffix():
+    """Numéro en « S » (question écrite canonique) : pas de remap R25-C."""
+    with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
+        r = {
+            "category": "questions",
+            "title": "Question écrite n°1054S : sujet",
+            "raw": {},
+        }
+        _fix_question_row(r)
+    assert r["title"].startswith("Question écrite n°1054S")
+
+
+def test_fix_question_row_r25c_idempotent():
+    """Un titre déjà étiqueté "Question au gouvernement n°xxxG" ne change pas."""
+    with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
+        r = {
+            "category": "questions",
+            "title": "Question au gouvernement n°0701G : sujet",
+            "raw": {},
+        }
+        _fix_question_row(r)
+        after_first = r["title"]
+        _fix_question_row(r)
+        after_second = r["title"]
+    assert after_first == after_second
+    assert after_first.startswith("Question au gouvernement n°0701G")
+
+
+def test_fix_question_row_r25c_ignores_numeric_only_numero():
+    """Numéro purement numérique (AN questions écrites) : pas de remap R25-C."""
+    with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
+        r = {
+            "category": "questions",
+            "title": "Question écrite n°14369 : sujet",
+            "raw": {},
+        }
+        _fix_question_row(r)
+    assert r["title"].startswith("Question écrite n°14369")

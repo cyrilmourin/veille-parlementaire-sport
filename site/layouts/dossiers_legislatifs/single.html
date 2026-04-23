@@ -12,7 +12,7 @@
   </nav>
   <h1>{{ .Title }}</h1>
   <p class="meta">
-    {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
+    {{ with .Params.chamber }}{{ partial "chamber-badge.html" . }}{{ end }}
     {{ with .Params.status_label }}
       · <span class="status{{ if $.Params.is_promulgated }} status-promulgated{{ end }}">{{ . }}</span>
     {{ end }}

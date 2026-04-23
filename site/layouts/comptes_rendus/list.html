@@ -53,7 +53,7 @@
                 {{ $slug := cond (eq $lc "an") "an" "senat" }}
                 <img class="chamber-logo" src="/logos/{{ $slug }}.svg" alt="{{ . }}" title="{{ . }}" loading="lazy" decoding="async" onerror="this.style.display='none'" width="22" height="22">
               {{ else }}
-                <span class="chamber" data-chamber="{{ . }}">{{ . }}</span>
+                {{ partial "chamber-badge.html" . }}
               {{ end }}
             {{ end }}
             {{ if not .Date.IsZero }} · <time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ printf "%d %s %d" .Date.Day (index $monthsFR (int .Date.Month)) .Date.Year }}</time>{{ end }}
