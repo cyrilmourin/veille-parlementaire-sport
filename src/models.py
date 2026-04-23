@@ -41,6 +41,17 @@ class Item(BaseModel):
     keyword_families: list[str] = Field(default_factory=list)
     snippet: str = ""           # extrait contextuel autour du 1er match (~160 chars)
 
+    # R33 (2026-04-24) — Persistance des champs recalculés (audit §4.5).
+    # Ces colonnes sont nullable en DB et optionnelles sur l'Item :
+    # elles sont renseignées par les parseurs ou les fixups quand
+    # l'information est disponible, consommées directement par l'export
+    # (plus besoin de recalculer à chaque build). Non-renseignées =
+    # fallback vers la logique actuelle (raw.* ou recalcul).
+    dossier_id: Optional[str] = None      # clé canonique dosleg : "pjl24-630"
+    canonical_url: Optional[str] = None   # URL dossier quand elle existe, sinon URL source
+    status_label: Optional[str] = None    # état dosleg : "Adopté", "Retiré", etc.
+    content_hash: Optional[str] = None    # sha1(title+summary) pour détecter un refresh silencieux
+
     # Brut
     raw: dict = Field(default_factory=dict, repr=False)
 
