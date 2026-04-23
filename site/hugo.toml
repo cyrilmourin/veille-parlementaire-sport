@@ -1,6 +1,6 @@
 baseURL = "https://veille.sideline-conseil.fr/"
 languageCode = "fr-fr"
-title = "Veille parlementaire sport — Sideline Conseil"
+title = "Veille Institutionnelle Sport — Sideline Conseil"
 enableRobotsTXT = true
 
 # Défense en profondeur : ne pas masquer une page dont `date:` tombe dans le
