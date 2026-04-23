@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R22a"
+SYSTEM_VERSION_LABEL = "R22g"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -62,6 +62,14 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     # nombreux et restent référents longtemps : 180j est un meilleur
     # compromis.
     "comptes_rendus": 180,
+    # R22h (2026-04-23) : questions → 3 mois (au lieu de 30j par défaut).
+    # Cyril veut aligner la fenêtre sur l'attente utilisateur ("un dépôt ou
+    # une réponse depuis moins de 3 mois"). Le volume de questions reste
+    # maîtrisé et 90j permet de capter celles dont la réponse JO est
+    # publiée bien après le dépôt. Couplé à l'ajout de `questions` dans
+    # STRICT_DATED_CATEGORIES ci-dessous, ça garantit qu'aucun item sans
+    # `published_at` valide ne passe via le fallback `inserted_at`.
+    "questions": 90,
 }
 
 # Catégories pour lesquelles on exige une vraie `published_at` ≤ now (pas de
@@ -71,7 +79,12 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
 #   - des flux RSS legacy sans <pubDate>,
 #   - des « pages pivot » scrapées par html_generic (« Page suivante », « Presse »),
 #   - des agendas hebdo datés en fin de semaine à venir.
-STRICT_DATED_CATEGORIES = {"communiques", "dossiers_legislatifs"}
+#
+# R22h (2026-04-23) : `questions` ajouté. Sans ça, un item AN sans
+# `published_at` (XSD parfois vide sur dateJO/dateCloture/dateDepot) passait
+# via le fallback `inserted_at` même s'il avait été déposé il y a > 90j.
+# Cyril a signalé 17-11612QE (publié 2025-12-09, ~135j) visible en prod.
+STRICT_DATED_CATEGORIES = {"communiques", "dossiers_legislatifs", "questions"}
 
 # R13-G (2026-04-21) : sous-fenêtre appliquée UNIQUEMENT dans
 # `_write_home` (pas dans les pages /items/<cat>/). La fenêtre globale de
@@ -1882,6 +1895,33 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
             # nom résolu. Évite un reset DB complet.
             if auteur_label and title:
                 title = re.sub(r"Député PA\d+", auteur_label, title)
+            # R22g (2026-04-23) — legacy format pré-R13-L :
+            #   "M. Jean-François Coulomme | Question orale n°83 — PA795136 (LFI-NFP) : M."
+            # Le patch R13-L avait simplifié le titre en "{qtype} : {sujet}"
+            # mais les items déjà en base (cache GHA SQLite) gardent l'ancien
+            # format et on les voit apparaître au-delà de la 5e question sur
+            # la page /items/questions/. On réécrit à l'export en
+            # reconstruisant depuis `raw.analyse` / `tete_analyse` / `rubrique`.
+            # Détection large : tout titre de question contenant "PA\d+ (...)".
+            if cat == "questions" and title and re.search(r"PA\d+\s*\([^)]+\)", title):
+                # Extraction du qtype_label : première occurrence de
+                # "Question <mot(s)>" avant "n°".
+                qtype_m = re.search(
+                    r"\b(Question[^|]*?)\s*n°\s*\d+",
+                    title,
+                    re.IGNORECASE,
+                )
+                qtype_label = (qtype_m.group(1).strip() if qtype_m else "Question")
+                sujet_court = ""
+                if isinstance(raw, dict):
+                    sujet_court = (
+                        (raw.get("analyse") or "").strip()
+                        or (raw.get("tete_analyse") or "").strip()
+                        or (raw.get("rubrique") or "").strip()
+                    )
+                if not sujet_court:
+                    sujet_court = "Question"
+                title = f"{qtype_label} : {sujet_court}"[:220]
         status_label = status_label.replace('"', "'")
 
         fm = [
