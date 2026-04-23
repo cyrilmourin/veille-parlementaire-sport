@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R19"
+SYSTEM_VERSION_LABEL = "R22a"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -798,6 +798,54 @@ def _load(rows: list[dict]) -> list[dict]:
     return out
 
 
+def _load_disabled_source_ids(config_path: str = "config/sources.yml") -> set[str]:
+    """R22b (2026-04-23) — retourne l'ensemble des `source_id` marqués
+    `enabled: false` dans config/sources.yml.
+
+    Motivation : quand Cyril désactive une source (ex. `alpes_2030_news`
+    en R17, `senat_theme_sport_rss` en R19-B), le fetcher s'arrête mais
+    les items déjà en DB continuent d'être ré-exportés vers le site jusqu'à
+    expiration de la fenêtre (30j à 180j selon catégorie). Résultat : la
+    source est « disabled » mais ses items restent affichés pendant des
+    semaines.
+
+    On filtre donc à l'export pour rendre la désactivation d'une source
+    effective immédiatement sur le site, sans dépendre d'un reset DB
+    manuel.
+    """
+    try:
+        import yaml
+        with open(config_path, "r", encoding="utf-8") as fp:
+            cfg = yaml.safe_load(fp) or {}
+    except Exception:
+        return set()
+    disabled: set[str] = set()
+    if not isinstance(cfg, dict):
+        return disabled
+    for group in cfg.values():
+        if not isinstance(group, dict):
+            continue
+        for src in (group.get("sources") or []):
+            if not isinstance(src, dict):
+                continue
+            if src.get("enabled") is False:
+                sid = src.get("id")
+                if isinstance(sid, str) and sid.strip():
+                    disabled.add(sid.strip())
+    return disabled
+
+
+def _filter_disabled_sources(rows: list[dict]) -> list[dict]:
+    """R22b — retire les rows dont le `source_id` est marqué disabled
+    dans config/sources.yml. Idempotent, safe : si le fichier YAML est
+    introuvable ou mal formé, on ne filtre rien (retourne rows tels quels).
+    """
+    disabled = _load_disabled_source_ids()
+    if not disabled:
+        return rows
+    return [r for r in rows if (r.get("source_id") or "").strip() not in disabled]
+
+
 def _filter_window(rows: list[dict]) -> list[dict]:
     """Garde uniquement les items dont la date de PUBLICATION est dans la
     fenêtre applicable à leur catégorie (WINDOW_DAYS_BY_CATEGORY sinon
@@ -1290,6 +1338,14 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # Appliqué AVANT le filtre fenêtre pour que la fenêtre 30j s'applique
     # bien à la date de séance et pas à la date de compression du zip.
     rows = _load(rows)
+    # R22b (2026-04-23) : filtre les rows dont la source est marquée
+    # disabled dans config/sources.yml. Sans ce filtre, les items ingérés
+    # avant la désactivation d'une source (ex. alpes_2030_news depuis R17,
+    # senat_theme_sport_rss depuis R19-B) continuent d'apparaître sur le
+    # site pendant des semaines — jusqu'à expiration de la fenêtre de
+    # publication visible. On le fait AVANT _fix_* (évite du travail inutile
+    # sur des items qu'on va jeter de toute façon).
+    rows = _filter_disabled_sources(rows)
     for r in rows:
         _fix_cr_row(r)
         _fix_question_row(r)
