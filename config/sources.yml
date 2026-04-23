@@ -585,14 +585,19 @@ autorites:
     # R13-M (2026-04-21) — réactivation CNOSF via sitemap.xml Drupal.
     # Le site CNOSF est Nuxt (rendu JS côté client pour /actualites), donc
     # html_generic ne voyait aucun lien. Le sitemap XML officiel est
-    # statique, contient toutes les URLs d'articles avec <lastmod>. Le
-    # nouveau format "sitemap" dans html_generic filtre les URLs qui
-    # contiennent "actualit-"/"news-"/"communique" et reconstitue le titre
-    # depuis le slug.
+    # statique, contient toutes les URLs d'articles avec <lastmod>.
+    # R22c (2026-04-23) : CNOSF utilise des slugs plats à la racine
+    # (ex. /630-000-participants-pour-la-10eme-edition-de-la-sop), sans
+    # préfixe /actualites/. Le filtre URL par défaut (actualites|news|…)
+    # rejetait donc 100 % des articles → 0 item ingéré. `url_filter: ["/"]`
+    # désactive le filtre (tous les slugs contiennent "/"). Le keyword
+    # matcher fait ensuite le tri sur le titre reconstitué depuis le slug :
+    # sur 130 URLs sur 120 jours, ~49 matches légitimes (JO, CNOSF, etc.).
     - id: cnosf
       category: communiques
       url: https://cnosf.franceolympique.com/sitemap.xml
       format: sitemap
+      url_filter: ["/"]
 
     - id: france_paralympique
       category: communiques

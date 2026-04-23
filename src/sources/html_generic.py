@@ -116,16 +116,34 @@ def _from_sitemap_generic(src: dict) -> list[Item]:
     url_filter_patterns = src.get("url_filter") or [
         "actualites", "actualite", "actu-", "news", "communique", "presse",
     ]
+    # R22c (2026-04-23) : certaines sources (CNOSF/Drupal) publient un
+    # sitemap avec <loc> en protocol-relative (`domaine.tld/slug`, sans
+    # https://). On détecte et préfixe `https://` pour obtenir une URL
+    # absolue exploitable en aval (Hugo, recherche, etc.).
     for url_node in root.findall("s:url", ns):
         loc = (url_node.findtext("s:loc", namespaces=ns) or "").strip()
         if not loc:
             continue
+        # Normalisation protocol-relative → https://
+        if loc.startswith("//"):
+            loc = "https:" + loc
+        elif not loc.startswith(("http://", "https://")):
+            # Soit "/slug" (chemin absolu) → préfixer schema + domaine du sitemap.
+            # Soit "domaine.tld/slug" (CNOSF) → préfixer "https://".
+            if loc.startswith("/"):
+                loc = f"https://{domain}{loc}"
+            else:
+                loc = "https://" + loc
         # Filtre : doit matcher au moins un pattern "actualité-like".
         low = loc.lower()
         if not any(p in low for p in url_filter_patterns):
             continue
         last = parse_iso((url_node.findtext("s:lastmod", namespaces=ns) or "").strip())
-        if last and last < cutoff:
+        # R22c : skip si pas de lastmod (évite d'ingérer les pages racines,
+        # /en, /accueil sans date → published_at=None pollue les tris).
+        if not last:
+            continue
+        if last < cutoff:
             continue
         # Titre reconstruit depuis le slug du dernier segment.
         slug = loc.rstrip("/").rsplit("/", 1)[-1]
