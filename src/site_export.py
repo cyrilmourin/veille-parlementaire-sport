@@ -554,16 +554,28 @@ def _strip_cr_an_preamble(haystack: str, max_prefix: int = 600) -> str:
 # filtre UI exposé sur les pages /items/agenda/ et /items/communiques/.
 # Retourne un slug stable utilisé en `data-family-source` côté template.
 #
-# Mapping initial :
-#   - parlement : flux Assemblée nationale + Sénat (chambre AN / Senat).
-#   - gouvernement : Matignon, Élysée, ministères (source_id `min_*`,
-#     `matignon_*`, `info_gouv_*`), agendas ministériels.
-#   - autorites : autorités administratives indépendantes (ANJ, AFLD,
-#     ARCOM, AdlC, Conseil constitutionnel, Conseil d'État, Défenseur
-#     des droits, Cour des comptes, IGESR rapports).
-#   - operateurs : opérateurs du sport (ANS, INSEP, INJEP, CNOSF, CPSF /
-#     France paralympique).
-#   - jorf : journal officiel (dila_jorf), textes et nominations.
+# R23-O (2026-04-23) — refonte à 5 familles stables validées par Cyril :
+#   1. parlement           : flux AN + Sénat (chambre AN / Senat).
+#   2. gouvernement        : Élysée, Matignon, info.gouv, ministères
+#                            (préfixes `elysee_`, `matignon_`,
+#                            `info_gouv_`, `min_`), agendas ministériels.
+#   3. operateurs_publics  : établissements/services publics sport
+#                            (ANS, INSEP, INJEP) rattachés aux ministères.
+#   4. autorites           : AAI + hautes juridictions + inspections
+#                            (AFLD, ARCOM, ANJ, Autorité concurrence,
+#                            Défenseur droits, Conseil d'État, Conseil
+#                            constitutionnel, Cour des comptes, IGESR).
+#   5. mouvement_sportif   : associations / fondations sport (CNOSF,
+#                            CPSF/France paralympique, FDSF).
+#
+# Changements R23-O vs R23-H :
+#   - L'ancienne famille `operateurs` est splittée en deux :
+#       ans + injep + insep       -> `operateurs_publics`
+#       cnosf + france_paralympique + fdsf -> `mouvement_sportif`
+#   - La famille `jorf` est RETIRÉE du filtre : /items/jorf/ a sa page
+#     dédiée dans la nav principale, le JORF n'apparaît pas en catégorie
+#     `communiques` ni `agenda`. Le mapping `dila_jorf` est conservé
+#     pour `chamber` fallback mais n'est plus servi aux boutons filtre.
 #
 # Si un source_id/chamber ne matche rien, on retombe sur "autres" — le
 # filtre UI affiche alors un bucket générique.
@@ -577,7 +589,9 @@ _SOURCE_FAMILY_BY_PREFIX = (
     ("dila_jorf", "jorf"),
 )
 _SOURCE_FAMILY_BY_ID = {
-    # Autorités administratives indépendantes
+    # Autorités administratives indépendantes + hautes juridictions +
+    # inspections (R23-O : regroupées dans le bucket "autorites" à la
+    # demande de Cyril, plutôt qu'éclatées AAI vs Juridictions).
     "afld": "autorites",
     "anj": "autorites",
     "arcom": "autorites",
@@ -588,11 +602,17 @@ _SOURCE_FAMILY_BY_ID = {
     "defenseur_droits": "autorites",
     "ccomptes_publications": "autorites",
     "igesr_rapports": "autorites",
-    # Opérateurs / ecosysteme sport
-    "ans": "operateurs",
-    "injep": "operateurs",
-    "cnosf": "operateurs",
-    "france_paralympique": "operateurs",
+    # R23-O : opérateurs publics (établissements / services publics
+    # rattachés aux ministères Sports / Jeunesse). Séparés du mouvement
+    # sportif associatif pour donner deux boutons distincts au filtre.
+    "ans": "operateurs_publics",
+    "injep": "operateurs_publics",
+    "insep": "operateurs_publics",
+    # R23-O : mouvement sportif (associations RUP + fondation RUP
+    # adossée au CNOSF). Catégorie séparée des opérateurs publics.
+    "cnosf": "mouvement_sportif",
+    "france_paralympique": "mouvement_sportif",
+    "fdsf": "mouvement_sportif",
 }
 
 
@@ -1980,7 +2000,16 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
         # Si Hugo filtre à nouveau les items sans `date:` valide, on
         # retombera sur _default/list.html via SPECIFIC_LAYOUT_CATS=agenda
         # seul. À surveiller après le run R13-M.
-        SPECIFIC_LAYOUT_CATS = {"agenda", "dossiers_legislatifs"}
+        # R23-O (2026-04-23) : ajout `communiques`. Sans `type:
+        # "communiques"` dans le frontmatter, Hugo dérivait .Type depuis
+        # le premier segment sous content/ (`items`), et la condition
+        # `{{ if eq .Type "communiques" }}` dans _default/list.html
+        # tombait à faux -> filtre par famille de source invisible sur
+        # /items/communiques/ (R23-H). Communiques n'a PAS de layout
+        # dédié (layouts/communiques/list.html inexistant) : Hugo
+        # retombera sur _default/list.html qui rend correctement la
+        # page + le filtre une fois .Type résolu.
+        SPECIFIC_LAYOUT_CATS = {"agenda", "dossiers_legislatifs", "communiques"}
         lines = [
             "---",
             f'title: "{label}"',

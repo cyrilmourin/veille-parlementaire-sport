@@ -1,12 +1,15 @@
-"""Tests R23-H (2026-04-23) : helper `_source_family` utilise cote
-site_export pour poser `family_source` dans le frontmatter des items.
+"""Tests R23-H (2026-04-23) + R23-O (2026-04-23) : helper `_source_family`
+utilise cote site_export pour poser `family_source` dans le frontmatter
+des items.
 
-5 familles stables + bucket "autres" :
+5 familles stables + bucket "autres" (R23-O : split ancien `operateurs`
+en deux sous-familles `operateurs_publics` et `mouvement_sportif`) :
   - parlement (AN, Senat)
   - gouvernement (Matignon, Elysee, ministeres)
   - autorites (ANJ, AFLD, ARCOM, AdlC, CC, CE, DDD, Cour des comptes, IGESR)
-  - operateurs (ANS, INSEP, INJEP, CNOSF, CPSF / France paralympique)
-  - jorf (DILA / journal officiel)
+  - operateurs_publics (ANS, INSEP, INJEP — opérateurs publics de l'État)
+  - mouvement_sportif (CNOSF, CPSF / France paralympique, FDSF)
+  - jorf (DILA / journal officiel) — page dédiée, retiré du filtre UI
 """
 from __future__ import annotations
 
@@ -93,22 +96,32 @@ def test_family_igesr():
     assert _source_family("igesr_rapports", "MinESR") == "autorites"
 
 
-# ---------- operateurs ----------------------------------------------------
+# ---------- operateurs_publics (R23-O) -----------------------------------
 
 def test_family_ans():
-    assert _source_family("ans", "ANS") == "operateurs"
+    assert _source_family("ans", "ANS") == "operateurs_publics"
 
 
 def test_family_injep():
-    assert _source_family("injep", "INJEP") == "operateurs"
+    assert _source_family("injep", "INJEP") == "operateurs_publics"
 
+
+def test_family_insep():
+    assert _source_family("insep", "INSEP") == "operateurs_publics"
+
+
+# ---------- mouvement_sportif (R23-O) ------------------------------------
 
 def test_family_cnosf():
-    assert _source_family("cnosf", "CNOSF") == "operateurs"
+    assert _source_family("cnosf", "CNOSF") == "mouvement_sportif"
 
 
 def test_family_france_paralympique():
-    assert _source_family("france_paralympique", "CPSF") == "operateurs"
+    assert _source_family("france_paralympique", "CPSF") == "mouvement_sportif"
+
+
+def test_family_fdsf():
+    assert _source_family("fdsf", "FDSF") == "mouvement_sportif"
 
 
 # ---------- jorf ---------------------------------------------------------

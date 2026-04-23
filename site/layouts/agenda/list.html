@@ -30,17 +30,20 @@
   <h1>{{ .Title }}</h1>
   {{ with .Content }}<div class="intro">{{ . }}</div>{{ end }}
 
-  {{/* R23-H (2026-04-23) : filtre UI par famille de source. Toggle CSS
-       sur l'attribut data-family-source posé sur chaque <li>. Par défaut
-       toutes les familles sont visibles ; un bouton `aria-pressed="true"`
-       signale l'état actif, seul l'item correspondant reste visible. */}}
+  {{/* R23-H (2026-04-23) + R23-O (2026-04-23) : filtre UI par famille
+       de source. Toggle CSS sur l'attribut data-family-source posé sur
+       chaque <li>. Par défaut toutes les familles sont visibles ; un
+       bouton `aria-pressed="true"` signale l'état actif, seul l'item
+       correspondant reste visible.
+       R23-O : 5 familles stables validées par Cyril, retrait du bouton
+       JORF (page dédiée dans la nav), split Opérateurs / Mouvement. */}}
   <nav class="source-family-filter" aria-label="Filtrer par famille de source">
     <button type="button" class="sff-btn" data-sff="all" aria-pressed="true">Tout</button>
     <button type="button" class="sff-btn" data-sff="parlement" aria-pressed="false">Parlement</button>
     <button type="button" class="sff-btn" data-sff="gouvernement" aria-pressed="false">Gouvernement</button>
-    <button type="button" class="sff-btn" data-sff="autorites" aria-pressed="false">Autorités</button>
-    <button type="button" class="sff-btn" data-sff="operateurs" aria-pressed="false">Opérateurs sport</button>
-    <button type="button" class="sff-btn" data-sff="jorf" aria-pressed="false">JORF</button>
+    <button type="button" class="sff-btn" data-sff="operateurs_publics" aria-pressed="false">Opérateurs publics</button>
+    <button type="button" class="sff-btn" data-sff="autorites" aria-pressed="false">Autres Autorités</button>
+    <button type="button" class="sff-btn" data-sff="mouvement_sportif" aria-pressed="false">Mouvement sportif</button>
   </nav>
 
   {{ if $upcoming }}
