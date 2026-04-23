@@ -1,0 +1,2790 @@
+{
+  "source_url": "https://www.senat.fr/senateurs/senatl.html",
+  "count": 348,
+  "entries": [
+    {
+      "slug": "aeschlimann_marie_do21071f",
+      "nom_usuel": "AESCHLIMANN",
+      "prenom_usuel": "Marie-Do",
+      "key": "aeschlimann marie-do",
+      "photo_url": "https://www.senat.fr/senimg/aeschlimann_marie_do21071f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/aeschlimann_marie_do21071f.html"
+    },
+    {
+      "slug": "allizard_pascal14133k",
+      "nom_usuel": "ALLIZARD",
+      "prenom_usuel": "Pascal",
+      "key": "allizard pascal",
+      "photo_url": "https://www.senat.fr/senimg/allizard_pascal14133k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/allizard_pascal14133k.html"
+    },
+    {
+      "slug": "anglars_jean_claude20032t",
+      "nom_usuel": "ANGLARS",
+      "prenom_usuel": "Jean-Claude",
+      "key": "anglars jean-claude",
+      "photo_url": "https://www.senat.fr/senimg/anglars_jean_claude20032t_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/anglars_jean_claude20032t.html"
+    },
+    {
+      "slug": "antoine_jocelyne21042a",
+      "nom_usuel": "ANTOINE",
+      "prenom_usuel": "Jocelyne",
+      "key": "antoine jocelyne",
+      "photo_url": "https://www.senat.fr/senimg/antoine_jocelyne21042a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/antoine_jocelyne21042a.html"
+    },
+    {
+      "slug": "apourceau_poly_cathy19760e",
+      "nom_usuel": "APOURCEAU-POLY",
+      "prenom_usuel": "Cathy",
+      "key": "apourceau-poly cathy",
+      "photo_url": "https://www.senat.fr/senimg/apourceau_poly_cathy19760e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/apourceau_poly_cathy19760e.html"
+    },
+    {
+      "slug": "arnaud_jean_michel14189c",
+      "nom_usuel": "ARNAUD",
+      "prenom_usuel": "Jean-Michel",
+      "key": "arnaud jean-michel",
+      "photo_url": "https://www.senat.fr/senimg/arnaud_jean_michel14189c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/arnaud_jean_michel14189c.html"
+    },
+    {
+      "slug": "artigalas_viviane19631v",
+      "nom_usuel": "ARTIGALAS",
+      "prenom_usuel": "Viviane",
+      "key": "artigalas viviane",
+      "photo_url": "https://www.senat.fr/senimg/artigalas_viviane19631v_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/artigalas_viviane19631v.html"
+    },
+    {
+      "slug": "bacchi_jeremy20112s",
+      "nom_usuel": "BACCHI",
+      "prenom_usuel": "Jérémy",
+      "key": "bacchi jeremy",
+      "photo_url": "https://www.senat.fr/senimg/bacchi_jeremy20112s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bacchi_jeremy20112s.html"
+    },
+    {
+      "slug": "bacci_jean20076g",
+      "nom_usuel": "BACCI",
+      "prenom_usuel": "Jean",
+      "key": "bacci jean",
+      "photo_url": "https://www.senat.fr/senimg/bacci_jean20076g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bacci_jean20076g.html"
+    },
+    {
+      "slug": "barros_pierre21084l",
+      "nom_usuel": "BARROS",
+      "prenom_usuel": "Pierre",
+      "key": "barros pierre",
+      "photo_url": "https://www.senat.fr/senimg/barros_pierre21084l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/barros_pierre21084l.html"
+    },
+    {
+      "slug": "basquin_alexandre21460q",
+      "nom_usuel": "BASQUIN",
+      "prenom_usuel": "Alexandre",
+      "key": "alexandre basquin",
+      "photo_url": "https://www.senat.fr/senimg/basquin_alexandre21460q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/basquin_alexandre21460q.html"
+    },
+    {
+      "slug": "bazin_arnaud19667j",
+      "nom_usuel": "BAZIN",
+      "prenom_usuel": "Arnaud",
+      "key": "arnaud bazin",
+      "photo_url": "https://www.senat.fr/senimg/bazin_arnaud19667j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bazin_arnaud19667j.html"
+    },
+    {
+      "slug": "belim_audrey21035b",
+      "nom_usuel": "BÉLIM",
+      "prenom_usuel": "Audrey",
+      "key": "audrey belim",
+      "photo_url": "https://www.senat.fr/senimg/belim_audrey21035b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/belim_audrey21035b.html"
+    },
+    {
+      "slug": "belin_bruno20024t",
+      "nom_usuel": "BELIN",
+      "prenom_usuel": "Bruno",
+      "key": "belin bruno",
+      "photo_url": "https://www.senat.fr/senimg/belin_bruno20024t_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/belin_bruno20024t.html"
+    },
+    {
+      "slug": "bellamy_marie_jeanne21125c",
+      "nom_usuel": "BELLAMY",
+      "prenom_usuel": "Marie-Jeanne",
+      "key": "bellamy marie-jeanne",
+      "photo_url": "https://www.senat.fr/senimg/bellamy_marie_jeanne21125c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bellamy_marie_jeanne21125c.html"
+    },
+    {
+      "slug": "bellurot_nadine20022r",
+      "nom_usuel": "BELLUROT",
+      "prenom_usuel": "Nadine",
+      "key": "bellurot nadine",
+      "photo_url": "https://www.senat.fr/senimg/bellurot_nadine20022r_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bellurot_nadine20022r.html"
+    },
+    {
+      "slug": "belrhiti_catherine19954n",
+      "nom_usuel": "BELRHITI",
+      "prenom_usuel": "Catherine",
+      "key": "belrhiti catherine",
+      "photo_url": "https://www.senat.fr/senimg/belrhiti_catherine19954n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/belrhiti_catherine19954n.html"
+    },
+    {
+      "slug": "benarroche_guy20110q",
+      "nom_usuel": "BENARROCHE",
+      "prenom_usuel": "Guy",
+      "key": "benarroche guy",
+      "photo_url": "https://www.senat.fr/senimg/benarroche_guy20110q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/benarroche_guy20110q.html"
+    },
+    {
+      "slug": "berthet_martine19575f",
+      "nom_usuel": "BERTHET",
+      "prenom_usuel": "Martine",
+      "key": "berthet martine",
+      "photo_url": "https://www.senat.fr/senimg/berthet_martine19575f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/berthet_martine19575f.html"
+    },
+    {
+      "slug": "bessin_guerin_marie_pierre21514m",
+      "nom_usuel": "BESSIN-GUÉRIN",
+      "prenom_usuel": "Marie-Pierre",
+      "key": "bessin-guerin marie-pierre",
+      "photo_url": "https://www.senat.fr/senimg/bessin_guerin_marie_pierre21514m_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bessin_guerin_marie_pierre21514m.html"
+    },
+    {
+      "slug": "bilhac_christian20116w",
+      "nom_usuel": "BILHAC",
+      "prenom_usuel": "Christian",
+      "key": "bilhac christian",
+      "photo_url": "https://www.senat.fr/senimg/bilhac_christian20116w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bilhac_christian20116w.html"
+    },
+    {
+      "slug": "billon_annick14030q",
+      "nom_usuel": "BILLON",
+      "prenom_usuel": "Annick",
+      "key": "annick billon",
+      "photo_url": "https://www.senat.fr/senimg/billon_annick14030q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/billon_annick14030q.html"
+    },
+    {
+      "slug": "bitz_olivier21043b",
+      "nom_usuel": "BITZ",
+      "prenom_usuel": "Olivier",
+      "key": "bitz olivier",
+      "photo_url": "https://www.senat.fr/senimg/bitz_olivier21043b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bitz_olivier21043b.html"
+    },
+    {
+      "slug": "blanc_etienne17367q",
+      "nom_usuel": "BLANC",
+      "prenom_usuel": "Étienne",
+      "key": "blanc etienne",
+      "photo_url": "https://www.senat.fr/senimg/blanc_etienne17367q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/blanc_etienne17367q.html"
+    },
+    {
+      "slug": "blanc_gregory21048g",
+      "nom_usuel": "BLANC",
+      "prenom_usuel": "Grégory",
+      "key": "blanc gregory",
+      "photo_url": "https://www.senat.fr/senimg/blanc_gregory21048g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/blanc_gregory21048g.html"
+    },
+    {
+      "slug": "blanc_jean_baptiste20086j",
+      "nom_usuel": "BLANC",
+      "prenom_usuel": "Jean-Baptiste",
+      "key": "blanc jean-baptiste",
+      "photo_url": "https://www.senat.fr/senimg/blanc_jean_baptiste20086j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/blanc_jean_baptiste20086j.html"
+    },
+    {
+      "slug": "blatrix_contat_florence20094j",
+      "nom_usuel": "BLATRIX CONTAT",
+      "prenom_usuel": "Florence",
+      "key": "blatrix contat florence",
+      "photo_url": "https://www.senat.fr/senimg/blatrix_contat_florence20094j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/blatrix_contat_florence20094j.html"
+    },
+    {
+      "slug": "bleunven_yves21050a",
+      "nom_usuel": "BLEUNVEN",
+      "prenom_usuel": "Yves",
+      "key": "bleunven yves",
+      "photo_url": "https://www.senat.fr/senimg/bleunven_yves21050a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bleunven_yves21050a.html"
+    },
+    {
+      "slug": "boileau_pierre21584c",
+      "nom_usuel": "BOILEAU",
+      "prenom_usuel": "Pierre",
+      "key": "boileau pierre",
+      "photo_url": "https://www.senat.fr/senimg/boileau_pierre21584c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/boileau_pierre21584c.html"
+    },
+    {
+      "slug": "bonfanti_dossat_christine19367y",
+      "nom_usuel": "BONFANTI-DOSSAT",
+      "prenom_usuel": "Christine",
+      "key": "bonfanti-dossat christine",
+      "photo_url": "https://www.senat.fr/senimg/bonfanti_dossat_christine19367y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bonfanti_dossat_christine19367y.html"
+    },
+    {
+      "slug": "bonhomme_francois14069u",
+      "nom_usuel": "BONHOMME",
+      "prenom_usuel": "François",
+      "key": "bonhomme francois",
+      "photo_url": "https://www.senat.fr/senimg/bonhomme_francois14069u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bonhomme_francois14069u.html"
+    },
+    {
+      "slug": "bonneau_francois20042v",
+      "nom_usuel": "BONNEAU",
+      "prenom_usuel": "François",
+      "key": "bonneau francois",
+      "photo_url": "https://www.senat.fr/senimg/bonneau_francois20042v_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bonneau_francois20042v.html"
+    },
+    {
+      "slug": "bonnefoy_nicole08060w",
+      "nom_usuel": "BONNEFOY",
+      "prenom_usuel": "Nicole",
+      "key": "bonnefoy nicole",
+      "photo_url": "https://www.senat.fr/senimg/bonnefoy_nicole08060w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bonnefoy_nicole08060w.html"
+    },
+    {
+      "slug": "bonnus_michel20078j",
+      "nom_usuel": "BONNUS",
+      "prenom_usuel": "Michel",
+      "key": "bonnus michel",
+      "photo_url": "https://www.senat.fr/senimg/bonnus_michel20078j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bonnus_michel20078j.html"
+    },
+    {
+      "slug": "borchio_fontimp_alexandra20138d",
+      "nom_usuel": "BORCHIO FONTIMP",
+      "prenom_usuel": "Alexandra",
+      "key": "alexandra borchio fontimp",
+      "photo_url": "https://www.senat.fr/senimg/borchio_fontimp_alexandra20138d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/borchio_fontimp_alexandra20138d.html"
+    },
+    {
+      "slug": "bouad_denis20088l",
+      "nom_usuel": "BOUAD",
+      "prenom_usuel": "Denis",
+      "key": "bouad denis",
+      "photo_url": "https://www.senat.fr/senimg/bouad_denis20088l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bouad_denis20088l.html"
+    },
+    {
+      "slug": "bourcier_corinne21046e",
+      "nom_usuel": "BOURCIER",
+      "prenom_usuel": "Corinne",
+      "key": "bourcier corinne",
+      "photo_url": "https://www.senat.fr/senimg/bourcier_corinne21046e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bourcier_corinne21046e.html"
+    },
+    {
+      "slug": "bourgi_hussein20114u",
+      "nom_usuel": "BOURGI",
+      "prenom_usuel": "Hussein",
+      "key": "bourgi hussein",
+      "photo_url": "https://www.senat.fr/senimg/bourgi_hussein20114u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bourgi_hussein20114u.html"
+    },
+    {
+      "slug": "bourguignon_brigitte18045d",
+      "nom_usuel": "BOURGUIGNON",
+      "prenom_usuel": "Brigitte",
+      "key": "bourguignon brigitte",
+      "photo_url": "https://www.senat.fr/senimg/bourguignon_brigitte18045d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bourguignon_brigitte18045d.html"
+    },
+    {
+      "slug": "boyer_jean_marc19383y",
+      "nom_usuel": "BOYER",
+      "prenom_usuel": "Jean-Marc",
+      "key": "boyer jean-marc",
+      "photo_url": "https://www.senat.fr/senimg/boyer_jean_marc19383y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/boyer_jean_marc19383y.html"
+    },
+    {
+      "slug": "boyer_valerie17737w",
+      "nom_usuel": "BOYER",
+      "prenom_usuel": "Valérie",
+      "key": "boyer valerie",
+      "photo_url": "https://www.senat.fr/senimg/boyer_valerie17737w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/boyer_valerie17737w.html"
+    },
+    {
+      "slug": "brault_jean_luc21052c",
+      "nom_usuel": "BRAULT",
+      "prenom_usuel": "Jean-Luc",
+      "key": "brault jean-luc",
+      "photo_url": "https://www.senat.fr/senimg/brault_jean_luc21052c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/brault_jean_luc21052c.html"
+    },
+    {
+      "slug": "briante_guillemont_sophie21404g",
+      "nom_usuel": "BRIANTE GUILLEMONT",
+      "prenom_usuel": "Sophie",
+      "key": "briante guillemont sophie",
+      "photo_url": "https://www.senat.fr/senimg/briante_guillemont_sophie21404g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/briante_guillemont_sophie21404g.html"
+    },
+    {
+      "slug": "briquet_isabelle20080c",
+      "nom_usuel": "BRIQUET",
+      "prenom_usuel": "Isabelle",
+      "key": "briquet isabelle",
+      "photo_url": "https://www.senat.fr/senimg/briquet_isabelle20080c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/briquet_isabelle20080c.html"
+    },
+    {
+      "slug": "brisson_max19621t",
+      "nom_usuel": "BRISSON",
+      "prenom_usuel": "Max",
+      "key": "brisson max",
+      "photo_url": "https://www.senat.fr/senimg/brisson_max19621t_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/brisson_max19621t.html"
+    },
+    {
+      "slug": "brossat_ian21088q",
+      "nom_usuel": "BROSSAT",
+      "prenom_usuel": "Ian",
+      "key": "brossat ian",
+      "photo_url": "https://www.senat.fr/senimg/brossat_ian21088q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/brossat_ian21088q.html"
+    },
+    {
+      "slug": "brossel_colombe21089r",
+      "nom_usuel": "BROSSEL",
+      "prenom_usuel": "Colombe",
+      "key": "brossel colombe",
+      "photo_url": "https://www.senat.fr/senimg/brossel_colombe21089r_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/brossel_colombe21089r.html"
+    },
+    {
+      "slug": "brulin_celine19758l",
+      "nom_usuel": "BRULIN",
+      "prenom_usuel": "Céline",
+      "key": "brulin celine",
+      "photo_url": "https://www.senat.fr/senimg/brulin_celine19758l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/brulin_celine19758l.html"
+    },
+    {
+      "slug": "bruyen_christian21063f",
+      "nom_usuel": "BRUYEN",
+      "prenom_usuel": "Christian",
+      "key": "bruyen christian",
+      "photo_url": "https://www.senat.fr/senimg/bruyen_christian21063f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/bruyen_christian21063f.html"
+    },
+    {
+      "slug": "buffet_francois_noel04047h",
+      "nom_usuel": "BUFFET",
+      "prenom_usuel": "François-Noël",
+      "key": "buffet francois-noel",
+      "photo_url": "https://www.senat.fr/senimg/buffet_francois_noel04047h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/buffet_francois_noel04047h.html"
+    },
+    {
+      "slug": "buis_bernard19782l",
+      "nom_usuel": "BUIS",
+      "prenom_usuel": "Bernard",
+      "key": "bernard buis",
+      "photo_url": "https://www.senat.fr/senimg/buis_bernard19782l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/buis_bernard19782l.html"
+    },
+    {
+      "slug": "burgoa_laurent20090e",
+      "nom_usuel": "BURGOA",
+      "prenom_usuel": "Laurent",
+      "key": "burgoa laurent",
+      "photo_url": "https://www.senat.fr/senimg/burgoa_laurent20090e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/burgoa_laurent20090e.html"
+    },
+    {
+      "slug": "buval_frederic21096q",
+      "nom_usuel": "BUVAL",
+      "prenom_usuel": "Frédéric",
+      "key": "buval frederic",
+      "photo_url": "https://www.senat.fr/senimg/buval_frederic21096q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/buval_frederic21096q.html"
+    },
+    {
+      "slug": "cabanel_henri14207l",
+      "nom_usuel": "CABANEL",
+      "prenom_usuel": "Henri",
+      "key": "cabanel henri",
+      "photo_url": "https://www.senat.fr/senimg/cabanel_henri14207l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/cabanel_henri14207l.html"
+    },
+    {
+      "slug": "cadec_alain20104s",
+      "nom_usuel": "CADEC",
+      "prenom_usuel": "Alain",
+      "key": "alain cadec",
+      "photo_url": "https://www.senat.fr/senimg/cadec_alain20104s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/cadec_alain20104s.html"
+    },
+    {
+      "slug": "cadic_olivier14255u",
+      "nom_usuel": "CADIC",
+      "prenom_usuel": "Olivier",
+      "key": "cadic olivier",
+      "photo_url": "https://www.senat.fr/senimg/cadic_olivier14255u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/cadic_olivier14255u.html"
+    },
+    {
+      "slug": "cambier_guislain21083k",
+      "nom_usuel": "CAMBIER",
+      "prenom_usuel": "Guislain",
+      "key": "cambier guislain",
+      "photo_url": "https://www.senat.fr/senimg/cambier_guislain21083k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/cambier_guislain21083k.html"
+    },
+    {
+      "slug": "cambon_christian04042c",
+      "nom_usuel": "CAMBON",
+      "prenom_usuel": "Christian",
+      "key": "cambon christian",
+      "photo_url": "https://www.senat.fr/senimg/cambon_christian04042c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/cambon_christian04042c.html"
+    },
+    {
+      "slug": "canales_marion21045d",
+      "nom_usuel": "CANALÈS",
+      "prenom_usuel": "Marion",
+      "key": "canales marion",
+      "photo_url": "https://www.senat.fr/senimg/canales_marion21045d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/canales_marion21045d.html"
+    },
+    {
+      "slug": "canayer_agnes14053l",
+      "nom_usuel": "CANAYER",
+      "prenom_usuel": "Agnès",
+      "key": "agnes canayer",
+      "photo_url": "https://www.senat.fr/senimg/canayer_agnes14053l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/canayer_agnes14053l.html"
+    },
+    {
+      "slug": "canevet_michel14083s",
+      "nom_usuel": "CANÉVET",
+      "prenom_usuel": "Michel",
+      "key": "canevet michel",
+      "photo_url": "https://www.senat.fr/senimg/canevet_michel14083s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/canevet_michel14083s.html"
+    },
+    {
+      "slug": "capo_canellas_vincent11053k",
+      "nom_usuel": "CAPO-CANELLAS",
+      "prenom_usuel": "Vincent",
+      "key": "capo-canellas vincent",
+      "photo_url": "https://www.senat.fr/senimg/capo_canellas_vincent11053k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/capo_canellas_vincent11053k.html"
+    },
+    {
+      "slug": "capus_emmanuel19545y",
+      "nom_usuel": "CAPUS",
+      "prenom_usuel": "Emmanuel",
+      "key": "capus emmanuel",
+      "photo_url": "https://www.senat.fr/senimg/capus_emmanuel19545y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/capus_emmanuel19545y.html"
+    },
+    {
+      "slug": "cardon_remi20060x",
+      "nom_usuel": "CARDON",
+      "prenom_usuel": "Rémi",
+      "key": "cardon remi",
+      "photo_url": "https://www.senat.fr/senimg/cardon_remi20060x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/cardon_remi20060x.html"
+    },
+    {
+      "slug": "carlotti_marie_arlette12028b",
+      "nom_usuel": "CARLOTTI",
+      "prenom_usuel": "Marie-Arlette",
+      "key": "carlotti marie-arlette",
+      "photo_url": "https://www.senat.fr/senimg/carlotti_marie_arlette12028b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/carlotti_marie_arlette12028b.html"
+    },
+    {
+      "slug": "carrere_gee_marie_claire21090j",
+      "nom_usuel": "CARRÈRE-GÉE",
+      "prenom_usuel": "Marie-Claire",
+      "key": "carrere-gee marie-claire",
+      "photo_url": "https://www.senat.fr/senimg/carrere_gee_marie_claire21090j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/carrere_gee_marie_claire21090j.html"
+    },
+    {
+      "slug": "carrere_maryse19629c",
+      "nom_usuel": "CARRÈRE",
+      "prenom_usuel": "Maryse",
+      "key": "carrere maryse",
+      "photo_url": "https://www.senat.fr/senimg/carrere_maryse19629c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/carrere_maryse19629c.html"
+    },
+    {
+      "slug": "cazabonne_alain19721w",
+      "nom_usuel": "CAZABONNE",
+      "prenom_usuel": "Alain",
+      "key": "alain cazabonne",
+      "photo_url": "https://www.senat.fr/senimg/cazabonne_alain19721w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/cazabonne_alain19721w.html"
+    },
+    {
+      "slug": "cazebonne_samantha19057m",
+      "nom_usuel": "CAZEBONNE",
+      "prenom_usuel": "Samantha",
+      "key": "cazebonne samantha",
+      "photo_url": "https://www.senat.fr/senimg/cazebonne_samantha19057m_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/cazebonne_samantha19057m.html"
+    },
+    {
+      "slug": "chaillou_christophe21057h",
+      "nom_usuel": "CHAILLOU",
+      "prenom_usuel": "Christophe",
+      "key": "chaillou christophe",
+      "photo_url": "https://www.senat.fr/senimg/chaillou_christophe21057h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/chaillou_christophe21057h.html"
+    },
+    {
+      "slug": "chain_larche_anne14329v",
+      "nom_usuel": "CHAIN-LARCHÉ",
+      "prenom_usuel": "Anne",
+      "key": "anne chain-larche",
+      "photo_url": "https://www.senat.fr/senimg/chain_larche_anne14329v_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/chain_larche_anne14329v.html"
+    },
+    {
+      "slug": "chaize_patrick14038y",
+      "nom_usuel": "CHAIZE",
+      "prenom_usuel": "Patrick",
+      "key": "chaize patrick",
+      "photo_url": "https://www.senat.fr/senimg/chaize_patrick14038y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/chaize_patrick14038y.html"
+    },
+    {
+      "slug": "chantrel_yan20264j",
+      "nom_usuel": "CHANTREL",
+      "prenom_usuel": "Yan",
+      "key": "chantrel yan",
+      "photo_url": "https://www.senat.fr/senimg/chantrel_yan20264j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/chantrel_yan20264j.html"
+    },
+    {
+      "slug": "chasseing_daniel14195a",
+      "nom_usuel": "CHASSEING",
+      "prenom_usuel": "Daniel",
+      "key": "chasseing daniel",
+      "photo_url": "https://www.senat.fr/senimg/chasseing_daniel14195a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/chasseing_daniel14195a.html"
+    },
+    {
+      "slug": "chatillon_alain08028w",
+      "nom_usuel": "CHATILLON",
+      "prenom_usuel": "Alain",
+      "key": "alain chatillon",
+      "photo_url": "https://www.senat.fr/senimg/chatillon_alain08028w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/chatillon_alain08028w.html"
+    },
+    {
+      "slug": "chauvet_patrick20144b",
+      "nom_usuel": "CHAUVET",
+      "prenom_usuel": "Patrick",
+      "key": "chauvet patrick",
+      "photo_url": "https://www.senat.fr/senimg/chauvet_patrick20144b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/chauvet_patrick20144b.html"
+    },
+    {
+      "slug": "chevalier_cedric21065h",
+      "nom_usuel": "CHEVALIER",
+      "prenom_usuel": "Cédric",
+      "key": "cedric chevalier",
+      "photo_url": "https://www.senat.fr/senimg/chevalier_cedric21065h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/chevalier_cedric21065h.html"
+    },
+    {
+      "slug": "chevrollier_guillaume18083k",
+      "nom_usuel": "CHEVROLLIER",
+      "prenom_usuel": "Guillaume",
+      "key": "chevrollier guillaume",
+      "photo_url": "https://www.senat.fr/senimg/chevrollier_guillaume18083k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/chevrollier_guillaume18083k.html"
+    },
+    {
+      "slug": "cigolotti_olivier14267y",
+      "nom_usuel": "CIGOLOTTI",
+      "prenom_usuel": "Olivier",
+      "key": "cigolotti olivier",
+      "photo_url": "https://www.senat.fr/senimg/cigolotti_olivier14267y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/cigolotti_olivier14267y.html"
+    },
+    {
+      "slug": "ciuntu_marie_carole21072g",
+      "nom_usuel": "CIUNTU",
+      "prenom_usuel": "Marie-Carole",
+      "key": "ciuntu marie-carole",
+      "photo_url": "https://www.senat.fr/senimg/ciuntu_marie_carole21072g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/ciuntu_marie_carole21072g.html"
+    },
+    {
+      "slug": "conconne_catherine19295a",
+      "nom_usuel": "CONCONNE",
+      "prenom_usuel": "Catherine",
+      "key": "catherine conconne",
+      "photo_url": "https://www.senat.fr/senimg/conconne_catherine19295a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/conconne_catherine19295a.html"
+    },
+    {
+      "slug": "conway_mouret_helene11027h",
+      "nom_usuel": "CONWAY-MOURET",
+      "prenom_usuel": "Hélène",
+      "key": "conway-mouret helene",
+      "photo_url": "https://www.senat.fr/senimg/conway_mouret_helene11027h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/conway_mouret_helene11027h.html"
+    },
+    {
+      "slug": "corbiere_naminzo_evelyne21034a",
+      "nom_usuel": "CORBIÈRE NAMINZO",
+      "prenom_usuel": "Evelyne",
+      "key": "corbiere evelyne naminzo",
+      "photo_url": "https://www.senat.fr/senimg/corbiere_naminzo_evelyne21034a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/corbiere_naminzo_evelyne21034a.html"
+    },
+    {
+      "slug": "corbisez_jean_pierre19681g",
+      "nom_usuel": "CORBISEZ",
+      "prenom_usuel": "Jean-Pierre",
+      "key": "corbisez jean-pierre",
+      "photo_url": "https://www.senat.fr/senimg/corbisez_jean_pierre19681g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/corbisez_jean_pierre19681g.html"
+    },
+    {
+      "slug": "courtial_edouard11115u",
+      "nom_usuel": "COURTIAL",
+      "prenom_usuel": "Édouard",
+      "key": "courtial edouard",
+      "photo_url": "https://www.senat.fr/senimg/courtial_edouard11115u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/courtial_edouard11115u.html"
+    },
+    {
+      "slug": "cozic_thierry20070a",
+      "nom_usuel": "COZIC",
+      "prenom_usuel": "Thierry",
+      "key": "cozic thierry",
+      "photo_url": "https://www.senat.fr/senimg/cozic_thierry20070a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/cozic_thierry20070a.html"
+    },
+    {
+      "slug": "cukierman_cecile11056n",
+      "nom_usuel": "CUKIERMAN",
+      "prenom_usuel": "Cécile",
+      "key": "cecile cukierman",
+      "photo_url": "https://www.senat.fr/senimg/cukierman_cecile11056n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/cukierman_cecile11056n.html"
+    },
+    {
+      "slug": "cuypers_pierre14357a",
+      "nom_usuel": "CUYPERS",
+      "prenom_usuel": "Pierre",
+      "key": "cuypers pierre",
+      "photo_url": "https://www.senat.fr/senimg/cuypers_pierre14357a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/cuypers_pierre14357a.html"
+    },
+    {
+      "slug": "daniel_karine18395y",
+      "nom_usuel": "DANIEL",
+      "prenom_usuel": "Karine",
+      "key": "daniel karine",
+      "photo_url": "https://www.senat.fr/senimg/daniel_karine18395y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/daniel_karine18395y.html"
+    },
+    {
+      "slug": "dantec_ronan11065p",
+      "nom_usuel": "DANTEC",
+      "prenom_usuel": "Ronan",
+      "key": "dantec ronan",
+      "photo_url": "https://www.senat.fr/senimg/dantec_ronan11065p_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/dantec_ronan11065p.html"
+    },
+    {
+      "slug": "darcos_laure19693l",
+      "nom_usuel": "DARCOS",
+      "prenom_usuel": "Laure",
+      "key": "darcos laure",
+      "photo_url": "https://www.senat.fr/senimg/darcos_laure19693l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/darcos_laure19693l.html"
+    },
+    {
+      "slug": "darnaud_mathieu14259y",
+      "nom_usuel": "DARNAUD",
+      "prenom_usuel": "Mathieu",
+      "key": "darnaud mathieu",
+      "photo_url": "https://www.senat.fr/senimg/darnaud_mathieu14259y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/darnaud_mathieu14259y.html"
+    },
+    {
+      "slug": "darras_jerome21067k",
+      "nom_usuel": "DARRAS",
+      "prenom_usuel": "Jérôme",
+      "key": "darras jerome",
+      "photo_url": "https://www.senat.fr/senimg/darras_jerome21067k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/darras_jerome21067k.html"
+    },
+    {
+      "slug": "daubet_raphael21041y",
+      "nom_usuel": "DAUBET",
+      "prenom_usuel": "Raphaël",
+      "key": "daubet raphael",
+      "photo_url": "https://www.senat.fr/senimg/daubet_raphael21041y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/daubet_raphael21041y.html"
+    },
+    {
+      "slug": "daubresse_marc_philippe04008a",
+      "nom_usuel": "DAUBRESSE",
+      "prenom_usuel": "Marc-Philippe",
+      "key": "daubresse marc-philippe",
+      "photo_url": "https://www.senat.fr/senimg/daubresse_marc_philippe04008a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/daubresse_marc_philippe04008a.html"
+    },
+    {
+      "slug": "de_cidrac_marta19701s",
+      "nom_usuel": "CIDRAC",
+      "prenom_usuel": "de Marta",
+      "key": "cidrac de marta",
+      "photo_url": "https://www.senat.fr/senimg/de_cidrac_marta19701s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/de_cidrac_marta19701s.html"
+    },
+    {
+      "slug": "de_la_gontrie_marie_pierre19649g",
+      "nom_usuel": "LA GONTRIE",
+      "prenom_usuel": "de Marie-Pierre",
+      "key": "de gontrie la marie-pierre",
+      "photo_url": "https://www.senat.fr/senimg/de_la_gontrie_marie_pierre19649g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/de_la_gontrie_marie_pierre19649g.html"
+    },
+    {
+      "slug": "de_la_provote_sonia19735d",
+      "nom_usuel": "LA PROVÔTÉ",
+      "prenom_usuel": "de Sonia",
+      "key": "de la provote sonia",
+      "photo_url": "https://www.senat.fr/senimg/de_la_provote_sonia19735d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/de_la_provote_sonia19735d.html"
+    },
+    {
+      "slug": "de_legge_dominique08034u",
+      "nom_usuel": "LEGGE",
+      "prenom_usuel": "de Dominique",
+      "key": "de dominique legge",
+      "photo_url": "https://www.senat.fr/senimg/de_legge_dominique08034u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/de_legge_dominique08034u.html"
+    },
+    {
+      "slug": "de_marco_monique20142y",
+      "nom_usuel": "MARCO",
+      "prenom_usuel": "de Monique",
+      "key": "de marco monique",
+      "photo_url": "https://www.senat.fr/senimg/de_marco_monique20142y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/de_marco_monique20142y.html"
+    },
+    {
+      "slug": "de_montgolfier_alberic08011m",
+      "nom_usuel": "MONTGOLFIER",
+      "prenom_usuel": "de Albéric",
+      "key": "alberic de montgolfier",
+      "photo_url": "https://www.senat.fr/senimg/de_montgolfier_alberic08011m_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/de_montgolfier_alberic08011m.html"
+    },
+    {
+      "slug": "de_nicolay_louis_jean14169x",
+      "nom_usuel": "NICOLAY",
+      "prenom_usuel": "de Louis-Jean",
+      "key": "de louis-jean nicolay",
+      "photo_url": "https://www.senat.fr/senimg/de_nicolay_louis_jean14169x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/de_nicolay_louis_jean14169x.html"
+    },
+    {
+      "slug": "delahaye_vincent11070l",
+      "nom_usuel": "DELAHAYE",
+      "prenom_usuel": "Vincent",
+      "key": "delahaye vincent",
+      "photo_url": "https://www.senat.fr/senimg/delahaye_vincent11070l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/delahaye_vincent11070l.html"
+    },
+    {
+      "slug": "delattre_nathalie19719d",
+      "nom_usuel": "DELATTRE",
+      "prenom_usuel": "Nathalie",
+      "key": "delattre nathalie",
+      "photo_url": "https://www.senat.fr/senimg/delattre_nathalie19719d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/delattre_nathalie19719d.html"
+    },
+    {
+      "slug": "delcros_bernard14327t",
+      "nom_usuel": "DELCROS",
+      "prenom_usuel": "Bernard",
+      "key": "bernard delcros",
+      "photo_url": "https://www.senat.fr/senimg/delcros_bernard14327t_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/delcros_bernard14327t.html"
+    },
+    {
+      "slug": "demas_patricia20140w",
+      "nom_usuel": "DEMAS",
+      "prenom_usuel": "Patricia",
+      "key": "demas patricia",
+      "photo_url": "https://www.senat.fr/senimg/demas_patricia20140w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/demas_patricia20140w.html"
+    },
+    {
+      "slug": "demilly_stephane17229f",
+      "nom_usuel": "DEMILLY",
+      "prenom_usuel": "Stéphane",
+      "key": "demilly stephane",
+      "photo_url": "https://www.senat.fr/senimg/demilly_stephane17229f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/demilly_stephane17229f.html"
+    },
+    {
+      "slug": "deseyne_chantal14217n",
+      "nom_usuel": "DESEYNE",
+      "prenom_usuel": "Chantal",
+      "key": "chantal deseyne",
+      "photo_url": "https://www.senat.fr/senimg/deseyne_chantal14217n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/deseyne_chantal14217n.html"
+    },
+    {
+      "slug": "devesa_brigitte20248j",
+      "nom_usuel": "DEVÉSA",
+      "prenom_usuel": "Brigitte",
+      "key": "brigitte devesa",
+      "photo_url": "https://www.senat.fr/senimg/devesa_brigitte20248j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/devesa_brigitte20248j.html"
+    },
+    {
+      "slug": "devinaz_gilbert_luc19251m",
+      "nom_usuel": "DEVINAZ",
+      "prenom_usuel": "Gilbert-Luc",
+      "key": "devinaz gilbert-luc",
+      "photo_url": "https://www.senat.fr/senimg/devinaz_gilbert_luc19251m_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/devinaz_gilbert_luc19251m.html"
+    },
+    {
+      "slug": "dhersin_franck15197g",
+      "nom_usuel": "DHERSIN",
+      "prenom_usuel": "Franck",
+      "key": "dhersin franck",
+      "photo_url": "https://www.senat.fr/senimg/dhersin_franck15197g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/dhersin_franck15197g.html"
+    },
+    {
+      "slug": "di_folco_catherine14215l",
+      "nom_usuel": "DI FOLCO",
+      "prenom_usuel": "Catherine",
+      "key": "catherine di folco",
+      "photo_url": "https://www.senat.fr/senimg/di_folco_catherine14215l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/di_folco_catherine14215l.html"
+    },
+    {
+      "slug": "doineau_elisabeth14042u",
+      "nom_usuel": "DOINEAU",
+      "prenom_usuel": "Élisabeth",
+      "key": "doineau elisabeth",
+      "photo_url": "https://www.senat.fr/senimg/doineau_elisabeth14042u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/doineau_elisabeth14042u.html"
+    },
+    {
+      "slug": "dossus_thomas20134y",
+      "nom_usuel": "DOSSUS",
+      "prenom_usuel": "Thomas",
+      "key": "dossus thomas",
+      "photo_url": "https://www.senat.fr/senimg/dossus_thomas20134y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/dossus_thomas20134y.html"
+    },
+    {
+      "slug": "drexler_sabine20124w",
+      "nom_usuel": "DREXLER",
+      "prenom_usuel": "Sabine",
+      "key": "drexler sabine",
+      "photo_url": "https://www.senat.fr/senimg/drexler_sabine20124w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/drexler_sabine20124w.html"
+    },
+    {
+      "slug": "duffourg_alain20040t",
+      "nom_usuel": "DUFFOURG",
+      "prenom_usuel": "Alain",
+      "key": "alain duffourg",
+      "photo_url": "https://www.senat.fr/senimg/duffourg_alain20040t_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/duffourg_alain20040t.html"
+    },
+    {
+      "slug": "dumas_catherine07033p",
+      "nom_usuel": "DUMAS",
+      "prenom_usuel": "Catherine",
+      "key": "catherine dumas",
+      "photo_url": "https://www.senat.fr/senimg/dumas_catherine07033p_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/dumas_catherine07033p.html"
+    },
+    {
+      "slug": "dumont_francoise20074e",
+      "nom_usuel": "DUMONT",
+      "prenom_usuel": "Françoise",
+      "key": "dumont francoise",
+      "photo_url": "https://www.senat.fr/senimg/dumont_francoise20074e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/dumont_francoise20074e.html"
+    },
+    {
+      "slug": "duplomb_laurent19507s",
+      "nom_usuel": "DUPLOMB",
+      "prenom_usuel": "Laurent",
+      "key": "duplomb laurent",
+      "photo_url": "https://www.senat.fr/senimg/duplomb_laurent19507s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/duplomb_laurent19507s.html"
+    },
+    {
+      "slug": "duranton_nicole14249w",
+      "nom_usuel": "DURANTON",
+      "prenom_usuel": "Nicole",
+      "key": "duranton nicole",
+      "photo_url": "https://www.senat.fr/senimg/duranton_nicole14249w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/duranton_nicole14249w.html"
+    },
+    {
+      "slug": "durox_aymeric21074j",
+      "nom_usuel": "DUROX",
+      "prenom_usuel": "Aymeric",
+      "key": "aymeric durox",
+      "photo_url": "https://www.senat.fr/senimg/durox_aymeric21074j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/durox_aymeric21074j.html"
+    },
+    {
+      "slug": "eble_vincent11074q",
+      "nom_usuel": "ÉBLÉ",
+      "prenom_usuel": "Vincent",
+      "key": "eble vincent",
+      "photo_url": "https://www.senat.fr/senimg/eble_vincent11074q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/eble_vincent11074q.html"
+    },
+    {
+      "slug": "espagnac_frederique11110b",
+      "nom_usuel": "ESPAGNAC",
+      "prenom_usuel": "Frédérique",
+      "key": "espagnac frederique",
+      "photo_url": "https://www.senat.fr/senimg/espagnac_frederique11110b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/espagnac_frederique11110b.html"
+    },
+    {
+      "slug": "estrosi_sassone_dominique14187a",
+      "nom_usuel": "ESTROSI SASSONE",
+      "prenom_usuel": "Dominique",
+      "key": "dominique estrosi sassone",
+      "photo_url": "https://www.senat.fr/senimg/estrosi_sassone_dominique14187a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/estrosi_sassone_dominique14187a.html"
+    },
+    {
+      "slug": "eustache_brinio_jacqueline19673g",
+      "nom_usuel": "EUSTACHE-BRINIO",
+      "prenom_usuel": "Jacqueline",
+      "key": "eustache-brinio jacqueline",
+      "photo_url": "https://www.senat.fr/senimg/eustache_brinio_jacqueline19673g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/eustache_brinio_jacqueline19673g.html"
+    },
+    {
+      "slug": "evren_agnes21091k",
+      "nom_usuel": "EVREN",
+      "prenom_usuel": "Agnès",
+      "key": "agnes evren",
+      "photo_url": "https://www.senat.fr/senimg/evren_agnes21091k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/evren_agnes21091k.html"
+    },
+    {
+      "slug": "fagnen_sebastien21062e",
+      "nom_usuel": "FAGNEN",
+      "prenom_usuel": "Sébastien",
+      "key": "fagnen sebastien",
+      "photo_url": "https://www.senat.fr/senimg/fagnen_sebastien21062e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/fagnen_sebastien21062e.html"
+    },
+    {
+      "slug": "fargeot_daniel21086n",
+      "nom_usuel": "FARGEOT",
+      "prenom_usuel": "Daniel",
+      "key": "daniel fargeot",
+      "photo_url": "https://www.senat.fr/senimg/fargeot_daniel21086n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/fargeot_daniel21086n.html"
+    },
+    {
+      "slug": "favreau_gilbert20038a",
+      "nom_usuel": "FAVREAU",
+      "prenom_usuel": "Gilbert",
+      "key": "favreau gilbert",
+      "photo_url": "https://www.senat.fr/senimg/favreau_gilbert20038a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/favreau_gilbert20038a.html"
+    },
+    {
+      "slug": "feraud_remi19647e",
+      "nom_usuel": "FÉRAUD",
+      "prenom_usuel": "Rémi",
+      "key": "feraud remi",
+      "photo_url": "https://www.senat.fr/senimg/feraud_remi19647e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/feraud_remi19647e.html"
+    },
+    {
+      "slug": "feret_corinne14281w",
+      "nom_usuel": "FÉRET",
+      "prenom_usuel": "Corinne",
+      "key": "corinne feret",
+      "photo_url": "https://www.senat.fr/senimg/feret_corinne14281w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/feret_corinne14281w.html"
+    },
+    {
+      "slug": "fernique_jacques20100n",
+      "nom_usuel": "FERNIQUE",
+      "prenom_usuel": "Jacques",
+      "key": "fernique jacques",
+      "photo_url": "https://www.senat.fr/senimg/fernique_jacques20100n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/fernique_jacques20100n.html"
+    },
+    {
+      "slug": "fialaire_bernard20132w",
+      "nom_usuel": "FIALAIRE",
+      "prenom_usuel": "Bernard",
+      "key": "bernard fialaire",
+      "photo_url": "https://www.senat.fr/senimg/fialaire_bernard20132w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/fialaire_bernard20132w.html"
+    },
+    {
+      "slug": "fichet_jean_luc08045x",
+      "nom_usuel": "FICHET",
+      "prenom_usuel": "Jean-Luc",
+      "key": "fichet jean-luc",
+      "photo_url": "https://www.senat.fr/senimg/fichet_jean_luc08045x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/fichet_jean_luc08045x.html"
+    },
+    {
+      "slug": "florennes_isabelle19111a",
+      "nom_usuel": "FLORENNES",
+      "prenom_usuel": "Isabelle",
+      "key": "florennes isabelle",
+      "photo_url": "https://www.senat.fr/senimg/florennes_isabelle19111a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/florennes_isabelle19111a.html"
+    },
+    {
+      "slug": "folliot_philippe17023s",
+      "nom_usuel": "FOLLIOT",
+      "prenom_usuel": "Philippe",
+      "key": "folliot philippe",
+      "photo_url": "https://www.senat.fr/senimg/folliot_philippe17023s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/folliot_philippe17023s.html"
+    },
+    {
+      "slug": "fouassin_stephane21033y",
+      "nom_usuel": "FOUASSIN",
+      "prenom_usuel": "Stéphane",
+      "key": "fouassin stephane",
+      "photo_url": "https://www.senat.fr/senimg/fouassin_stephane21033y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/fouassin_stephane21033y.html"
+    },
+    {
+      "slug": "frassa_christophe_andre08018u",
+      "nom_usuel": "FRASSA",
+      "prenom_usuel": "Christophe-André",
+      "key": "christophe-andre frassa",
+      "photo_url": "https://www.senat.fr/senimg/frassa_christophe_andre08018u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/frassa_christophe_andre08018u.html"
+    },
+    {
+      "slug": "gacquerre_amel20286q",
+      "nom_usuel": "GACQUERRE",
+      "prenom_usuel": "Amel",
+      "key": "amel gacquerre",
+      "photo_url": "https://www.senat.fr/senimg/gacquerre_amel20286q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/gacquerre_amel20286q.html"
+    },
+    {
+      "slug": "garnier_laurence20172f",
+      "nom_usuel": "GARNIER",
+      "prenom_usuel": "Laurence",
+      "key": "garnier laurence",
+      "photo_url": "https://www.senat.fr/senimg/garnier_laurence20172f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/garnier_laurence20172f.html"
+    },
+    {
+      "slug": "gay_fabien19695n",
+      "nom_usuel": "GAY",
+      "prenom_usuel": "Fabien",
+      "key": "fabien gay",
+      "photo_url": "https://www.senat.fr/senimg/gay_fabien19695n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/gay_fabien19695n.html"
+    },
+    {
+      "slug": "genet_fabien20120s",
+      "nom_usuel": "GENET",
+      "prenom_usuel": "Fabien",
+      "key": "fabien genet",
+      "photo_url": "https://www.senat.fr/senimg/genet_fabien20120s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/genet_fabien20120s.html"
+    },
+    {
+      "slug": "gerbaud_frederique14355x",
+      "nom_usuel": "GERBAUD",
+      "prenom_usuel": "Frédérique",
+      "key": "frederique gerbaud",
+      "photo_url": "https://www.senat.fr/senimg/gerbaud_frederique14355x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/gerbaud_frederique14355x.html"
+    },
+    {
+      "slug": "gille_herve19820y",
+      "nom_usuel": "GILLÉ",
+      "prenom_usuel": "Hervé",
+      "key": "gille herve",
+      "photo_url": "https://www.senat.fr/senimg/gille_herve19820y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/gille_herve19820y.html"
+    },
+    {
+      "slug": "girardin_annick21032x",
+      "nom_usuel": "GIRARDIN",
+      "prenom_usuel": "Annick",
+      "key": "annick girardin",
+      "photo_url": "https://www.senat.fr/senimg/girardin_annick21032x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/girardin_annick21032x.html"
+    },
+    {
+      "slug": "gold_eric19387d",
+      "nom_usuel": "GOLD",
+      "prenom_usuel": "Éric",
+      "key": "eric gold",
+      "photo_url": "https://www.senat.fr/senimg/gold_eric19387d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/gold_eric19387d.html"
+    },
+    {
+      "slug": "gontard_guillaume19347u",
+      "nom_usuel": "GONTARD",
+      "prenom_usuel": "Guillaume",
+      "key": "gontard guillaume",
+      "photo_url": "https://www.senat.fr/senimg/gontard_guillaume19347u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/gontard_guillaume19347u.html"
+    },
+    {
+      "slug": "gosselin_beatrice20180f",
+      "nom_usuel": "GOSSELIN",
+      "prenom_usuel": "Béatrice",
+      "key": "beatrice gosselin",
+      "photo_url": "https://www.senat.fr/senimg/gosselin_beatrice20180f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/gosselin_beatrice20180f.html"
+    },
+    {
+      "slug": "goulet_nathalie07004j",
+      "nom_usuel": "GOULET",
+      "prenom_usuel": "Nathalie",
+      "key": "goulet nathalie",
+      "photo_url": "https://www.senat.fr/senimg/goulet_nathalie07004j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/goulet_nathalie07004j.html"
+    },
+    {
+      "slug": "goy_chavent_sylvie08056b",
+      "nom_usuel": "GOY-CHAVENT",
+      "prenom_usuel": "Sylvie",
+      "key": "goy-chavent sylvie",
+      "photo_url": "https://www.senat.fr/senimg/goy_chavent_sylvie08056b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/goy_chavent_sylvie08056b.html"
+    },
+    {
+      "slug": "grand_jean_pierre14211g",
+      "nom_usuel": "GRAND",
+      "prenom_usuel": "Jean-Pierre",
+      "key": "grand jean-pierre",
+      "photo_url": "https://www.senat.fr/senimg/grand_jean_pierre14211g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/grand_jean_pierre14211g.html"
+    },
+    {
+      "slug": "greaume_michelle19565d",
+      "nom_usuel": "GRÉAUME",
+      "prenom_usuel": "Michelle",
+      "key": "greaume michelle",
+      "photo_url": "https://www.senat.fr/senimg/greaume_michelle19565d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/greaume_michelle19565d.html"
+    },
+    {
+      "slug": "gremillet_daniel14033t",
+      "nom_usuel": "GREMILLET",
+      "prenom_usuel": "Daniel",
+      "key": "daniel gremillet",
+      "photo_url": "https://www.senat.fr/senimg/gremillet_daniel14033t_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/gremillet_daniel14033t.html"
+    },
+    {
+      "slug": "grosperrin_jacques14123h",
+      "nom_usuel": "GROSPERRIN",
+      "prenom_usuel": "Jacques",
+      "key": "grosperrin jacques",
+      "photo_url": "https://www.senat.fr/senimg/grosperrin_jacques14123h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/grosperrin_jacques14123h.html"
+    },
+    {
+      "slug": "grosvalet_philippe21066j",
+      "nom_usuel": "GROSVALET",
+      "prenom_usuel": "Philippe",
+      "key": "grosvalet philippe",
+      "photo_url": "https://www.senat.fr/senimg/grosvalet_philippe21066j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/grosvalet_philippe21066j.html"
+    },
+    {
+      "slug": "gruny_pascale14026u",
+      "nom_usuel": "GRUNY",
+      "prenom_usuel": "Pascale",
+      "key": "gruny pascale",
+      "photo_url": "https://www.senat.fr/senimg/gruny_pascale14026u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/gruny_pascale14026u.html"
+    },
+    {
+      "slug": "gueret_daniel20068g",
+      "nom_usuel": "GUERET",
+      "prenom_usuel": "Daniel",
+      "key": "daniel gueret",
+      "photo_url": "https://www.senat.fr/senimg/gueret_daniel20068g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/gueret_daniel20068g.html"
+    },
+    {
+      "slug": "guhl_antoinette21092l",
+      "nom_usuel": "GUHL",
+      "prenom_usuel": "Antoinette",
+      "key": "antoinette guhl",
+      "photo_url": "https://www.senat.fr/senimg/guhl_antoinette21092l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/guhl_antoinette21092l.html"
+    },
+    {
+      "slug": "guidez_jocelyne19691j",
+      "nom_usuel": "GUIDEZ",
+      "prenom_usuel": "Jocelyne",
+      "key": "guidez jocelyne",
+      "photo_url": "https://www.senat.fr/senimg/guidez_jocelyne19691j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/guidez_jocelyne19691j.html"
+    },
+    {
+      "slug": "guiol_andre20072c",
+      "nom_usuel": "GUIOL",
+      "prenom_usuel": "André",
+      "key": "andre guiol",
+      "photo_url": "https://www.senat.fr/senimg/guiol_andre20072c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/guiol_andre20072c.html"
+    },
+    {
+      "slug": "harribey_laurence19725b",
+      "nom_usuel": "HARRIBEY",
+      "prenom_usuel": "Laurence",
+      "key": "harribey laurence",
+      "photo_url": "https://www.senat.fr/senimg/harribey_laurence19725b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/harribey_laurence19725b.html"
+    },
+    {
+      "slug": "havet_nadege20106u",
+      "nom_usuel": "HAVET",
+      "prenom_usuel": "Nadège",
+      "key": "havet nadege",
+      "photo_url": "https://www.senat.fr/senimg/havet_nadege20106u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/havet_nadege20106u.html"
+    },
+    {
+      "slug": "haye_ludovic20128b",
+      "nom_usuel": "HAYE",
+      "prenom_usuel": "Ludovic",
+      "key": "haye ludovic",
+      "photo_url": "https://www.senat.fr/senimg/haye_ludovic20128b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/haye_ludovic20128b.html"
+    },
+    {
+      "slug": "henno_olivier19569h",
+      "nom_usuel": "HENNO",
+      "prenom_usuel": "Olivier",
+      "key": "henno olivier",
+      "photo_url": "https://www.senat.fr/senimg/henno_olivier19569h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/henno_olivier19569h.html"
+    },
+    {
+      "slug": "herve_loic14179a",
+      "nom_usuel": "HERVÉ",
+      "prenom_usuel": "Loïc",
+      "key": "herve loic",
+      "photo_url": "https://www.senat.fr/senimg/herve_loic14179a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/herve_loic14179a.html"
+    },
+    {
+      "slug": "herzog_christine19685l",
+      "nom_usuel": "HERZOG",
+      "prenom_usuel": "Christine",
+      "key": "christine herzog",
+      "photo_url": "https://www.senat.fr/senimg/herzog_christine19685l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/herzog_christine19685l.html"
+    },
+    {
+      "slug": "hingray_jean20048c",
+      "nom_usuel": "HINGRAY",
+      "prenom_usuel": "Jean",
+      "key": "hingray jean",
+      "photo_url": "https://www.senat.fr/senimg/hingray_jean20048c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/hingray_jean20048c.html"
+    },
+    {
+      "slug": "hochart_joshua21085m",
+      "nom_usuel": "HOCHART",
+      "prenom_usuel": "Joshua",
+      "key": "hochart joshua",
+      "photo_url": "https://www.senat.fr/senimg/hochart_joshua21085m_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/hochart_joshua21085m.html"
+    },
+    {
+      "slug": "houpert_alain08069g",
+      "nom_usuel": "HOUPERT",
+      "prenom_usuel": "Alain",
+      "key": "alain houpert",
+      "photo_url": "https://www.senat.fr/senimg/houpert_alain08069g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/houpert_alain08069g.html"
+    },
+    {
+      "slug": "housseau_marie_lise21415k",
+      "nom_usuel": "HOUSSEAU",
+      "prenom_usuel": "Marie-Lise",
+      "key": "housseau marie-lise",
+      "photo_url": "https://www.senat.fr/senimg/housseau_marie_lise21415k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/housseau_marie_lise21415k.html"
+    },
+    {
+      "slug": "hugonet_jean_raymond19399h",
+      "nom_usuel": "HUGONET",
+      "prenom_usuel": "Jean-Raymond",
+      "key": "hugonet jean-raymond",
+      "photo_url": "https://www.senat.fr/senimg/hugonet_jean_raymond19399h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/hugonet_jean_raymond19399h.html"
+    },
+    {
+      "slug": "husson_jean_francois11048n",
+      "nom_usuel": "HUSSON",
+      "prenom_usuel": "Jean-François",
+      "key": "husson jean-francois",
+      "photo_url": "https://www.senat.fr/senimg/husson_jean_francois11048n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/husson_jean_francois11048n.html"
+    },
+    {
+      "slug": "iacovelli_xavier19591f",
+      "nom_usuel": "IACOVELLI",
+      "prenom_usuel": "Xavier",
+      "key": "iacovelli xavier",
+      "photo_url": "https://www.senat.fr/senimg/iacovelli_xavier19591f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/iacovelli_xavier19591f.html"
+    },
+    {
+      "slug": "imbert_corinne14213j",
+      "nom_usuel": "IMBERT",
+      "prenom_usuel": "Corinne",
+      "key": "corinne imbert",
+      "photo_url": "https://www.senat.fr/senimg/imbert_corinne14213j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/imbert_corinne14213j.html"
+    },
+    {
+      "slug": "jacquemet_annick20066e",
+      "nom_usuel": "JACQUEMET",
+      "prenom_usuel": "Annick",
+      "key": "annick jacquemet",
+      "photo_url": "https://www.senat.fr/senimg/jacquemet_annick20066e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/jacquemet_annick20066e.html"
+    },
+    {
+      "slug": "jacques_micheline20034v",
+      "nom_usuel": "JACQUES",
+      "prenom_usuel": "Micheline",
+      "key": "jacques micheline",
+      "photo_url": "https://www.senat.fr/senimg/jacques_micheline20034v_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/jacques_micheline20034v.html"
+    },
+    {
+      "slug": "jacquin_olivier19551w",
+      "nom_usuel": "JACQUIN",
+      "prenom_usuel": "Olivier",
+      "key": "jacquin olivier",
+      "photo_url": "https://www.senat.fr/senimg/jacquin_olivier19551w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/jacquin_olivier19551w.html"
+    },
+    {
+      "slug": "jadot_yannick21093m",
+      "nom_usuel": "JADOT",
+      "prenom_usuel": "Yannick",
+      "key": "jadot yannick",
+      "photo_url": "https://www.senat.fr/senimg/jadot_yannick21093m_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/jadot_yannick21093m.html"
+    },
+    {
+      "slug": "jeansannetas_eric14121f",
+      "nom_usuel": "JEANSANNETAS",
+      "prenom_usuel": "Éric",
+      "key": "eric jeansannetas",
+      "photo_url": "https://www.senat.fr/senimg/jeansannetas_eric14121f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/jeansannetas_eric14121f.html"
+    },
+    {
+      "slug": "joly_patrice19531s",
+      "nom_usuel": "JOLY",
+      "prenom_usuel": "Patrice",
+      "key": "joly patrice",
+      "photo_url": "https://www.senat.fr/senimg/joly_patrice19531s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/joly_patrice19531s.html"
+    },
+    {
+      "slug": "jomier_bernard19683j",
+      "nom_usuel": "JOMIER",
+      "prenom_usuel": "Bernard",
+      "key": "bernard jomier",
+      "photo_url": "https://www.senat.fr/senimg/jomier_bernard19683j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/jomier_bernard19683j.html"
+    },
+    {
+      "slug": "josende_lauriane21044c",
+      "nom_usuel": "JOSENDE",
+      "prenom_usuel": "Lauriane",
+      "key": "josende lauriane",
+      "photo_url": "https://www.senat.fr/senimg/josende_lauriane21044c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/josende_lauriane21044c.html"
+    },
+    {
+      "slug": "joseph_else20056c",
+      "nom_usuel": "JOSEPH",
+      "prenom_usuel": "Else",
+      "key": "else joseph",
+      "photo_url": "https://www.senat.fr/senimg/joseph_else20056c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/joseph_else20056c.html"
+    },
+    {
+      "slug": "jourda_gisele14097y",
+      "nom_usuel": "JOURDA",
+      "prenom_usuel": "Gisèle",
+      "key": "gisele jourda",
+      "photo_url": "https://www.senat.fr/senimg/jourda_gisele14097y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/jourda_gisele14097y.html"
+    },
+    {
+      "slug": "jourda_muriel19447x",
+      "nom_usuel": "JOURDA",
+      "prenom_usuel": "Muriel",
+      "key": "jourda muriel",
+      "photo_url": "https://www.senat.fr/senimg/jourda_muriel19447x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/jourda_muriel19447x.html"
+    },
+    {
+      "slug": "jouve_mireille14241n",
+      "nom_usuel": "JOUVE",
+      "prenom_usuel": "Mireille",
+      "key": "jouve mireille",
+      "photo_url": "https://www.senat.fr/senimg/jouve_mireille14241n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/jouve_mireille14241n.html"
+    },
+    {
+      "slug": "joyandet_alain95041e",
+      "nom_usuel": "JOYANDET",
+      "prenom_usuel": "Alain",
+      "key": "alain joyandet",
+      "photo_url": "https://www.senat.fr/senimg/joyandet_alain95041e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/joyandet_alain95041e.html"
+    },
+    {
+      "slug": "kanner_patrick14021p",
+      "nom_usuel": "KANNER",
+      "prenom_usuel": "Patrick",
+      "key": "kanner patrick",
+      "photo_url": "https://www.senat.fr/senimg/kanner_patrick14021p_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/kanner_patrick14021p.html"
+    },
+    {
+      "slug": "karoutchi_roger99004r",
+      "nom_usuel": "KAROUTCHI",
+      "prenom_usuel": "Roger",
+      "key": "karoutchi roger",
+      "photo_url": "https://www.senat.fr/senimg/karoutchi_roger99004r_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/karoutchi_roger99004r.html"
+    },
+    {
+      "slug": "kern_claude14073q",
+      "nom_usuel": "KERN",
+      "prenom_usuel": "Claude",
+      "key": "claude kern",
+      "photo_url": "https://www.senat.fr/senimg/kern_claude14073q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/kern_claude14073q.html"
+    },
+    {
+      "slug": "kerrouche_eric19489j",
+      "nom_usuel": "KERROUCHE",
+      "prenom_usuel": "Éric",
+      "key": "eric kerrouche",
+      "photo_url": "https://www.senat.fr/senimg/kerrouche_eric19489j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/kerrouche_eric19489j.html"
+    },
+    {
+      "slug": "khalife_khalife21081h",
+      "nom_usuel": "KHALIFÉ",
+      "prenom_usuel": "Khalifé",
+      "key": "khalife khalife",
+      "photo_url": "https://www.senat.fr/senimg/khalife_khalife21081h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/khalife_khalife21081h.html"
+    },
+    {
+      "slug": "klinger_christian20126y",
+      "nom_usuel": "KLINGER",
+      "prenom_usuel": "Christian",
+      "key": "christian klinger",
+      "photo_url": "https://www.senat.fr/senimg/klinger_christian20126y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/klinger_christian20126y.html"
+    },
+    {
+      "slug": "kulimoetoke_mikaele20016t",
+      "nom_usuel": "KULIMOETOKE",
+      "prenom_usuel": "Mikaele",
+      "key": "kulimoetoke mikaele",
+      "photo_url": "https://www.senat.fr/senimg/kulimoetoke_mikaele20016t_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/kulimoetoke_mikaele20016t.html"
+    },
+    {
+      "slug": "lafon_laurent19611r",
+      "nom_usuel": "LAFON",
+      "prenom_usuel": "Laurent",
+      "key": "lafon laurent",
+      "photo_url": "https://www.senat.fr/senimg/lafon_laurent19611r_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/lafon_laurent19611r.html"
+    },
+    {
+      "slug": "lahellec_gerard20102q",
+      "nom_usuel": "LAHELLEC",
+      "prenom_usuel": "Gérard",
+      "key": "gerard lahellec",
+      "photo_url": "https://www.senat.fr/senimg/lahellec_gerard20102q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/lahellec_gerard20102q.html"
+    },
+    {
+      "slug": "lamenie_marc07029t",
+      "nom_usuel": "LAMÉNIE",
+      "prenom_usuel": "Marc",
+      "key": "lamenie marc",
+      "photo_url": "https://www.senat.fr/senimg/lamenie_marc07029t_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/lamenie_marc07029t.html"
+    },
+    {
+      "slug": "laouedj_ahmed21078n",
+      "nom_usuel": "LAOUEDJ",
+      "prenom_usuel": "Ahmed",
+      "key": "ahmed laouedj",
+      "photo_url": "https://www.senat.fr/senimg/laouedj_ahmed21078n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/laouedj_ahmed21078n.html"
+    },
+    {
+      "slug": "larcher_gerard86034e",
+      "nom_usuel": "LARCHER",
+      "prenom_usuel": "Gérard",
+      "key": "gerard larcher",
+      "photo_url": "https://www.senat.fr/senimg/larcher_gerard86034e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/larcher_gerard86034e.html"
+    },
+    {
+      "slug": "lassarade_florence19723y",
+      "nom_usuel": "LASSARADE",
+      "prenom_usuel": "Florence",
+      "key": "florence lassarade",
+      "photo_url": "https://www.senat.fr/senimg/lassarade_florence19723y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/lassarade_florence19723y.html"
+    },
+    {
+      "slug": "laugier_michel19699s",
+      "nom_usuel": "LAUGIER",
+      "prenom_usuel": "Michel",
+      "key": "laugier michel",
+      "photo_url": "https://www.senat.fr/senimg/laugier_michel19699s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/laugier_michel19699s.html"
+    },
+    {
+      "slug": "laurent_daniel08015r",
+      "nom_usuel": "LAURENT",
+      "prenom_usuel": "Daniel",
+      "key": "daniel laurent",
+      "photo_url": "https://www.senat.fr/senimg/laurent_daniel08015r_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/laurent_daniel08015r.html"
+    },
+    {
+      "slug": "lavarde_christine19711u",
+      "nom_usuel": "LAVARDE",
+      "prenom_usuel": "Christine",
+      "key": "christine lavarde",
+      "photo_url": "https://www.senat.fr/senimg/lavarde_christine19711u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/lavarde_christine19711u.html"
+    },
+    {
+      "slug": "le_gleut_ronan19709b",
+      "nom_usuel": "LE GLEUT",
+      "prenom_usuel": "Ronan",
+      "key": "gleut le ronan",
+      "photo_url": "https://www.senat.fr/senimg/le_gleut_ronan19709b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/le_gleut_ronan19709b.html"
+    },
+    {
+      "slug": "le_houerou_annie18193q",
+      "nom_usuel": "LE HOUEROU",
+      "prenom_usuel": "Annie",
+      "key": "annie houerou le",
+      "photo_url": "https://www.senat.fr/senimg/le_houerou_annie18193q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/le_houerou_annie18193q.html"
+    },
+    {
+      "slug": "le_rudulier_stephane20108w",
+      "nom_usuel": "LE RUDULIER",
+      "prenom_usuel": "Stéphane",
+      "key": "le rudulier stephane",
+      "photo_url": "https://www.senat.fr/senimg/le_rudulier_stephane20108w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/le_rudulier_stephane20108w.html"
+    },
+    {
+      "slug": "lefevre_antoine08010l",
+      "nom_usuel": "LEFÈVRE",
+      "prenom_usuel": "Antoine",
+      "key": "antoine lefevre",
+      "photo_url": "https://www.senat.fr/senimg/lefevre_antoine08010l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/lefevre_antoine08010l.html"
+    },
+    {
+      "slug": "lemoyne_jean_baptiste14037x",
+      "nom_usuel": "LEMOYNE",
+      "prenom_usuel": "Jean-Baptiste",
+      "key": "jean-baptiste lemoyne",
+      "photo_url": "https://www.senat.fr/senimg/lemoyne_jean_baptiste14037x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/lemoyne_jean_baptiste14037x.html"
+    },
+    {
+      "slug": "lermytte_marie_claude21087p",
+      "nom_usuel": "LERMYTTE",
+      "prenom_usuel": "Marie-Claude",
+      "key": "lermytte marie-claude",
+      "photo_url": "https://www.senat.fr/senimg/lermytte_marie_claude21087p_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/lermytte_marie_claude21087p.html"
+    },
+    {
+      "slug": "leroy_henri19729f",
+      "nom_usuel": "LEROY",
+      "prenom_usuel": "Henri",
+      "key": "henri leroy",
+      "photo_url": "https://www.senat.fr/senimg/leroy_henri19729f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/leroy_henri19729f.html"
+    },
+    {
+      "slug": "levi_pierre_antoine20052x",
+      "nom_usuel": "LEVI",
+      "prenom_usuel": "Pierre-Antoine",
+      "key": "levi pierre-antoine",
+      "photo_url": "https://www.senat.fr/senimg/levi_pierre_antoine20052x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/levi_pierre_antoine20052x.html"
+    },
+    {
+      "slug": "levrier_martin19697q",
+      "nom_usuel": "LÉVRIER",
+      "prenom_usuel": "Martin",
+      "key": "levrier martin",
+      "photo_url": "https://www.senat.fr/senimg/levrier_martin19697q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/levrier_martin19697q.html"
+    },
+    {
+      "slug": "linkenheld_audrey18207d",
+      "nom_usuel": "LINKENHELD",
+      "prenom_usuel": "Audrey",
+      "key": "audrey linkenheld",
+      "photo_url": "https://www.senat.fr/senimg/linkenheld_audrey18207d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/linkenheld_audrey18207d.html"
+    },
+    {
+      "slug": "loisier_anne_catherine14205j",
+      "nom_usuel": "LOISIER",
+      "prenom_usuel": "Anne-Catherine",
+      "key": "anne-catherine loisier",
+      "photo_url": "https://www.senat.fr/senimg/loisier_anne_catherine14205j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/loisier_anne_catherine14205j.html"
+    },
+    {
+      "slug": "longeot_jean_francois14219q",
+      "nom_usuel": "LONGEOT",
+      "prenom_usuel": "Jean-François",
+      "key": "jean-francois longeot",
+      "photo_url": "https://www.senat.fr/senimg/longeot_jean_francois14219q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/longeot_jean_francois14219q.html"
+    },
+    {
+      "slug": "lopez_vivette14059s",
+      "nom_usuel": "LOPEZ",
+      "prenom_usuel": "Vivette",
+      "key": "lopez vivette",
+      "photo_url": "https://www.senat.fr/senimg/lopez_vivette14059s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/lopez_vivette14059s.html"
+    },
+    {
+      "slug": "louault_vincent21054e",
+      "nom_usuel": "LOUAULT",
+      "prenom_usuel": "Vincent",
+      "key": "louault vincent",
+      "photo_url": "https://www.senat.fr/senimg/louault_vincent21054e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/louault_vincent21054e.html"
+    },
+    {
+      "slug": "lozach_jean_jacques08012n",
+      "nom_usuel": "LOZACH",
+      "prenom_usuel": "Jean-Jacques",
+      "key": "jean-jacques lozach",
+      "photo_url": "https://www.senat.fr/senimg/lozach_jean_jacques08012n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/lozach_jean_jacques08012n.html"
+    },
+    {
+      "slug": "lubin_monique17779h",
+      "nom_usuel": "LUBIN",
+      "prenom_usuel": "Monique",
+      "key": "lubin monique",
+      "photo_url": "https://www.senat.fr/senimg/lubin_monique17779h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/lubin_monique17779h.html"
+    },
+    {
+      "slug": "lurel_victorin12016w",
+      "nom_usuel": "LUREL",
+      "prenom_usuel": "Victorin",
+      "key": "lurel victorin",
+      "photo_url": "https://www.senat.fr/senimg/lurel_victorin12016w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/lurel_victorin12016w.html"
+    },
+    {
+      "slug": "malet_viviane19657g",
+      "nom_usuel": "MALET",
+      "prenom_usuel": "Viviane",
+      "key": "malet viviane",
+      "photo_url": "https://www.senat.fr/senimg/malet_viviane19657g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/malet_viviane19657g.html"
+    },
+    {
+      "slug": "malhuret_claude14251q",
+      "nom_usuel": "MALHURET",
+      "prenom_usuel": "Claude",
+      "key": "claude malhuret",
+      "photo_url": "https://www.senat.fr/senimg/malhuret_claude14251q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/malhuret_claude14251q.html"
+    },
+    {
+      "slug": "mandelli_didier14031r",
+      "nom_usuel": "MANDELLI",
+      "prenom_usuel": "Didier",
+      "key": "didier mandelli",
+      "photo_url": "https://www.senat.fr/senimg/mandelli_didier14031r_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/mandelli_didier14031r.html"
+    },
+    {
+      "slug": "marc_alain14111d",
+      "nom_usuel": "MARC",
+      "prenom_usuel": "Alain",
+      "key": "alain marc",
+      "photo_url": "https://www.senat.fr/senimg/marc_alain14111d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/marc_alain14111d.html"
+    },
+    {
+      "slug": "margate_marianne21075k",
+      "nom_usuel": "MARGATÉ",
+      "prenom_usuel": "Marianne",
+      "key": "margate marianne",
+      "photo_url": "https://www.senat.fr/senimg/margate_marianne21075k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/margate_marianne21075k.html"
+    },
+    {
+      "slug": "margueritte_david21486b",
+      "nom_usuel": "MARGUERITTE",
+      "prenom_usuel": "David",
+      "key": "david margueritte",
+      "photo_url": "https://www.senat.fr/senimg/margueritte_david21486b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/margueritte_david21486b.html"
+    },
+    {
+      "slug": "marie_didier14001x",
+      "nom_usuel": "MARIE",
+      "prenom_usuel": "Didier",
+      "key": "didier marie",
+      "photo_url": "https://www.senat.fr/senimg/marie_didier14001x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/marie_didier14001x.html"
+    },
+    {
+      "slug": "marseille_herve11085t",
+      "nom_usuel": "MARSEILLE",
+      "prenom_usuel": "Hervé",
+      "key": "herve marseille",
+      "photo_url": "https://www.senat.fr/senimg/marseille_herve11085t_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/marseille_herve11085t.html"
+    },
+    {
+      "slug": "martin_pascal19826f",
+      "nom_usuel": "MARTIN",
+      "prenom_usuel": "Pascal",
+      "key": "martin pascal",
+      "photo_url": "https://www.senat.fr/senimg/martin_pascal19826f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/martin_pascal19826f.html"
+    },
+    {
+      "slug": "martin_pauline21058j",
+      "nom_usuel": "MARTIN",
+      "prenom_usuel": "Pauline",
+      "key": "martin pauline",
+      "photo_url": "https://www.senat.fr/senimg/martin_pauline21058j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/martin_pauline21058j.html"
+    },
+    {
+      "slug": "masset_michel21040x",
+      "nom_usuel": "MASSET",
+      "prenom_usuel": "Michel",
+      "key": "masset michel",
+      "photo_url": "https://www.senat.fr/senimg/masset_michel21040x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/masset_michel21040x.html"
+    },
+    {
+      "slug": "matray_paulette21512k",
+      "nom_usuel": "MATRAY",
+      "prenom_usuel": "Paulette",
+      "key": "matray paulette",
+      "photo_url": "https://www.senat.fr/senimg/matray_paulette21512k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/matray_paulette21512k.html"
+    },
+    {
+      "slug": "maurey_herve08009t",
+      "nom_usuel": "MAUREY",
+      "prenom_usuel": "Hervé",
+      "key": "herve maurey",
+      "photo_url": "https://www.senat.fr/senimg/maurey_herve08009t_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/maurey_herve08009t.html"
+    },
+    {
+      "slug": "medevielle_pierre14221j",
+      "nom_usuel": "MÉDEVIELLE",
+      "prenom_usuel": "Pierre",
+      "key": "medevielle pierre",
+      "photo_url": "https://www.senat.fr/senimg/medevielle_pierre14221j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/medevielle_pierre14221j.html"
+    },
+    {
+      "slug": "meignen_thierry20252e",
+      "nom_usuel": "MEIGNEN",
+      "prenom_usuel": "Thierry",
+      "key": "meignen thierry",
+      "photo_url": "https://www.senat.fr/senimg/meignen_thierry20252e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/meignen_thierry20252e.html"
+    },
+    {
+      "slug": "mellouli_akli21073h",
+      "nom_usuel": "MELLOULI",
+      "prenom_usuel": "Akli",
+      "key": "akli mellouli",
+      "photo_url": "https://www.senat.fr/senimg/mellouli_akli21073h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/mellouli_akli21073h.html"
+    },
+    {
+      "slug": "menonville_franck19563b",
+      "nom_usuel": "MENONVILLE",
+      "prenom_usuel": "Franck",
+      "key": "franck menonville",
+      "photo_url": "https://www.senat.fr/senimg/menonville_franck19563b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/menonville_franck19563b.html"
+    },
+    {
+      "slug": "mercier_marie14147r",
+      "nom_usuel": "MERCIER",
+      "prenom_usuel": "Marie",
+      "key": "marie mercier",
+      "photo_url": "https://www.senat.fr/senimg/mercier_marie14147r_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/mercier_marie14147r.html"
+    },
+    {
+      "slug": "merillou_serge20028x",
+      "nom_usuel": "MÉRILLOU",
+      "prenom_usuel": "Serge",
+      "key": "merillou serge",
+      "photo_url": "https://www.senat.fr/senimg/merillou_serge20028x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/merillou_serge20028x.html"
+    },
+    {
+      "slug": "michallet_damien21080g",
+      "nom_usuel": "MICHALLET",
+      "prenom_usuel": "Damien",
+      "key": "damien michallet",
+      "photo_url": "https://www.senat.fr/senimg/michallet_damien21080g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/michallet_damien21080g.html"
+    },
+    {
+      "slug": "michau_jean_jacques20018v",
+      "nom_usuel": "MICHAU",
+      "prenom_usuel": "Jean-Jacques",
+      "key": "jean-jacques michau",
+      "photo_url": "https://www.senat.fr/senimg/michau_jean_jacques20018v_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/michau_jean_jacques20018v.html"
+    },
+    {
+      "slug": "micouleau_brigitte14223l",
+      "nom_usuel": "MICOULEAU",
+      "prenom_usuel": "Brigitte",
+      "key": "brigitte micouleau",
+      "photo_url": "https://www.senat.fr/senimg/micouleau_brigitte14223l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/micouleau_brigitte14223l.html"
+    },
+    {
+      "slug": "milon_alain04092n",
+      "nom_usuel": "MILON",
+      "prenom_usuel": "Alain",
+      "key": "alain milon",
+      "photo_url": "https://www.senat.fr/senimg/milon_alain04092n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/milon_alain04092n.html"
+    },
+    {
+      "slug": "mizzon_jean_marie19335q",
+      "nom_usuel": "MIZZON",
+      "prenom_usuel": "Jean-Marie",
+      "key": "jean-marie mizzon",
+      "photo_url": "https://www.senat.fr/senimg/mizzon_jean_marie19335q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/mizzon_jean_marie19335q.html"
+    },
+    {
+      "slug": "mohamed_soilihi_thani11072n",
+      "nom_usuel": "MOHAMED SOILIHI",
+      "prenom_usuel": "Thani",
+      "key": "mohamed soilihi thani",
+      "photo_url": "https://www.senat.fr/senimg/mohamed_soilihi_thani11072n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/mohamed_soilihi_thani11072n.html"
+    },
+    {
+      "slug": "monier_marie_pierre14109k",
+      "nom_usuel": "MONIER",
+      "prenom_usuel": "Marie-Pierre",
+      "key": "marie-pierre monier",
+      "photo_url": "https://www.senat.fr/senimg/monier_marie_pierre14109k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/monier_marie_pierre14109k.html"
+    },
+    {
+      "slug": "montauge_franck14257w",
+      "nom_usuel": "MONTAUGÉ",
+      "prenom_usuel": "Franck",
+      "key": "franck montauge",
+      "photo_url": "https://www.senat.fr/senimg/montauge_franck14257w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/montauge_franck14257w.html"
+    },
+    {
+      "slug": "morin_desailly_catherine04070g",
+      "nom_usuel": "MORIN-DESAILLY",
+      "prenom_usuel": "Catherine",
+      "key": "catherine morin-desailly",
+      "photo_url": "https://www.senat.fr/senimg/morin_desailly_catherine04070g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/morin_desailly_catherine04070g.html"
+    },
+    {
+      "slug": "mouiller_philippe14071n",
+      "nom_usuel": "MOUILLER",
+      "prenom_usuel": "Philippe",
+      "key": "mouiller philippe",
+      "photo_url": "https://www.senat.fr/senimg/mouiller_philippe14071n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/mouiller_philippe14071n.html"
+    },
+    {
+      "slug": "mouton_marie_pierre21534r",
+      "nom_usuel": "MOUTON",
+      "prenom_usuel": "Marie-Pierre",
+      "key": "marie-pierre mouton",
+      "photo_url": "https://www.senat.fr/senimg/mouton_marie_pierre21534r_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/mouton_marie_pierre21534r.html"
+    },
+    {
+      "slug": "muller_bronn_laurence20096l",
+      "nom_usuel": "MULLER-BRONN",
+      "prenom_usuel": "Laurence",
+      "key": "laurence muller-bronn",
+      "photo_url": "https://www.senat.fr/senimg/muller_bronn_laurence20096l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/muller_bronn_laurence20096l.html"
+    },
+    {
+      "slug": "nadille_solanges21097r",
+      "nom_usuel": "NADILLE",
+      "prenom_usuel": "Solanges",
+      "key": "nadille solanges",
+      "photo_url": "https://www.senat.fr/senimg/nadille_solanges21097r_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/nadille_solanges21097r.html"
+    },
+    {
+      "slug": "narassiguin_corinne18231d",
+      "nom_usuel": "NARASSIGUIN",
+      "prenom_usuel": "Corinne",
+      "key": "corinne narassiguin",
+      "photo_url": "https://www.senat.fr/senimg/narassiguin_corinne18231d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/narassiguin_corinne18231d.html"
+    },
+    {
+      "slug": "naturel_georges21029d",
+      "nom_usuel": "NATUREL",
+      "prenom_usuel": "Georges",
+      "key": "georges naturel",
+      "photo_url": "https://www.senat.fr/senimg/naturel_georges21029d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/naturel_georges21029d.html"
+    },
+    {
+      "slug": "nedelec_anne_marie21039f",
+      "nom_usuel": "NÉDÉLEC",
+      "prenom_usuel": "Anne-Marie",
+      "key": "anne-marie nedelec",
+      "photo_url": "https://www.senat.fr/senimg/nedelec_anne_marie21039f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/nedelec_anne_marie21039f.html"
+    },
+    {
+      "slug": "noel_sylviane19768n",
+      "nom_usuel": "NOËL",
+      "prenom_usuel": "Sylviane",
+      "key": "noel sylviane",
+      "photo_url": "https://www.senat.fr/senimg/noel_sylviane19768n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/noel_sylviane19768n.html"
+    },
+    {
+      "slug": "nougein_claude14253s",
+      "nom_usuel": "NOUGEIN",
+      "prenom_usuel": "Claude",
+      "key": "claude nougein",
+      "photo_url": "https://www.senat.fr/senimg/nougein_claude14253s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/nougein_claude14253s.html"
+    },
+    {
+      "slug": "ollivier_mathilde21037d",
+      "nom_usuel": "OLLIVIER",
+      "prenom_usuel": "Mathilde",
+      "key": "mathilde ollivier",
+      "photo_url": "https://www.senat.fr/senimg/ollivier_mathilde21037d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/ollivier_mathilde21037d.html"
+    },
+    {
+      "slug": "omar_oili_said19331l",
+      "nom_usuel": "OMAR OILI",
+      "prenom_usuel": "Saïd",
+      "key": "oili omar said",
+      "photo_url": "https://www.senat.fr/senimg/omar_oili_said19331l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/omar_oili_said19331l.html"
+    },
+    {
+      "slug": "ouizille_alexandre21060c",
+      "nom_usuel": "OUIZILLE",
+      "prenom_usuel": "Alexandre",
+      "key": "alexandre ouizille",
+      "photo_url": "https://www.senat.fr/senimg/ouizille_alexandre21060c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/ouizille_alexandre21060c.html"
+    },
+    {
+      "slug": "ouzoulias_pierre19593h",
+      "nom_usuel": "OUZOULIAS",
+      "prenom_usuel": "Pierre",
+      "key": "ouzoulias pierre",
+      "photo_url": "https://www.senat.fr/senimg/ouzoulias_pierre19593h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/ouzoulias_pierre19593h.html"
+    },
+    {
+      "slug": "paccaud_olivier19573d",
+      "nom_usuel": "PACCAUD",
+      "prenom_usuel": "Olivier",
+      "key": "olivier paccaud",
+      "photo_url": "https://www.senat.fr/senimg/paccaud_olivier19573d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/paccaud_olivier19573d.html"
+    },
+    {
+      "slug": "paire_sandra21592c",
+      "nom_usuel": "PAIRE",
+      "prenom_usuel": "Sandra",
+      "key": "paire sandra",
+      "photo_url": "https://www.senat.fr/senimg/paire_sandra21592c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/paire_sandra21592c.html"
+    },
+    {
+      "slug": "pantel_guylene19866p",
+      "nom_usuel": "PANTEL",
+      "prenom_usuel": "Guylène",
+      "key": "guylene pantel",
+      "photo_url": "https://www.senat.fr/senimg/pantel_guylene19866p_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/pantel_guylene19866p.html"
+    },
+    {
+      "slug": "panunzi_jean_jacques14191v",
+      "nom_usuel": "PANUNZI",
+      "prenom_usuel": "Jean-Jacques",
+      "key": "jean-jacques panunzi",
+      "photo_url": "https://www.senat.fr/senimg/panunzi_jean_jacques14191v_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/panunzi_jean_jacques14191v.html"
+    },
+    {
+      "slug": "paoli_gagin_vanina20050v",
+      "nom_usuel": "PAOLI-GAGIN",
+      "prenom_usuel": "Vanina",
+      "key": "paoli-gagin vanina",
+      "photo_url": "https://www.senat.fr/senimg/paoli_gagin_vanina20050v_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/paoli_gagin_vanina20050v.html"
+    },
+    {
+      "slug": "parigi_paul_toussaint20036x",
+      "nom_usuel": "PARIGI",
+      "prenom_usuel": "Paul Toussaint",
+      "key": "parigi paul toussaint",
+      "photo_url": "https://www.senat.fr/senimg/parigi_paul_toussaint20036x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/parigi_paul_toussaint20036x.html"
+    },
+    {
+      "slug": "patient_georges08073c",
+      "nom_usuel": "PATIENT",
+      "prenom_usuel": "Georges",
+      "key": "georges patient",
+      "photo_url": "https://www.senat.fr/senimg/patient_georges08073c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/patient_georges08073c.html"
+    },
+    {
+      "slug": "patriat_francois08061x",
+      "nom_usuel": "PATRIAT",
+      "prenom_usuel": "François",
+      "key": "francois patriat",
+      "photo_url": "https://www.senat.fr/senimg/patriat_francois08061x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/patriat_francois08061x.html"
+    },
+    {
+      "slug": "patru_anne_sophie21421h",
+      "nom_usuel": "PATRU",
+      "prenom_usuel": "Anne-Sophie",
+      "key": "anne-sophie patru",
+      "photo_url": "https://www.senat.fr/senimg/patru_anne_sophie21421h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/patru_anne_sophie21421h.html"
+    },
+    {
+      "slug": "paul_philippe08047a",
+      "nom_usuel": "PAUL",
+      "prenom_usuel": "Philippe",
+      "key": "paul philippe",
+      "photo_url": "https://www.senat.fr/senimg/paul_philippe08047a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/paul_philippe08047a.html"
+    },
+    {
+      "slug": "paumier_jean_gerard21055f",
+      "nom_usuel": "PAUMIER",
+      "prenom_usuel": "Jean-Gérard",
+      "key": "jean-gerard paumier",
+      "photo_url": "https://www.senat.fr/senimg/paumier_jean_gerard21055f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/paumier_jean_gerard21055f.html"
+    },
+    {
+      "slug": "pellevat_cyril14237s",
+      "nom_usuel": "PELLEVAT",
+      "prenom_usuel": "Cyril",
+      "key": "cyril pellevat",
+      "photo_url": "https://www.senat.fr/senimg/pellevat_cyril14237s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/pellevat_cyril14237s.html"
+    },
+    {
+      "slug": "pernot_clement21047f",
+      "nom_usuel": "PERNOT",
+      "prenom_usuel": "Clément",
+      "key": "clement pernot",
+      "photo_url": "https://www.senat.fr/senimg/pernot_clement21047f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/pernot_clement21047f.html"
+    },
+    {
+      "slug": "perrin_cedric14193x",
+      "nom_usuel": "PERRIN",
+      "prenom_usuel": "Cédric",
+      "key": "cedric perrin",
+      "photo_url": "https://www.senat.fr/senimg/perrin_cedric14193x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/perrin_cedric14193x.html"
+    },
+    {
+      "slug": "perrot_evelyne19745f",
+      "nom_usuel": "PERROT",
+      "prenom_usuel": "Évelyne",
+      "key": "evelyne perrot",
+      "photo_url": "https://www.senat.fr/senimg/perrot_evelyne19745f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/perrot_evelyne19745f.html"
+    },
+    {
+      "slug": "petrus_annick20148f",
+      "nom_usuel": "PETRUS",
+      "prenom_usuel": "Annick",
+      "key": "annick petrus",
+      "photo_url": "https://www.senat.fr/senimg/petrus_annick20148f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/petrus_annick20148f.html"
+    },
+    {
+      "slug": "phinera_horth_marie_laure20146d",
+      "nom_usuel": "PHINERA-HORTH",
+      "prenom_usuel": "Marie-Laure",
+      "key": "marie-laure phinera-horth",
+      "photo_url": "https://www.senat.fr/senimg/phinera_horth_marie_laure20146d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/phinera_horth_marie_laure20146d.html"
+    },
+    {
+      "slug": "piednoir_stephane19533u",
+      "nom_usuel": "PIEDNOIR",
+      "prenom_usuel": "Stéphane",
+      "key": "piednoir stephane",
+      "photo_url": "https://www.senat.fr/senimg/piednoir_stephane19533u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/piednoir_stephane19533u.html"
+    },
+    {
+      "slug": "pillefer_bernard21053d",
+      "nom_usuel": "PILLEFER",
+      "prenom_usuel": "Bernard",
+      "key": "bernard pillefer",
+      "photo_url": "https://www.senat.fr/senimg/pillefer_bernard21053d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/pillefer_bernard21053d.html"
+    },
+    {
+      "slug": "pla_sebastien20030r",
+      "nom_usuel": "PLA",
+      "prenom_usuel": "Sebastien",
+      "key": "pla sebastien",
+      "photo_url": "https://www.senat.fr/senimg/pla_sebastien20030r_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/pla_sebastien20030r.html"
+    },
+    {
+      "slug": "pluchet_kristina20118y",
+      "nom_usuel": "PLUCHET",
+      "prenom_usuel": "Kristina",
+      "key": "kristina pluchet",
+      "photo_url": "https://www.senat.fr/senimg/pluchet_kristina20118y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/pluchet_kristina20118y.html"
+    },
+    {
+      "slug": "pointereau_remy05012a",
+      "nom_usuel": "POINTEREAU",
+      "prenom_usuel": "Rémy",
+      "key": "pointereau remy",
+      "photo_url": "https://www.senat.fr/senimg/pointereau_remy05012a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/pointereau_remy05012a.html"
+    },
+    {
+      "slug": "poncet_monge_raymonde20130u",
+      "nom_usuel": "PONCET MONGE",
+      "prenom_usuel": "Raymonde",
+      "key": "monge poncet raymonde",
+      "photo_url": "https://www.senat.fr/senimg/poncet_monge_raymonde20130u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/poncet_monge_raymonde20130u.html"
+    },
+    {
+      "slug": "poumirol_emilienne17965h",
+      "nom_usuel": "POUMIROL",
+      "prenom_usuel": "Émilienne",
+      "key": "emilienne poumirol",
+      "photo_url": "https://www.senat.fr/senimg/poumirol_emilienne17965h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/poumirol_emilienne17965h.html"
+    },
+    {
+      "slug": "primas_sophie11090q",
+      "nom_usuel": "PRIMAS",
+      "prenom_usuel": "Sophie",
+      "key": "primas sophie",
+      "photo_url": "https://www.senat.fr/senimg/primas_sophie11090q_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/primas_sophie11090q.html"
+    },
+    {
+      "slug": "puissat_frederique19679n",
+      "nom_usuel": "PUISSAT",
+      "prenom_usuel": "Frédérique",
+      "key": "frederique puissat",
+      "photo_url": "https://www.senat.fr/senimg/puissat_frederique19679n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/puissat_frederique19679n.html"
+    },
+    {
+      "slug": "rambaud_didier19349w",
+      "nom_usuel": "RAMBAUD",
+      "prenom_usuel": "Didier",
+      "key": "didier rambaud",
+      "photo_url": "https://www.senat.fr/senimg/rambaud_didier19349w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/rambaud_didier19349w.html"
+    },
+    {
+      "slug": "rapin_jean_francois14331p",
+      "nom_usuel": "RAPIN",
+      "prenom_usuel": "Jean-François",
+      "key": "jean-francois rapin",
+      "photo_url": "https://www.senat.fr/senimg/rapin_jean_francois14331p_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/rapin_jean_francois14331p.html"
+    },
+    {
+      "slug": "ravier_stephane14055n",
+      "nom_usuel": "RAVIER",
+      "prenom_usuel": "Stéphane",
+      "key": "ravier stephane",
+      "photo_url": "https://www.senat.fr/senimg/ravier_stephane14055n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/ravier_stephane14055n.html"
+    },
+    {
+      "slug": "raynal_claude14225n",
+      "nom_usuel": "RAYNAL",
+      "prenom_usuel": "Claude",
+      "key": "claude raynal",
+      "photo_url": "https://www.senat.fr/senimg/raynal_claude14225n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/raynal_claude14225n.html"
+    },
+    {
+      "slug": "redon_sarrazy_christian20082e",
+      "nom_usuel": "REDON-SARRAZY",
+      "prenom_usuel": "Christian",
+      "key": "christian redon-sarrazy",
+      "photo_url": "https://www.senat.fr/senimg/redon_sarrazy_christian20082e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/redon_sarrazy_christian20082e.html"
+    },
+    {
+      "slug": "renaud_garabedian_evelyne19705w",
+      "nom_usuel": "RENAUD-GARABEDIAN",
+      "prenom_usuel": "Évelyne",
+      "key": "evelyne renaud-garabedian",
+      "photo_url": "https://www.senat.fr/senimg/renaud_garabedian_evelyne19705w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/renaud_garabedian_evelyne19705w.html"
+    },
+    {
+      "slug": "retailleau_bruno04033b",
+      "nom_usuel": "RETAILLEAU",
+      "prenom_usuel": "Bruno",
+      "key": "bruno retailleau",
+      "photo_url": "https://www.senat.fr/senimg/retailleau_bruno04033b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/retailleau_bruno04033b.html"
+    },
+    {
+      "slug": "reynaud_herve21068l",
+      "nom_usuel": "REYNAUD",
+      "prenom_usuel": "Hervé",
+      "key": "herve reynaud",
+      "photo_url": "https://www.senat.fr/senimg/reynaud_herve21068l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/reynaud_herve21068l.html"
+    },
+    {
+      "slug": "richard_olivia21038e",
+      "nom_usuel": "RICHARD",
+      "prenom_usuel": "Olivia",
+      "key": "olivia richard",
+      "photo_url": "https://www.senat.fr/senimg/richard_olivia21038e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/richard_olivia21038e.html"
+    },
+    {
+      "slug": "richer_marie_pierre19798u",
+      "nom_usuel": "RICHER",
+      "prenom_usuel": "Marie-Pierre",
+      "key": "marie-pierre richer",
+      "photo_url": "https://www.senat.fr/senimg/richer_marie_pierre19798u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/richer_marie_pierre19798u.html"
+    },
+    {
+      "slug": "rietmann_olivier20054a",
+      "nom_usuel": "RIETMANN",
+      "prenom_usuel": "Olivier",
+      "key": "olivier rietmann",
+      "photo_url": "https://www.senat.fr/senimg/rietmann_olivier20054a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/rietmann_olivier20054a.html"
+    },
+    {
+      "slug": "robert_sylvie14229s",
+      "nom_usuel": "ROBERT",
+      "prenom_usuel": "Sylvie",
+      "key": "robert sylvie",
+      "photo_url": "https://www.senat.fr/senimg/robert_sylvie14229s_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/robert_sylvie14229s.html"
+    },
+    {
+      "slug": "rochette_pierre_jean21070e",
+      "nom_usuel": "ROCHETTE",
+      "prenom_usuel": "Pierre Jean",
+      "key": "jean pierre rochette",
+      "photo_url": "https://www.senat.fr/senimg/rochette_pierre_jean21070e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/rochette_pierre_jean21070e.html"
+    },
+    {
+      "slug": "rohfritsch_teva20150y",
+      "nom_usuel": "ROHFRITSCH",
+      "prenom_usuel": "Teva",
+      "key": "rohfritsch teva",
+      "photo_url": "https://www.senat.fr/senimg/rohfritsch_teva20150y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/rohfritsch_teva20150y.html"
+    },
+    {
+      "slug": "roiron_pierre_alain21056g",
+      "nom_usuel": "ROIRON",
+      "prenom_usuel": "Pierre-Alain",
+      "key": "pierre-alain roiron",
+      "photo_url": "https://www.senat.fr/senimg/roiron_pierre_alain21056g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/roiron_pierre_alain21056g.html"
+    },
+    {
+      "slug": "rojouan_bruno20020p",
+      "nom_usuel": "ROJOUAN",
+      "prenom_usuel": "Bruno",
+      "key": "bruno rojouan",
+      "photo_url": "https://www.senat.fr/senimg/rojouan_bruno20020p_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/rojouan_bruno20020p.html"
+    },
+    {
+      "slug": "romagny_anne_sophie21064g",
+      "nom_usuel": "ROMAGNY",
+      "prenom_usuel": "Anne-Sophie",
+      "key": "anne-sophie romagny",
+      "photo_url": "https://www.senat.fr/senimg/romagny_anne_sophie21064g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/romagny_anne_sophie21064g.html"
+    },
+    {
+      "slug": "ros_david21059k",
+      "nom_usuel": "ROS",
+      "prenom_usuel": "David",
+      "key": "david ros",
+      "photo_url": "https://www.senat.fr/senimg/ros_david21059k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/ros_david21059k.html"
+    },
+    {
+      "slug": "rossignol_laurence11045k",
+      "nom_usuel": "ROSSIGNOL",
+      "prenom_usuel": "Laurence",
+      "key": "laurence rossignol",
+      "photo_url": "https://www.senat.fr/senimg/rossignol_laurence11045k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/rossignol_laurence11045k.html"
+    },
+    {
+      "slug": "roux_jean_yves14107h",
+      "nom_usuel": "ROUX",
+      "prenom_usuel": "Jean-Yves",
+      "key": "jean-yves roux",
+      "photo_url": "https://www.senat.fr/senimg/roux_jean_yves14107h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/roux_jean_yves14107h.html"
+    },
+    {
+      "slug": "ruelle_jean_luc21036c",
+      "nom_usuel": "RUELLE",
+      "prenom_usuel": "Jean-Luc",
+      "key": "jean-luc ruelle",
+      "photo_url": "https://www.senat.fr/senimg/ruelle_jean_luc21036c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/ruelle_jean_luc21036c.html"
+    },
+    {
+      "slug": "saint_pe_denise19619a",
+      "nom_usuel": "SAINT-PÉ",
+      "prenom_usuel": "Denise",
+      "key": "denise saint-pe",
+      "photo_url": "https://www.senat.fr/senimg/saint_pe_denise19619a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/saint_pe_denise19619a.html"
+    },
+    {
+      "slug": "salmon_daniel20092g",
+      "nom_usuel": "SALMON",
+      "prenom_usuel": "Daniel",
+      "key": "daniel salmon",
+      "photo_url": "https://www.senat.fr/senimg/salmon_daniel20092g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/salmon_daniel20092g.html"
+    },
+    {
+      "slug": "saury_hugues19421m",
+      "nom_usuel": "SAURY",
+      "prenom_usuel": "Hugues",
+      "key": "hugues saury",
+      "photo_url": "https://www.senat.fr/senimg/saury_hugues19421m_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/saury_hugues19421m.html"
+    },
+    {
+      "slug": "sautarel_stephane20044x",
+      "nom_usuel": "SAUTAREL",
+      "prenom_usuel": "Stéphane",
+      "key": "sautarel stephane",
+      "photo_url": "https://www.senat.fr/senimg/sautarel_stephane20044x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/sautarel_stephane20044x.html"
+    },
+    {
+      "slug": "savin_michel11043h",
+      "nom_usuel": "SAVIN",
+      "prenom_usuel": "Michel",
+      "key": "michel savin",
+      "photo_url": "https://www.senat.fr/senimg/savin_michel11043h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/savin_michel11043h.html"
+    },
+    {
+      "slug": "savoldelli_pascal19687n",
+      "nom_usuel": "SAVOLDELLI",
+      "prenom_usuel": "Pascal",
+      "key": "pascal savoldelli",
+      "photo_url": "https://www.senat.fr/senimg/savoldelli_pascal19687n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/savoldelli_pascal19687n.html"
+    },
+    {
+      "slug": "schalck_elsa20098n",
+      "nom_usuel": "SCHALCK",
+      "prenom_usuel": "Elsa",
+      "key": "elsa schalck",
+      "photo_url": "https://www.senat.fr/senimg/schalck_elsa20098n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/schalck_elsa20098n.html"
+    },
+    {
+      "slug": "schillinger_patricia04045f",
+      "nom_usuel": "SCHILLINGER",
+      "prenom_usuel": "Patricia",
+      "key": "patricia schillinger",
+      "photo_url": "https://www.senat.fr/senimg/schillinger_patricia04045f_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/schillinger_patricia04045f.html"
+    },
+    {
+      "slug": "sene_marc21510h",
+      "nom_usuel": "SÉNÉ",
+      "prenom_usuel": "Marc",
+      "key": "marc sene",
+      "photo_url": "https://www.senat.fr/senimg/sene_marc21510h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/sene_marc21510h.html"
+    },
+    {
+      "slug": "senee_ghislaine21079p",
+      "nom_usuel": "SENÉE",
+      "prenom_usuel": "Ghislaine",
+      "key": "ghislaine senee",
+      "photo_url": "https://www.senat.fr/senimg/senee_ghislaine21079p_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/senee_ghislaine21079p.html"
+    },
+    {
+      "slug": "sido_bruno01058x",
+      "nom_usuel": "SIDO",
+      "prenom_usuel": "Bruno",
+      "key": "bruno sido",
+      "photo_url": "https://www.senat.fr/senimg/sido_bruno01058x_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/sido_bruno01058x.html"
+    },
+    {
+      "slug": "silvani_silvana21049h",
+      "nom_usuel": "SILVANI",
+      "prenom_usuel": "Silvana",
+      "key": "silvana silvani",
+      "photo_url": "https://www.senat.fr/senimg/silvani_silvana21049h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/silvani_silvana21049h.html"
+    },
+    {
+      "slug": "sol_jean19703u",
+      "nom_usuel": "SOL",
+      "prenom_usuel": "Jean",
+      "key": "jean sol",
+      "photo_url": "https://www.senat.fr/senimg/sol_jean19703u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/sol_jean19703u.html"
+    },
+    {
+      "slug": "sollogoub_nadia19713w",
+      "nom_usuel": "SOLLOGOUB",
+      "prenom_usuel": "Nadia",
+      "key": "nadia sollogoub",
+      "photo_url": "https://www.senat.fr/senimg/sollogoub_nadia19713w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/sollogoub_nadia19713w.html"
+    },
+    {
+      "slug": "somon_laurent20062a",
+      "nom_usuel": "SOMON",
+      "prenom_usuel": "Laurent",
+      "key": "laurent somon",
+      "photo_url": "https://www.senat.fr/senimg/somon_laurent20062a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/somon_laurent20062a.html"
+    },
+    {
+      "slug": "souyris_anne21094n",
+      "nom_usuel": "SOUYRIS",
+      "prenom_usuel": "Anne",
+      "key": "anne souyris",
+      "photo_url": "https://www.senat.fr/senimg/souyris_anne21094n_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/souyris_anne21094n.html"
+    },
+    {
+      "slug": "stanzione_lucien20084g",
+      "nom_usuel": "STANZIONE",
+      "prenom_usuel": "Lucien",
+      "key": "lucien stanzione",
+      "photo_url": "https://www.senat.fr/senimg/stanzione_lucien20084g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/stanzione_lucien20084g.html"
+    },
+    {
+      "slug": "szczurek_christopher21069m",
+      "nom_usuel": "SZCZUREK",
+      "prenom_usuel": "Christopher",
+      "key": "christopher szczurek",
+      "photo_url": "https://www.senat.fr/senimg/szczurek_christopher21069m_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/szczurek_christopher21069m.html"
+    },
+    {
+      "slug": "szpiner_francis21095p",
+      "nom_usuel": "SZPINER",
+      "prenom_usuel": "Francis",
+      "key": "francis szpiner",
+      "photo_url": "https://www.senat.fr/senimg/szpiner_francis21095p_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/szpiner_francis21095p.html"
+    },
+    {
+      "slug": "temal_rachid19669l",
+      "nom_usuel": "TEMAL",
+      "prenom_usuel": "Rachid",
+      "key": "rachid temal",
+      "photo_url": "https://www.senat.fr/senimg/temal_rachid19669l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/temal_rachid19669l.html"
+    },
+    {
+      "slug": "tetuanui_lana14275y",
+      "nom_usuel": "TETUANUI",
+      "prenom_usuel": "Lana",
+      "key": "lana tetuanui",
+      "photo_url": "https://www.senat.fr/senimg/tetuanui_lana14275y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/tetuanui_lana14275y.html"
+    },
+    {
+      "slug": "theophile_dominique19301e",
+      "nom_usuel": "THÉOPHILE",
+      "prenom_usuel": "Dominique",
+      "key": "dominique theophile",
+      "photo_url": "https://www.senat.fr/senimg/theophile_dominique19301e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/theophile_dominique19301e.html"
+    },
+    {
+      "slug": "tissot_jean_claude19413m",
+      "nom_usuel": "TISSOT",
+      "prenom_usuel": "Jean-Claude",
+      "key": "jean-claude tissot",
+      "photo_url": "https://www.senat.fr/senimg/tissot_jean_claude19413m_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/tissot_jean_claude19413m.html"
+    },
+    {
+      "slug": "uzenat_simon21051b",
+      "nom_usuel": "UZENAT",
+      "prenom_usuel": "Simon",
+      "key": "simon uzenat",
+      "photo_url": "https://www.senat.fr/senimg/uzenat_simon21051b_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/uzenat_simon21051b.html"
+    },
+    {
+      "slug": "valente_le_hir_sylvie21061d",
+      "nom_usuel": "VALENTE LE HIR",
+      "prenom_usuel": "Sylvie",
+      "key": "hir le sylvie valente",
+      "photo_url": "https://www.senat.fr/senimg/valente_le_hir_sylvie21061d_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/valente_le_hir_sylvie21061d.html"
+    },
+    {
+      "slug": "vallet_mickael20064c",
+      "nom_usuel": "VALLET",
+      "prenom_usuel": "Mickaël",
+      "key": "mickael vallet",
+      "photo_url": "https://www.senat.fr/senimg/vallet_mickael20064c_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/vallet_mickael20064c.html"
+    },
+    {
+      "slug": "varaillas_marie_claude20046a",
+      "nom_usuel": "VARAILLAS",
+      "prenom_usuel": "Marie-Claude",
+      "key": "marie-claude varaillas",
+      "photo_url": "https://www.senat.fr/senimg/varaillas_marie_claude20046a_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/varaillas_marie_claude20046a.html"
+    },
+    {
+      "slug": "vayssouze_faure_jean_marc21031w",
+      "nom_usuel": "VAYSSOUZE-FAURE",
+      "prenom_usuel": "Jean-Marc",
+      "key": "jean-marc vayssouze-faure",
+      "photo_url": "https://www.senat.fr/senimg/vayssouze_faure_jean_marc21031w_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/vayssouze_faure_jean_marc21031w.html"
+    },
+    {
+      "slug": "ventalon_anne20026v",
+      "nom_usuel": "VENTALON",
+      "prenom_usuel": "Anne",
+      "key": "anne ventalon",
+      "photo_url": "https://www.senat.fr/senimg/ventalon_anne20026v_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/ventalon_anne20026v.html"
+    },
+    {
+      "slug": "verien_dominique19749k",
+      "nom_usuel": "VÉRIEN",
+      "prenom_usuel": "Dominique",
+      "key": "dominique verien",
+      "photo_url": "https://www.senat.fr/senimg/verien_dominique19749k_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/verien_dominique19749k.html"
+    },
+    {
+      "slug": "vermeillet_sylvie19479g",
+      "nom_usuel": "VERMEILLET",
+      "prenom_usuel": "Sylvie",
+      "key": "sylvie vermeillet",
+      "photo_url": "https://www.senat.fr/senimg/vermeillet_sylvie19479g_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/vermeillet_sylvie19479g.html"
+    },
+    {
+      "slug": "verzelen_pierre_jean20122u",
+      "nom_usuel": "VERZELEN",
+      "prenom_usuel": "Pierre-Jean",
+      "key": "pierre-jean verzelen",
+      "photo_url": "https://www.senat.fr/senimg/verzelen_pierre_jean20122u_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/verzelen_pierre_jean20122u.html"
+    },
+    {
+      "slug": "vial_cedric20058e",
+      "nom_usuel": "VIAL",
+      "prenom_usuel": "Cédric",
+      "key": "cedric vial",
+      "photo_url": "https://www.senat.fr/senimg/vial_cedric20058e_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/vial_cedric20058e.html"
+    },
+    {
+      "slug": "vogel_jean_pierre14173t",
+      "nom_usuel": "VOGEL",
+      "prenom_usuel": "Jean Pierre",
+      "key": "jean pierre vogel",
+      "photo_url": "https://www.senat.fr/senimg/vogel_jean_pierre14173t_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/vogel_jean_pierre14173t.html"
+    },
+    {
+      "slug": "vogel_louis21076l",
+      "nom_usuel": "VOGEL",
+      "prenom_usuel": "Louis",
+      "key": "louis vogel",
+      "photo_url": "https://www.senat.fr/senimg/vogel_louis21076l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/vogel_louis21076l.html"
+    },
+    {
+      "slug": "vogel_melanie20266l",
+      "nom_usuel": "VOGEL",
+      "prenom_usuel": "Mélanie",
+      "key": "melanie vogel",
+      "photo_url": "https://www.senat.fr/senimg/vogel_melanie20266l_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/vogel_melanie20266l.html"
+    },
+    {
+      "slug": "wattebled_dany19585h",
+      "nom_usuel": "WATTEBLED",
+      "prenom_usuel": "Dany",
+      "key": "dany wattebled",
+      "photo_url": "https://www.senat.fr/senimg/wattebled_dany19585h_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/wattebled_dany19585h.html"
+    },
+    {
+      "slug": "weber_michael21082j",
+      "nom_usuel": "WEBER",
+      "prenom_usuel": "Michaël",
+      "key": "michael weber",
+      "photo_url": "https://www.senat.fr/senimg/weber_michael21082j_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/weber_michael21082j.html"
+    },
+    {
+      "slug": "xowie_robert_wienie21030v",
+      "nom_usuel": "XOWIE",
+      "prenom_usuel": "Robert Wienie",
+      "key": "robert wienie xowie",
+      "photo_url": "https://www.senat.fr/senimg/xowie_robert_wienie21030v_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/xowie_robert_wienie21030v.html"
+    },
+    {
+      "slug": "ziane_adel21077m",
+      "nom_usuel": "ZIANE",
+      "prenom_usuel": "Adel",
+      "key": "adel ziane",
+      "photo_url": "https://www.senat.fr/senimg/ziane_adel21077m_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/ziane_adel21077m.html"
+    }
+  ]
+}

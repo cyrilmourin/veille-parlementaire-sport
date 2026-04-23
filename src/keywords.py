@@ -190,9 +190,20 @@ class KeywordMatcher:
         return (prefix + snippet + suffix).replace("\n", " ").strip()
 
     def apply(self, items: Iterable):
-        """Annote in-place une liste d'Item (keywords + snippet)."""
+        """Annote in-place une liste d'Item (keywords + snippet).
+
+        R26 (2026-04-23) : si `item.raw` contient une clé `haystack_body`
+        (JORF notamment), on l'ajoute au match — permet de capter des
+        textes dont le titre est générique mais dont le corps mentionne
+        les thèmes surveillés. Le snippet reste construit depuis
+        `summary` pour rester court côté affichage.
+        """
         for item in items:
-            kws, fams = self.match(item.title, item.summary)
+            extra_haystack = ""
+            raw = getattr(item, "raw", None)
+            if isinstance(raw, dict):
+                extra_haystack = raw.get("haystack_body") or ""
+            kws, fams = self.match(item.title, item.summary, extra_haystack)
             item.matched_keywords = kws
             item.keyword_families = fams
             # Snippet : priorité au summary (plus riche), fallback sur le titre

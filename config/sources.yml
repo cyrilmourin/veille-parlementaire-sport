@@ -64,6 +64,22 @@ assemblee_nationale:
       format: xml_zip
       since_days: 30
 
+    # R28 (2026-04-23) — Rapports parlementaires AN. Les rapports sont
+    # inclus dans le dump `Dossiers_Legislatifs.json.zip` mais noyés parmi
+    # toutes les étapes de procédure (PPL/PJL, textes adoptés, avis,
+    # commissions). Pour alimenter un flux « rapports AN » dédié (symétrie
+    # avec `senat_rapports`), on scrape la page publique de listing :
+    #   https://www2.assemblee-nationale.fr/documents/liste?type=rapports&legis=17
+    # Page server-rendered, ~100 rapports les plus récents, avec pour
+    # chaque entrée `data-id="OMC_RAPPANR5L17BXXXX"`, titre, date
+    # (« Mis en ligne … »), lien dossier législatif + PDF. Le handler
+    # `assemblee_rapports.fetch_source` filtre les entrées `OMC_RAPP`
+    # (ignore PRJL/PION/AVIS) et privilégie l'URL du dossier législatif.
+    - id: an_rapports
+      category: communiques
+      url: https://www2.assemblee-nationale.fr/documents/liste?type=rapports&legis=17
+      format: an_rapports_html
+
 senat:
   sources:
     # ----- Dossiers législatifs : flux Akoma Ntoso (titre + statut + date)

@@ -25,6 +25,7 @@ from pathlib import Path
 
 from . import digest, normalize, ping_state, site_export
 from . import ping as ping_mod
+from .assemblee_organes import BYPASS_ORGANE_LABEL, is_sport_relevant_organe
 from .keywords import KeywordMatcher
 from .store import Store
 
@@ -94,6 +95,38 @@ def _apply_source_bypass(items) -> int:
     return enriched
 
 
+def _apply_organe_bypass(items) -> int:
+    """R27 (2026-04-23) : bypass keyword pour items d'un organe sport/JOP.
+
+    Injecte le pseudo-keyword `(organe sport/JOP)` sur les items agenda
+    (et le cas échéant CR si `raw.organe` est peuplé un jour) dont le
+    code organe appartient à `SPORT_RELEVANT_ORGANES`. But : remonter
+    les réunions de la Commission culture/éducation AN, des missions
+    d'information JOP 2024, de la commission d'enquête fédérations etc.
+    même quand le titre d'ordre du jour n'accroche aucun mot-clé.
+
+    Opère in-place. N'enrichit que les items SANS match préalable (ne
+    double pas les keywords métier déjà trouvés). Retourne le compte
+    pour logging.
+
+    Scope : catégories `reunions_agenda` et `comptes_rendus` côté AN.
+    Le code organe est lu dans `item.raw["organe"]` (peuplé par le
+    parser an_agenda — voir `src/sources/assemblee.py` L1687).
+    """
+    enriched = 0
+    for it in items:
+        if getattr(it, "matched_keywords", None):
+            continue
+        raw = getattr(it, "raw", None)
+        if not isinstance(raw, dict):
+            continue
+        organe_ref = raw.get("organe") or ""
+        if is_sport_relevant_organe(organe_ref):
+            it.matched_keywords = [BYPASS_ORGANE_LABEL]
+            enriched += 1
+    return enriched
+
+
 def _setup_logging(verbose: bool = False):
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -116,11 +149,15 @@ def run(since_days: int = 1, send: bool = True, verbose: bool = False) -> int:
     # R25-H (2026-04-23) — bypass keywords pour sources 100% sport
     # (ANS, INSEP, INJEP, AFLD, CNOSF, CPSF, FDSF, MinSports). Voir
     # BYPASS_KEYWORDS_SOURCES en tête de module.
-    bypassed = _apply_source_bypass(items)
+    bypassed_source = _apply_source_bypass(items)
+    # R27 (2026-04-23) — bypass keywords pour réunions d'organes sport/JOP
+    # (commissions culture/sociales, missions d'info JOP, CE fédérations).
+    # Voir `src/assemblee_organes.py`.
+    bypassed_organe = _apply_organe_bypass(items)
     matched = [it for it in items if it.matched_keywords]
     log.info(
-        "Matching : %d items matchés sur %d (dont %d via bypass source)",
-        len(matched), len(items), bypassed,
+        "Matching : %d items matchés sur %d (dont %d via bypass source, %d via bypass organe)",
+        len(matched), len(items), bypassed_source, bypassed_organe,
     )
 
     # 3. Persist
@@ -183,9 +220,10 @@ def dry(verbose: bool = False) -> int:
     items, stats = normalize.run_all(CONFIG_SOURCES)
     matcher = KeywordMatcher(CONFIG_KEYWORDS)
     matcher.apply(items)
-    # R25-H : même règle de bypass qu'en mode run, pour que `dry` reflète
-    # fidèlement ce qui serait persisté et affiché sur le site.
+    # R25-H + R27 : même règles de bypass qu'en mode run, pour que `dry`
+    # reflète fidèlement ce qui serait persisté et affiché sur le site.
     _apply_source_bypass(items)
+    _apply_organe_bypass(items)
     matched = [it for it in items if it.matched_keywords]
     log.info("=== Dry-run ===")
     log.info("Total items : %d", len(items))

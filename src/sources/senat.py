@@ -550,22 +550,33 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
             # le libellé neutre "Question écrite" ; le sid distinct reste utile
             # en interne (dedup, compteurs digest) mais n'apparaît plus dans
             # le titre affiché.
-            qtype_label = {
+            # R25b-C (2026-04-23) : le CSV `senat_questions_1an` liste des
+            # questions de +1 an sans réponse TOUTES NATURES confondues. Il
+            # mélange donc QE (question écrite), QOSD (question orale sans
+            # débat) et QG (question au gouvernement rétroactive). L'ancien
+            # mappage figé `senat_questions_1an → "Question écrite"` classait
+            # à tort des questions orales (ex. 1054S : Nature='QOSD'). On lit
+            # désormais la colonne `Nature` du CSV en priorité ; fallback sur
+            # le label associé au sid pour les sources qui n'ont pas `Nature`.
+            nature_csv = (_pick(r, "Nature", "nature") or "").strip().upper()
+            _NATURE_LABELS = {
+                "QE": "Question écrite",
+                "QOSD": "Question orale sans débat",
+                "QG": "Question au gouvernement",
+                "QO": "Question orale",
+            }
+            sid_label = {
                 "senat_questions": "Question écrite",
                 "senat_qg": "Question au gouvernement",
                 "senat_questions_1an": "Question écrite",
             }.get(sid, "Question")
-            # Titre épuré (UX-D 2026-04-21) : {type} n°{num} — {civ prénom
-            # nom auteur} ({groupe}) : {objet/sujet}. L'ancien format
-            # "→ {ministère interrogé} [{sort}] : {sujet}" est abandonné à la
-            # demande utilisateur : le ministre interrogé n'a pas de valeur
-            # dans le titre (l'info reste disponible dans le summary pour
-            # matching + consultation détaillée).
-            # R13-L (2026-04-21) : auteur + groupe retirés du titre (affichés
-            # AVANT le titre via .auteur-inline). Format final : "Question
-            # écrite n°X : sujet" — le template ajoute une barre verticale
-            # entre .auteur-inline et .title.
-            title_bits = [f"{qtype_label} n°{uid}"]
+            qtype_label = _NATURE_LABELS.get(nature_csv, sid_label)
+            # R25b-B (2026-04-23) : retrait de « n°{uid} » du titre pour
+            # harmoniser avec l'AN (`Question écrite : sujet`). Le numéro
+            # reste disponible pour dédup via `raw.Numéro` et reste affiché
+            # en badge côté template si besoin. Format final :
+            # "Question <nature> : sujet".
+            title_bits = [qtype_label]
             title_bits.append(f": {sujet}")
             summary = " — ".join(p for p in [
                 auteur, groupe,

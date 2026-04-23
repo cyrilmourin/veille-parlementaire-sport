@@ -16,6 +16,7 @@ import yaml
 from .models import Item
 from .sources import (  # noqa: F401
     assemblee,
+    assemblee_rapports,
     data_gouv,
     dila_jorf,
     elysee,
@@ -43,6 +44,16 @@ ROUTER: list[tuple[Callable[[dict, dict], bool], Callable[[dict], list[Item]]]] 
     (
         lambda group, src: src.get("format", "").startswith("min_sports_"),
         min_sports.fetch_source,
+    ),
+    # R28 (2026-04-23) — Rapports AN scrappés depuis la page HTML de
+    # listing. Routé par format pour rester dans le groupe
+    # `assemblee_nationale` sans forker la topologie YAML, et PRIORITAIRE
+    # sur la règle `group == "assemblee_nationale"` ci-dessous qui
+    # enverrait sinon au handler `assemblee.fetch_source` (format
+    # json_zip / xml_zip uniquement).
+    (
+        lambda group, src: src.get("format") == "an_rapports_html",
+        assemblee_rapports.fetch_source,
     ),
     # Assemblée nationale — zips JSON
     (lambda group, src: group == "assemblee_nationale", assemblee.fetch_source),

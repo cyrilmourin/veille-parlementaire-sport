@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R25"
+SYSTEM_VERSION_LABEL = "R28"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -415,6 +415,48 @@ def _fix_question_row(r: dict) -> None:
                 count=1,
             )
 
+    # 0quinquies) R25b-C (2026-04-23) : reclasse les items Sénat où le titre
+    #             indique "Question écrite" alors que le CSV a Nature='QOSD'
+    #             (question orale sans débat) ou Nature='QO' (question orale).
+    #             Cas typique : n°1054S — suffixe « S » donc pas une QAG, mais
+    #             le CSV senat_questions_1an mixe QE/QOSD/QG, et l'ancien
+    #             mappage figé classait tout comme "Question écrite".
+    #             Idempotent : ne touche que si le label courant n'est pas
+    #             déjà aligné sur raw.Nature.
+    if isinstance(raw, dict):
+        nature_csv = (raw.get("Nature") or raw.get("nature") or "").strip().upper()
+        nature_label_map = {
+            "QOSD": "Question orale sans débat",
+            "QO": "Question orale",
+            "QG": "Question au gouvernement",
+            "QE": "Question écrite",
+        }
+        target_label = nature_label_map.get(nature_csv)
+        if target_label:
+            cur_prefix_m = re.match(r"^(Question[^\n:—]*?)(?=\s+n°|\s*:|\s*$)", title)
+            if cur_prefix_m:
+                cur_label = cur_prefix_m.group(1).strip()
+                if cur_label.lower() != target_label.lower():
+                    title = re.sub(
+                        r"^Question[^\n:—]*?(?=\s+n°|\s*:|\s*$)",
+                        target_label,
+                        title,
+                        count=1,
+                    )
+
+    # 0sexies) R25b-B (2026-04-23) : retire le fragment « n°<numéro> »
+    #          (Sénat : 1054S, 0701G, 08141 ; AN : rarement présent) du titre
+    #          des questions, pour harmoniser avec le format AN épuré
+    #          « Question écrite : sujet ». Le numéro reste stocké dans
+    #          raw.Numéro pour dédup/matching. Idempotent. On tolère un espace
+    #          de séparateur avant les deux-points suivants, et on normalise
+    #          les espaces multiples.
+    title = re.sub(
+        r"(?i)^(Question[^\n]*?)\s+n°\s*[A-Z0-9]+\b",
+        r"\1",
+        title,
+    )
+
     # 0bis) R13-L (2026-04-21) : retire l'auteur + groupe du titre
     #       (demande Cyril : l'auteur est déjà affiché comme .auteur-inline
     #       cliquable AVANT le titre, avec une barre verticale séparateur).
@@ -629,7 +671,19 @@ def _build_senat_photo_cache(rows: list[dict]) -> dict[str, tuple[str, str]]:
     Les rows en entrée sont le retour de `_load(rows)` : `raw` est déjà
     parsé en dict et contient `auteur`, `auteur_url`, `auteur_photo_url`
     tels qu'exposés par le parser senat_amendements.
+
+    R25b-A (2026-04-23) : deux sources complémentaires alimentent désormais
+    le cache :
+      1. Les amendements Sénat ingérés avec R23-C5+ (photo peuplée dans raw).
+      2. L'index officiel `data/senat_slugs.json` (348 sénateurs en
+         activité), chargé via `senat_slugs.resolve_by_auteur`. Couvre
+         les amendements pré-R23-C5 dont raw.auteur_photo_url est vide
+         ET tous les sénateurs qui ne déposent pas d'amendements dans
+         la fenêtre. Les QAG Sénat en bénéficient via `_enrich_senat_question_photo`.
+    Source (1) reste prioritaire (URL déjà exposée et vérifiée côté
+    parser). Source (2) sert de fallback quand (1) est vide.
     """
+    from . import senat_slugs
     cache: dict[str, tuple[str, str]] = {}
     for r in rows:
         if (r.get("category") or "") != "amendements":
@@ -637,13 +691,31 @@ def _build_senat_photo_cache(rows: list[dict]) -> dict[str, tuple[str, str]]:
         if (r.get("chamber") or "") != "Senat":
             continue
         raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
-        photo = (raw.get("auteur_photo_url") or "").strip()
-        fiche = (raw.get("auteur_url") or "").strip()
-        if not photo and not fiche:
-            continue
         auteur = (raw.get("auteur") or "").strip()
         key = _normalize_auteur_name_senat(auteur)
         if not key:
+            continue
+        photo = (raw.get("auteur_photo_url") or "").strip()
+        fiche = (raw.get("auteur_url") or "").strip()
+        # Fallback R25b-A : si l'amendement n'a pas de photo peuplée (pre
+        # R23-C5), on tente la résolution via l'index officiel Sénat.
+        # Permet aussi de backfill raw pour que le frontmatter amendement
+        # (cf. site_export section "auteur_photo_url backfill AN") affiche
+        # un portrait.
+        if not photo:
+            hit = senat_slugs.resolve_by_auteur(auteur)
+            if hit:
+                photo = photo or hit[0]
+                fiche = fiche or hit[1]
+                # On écrit dans raw pour que la passe d'export Markdown
+                # (qui relit raw.auteur_photo_url) profite aussi du fallback
+                # sur les amendements eux-mêmes, pas juste sur les questions.
+                if photo and not raw.get("auteur_photo_url"):
+                    raw["auteur_photo_url"] = photo
+                if fiche and not raw.get("auteur_url"):
+                    raw["auteur_url"] = fiche
+                r["raw"] = raw
+        if not photo and not fiche:
             continue
         # Si plusieurs rows pour le même sénateur, la première suffit
         # (même slug senfic → même portrait).
@@ -653,17 +725,21 @@ def _build_senat_photo_cache(rows: list[dict]) -> dict[str, tuple[str, str]]:
 
 def _enrich_senat_question_photo(r: dict, cache: dict[str, tuple[str, str]]) -> None:
     """Injecte `auteur_photo_url` / `auteur_url` dans raw pour une question
-    Sénat dont l'auteur est connu via les amendements de la même période.
+    Sénat dont l'auteur est connu via les amendements de la même période
+    OU via l'index officiel Sénat (R25b-A).
+
+    Ordre de résolution :
+      1. Cache R23-N (amendements de la fenêtre) — data locale fraîche.
+      2. Index officiel `senat_slugs.resolve_photo()` — 348 sénateurs en
+         activité, couvre les QAG dont l'auteur n'a pas déposé d'amendement
+         dans la fenêtre.
 
     Idempotent : ne touche pas aux rows déjà pourvus d'une photo, ne
-    touche pas aux rows non-Sénat, ne touche pas aux rows dont le nom
-    n'est pas dans le cache.
+    touche pas aux rows non-Sénat.
     """
     if (r.get("category") or "") != "questions":
         return
     if (r.get("chamber") or "") != "Senat":
-        return
-    if not cache:
         return
     raw = r.get("raw") if isinstance(r.get("raw"), dict) else None
     if not isinstance(raw, dict):
@@ -672,8 +748,7 @@ def _enrich_senat_question_photo(r: dict, cache: dict[str, tuple[str, str]]) -> 
     if (raw.get("auteur_photo_url") or "").strip():
         return
     # Reconstruit le nom depuis les colonnes CSV Sénat si dispo, sinon
-    # tombe sur raw["auteur"] (rarement peuplé pour les questions, mais
-    # un _fix_question_row futur pourrait l'être).
+    # tombe sur raw["auteur"].
     civ = (raw.get("Civilité") or raw.get("civilite") or "").strip()
     prenom = (raw.get("Prénom") or raw.get("prenom") or "").strip()
     nom = (raw.get("Nom") or raw.get("nom") or "").strip()
@@ -682,10 +757,21 @@ def _enrich_senat_question_photo(r: dict, cache: dict[str, tuple[str, str]]) -> 
     key = _normalize_auteur_name_senat(candidate)
     if not key:
         return
-    hit = cache.get(key)
-    if not hit:
+    photo, fiche = "", ""
+    # 1) Priorité au cache R23-N (amendements Sénat de la fenêtre).
+    if cache:
+        hit = cache.get(key)
+        if hit:
+            photo, fiche = hit
+    # 2) Fallback R25b-A : index officiel Sénat (couvre les 348 sénateurs).
+    if not photo:
+        from . import senat_slugs
+        hit2 = senat_slugs.resolve_photo(civ, prenom, nom) or senat_slugs.resolve_by_auteur(full)
+        if hit2:
+            photo = photo or hit2[0]
+            fiche = fiche or hit2[1]
+    if not photo and not fiche:
         return
-    photo, fiche = hit
     if photo:
         raw["auteur_photo_url"] = photo
     if fiche and not raw.get("auteur_url"):
@@ -1237,6 +1323,57 @@ def _filter_disabled_sources(rows: list[dict]) -> list[dict]:
     return [r for r in rows if (r.get("source_id") or "").strip() not in disabled]
 
 
+# R28 (2026-04-23) — Filtre « publications parlementaires ».
+# Sur la page /items/communiques/, le bucket family_source=parlement ne
+# doit lister QUE les rapports (AN + Sénat), pas les actualités RSS
+# Sénat (senat_rss, ~30 communiqués par mois) qui brouillent la lecture
+# métier : Cyril distingue « rapport parlementaire » (document de
+# contrôle avec n° + dossier) et « communiqué » (actu institutionnelle
+# générique). Les items concernés :
+#   - senat_rapports → GARDÉ (rapports Sénat, ~1500 entrées)
+#   - an_rapports    → GARDÉ (rapports AN, R28)
+#   - senat_rss      → RETIRÉ de la famille parlement (reste visible
+#                      via la nav principale /items/communiques/ s'il
+#                      était encore rangé ailleurs, mais ici on le
+#                      masque pour le bucket parlement uniquement)
+# Autres catégories (agenda, dossiers_legislatifs, questions, etc.) :
+# pas touchées — la famille parlement continue à couvrir tous les flux
+# AN/Sénat sur ces volets.
+_PARLEMENT_PUBLICATIONS_ALLOWED_SOURCES = {"senat_rapports", "an_rapports"}
+
+
+def _filter_parlement_publications(rows: list[dict]) -> list[dict]:
+    """R28 — pour category=communiques ET family_source=parlement, ne
+    garde que les rapports (senat_rapports + an_rapports). Les autres
+    items parlementaires en publications (ex. senat_rss) sont retirés.
+
+    Idempotent. Aucun effet sur les autres catégories / familles.
+    """
+    kept: list[dict] = []
+    dropped = 0
+    for r in rows:
+        cat = (r.get("category") or "").strip()
+        if cat != "communiques":
+            kept.append(r)
+            continue
+        family = _source_family(r.get("source_id"), r.get("chamber"))
+        if family != "parlement":
+            kept.append(r)
+            continue
+        sid = (r.get("source_id") or "").strip()
+        if sid in _PARLEMENT_PUBLICATIONS_ALLOWED_SOURCES:
+            kept.append(r)
+        else:
+            dropped += 1
+    if dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "R28 filtre publications parlement : %d item(s) non-rapport masqué(s)",
+            dropped,
+        )
+    return kept
+
+
 def _filter_window(rows: list[dict]) -> list[dict]:
     """Garde uniquement les items dont la date de PUBLICATION est dans la
     fenêtre applicable à leur catégorie (WINDOW_DAYS_BY_CATEGORY sinon
@@ -1737,6 +1874,10 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # publication visible. On le fait AVANT _fix_* (évite du travail inutile
     # sur des items qu'on va jeter de toute façon).
     rows = _filter_disabled_sources(rows)
+    # R28 (2026-04-23) : dans la famille parlement x publications, on ne
+    # garde que les rapports officiels (AN + Sénat). Les actualités RSS
+    # Sénat (senat_rss) sont exclues de ce bucket (cf. docstring).
+    rows = _filter_parlement_publications(rows)
     # R23-N (2026-04-23) : cache nom_auteur_normalisé → (photo, fiche) bâti
     # depuis les amendements Sénat. Utilisé pour enrichir les questions Sénat
     # qui, à l'ingestion, n'ont pas de colonne « Fiche Sénateur » exploitable.

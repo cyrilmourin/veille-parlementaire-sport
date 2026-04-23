@@ -60,7 +60,10 @@ def test_fix_question_row_strips_ministere_and_sort():
     # réécrit en "Question écrite" (étiquette trompeuse vu les re-dépôts
     # automatiques côté Sénat). Le sid source reste préservé pour les
     # compteurs digest.
-    assert "Question écrite n°1054S" in r["title"]
+    # R25b-B (2026-04-23) : le n°<uid> est aussi retiré du titre pour
+    # harmoniser avec l'AN (« Question écrite : sujet »).
+    assert r["title"].startswith("Question écrite")
+    assert "n°" not in r["title"]
     assert "Question de +1 an" not in r["title"]
     assert "Cyril Pellevat" not in r["title"]
     assert "(Les Indépendants)" not in r["title"]
@@ -123,8 +126,10 @@ def test_fix_question_row_handles_unknown_deputy():
         }
         _fix_question_row(r)
     # R13-L : l'auteur (incluant Député PAxxx) est retiré du titre.
+    # R25b-B : n°1 aussi retiré.
     assert "Député PA999999" not in r["title"]
-    assert "Question écrite n°1" in r["title"]
+    assert r["title"].startswith("Question écrite")
+    assert "n°" not in r["title"]
     assert "sujet" in r["title"]
 
 
@@ -624,7 +629,9 @@ def test_fix_question_row_rewrites_1an_prefix_to_question_ecrite():
             "raw": {},
         }
         _fix_question_row(r)
-    assert r["title"].startswith("Question écrite n°12345S")
+    # R25b-B : le n°<uid> est retiré du titre pour harmoniser avec l'AN.
+    assert r["title"].startswith("Question écrite")
+    assert "n°" not in r["title"]
     assert "+1 an" not in r["title"]
     assert "sans réponse" not in r["title"]
 
@@ -656,8 +663,10 @@ def test_fix_question_row_1an_prefix_preserves_source_id():
             "raw": {},
         }
         _fix_question_row(r)
+    # R25b-B : le n°<uid> est retiré du titre (harmonisation AN).
     assert r["source_id"] == "senat_questions_1an"
-    assert r["title"].startswith("Question écrite n°999S")
+    assert r["title"].startswith("Question écrite")
+    assert "n°" not in r["title"]
 
 
 # ---------- _fix_cr_row (R13-G : "Séance AN du" → "Séance du") ------------
@@ -960,21 +969,26 @@ def test_enrich_senat_question_photo_uses_auteur_fallback():
 
 
 def test_enrich_senat_question_photo_miss_returns_silently():
-    """Nom inconnu du cache → aucun changement, pas d'exception."""
+    """Nom inconnu du cache R23-N ET de l'index senat_slugs → aucun changement,
+    pas d'exception. R25b-A : on mocke `resolve_by_auteur` pour isoler le test
+    du contenu réel de data/senat_slugs.json (qui contient les 348 sénateurs
+    en activité, donc un vrai nom comme WATTEBLED y serait trouvé)."""
     cache = {"autre personne": ("x", "y")}
     r = {
         "category": "questions",
         "chamber": "Senat",
-        "raw": {"Prénom": "Dany", "Nom": "WATTEBLED"},
+        "raw": {"Prénom": "Zzinconnu", "Nom": "PERSONNEINEXISTANTE"},
     }
-    _enrich_senat_question_photo(r, cache)
+    with patch("src.senat_slugs.resolve_by_auteur", return_value=None):
+        _enrich_senat_question_photo(r, cache)
     assert "auteur_photo_url" not in r["raw"]
 
 
 # ---------- R25-C : dédup QAG vs question écrite (numéro en « G ») ----------
 
 def test_fix_question_row_rewrites_question_ecrite_G_to_qag():
-    """n°0701G + label "Question écrite" → "Question au gouvernement n°0701G"."""
+    """n°0701G + label "Question écrite" → "Question au gouvernement".
+    R25b-B (2026-04-23) : le n°0701G est ensuite strippé du titre."""
     with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
         r = {
             "category": "questions",
@@ -982,14 +996,16 @@ def test_fix_question_row_rewrites_question_ecrite_G_to_qag():
             "raw": {},
         }
         _fix_question_row(r)
-    assert r["title"].startswith("Question au gouvernement n°0701G")
+    assert r["title"].startswith("Question au gouvernement")
     assert "Question écrite" not in r["title"]
+    assert "n°" not in r["title"]
 
 
 def test_fix_question_row_rewrites_1an_prefix_G_to_qag():
     """Legacy préfixe "Question de +1 an sans réponse" sur numéro en G :
     R23-D le réécrit d'abord en "Question écrite", puis R25-C le remappe
-    en "Question au gouvernement" vu le suffixe G."""
+    en "Question au gouvernement" vu le suffixe G, enfin R25b-B strippe
+    le n°."""
     with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
         r = {
             "category": "questions",
@@ -997,13 +1013,15 @@ def test_fix_question_row_rewrites_1an_prefix_G_to_qag():
             "raw": {},
         }
         _fix_question_row(r)
-    assert r["title"].startswith("Question au gouvernement n°0701G")
+    assert r["title"].startswith("Question au gouvernement")
     assert "+1 an" not in r["title"]
     assert "Question écrite" not in r["title"]
+    assert "n°" not in r["title"]
 
 
 def test_fix_question_row_keeps_question_ecrite_S_suffix():
-    """Numéro en « S » (question écrite canonique) : pas de remap R25-C."""
+    """Numéro en « S » (question écrite canonique) : pas de remap R25-C.
+    R25b-B strippe tout de même le n°."""
     with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
         r = {
             "category": "questions",
@@ -1011,11 +1029,13 @@ def test_fix_question_row_keeps_question_ecrite_S_suffix():
             "raw": {},
         }
         _fix_question_row(r)
-    assert r["title"].startswith("Question écrite n°1054S")
+    assert r["title"].startswith("Question écrite")
+    assert "n°" not in r["title"]
 
 
 def test_fix_question_row_r25c_idempotent():
-    """Un titre déjà étiqueté "Question au gouvernement n°xxxG" ne change pas."""
+    """Un titre déjà étiqueté "Question au gouvernement n°xxxG" ne change pas
+    après la 1re passe (R25b-B strippe le n°, 2e passe no-op)."""
     with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
         r = {
             "category": "questions",
@@ -1027,11 +1047,14 @@ def test_fix_question_row_r25c_idempotent():
         _fix_question_row(r)
         after_second = r["title"]
     assert after_first == after_second
-    assert after_first.startswith("Question au gouvernement n°0701G")
+    assert after_first.startswith("Question au gouvernement")
+    assert "n°" not in after_first
 
 
 def test_fix_question_row_r25c_ignores_numeric_only_numero():
-    """Numéro purement numérique (AN questions écrites) : pas de remap R25-C."""
+    """Numéro purement numérique (AN questions écrites) : pas de remap R25-C.
+    R25b-B strippe tout de même le n° pour harmoniser avec le format AN
+    épuré « Question écrite : sujet »."""
     with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
         r = {
             "category": "questions",
@@ -1039,4 +1062,5 @@ def test_fix_question_row_r25c_ignores_numeric_only_numero():
             "raw": {},
         }
         _fix_question_row(r)
-    assert r["title"].startswith("Question écrite n°14369")
+    assert r["title"].startswith("Question écrite")
+    assert "n°" not in r["title"]

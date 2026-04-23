@@ -36,3 +36,12 @@ references/
 # Scripts diagnostiques one-shot
 scripts/diag_*.py
 scripts/diag_*.txt
+# Scripts one-shot commit/push generes par session (R22/R23/R24/R25...) :
+# ne pas versionner, archiver au besoin. reset_db_full.command est un
+# utilitaire reutilisable tenu hors git volontairement.
+push_*.command
+commit_*.command
+deploy_*.command
+finish_*.command
+run_clean_*.command
+cleanup_*.command

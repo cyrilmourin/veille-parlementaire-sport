@@ -96,8 +96,52 @@ def _find(root, *paths):
     return None
 
 
+def _collect_inner_text(el, max_len: int = 6000) -> str:
+    """Concatène le texte de tous les descendants d'un nœud (ignore tags,
+    attributs, commentaires) en respectant l'ordre. Utilisé pour aplatir
+    <NOTICE>, <TEXTE>, <VISAS>, <ARTICLE>… en texte brut.
+
+    `max_len` coupe de façon défensive quand le corps d'un arrêté est
+    très long (cas des conventions collectives étendues qui pèsent
+    plusieurs centaines de ko). La fenêtre 6000c suffit au haystack
+    (3000c) et au summary (400c) sans mobiliser de mémoire inutile.
+    """
+    if el is None:
+        return ""
+    try:
+        # `itertext()` de lxml renvoie tous les .text + .tail dans l'ordre
+        parts: list[str] = []
+        total = 0
+        for t in el.itertext():
+            if not t:
+                continue
+            s = t.strip()
+            if not s:
+                continue
+            parts.append(s)
+            total += len(s) + 1
+            if total >= max_len:
+                break
+        # Normalise les blancs (retours chariot XML + espaces multiples).
+        raw = " ".join(parts)
+        return re.sub(r"\s+", " ", raw).strip()
+    except Exception:  # pragma: no cover — défensif
+        return ""
+
+
 def _parse_texte_version(xml_bytes: bytes) -> dict | None:
-    """Extrait les champs utiles d'un fichier TEXTE_VERSION_xxx.xml."""
+    """Extrait les champs utiles d'un fichier TEXTE_VERSION_xxx.xml.
+
+    R26 (2026-04-23) : extraction additionnelle de la NOTICE (résumé officiel
+    DILA de l'acte, 1-3 phrases quand présent) et d'un haystack du corps
+    (visas + articles aplati en texte brut, max 3000c). Ces deux champs sont
+    remontés dans `raw` pour alimenter respectivement le `summary` (NOTICE
+    prioritaire, fallback début du corps) et la recherche keywords
+    (`matcher.apply(haystack_extra=…)`). Permet de capter les arrêtés où
+    le mot « sport » n'apparaît que dans le corps (ex. nomination au
+    cabinet du MinSports dont le titre est générique « portant
+    nomination de Mme X »).
+    """
     try:
         root = etree.fromstring(xml_bytes)
     except etree.XMLSyntaxError:
@@ -115,6 +159,22 @@ def _parse_texte_version(xml_bytes: bytes) -> dict | None:
     if not id_text or not titre:
         return None
 
+    # R26 — NOTICE : résumé DILA officiel (champ META_SPEC/META_TEXTE_VERSION/
+    # NOTICE dans les schemas récents, parfois META_COMMUN/NOTICE sur les
+    # textes anciens). Texte brut avec balises inline (<it>, <sup>…) : on
+    # aplatit via itertext().
+    notice_el = _find(root, ".//NOTICE", ".//META_TEXTE_VERSION/NOTICE")
+    notice = _collect_inner_text(notice_el, max_len=1200)
+
+    # R26 — corps du texte pour haystack keywords + fallback summary.
+    # Le conteneur <TEXTE> regroupe <VISAS> + <ARTICLE>+ (+ parfois <NOTA>,
+    # <SIGNATAIRES>). itertext() préserve l'ordre visuel. On cape à 3000c
+    # pour la recherche keywords (suffisant pour les visas ministériels
+    # et le premier article) et on reserve 400c pour le summary fallback.
+    texte_el = _find(root, ".//TEXTE", ".//CORPS")
+    body_full = _collect_inner_text(texte_el, max_len=6000)
+    body_head = body_full[:3000]
+
     # URL Legifrance publique
     url = f"https://www.legifrance.gouv.fr/jorf/id/{id_text}"
     return {
@@ -123,6 +183,8 @@ def _parse_texte_version(xml_bytes: bytes) -> dict | None:
         "title": titre,
         "url": url,
         "date": parse_iso(date_publi) or parse_iso(date_sign),
+        "notice": notice,
+        "body_head": body_head,
     }
 
 
@@ -184,6 +246,20 @@ def fetch_source(src: dict) -> list[Item]:
             if any(h in title_low for h in _NOM_HINTS):
                 cat = "nominations"
 
+            # R26 — summary : NOTICE DILA si présente (résumé officiel,
+            # 1-3 phrases), sinon premier segment du corps (visas + début
+            # article 1er), fallback final sur le libellé nature. 400c
+            # suffit à la vignette site. La première phrase doit être
+            # self-contained pour le digest email aussi.
+            notice = info.get("notice") or ""
+            body_head = info.get("body_head") or ""
+            if notice:
+                summary = notice[:400]
+            elif body_head:
+                summary = body_head[:400]
+            else:
+                summary = f"{info['nature'].capitalize()} publié au JORF."
+
             out.append(Item(
                 source_id=src["id"],
                 uid=info["id"],
@@ -192,8 +268,17 @@ def fetch_source(src: dict) -> list[Item]:
                 title=info["title"][:220],
                 url=info["url"],
                 published_at=info["date"],
-                summary=f"{info['nature'].capitalize()} publié au JORF.",
-                raw={"nature": info["nature"], "dump": url},
+                summary=summary,
+                raw={
+                    "nature": info["nature"],
+                    "dump": url,
+                    "notice": notice,
+                    # R26 — haystack body (3000c). Lu par matcher.apply via
+                    # le paramètre `haystack_extra` pour élargir la
+                    # couverture keywords aux textes dont le titre est
+                    # générique mais le corps parle de sport.
+                    "haystack_body": body_head,
+                },
             ))
     log.info("DILA JORF : %d items uniques sur %d dumps", len(out), len(dumps))
     return out
