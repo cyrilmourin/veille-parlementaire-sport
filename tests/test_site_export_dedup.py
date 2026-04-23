@@ -173,3 +173,60 @@ def test_dedup_merges_senat_variants_via_signet_across_urls():
     dosleg = [r for r in result if r.get("category") == "dossiers_legislatifs"]
     assert len(dosleg) == 1
     assert dosleg[0]["published_at"].startswith("2026-03-20")
+
+
+def test_dedup_r22a_preserves_url_an_bridge_across_passes():
+    """R22a (2026-04-23) — régression : passe 2a écrasait l'url_an utile
+    au bridge AN↔Sénat. Scénario réel JOP Alpes 2030 : 4 items (1 AN +
+    2 senat_akn avec url_an + 1 senat_promulguees sans url_an). Passe 2a
+    fusionne les 3 Sénat → garde senat_promulguees (date plus récente) →
+    perd `url_an`. Passe 2c ne peut plus relier AN↔Sénat. Fix :
+    `_merge_ids_into_winner` cumule les IDs dans `raw._merged_dossier_ids`
+    pour que 2c les voie. Résultat attendu : 1 item au lieu de 2.
+    """
+    an = _make_item(
+        "DLR5L17N52100",
+        "Projet de loi relatif à l'organisation des jeux Olympiques et Paralympiques de 2030",
+        "https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52100",
+        "AN",
+        "2026-03-20",
+        raw={"dossier_id": "DLR5L17N52100"},
+    )
+    senat_prom = _make_item(
+        "2026-201",
+        "Projet de loi relatif à l'organisation des jeux Olympiques et Paralympiques de 2030",
+        "http://www.senat.fr/dossier-legislatif/pjl24-630.html",
+        "Senat",
+        "2026-03-20",
+        raw={"dossier_id": "2026-201"},
+    )
+    senat_akn_adop = _make_item(
+        "pjl24-630",
+        "Jeux Olympiques et Paralympiques de 2030 (PJL)",
+        "https://www.senat.fr/dossier-legislatif/pjl24-630.html",
+        "Senat",
+        "2026-02-05",
+        raw={
+            "dossier_id": "pjl24-630",
+            "signet": "pjl24-630",
+            "url_an": "http://www.assemblee-nationale.fr/17/dossiers/DLR5L17N52100.asp",
+        },
+    )
+    senat_akn_depot = _make_item(
+        "pjl24-630",
+        "Jeux Olympiques et Paralympiques de 2030 (PJL)",
+        "https://www.senat.fr/dossier-legislatif/pjl24-630.html",
+        "Senat",
+        "2026-01-27",
+        raw={
+            "dossier_id": "pjl24-630",
+            "signet": "pjl24-630",
+            "url_an": "http://www.assemblee-nationale.fr/17/dossiers/DLR5L17N52100.asp",
+        },
+    )
+    result = _dedup([senat_prom, an, senat_akn_adop, senat_akn_depot])
+    dosleg = [r for r in result if r.get("category") == "dossiers_legislatifs"]
+    assert len(dosleg) == 1, (
+        f"attendu 1 item fusionné (4→1 via merged_dossier_ids bridge), "
+        f"vu {len(dosleg)}"
+    )

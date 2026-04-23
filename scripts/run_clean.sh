@@ -18,6 +18,19 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_DIR"
 
+# ── Python : priorité au venv du repo, sinon python3 système ───────────────
+# R22+ (2026-04-23) : macOS moderne n'aliase pas `python` → `python3`.
+# Avant ce fix, la ligne `python -m src.main run` plantait
+# `command not found` et le reset DB restait sans DB régénérée.
+if [[ -x "$REPO_DIR/.venv/bin/python" ]]; then
+  PYTHON="$REPO_DIR/.venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON="$(command -v python3)"
+else
+  echo "ERREUR : aucun Python disponible (ni .venv/bin/python ni python3 système)" >&2
+  exit 1
+fi
+
 # ── Couleurs ───────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 ok()   { echo -e "${GREEN}✓${NC} $*"; }
@@ -77,7 +90,8 @@ fi
 
 # ── 3. Run pipeline ────────────────────────────────────────────────────────
 step "Lancement pipeline (--since $SINCE --no-email)"
-python -m src.main run --since "$SINCE" --no-email -v 2>&1 | tee /tmp/veille_run.log
+step "Python utilisé : $PYTHON"
+"$PYTHON" -m src.main run --since "$SINCE" --no-email -v 2>&1 | tee /tmp/veille_run.log
 
 EXIT_CODE=${PIPESTATUS[0]}
 if [[ "$EXIT_CODE" -ne 0 ]]; then
@@ -89,7 +103,7 @@ ok "Pipeline terminé sans erreur"
 # ── 4. Vérification dédup dossiers législatifs ─────────────────────────────
 step "Vérification dédup dossiers législatifs"
 
-python3 - <<'PYEOF'
+"$PYTHON" - <<'PYEOF'
 import sqlite3, json, re, sys
 from pathlib import Path
 

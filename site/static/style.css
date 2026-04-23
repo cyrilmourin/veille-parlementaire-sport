@@ -704,11 +704,14 @@ a:hover { text-decoration: underline; }
 
 /* Module recherche dans la sidebar.
    R13-G : plus de gradient (demande Cyril) — fond bleu Sideline uni,
-   police crème pour cohérence avec le header. */
+   police crème pour cohérence avec le header.
+   R22+ (2026-04-23) : fond ajusté à #11264b (bleu marine plus profond
+   que le --sl-blue d'origine) sur demande Cyril. Border + bouton
+   alignés sur la même teinte pour conserver l'harmonie visuelle. */
 .side-card--search {
-  background: var(--sl-blue);
+  background: #11264b;
   color: var(--sl-cream);
-  border-color: var(--sl-blue);
+  border-color: #11264b;
 }
 .side-card--search .side-title {
   color: var(--sl-cream);
@@ -741,7 +744,8 @@ a:hover { text-decoration: underline; }
   flex: 0 0 36px;
   border: 0;
   border-radius: 6px;
-  background: var(--sl-blue);
+  /* R22+ (2026-04-23) : aligné sur le nouveau fond carte #11264b. */
+  background: #11264b;
   color: #fff;
   font-size: 18px;
   font-weight: 700;

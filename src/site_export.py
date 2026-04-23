@@ -974,8 +974,41 @@ def _item_dossier_ids(row: dict) -> set[str]:
     url_an = raw.get("url_an")
     if isinstance(url_an, str) and url_an:
         ids |= _extract_dossier_ids_from_url(url_an)
+    # R22a (2026-04-23) — IDs cumulés lors des fusions précédentes (2a/2b).
+    # Cf. `_merge_ids_into_winner` : on préserve l'info de bridge AN↔Sénat
+    # quand un senat_akn_* (qui portait url_an) est écarté en 2a au profit
+    # d'un senat_promulguees (sans url_an). Sans ce cumul, la passe 2c ne
+    # peut plus relier l'AN qui reste.
+    merged = raw.get("_merged_dossier_ids")
+    if isinstance(merged, list):
+        for m in merged:
+            if isinstance(m, str) and m.strip():
+                ids.add(m.strip().lower())
     ids.discard("")
     return ids
+
+
+def _merge_ids_into_winner(winner: dict, loser: dict) -> None:
+    """R22a (2026-04-23) — injecte les IDs du loser dans winner.raw pour que
+    les passes de dédup ultérieures (`_item_dossier_ids`) voient encore le
+    bridge AN↔Sénat des items écartés.
+
+    Sans ça, le scénario JOP Alpes 2030 cassait : passe 2a fusionne les 3
+    Sénat sur `pjl24-630.html` en gardant senat_promulguees (date desc),
+    mais senat_promulguees n'a pas `url_an` — donc passe 2c perd le lien
+    vers DLR5L17N52100 côté AN et les 2 items (AN + Sénat) restent.
+    """
+    raw_w = winner.get("raw")
+    if not isinstance(raw_w, dict):
+        return
+    loser_ids = _item_dossier_ids(loser)
+    if not loser_ids:
+        return
+    existing = raw_w.get("_merged_dossier_ids")
+    if not isinstance(existing, list):
+        existing = []
+    cumul = set(existing) | loser_ids
+    raw_w["_merged_dossier_ids"] = sorted(cumul)
 
 
 def _dedup(rows: list[dict]) -> list[dict]:
@@ -1090,7 +1123,10 @@ def _dedup(rows: list[dict]) -> list[dict]:
         if prev is None:
             by_url[u] = r
             continue
-        by_url[u] = _prefer(prev, r)
+        w = _prefer(prev, r)
+        loser = r if w is prev else prev
+        _merge_ids_into_winner(w, loser)  # R22a — préserver bridge AN↔Sénat
+        by_url[u] = w
     step1 = list(by_url.values())
     dropped_url = len(dosleg) - len(step1)
 
@@ -1142,8 +1178,14 @@ def _dedup(rows: list[dict]) -> list[dict]:
             dedup_dosleg.append(grp[0])
             continue
         winner = grp[0]
+        losers = []
         for cand in grp[1:]:
-            winner = _prefer(winner, cand)
+            new_w = _prefer(winner, cand)
+            losers.append(cand if new_w is winner else winner)
+            winner = new_w
+        # R22a (2026-04-23) — cumul des IDs pour que la passe 2c les voit.
+        for loser in losers:
+            _merge_ids_into_winner(winner, loser)
         dedup_dosleg.append(winner)
     dropped_sem = len(step1) - len(dedup_dosleg)
 

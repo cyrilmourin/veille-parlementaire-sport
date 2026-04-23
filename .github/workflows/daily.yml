@@ -139,7 +139,15 @@ jobs:
 
       - name: Build Hugo site
         working-directory: site
-        run: hugo --minify --baseURL "https://veille.sideline-conseil.fr/"
+        # R22a (2026-04-23) — purge site/public/ AVANT build pour éviter que
+        # les pages générées par d'anciennes runs (sources désactivées comme
+        # alpes_2030_news ou senat_theme_sport_rss) restent fantômes en ligne.
+        # Hugo ne supprime pas les fichiers orphelins par défaut. Option
+        # --cleanDestinationDir existe mais n'est efficace que si la dest
+        # vient d'être créée ; on fait `rm -rf` en amont par prudence.
+        run: |
+          rm -rf public
+          hugo --minify --baseURL "https://veille.sideline-conseil.fr/"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

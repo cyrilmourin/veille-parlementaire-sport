@@ -101,14 +101,15 @@ def test_aai_sport_sources_present_and_enabled(cfg):
 
 
 def test_high_jurisdictions_configured(cfg):
-    """Les 3 hautes juridictions (Conseil d'État, Conseil constitutionnel,
-    Cour de cassation) doivent avoir une entrée dans le YAML, même si
-    Cassation est désactivée (présence = visibilité opérationnelle)."""
+    """Les hautes juridictions dans le scope doivent avoir une entrée YAML.
+    R22 (2026-04-23) : Cour de cassation retirée du scope (site JS-only
+    insurmontable, aucun flux RSS exposé côté officiel). Cf. AUDIT_R19.md §7.
+    """
     all_ids = {s["id"] for _g, s in _iter_sources(cfg)}
     assert "conseil_etat" in all_ids
     assert "conseil_constit_actualites" in all_ids
     assert "conseil_constit_decisions" in all_ids
-    assert "cour_cassation" in all_ids
+    # Cour de cassation volontairement non listée (R22).
 
 
 def test_dispatch_covers_all_enabled_sources(cfg):
