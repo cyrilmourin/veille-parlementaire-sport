@@ -200,6 +200,31 @@ def _build_item(
     subdivision = (row.get("Subdivision") or "").strip()
     alinea = (row.get("Alinéa") or row.get("Alinea") or "").strip()
 
+    # R23-C5 (2026-04-23) : URL fiche sénateur + URL photo portrait
+    # construite depuis le slug senfic (ex. wattebled_dany19585h).
+    # La colonne "Fiche Sénateur" arrive typiquement sous la forme
+    # `//www.senat.fr/senfic/<slug>.html` (pas de schema). On normalise
+    # pour expose un auteur_url https et un auteur_photo_url via
+    # amo_loader.build_photo_url_senat (pattern /senimg/<slug>_carre.jpg).
+    fiche_senateur = (row.get("Fiche Sénateur") or row.get("Fiche Senateur") or "").strip()
+    auteur_url = ""
+    auteur_photo_url = ""
+    if fiche_senateur:
+        # Normalisation du schema (//www… → https://www…)
+        if fiche_senateur.startswith("//"):
+            auteur_url = "https:" + fiche_senateur
+        elif fiche_senateur.startswith("http"):
+            auteur_url = fiche_senateur
+        else:
+            # chemin relatif rare : on prefixe senat.fr
+            auteur_url = "https://www.senat.fr" + (
+                fiche_senateur if fiche_senateur.startswith("/") else f"/{fiche_senateur}"
+            )
+        # L'URL photo se deduit du slug, meme si on n'a pas pu normaliser
+        # l'auteur_url (build_photo_url_senat accepte le format raw).
+        from ..amo_loader import build_photo_url_senat
+        auteur_photo_url = build_photo_url_senat(fiche_senateur) or ""
+
     published_at: datetime | None = None
     if date_depot:
         try:
@@ -268,6 +293,11 @@ def _build_item(
             "alinea": alinea,
             "dossier_titre": titre_dossier,
             "dossier_url": dossier_url,
+            # R23-C5 (2026-04-23) : photo portrait senateur (pattern
+            # /senimg/<slug>_carre.jpg) + URL fiche senateur avec https.
+            # Consommes cote site_export pour exposer dans le frontmatter.
+            "auteur_url": auteur_url,
+            "auteur_photo_url": auteur_photo_url,
         },
     )
 

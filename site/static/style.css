@@ -621,26 +621,53 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px dotted var(--muted);
 }
 
-/* R23-C (2026-04-23) : miniature portrait parlementaire en début
-   d'item (listes) et en grande taille sur la fiche détail. Format carré
-   arrondi demandé par Cyril (border-radius 6px, pas round pour éviter
-   l'effet "pastille"). */
+/* R23-C (2026-04-23) : portrait parlementaire.
+   R23-C4 (2026-04-23) : agrandi à 56x56 avec border-radius 8 pour
+   matcher visuellement les logos AN/Senat des cartes dossiers
+   législatifs (.dosleg-card__icon). Le <li> parent est passé en
+   flex horizontal via .listing-item (colonne gauche photo + body).
+   Format carré arrondi demandé par Cyril (border-radius 8px, pas round
+   pour éviter l'effet "pastille"). */
 .auteur-photo {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
   object-fit: cover;
-  vertical-align: middle;
-  margin-right: 6px;
+  display: block;
   background: var(--sl-grey-100, #eee);
   /* Petit contour pour lisibilité sur fond clair */
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 .auteur-photo-lg {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  margin-right: 10px;
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  margin-right: 14px;
+}
+
+/* R23-C4 (2026-04-23) : layout deux colonnes pour les items de listing
+   (amendements, questions, communiqués, agenda, CR…). Même structure
+   visuelle que .dosleg-card (photo/logo en colonne gauche 56x56, body
+   à droite). Si .listing-item__photo n'est pas présent (pas de photo
+   dispo pour l'item), le body prend toute la largeur naturellement.
+   Si la photo 404 côté navigateur, onerror masque .listing-item__photo
+   (display:none), même comportement. */
+.listing .items > li.listing-item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.listing-item__photo {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+}
+.listing-item__photo .auteur-photo {
+  margin: 0;
+}
+.listing-item__body {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* ---------- Pagination inline (listings) ----------------------------- */

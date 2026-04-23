@@ -88,8 +88,13 @@
         </div>
 
         {{ with .Params.status_label }}
+          {{/* R23-M (2026-04-23) : retrait du prefixe "En cours :" —
+               le status_label seul suffit a porter l'info. "Promulgué :"
+               est conservé pour marquer explicitement le statut final
+               positif (le status_label contient alors le numéro/date
+               de la loi, d'où l'utilité du préfixe). */}}
           <div class="dosleg-card__status{{ if $.Params.is_promulgated }} dosleg-card__status--promulgated{{ end }}">
-            {{ if $.Params.is_promulgated }}Promulgué : {{ . }}{{ else }}En cours : {{ . }}{{ end }}
+            {{ if $.Params.is_promulgated }}Promulgué : {{ . }}{{ else }}{{ . }}{{ end }}
           </div>
         {{ end }}
 

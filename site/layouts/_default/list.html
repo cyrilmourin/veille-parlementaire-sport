@@ -23,45 +23,54 @@
   {{ end }}
   <ul class="items">
     {{ range (.Paginate .Pages.ByDate.Reverse).Pages }}
-      <li{{ with .Params.family_source }} data-family-source="{{ . }}"{{ end }}>
-        {{/* R13-J : auteur (lien fiche député/sénateur) inline AVANT le titre,
-             même taille de police. Fixup patch 9. Ouverture nouvel onglet.
-             R13-L : barre verticale séparateur entre auteur et titre
-             (demande Cyril). Visible uniquement si auteur présent. */}}
-        {{/* R23-B (2026-04-23) : sigle groupe parlementaire en inline après
-             l'auteur, tooltip `title=""` avec le libellé long quand fourni.
-             R23-C (2026-04-23) : photo portrait miniature (28x28) AVANT
-             l'auteur quand dispo. `onerror` masque l'image si 404 (acteur
-             inconnu ou photo absente). `loading="lazy"` + decoding="async"
-             évitent le blocage de rendu. `alt=""` pour ne pas doubler
-             l'info avec .auteur-inline (accessibilité lecteurs d'écran). */}}
-        {{ with .Params.auteur_photo_url }}<img class="auteur-photo" src="{{ . }}" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" width="28" height="28">{{ end }}
-        {{ if .Params.auteur_url }}<a class="auteur-inline" href="{{ .Params.auteur_url }}" target="_blank" rel="noopener noreferrer" title="Fiche {{ .Params.auteur }}">{{ .Params.auteur }}</a>{{ with .Params.auteur_groupe }} <span class="auteur-groupe"{{ with $.Params.auteur_groupe_long }} title="{{ . }}"{{ end }}>({{ . }})</span>{{ end }}<span class="auteur-sep"> | </span>{{ else if .Params.auteur }}<span class="auteur-inline">{{ .Params.auteur }}</span>{{ with .Params.auteur_groupe }} <span class="auteur-groupe"{{ with $.Params.auteur_groupe_long }} title="{{ . }}"{{ end }}>({{ . }})</span>{{ end }}<span class="auteur-sep"> | </span>{{ end }}
-        {{ if .Params.source_url }}
-        <a href="{{ .Params.source_url }}" class="title" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
-        {{ else }}
-        <span class="title no-link">{{ .Title }}</span>
+      {{/* R23-C4 (2026-04-23) : le <li> devient flex horizontal avec, si
+           .Params.auteur_photo_url est défini, une colonne gauche dédiée
+           à la photo portrait au même format visuel que les logos chambre
+           des dossiers législatifs (56x56, border-radius 8px). Si pas de
+           photo, le body prend toute la largeur (pas de colonne vide).
+           Si la photo 404 à l'exécution, onerror masque le bloc
+           .listing-item__photo entier (pas juste l'img) pour que le body
+           reprenne tout l'espace disponible. */}}
+      <li class="listing-item"{{ with .Params.family_source }} data-family-source="{{ . }}"{{ end }}>
+        {{ with .Params.auteur_photo_url }}
+          <div class="listing-item__photo" aria-hidden="true">
+            <img class="auteur-photo" src="{{ . }}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.style.display='none'" width="56" height="56">
+          </div>
         {{ end }}
-        <div class="item-meta">
-          <span class="meta-main">
-            {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
-            {{ with .Params.status_label }} · <span class="status{{ if $.Params.is_promulgated }} status-promulgated{{ end }}{{ if eq . "Retiré" }} status-retire{{ end }}">{{ . }}</span>{{ end }}
-            {{ if not .Date.IsZero }} · <time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ printf "%d %s %d" .Date.Day (index $monthsFR (int .Date.Month)) .Date.Year }}</time>{{ end }}
-            {{/* R13-J : chip sort/état juste APRÈS la date pour les amendements.
-                 R13-O (2026-04-21) : fix data-sort qui restait vide. Le `with`
-                 changeait le contexte `.` vers la valeur de sort_label, donc
-                 `$.Params.sort_slug` fonctionnait mais apparemment Hugo le
-                 vidait à l'output. Utilisation de `if` + accès direct. */}}
-            {{ if .Params.sort_label }} · <span class="sort-chip" data-sort="{{ .Params.sort_slug | default "" }}">{{ .Params.sort_label }}</span>{{ end }}
-          </span>
-          {{ with .Params.keywords }}
-            <span class="meta-tags">
-              {{ $fam := "" }}{{ with $.Params.families }}{{ $fam = index . 0 }}{{ end }}
-              {{ range first 12 . }}<span class="kw-tag"{{ with $fam }} data-family="{{ . }}"{{ end }}>{{ . }}</span>{{ end }}
-            </span>
+        <div class="listing-item__body">
+          {{/* R13-J : auteur (lien fiche député/sénateur) inline AVANT le titre,
+               même taille de police. Fixup patch 9. Ouverture nouvel onglet.
+               R13-L : barre verticale séparateur entre auteur et titre
+               (demande Cyril). Visible uniquement si auteur présent. */}}
+          {{/* R23-B (2026-04-23) : sigle groupe parlementaire en inline après
+               l'auteur, tooltip `title=""` avec le libellé long quand fourni. */}}
+          {{ if .Params.auteur_url }}<a class="auteur-inline" href="{{ .Params.auteur_url }}" target="_blank" rel="noopener noreferrer" title="Fiche {{ .Params.auteur }}">{{ .Params.auteur }}</a>{{ with .Params.auteur_groupe }} <span class="auteur-groupe"{{ with $.Params.auteur_groupe_long }} title="{{ . }}"{{ end }}>({{ . }})</span>{{ end }}<span class="auteur-sep"> | </span>{{ else if .Params.auteur }}<span class="auteur-inline">{{ .Params.auteur }}</span>{{ with .Params.auteur_groupe }} <span class="auteur-groupe"{{ with $.Params.auteur_groupe_long }} title="{{ . }}"{{ end }}>({{ . }})</span>{{ end }}<span class="auteur-sep"> | </span>{{ end }}
+          {{ if .Params.source_url }}
+          <a href="{{ .Params.source_url }}" class="title" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
+          {{ else }}
+          <span class="title no-link">{{ .Title }}</span>
           {{ end }}
+          <div class="item-meta">
+            <span class="meta-main">
+              {{ with .Params.chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
+              {{ with .Params.status_label }} · <span class="status{{ if $.Params.is_promulgated }} status-promulgated{{ end }}{{ if eq . "Retiré" }} status-retire{{ end }}">{{ . }}</span>{{ end }}
+              {{ if not .Date.IsZero }} · <time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ printf "%d %s %d" .Date.Day (index $monthsFR (int .Date.Month)) .Date.Year }}</time>{{ end }}
+              {{/* R13-J : chip sort/état juste APRÈS la date pour les amendements.
+                   R13-O (2026-04-21) : fix data-sort qui restait vide. Le `with`
+                   changeait le contexte `.` vers la valeur de sort_label, donc
+                   `$.Params.sort_slug` fonctionnait mais apparemment Hugo le
+                   vidait à l'output. Utilisation de `if` + accès direct. */}}
+              {{ if .Params.sort_label }} · <span class="sort-chip" data-sort="{{ .Params.sort_slug | default "" }}">{{ .Params.sort_label }}</span>{{ end }}
+            </span>
+            {{ with .Params.keywords }}
+              <span class="meta-tags">
+                {{ $fam := "" }}{{ with $.Params.families }}{{ $fam = index . 0 }}{{ end }}
+                {{ range first 12 . }}<span class="kw-tag"{{ with $fam }} data-family="{{ . }}"{{ end }}>{{ . }}</span>{{ end }}
+              </span>
+            {{ end }}
+          </div>
+          {{ with .Params.snippet }}<div class="snippet-inline">« {{ . }} »</div>{{ end }}
         </div>
-        {{ with .Params.snippet }}<div class="snippet-inline">« {{ . }} »</div>{{ end }}
       </li>
     {{ end }}
   </ul>
