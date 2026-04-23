@@ -56,6 +56,14 @@ jobs:
   collect-and-publish:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # R24 (2026-04-23) : ne tourne PAS sur le cron 17h30 (qui est réservé
+    # au job ping-afternoon). Tourne sur :
+    # - le cron matin "0 2 * * *"
+    # - push sur main
+    # - workflow_dispatch manuel
+    # On filtre via github.event.schedule pour que seul le cron matin
+    # déclenche le pipeline complet.
+    if: github.event_name != 'schedule' || github.event.schedule == '0 2 * * *'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -257,4 +265,17 @@ jobs:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
           DIGEST_TO: ${{ secrets.DIGEST_TO }}
+          SITE_URL: "https://veille.sideline-conseil.fr"
         run: python -m src.main ping -v
+
+      # Commit du ping_state.json si modifié (les nouveaux UIDs notifiés
+      # sont mergés dans pinged_uids). Sans ça, un redémarrage du job
+      # re-notifierait les mêmes items.
+      - name: Commit ping_state.json if changed
+        if: always()
+        run: |
+          git config user.name "veille-bot"
+          git config user.email "veille-bot@sideline-conseil.fr"
+          git add data/ping_state.json 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "chore: ping_state $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push || true

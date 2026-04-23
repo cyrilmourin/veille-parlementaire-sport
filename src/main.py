@@ -6,6 +6,7 @@ Usage :
     python -m src.main run --no-email  # sans envoi SMTP
     python -m src.main run --since 7   # backfill 7 jours (pour le premier run)
     python -m src.main dry              # fetch + match uniquement, pas d'écriture
+    python -m src.main ping            # ping 17h30 : email si nouveautés depuis matin
 
 Variables d'environnement :
     PISTE_CLIENT_ID / PISTE_CLIENT_SECRET — Légifrance
@@ -22,7 +23,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import digest, normalize, site_export
+from . import digest, normalize, ping_state, site_export
+from . import ping as ping_mod
 from .keywords import KeywordMatcher
 from .store import Store
 
@@ -34,6 +36,7 @@ CONFIG_KEYWORDS = ROOT / "config" / "keywords.yml"
 SQLITE_PATH = ROOT / "data" / "veille.sqlite3"
 SITE_ROOT = ROOT / "site"
 DIGEST_OUT = ROOT / "data" / "last_digest.html"
+PING_STATE_PATH = ROOT / "data" / "ping_state.json"
 
 DEFAULT_TO = os.environ.get("DIGEST_TO", "cyrilmourin@sideline-conseil.fr")
 DEFAULT_SITE_URL = os.environ.get("SITE_URL", "https://veille.sideline-conseil.fr")
@@ -92,6 +95,25 @@ def run(since_days: int = 1, send: bool = True, verbose: bool = False) -> int:
     summary = site_export.export(all_matched, SITE_ROOT)
     log.info("Site statique exporté : %s", summary)
 
+    # 7. R24 (2026-04-23) — snapshot ping : sauvegarde des hash_keys matchés des
+    # 4 catégories chaudes (dossiers, amendements, questions, CR) pour que le
+    # job ping-afternoon puisse détecter les nouveautés apparues après 4h.
+    # Pas de filtre de date : on capture l'état *complet* du set matché pour
+    # que le diff à 17h30 soit rigoureux (un item ré-upserté sans hash_key
+    # neuf ne déclenchera pas de faux-positif).
+    snapshot = ping_state.snapshot_from_rows(all_matched, ping_state.PING_CATEGORIES)
+    ping_state.save(
+        PING_STATE_PATH,
+        last_run_at=datetime.now(timezone.utc),
+        last_ping_at=None,
+        pinged_uids=snapshot,
+    )
+    log.info(
+        "Ping state écrit : %s (%s)",
+        PING_STATE_PATH,
+        ", ".join(f"{c}={len(v)}" for c, v in sorted(snapshot.items())),
+    )
+
     store.close()
     return 0
 
@@ -117,6 +139,24 @@ def dry(verbose: bool = False) -> int:
     return 0
 
 
+def ping(send: bool = True, verbose: bool = False) -> int:
+    """Ping 17h30 : lit la DB, compare avec l'état du matin (`ping_state.json`),
+    envoie un email court si de nouveaux items matchés sont apparus dans les
+    catégories prioritaires. Pas de fetch réseau — lecture DB uniquement.
+
+    R24 (2026-04-23) — cron lundi-vendredi 17h30 Paris (15h30 UTC en été).
+    """
+    _setup_logging(verbose)
+    log.info("=== Ping 17h30 — %s ===", datetime.now().isoformat(timespec="seconds"))
+    return ping_mod.run_ping(
+        db_path=SQLITE_PATH,
+        state_path=PING_STATE_PATH,
+        site_url=DEFAULT_SITE_URL,
+        to=DEFAULT_TO,
+        send=send,
+    )
+
+
 def main():
     ap = argparse.ArgumentParser(prog="veille")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -129,12 +169,18 @@ def main():
     p_dry = sub.add_parser("dry", help="Fetch + match uniquement")
     p_dry.add_argument("-v", "--verbose", action="store_true")
 
+    p_ping = sub.add_parser("ping", help="Ping 17h30 : email si nouveautés depuis matin")
+    p_ping.add_argument("--no-email", action="store_true")
+    p_ping.add_argument("-v", "--verbose", action="store_true")
+
     args = ap.parse_args()
 
     if args.cmd == "run":
         sys.exit(run(since_days=args.since, send=not args.no_email, verbose=args.verbose))
     elif args.cmd == "dry":
         sys.exit(dry(verbose=args.verbose))
+    elif args.cmd == "ping":
+        sys.exit(ping(send=not args.no_email, verbose=args.verbose))
 
 
 if __name__ == "__main__":
