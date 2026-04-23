@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R23f"
+SYSTEM_VERSION_LABEL = "R23g"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -550,6 +550,76 @@ def _strip_cr_an_preamble(haystack: str, max_prefix: int = 600) -> str:
     return haystack
 
 
+# R23-H (2026-04-23) — Regroupement des sources en 5 familles pour le
+# filtre UI exposé sur les pages /items/agenda/ et /items/communiques/.
+# Retourne un slug stable utilisé en `data-family-source` côté template.
+#
+# Mapping initial :
+#   - parlement : flux Assemblée nationale + Sénat (chambre AN / Senat).
+#   - gouvernement : Matignon, Élysée, ministères (source_id `min_*`,
+#     `matignon_*`, `info_gouv_*`), agendas ministériels.
+#   - autorites : autorités administratives indépendantes (ANJ, AFLD,
+#     ARCOM, AdlC, Conseil constitutionnel, Conseil d'État, Défenseur
+#     des droits, Cour des comptes, IGESR rapports).
+#   - operateurs : opérateurs du sport (ANS, INSEP, INJEP, CNOSF, CPSF /
+#     France paralympique).
+#   - jorf : journal officiel (dila_jorf), textes et nominations.
+#
+# Si un source_id/chamber ne matche rien, on retombe sur "autres" — le
+# filtre UI affiche alors un bucket générique.
+_SOURCE_FAMILY_BY_PREFIX = (
+    ("an_", "parlement"),
+    ("senat_", "parlement"),
+    ("matignon_", "gouvernement"),
+    ("info_gouv_", "gouvernement"),
+    ("elysee_", "gouvernement"),
+    ("min_", "gouvernement"),
+    ("dila_jorf", "jorf"),
+)
+_SOURCE_FAMILY_BY_ID = {
+    # Autorités administratives indépendantes
+    "afld": "autorites",
+    "anj": "autorites",
+    "arcom": "autorites",
+    "autorite_concurrence": "autorites",
+    "conseil_constit_actualites": "autorites",
+    "conseil_constit_decisions": "autorites",
+    "conseil_etat": "autorites",
+    "defenseur_droits": "autorites",
+    "ccomptes_publications": "autorites",
+    "igesr_rapports": "autorites",
+    # Opérateurs / ecosysteme sport
+    "ans": "operateurs",
+    "injep": "operateurs",
+    "cnosf": "operateurs",
+    "france_paralympique": "operateurs",
+}
+
+
+def _source_family(source_id: str | None, chamber: str | None = None) -> str:
+    """Retourne le slug de famille pour un couple (source_id, chamber).
+
+    Cf. _SOURCE_FAMILY_BY_PREFIX / _SOURCE_FAMILY_BY_ID. Fallback
+    "autres" si aucune règle ne matche — le template affichera le bucket
+    générique.
+    """
+    sid = (source_id or "").strip().lower()
+    if sid:
+        # Match id exact d'abord (plus specifique).
+        if sid in _SOURCE_FAMILY_BY_ID:
+            return _SOURCE_FAMILY_BY_ID[sid]
+        for prefix, family in _SOURCE_FAMILY_BY_PREFIX:
+            if sid.startswith(prefix):
+                return family
+    # Fallback chamber-only (utile pour les items sans source_id propre).
+    ch = (chamber or "").strip().lower()
+    if ch in ("an", "senat", "sénat"):
+        return "parlement"
+    if ch in ("jorf",):
+        return "jorf"
+    return "autres"
+
+
 _AMEND_DEPUTE_RE = re.compile(r"Député\s+(PA\d+)")
 
 
@@ -775,6 +845,52 @@ def _fix_agenda_row(r: dict) -> None:
                     # code technique — le badge .chamber[data-chamber=AN]
                     # et le tag date ci-dessous porteront le contexte).
                     r["title"] = "Réunion parlementaire"
+
+    # R23-G (2026-04-23) : nettoyage des titres AN agenda legacy qui
+    # transportent un LIEU comme suffixe (« — Salle 6242 – Palais
+    # Bourbon, 2ème sous-sol ») ou un préfixe "ordinal chambre (à
+    # confirmer)". Avant R23-G, `_collect_agenda_titles` descendait
+    # dans le sous-arbre `lieu.*` et remontait ces libellés de salle
+    # comme candidats. Les items deja ingeres gardent le mauvais titre
+    # tant qu'on ne les reset pas ; ce fixup reecrit le titre en place.
+    #
+    # Idempotent : la regex ne matche que si le suffixe " — <lieu>" est
+    # encore present. Apres une 1re passe, le titre ne finit plus par
+    # un lieu et le fixup est no-op.
+    if cat == "agenda":
+        cur = r.get("title") or ""
+        # Suffixe lieu apres un em-dash ou tiret : on coupe AVANT le tiret.
+        # Utilisation de `re.split` pour preserver l'entete (commission).
+        _m = re.search(
+            r"\s*[-–—]\s*(?:Salle\b|Visioconf[ée]rence\b|Palais\s+Bourbon\b"
+            r"|H[ée]micycle\b|Petit\s+Luxembourg\b|Palais\s+du\s+Luxembourg\b"
+            r"|\d+\s*(?:rue|avenue|boulevard)\b).*$",
+            cur,
+            flags=re.IGNORECASE,
+        )
+        if _m and _m.start() > 0:
+            new_title = cur[:_m.start()].rstrip().rstrip("—–-").rstrip()
+            if new_title:
+                r["title"] = new_title[:220]
+        # Titre qui EST un lieu pur (ex. "salle 4075 (9 rue de Bourgogne)") :
+        # on remplace par organe_label (raw) si connu, sinon "Réunion
+        # parlementaire" en dernier recours.
+        cur2 = r.get("title") or ""
+        if re.match(
+            r"^\s*(Salle\b|Visioconf[ée]rence\b|Palais\s+Bourbon\b|"
+            r"H[ée]micycle\b|\d+\s*(?:rue|avenue|boulevard)\b)",
+            cur2,
+            flags=re.IGNORECASE,
+        ):
+            raw = r.get("raw") or {}
+            if isinstance(raw, str):
+                try:
+                    raw = json.loads(raw or "{}")
+                except Exception:
+                    raw = {}
+            organe_label = (raw.get("organe_label") or "").strip() \
+                if isinstance(raw, dict) else ""
+            r["title"] = (organe_label or "Réunion parlementaire")[:220]
 
 
 def _window_for(category: str | None) -> int:
@@ -2089,10 +2205,16 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         if published_at_real:
             fm.append(f"published_at_real: {published_at_real}")
         fm.append(f"has_real_date: {str(has_real_date).lower()}")
+        # R23-H (2026-04-23) : famille de source pour le filtre UI exposé
+        # sur /items/agenda/ et /items/communiques/. 5 buckets stables :
+        # parlement | gouvernement | autorites | operateurs | jorf
+        # (fallback "autres"). cf. _source_family().
+        family_source = _source_family(r.get("source_id"), r.get("chamber"))
         fm += [
             f"category: {cat}",
             f'chamber: "{r.get("chamber") or ""}"',
             f'source: "{r.get("source_id") or ""}"',
+            f'family_source: "{family_source}"',
             f'source_url: "{source_url}"',
             f"keywords: {json.dumps(r.get('matched_keywords') or [], ensure_ascii=False)}",
             f"families: {json.dumps(r.get('keyword_families') or [], ensure_ascii=False)}",

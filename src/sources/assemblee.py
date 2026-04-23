@@ -1342,6 +1342,9 @@ _AGENDA_ID_RE = re.compile(
 
 # Chaînes de bruit : statuts, états de participation, booléens, adjectifs
 # ordinaux de session, valeurs xsi:type, codes de rôle.
+# R23-G (2026-04-23) : ajout des libellés "chambre hôte (à confirmer)"
+# qui fuitaient comme titre pour les réunions des offices parlementaires
+# bicaméraux (OPECST, etc.).
 _AGENDA_NOISE = {
     "confirmé", "confirme", "reporté", "reporte", "annulé", "annule",
     "ordinaire", "extraordinaire", "première", "premiere", "deuxième",
@@ -1350,6 +1353,8 @@ _AGENDA_NOISE = {
     "true", "false", "null", "none",
     "ouverturepresse", "ouverture presse",
     "assemblée nationale", "assemblee nationale",
+    "assemblée nationale (à confirmer)", "assemblee nationale (a confirmer)",
+    "sénat (à confirmer)", "senat (a confirmer)",
     "oui", "non",
     # Chaînes de namespace / schéma qui apparaissent dans le shotgun
     "http://schemas.assemblee-nationale.fr/referentiel",
@@ -1363,6 +1368,24 @@ _AGENDA_TITLE_KEYS = [
     "libelleObjet", "titreReunion", "intitule",
     "objet", "libelle", "libelleLong",
 ]
+
+
+# R23-G (2026-04-23) : chaînes qui décrivent un LIEU (pas un objet) et qui
+# fuitaient comme titre candidat via `lieu.libelleLong`/`libelleCourt` ou
+# via un resumeODJ du type "Visioconférence sans salle". On les rejette en
+# amont dans `_is_agenda_title_candidate`.
+_AGENDA_LIEU_RE = re.compile(
+    r"^\s*("
+    r"salle\b|"
+    r"visioconf[ée]rence\b|"
+    r"hémicycle\b|hemicycle\b|"
+    r"palais\s+bourbon\b|"
+    r"palais\s+du\s+luxembourg\b|"
+    r"petit\s+luxembourg\b|"
+    r"\d+\s*(rue|avenue|boulevard)\b"
+    r")",
+    re.IGNORECASE,
+)
 
 
 def _is_agenda_title_candidate(s) -> bool:
@@ -1386,7 +1409,16 @@ def _is_agenda_title_candidate(s) -> bool:
     # Doit contenir au moins une lettre minuscule (les codes sont MAJ)
     if not any(c.islower() for c in t):
         return False
+    # R23-G : rejette les chaînes qui décrivent un LIEU (pas un objet).
+    if _AGENDA_LIEU_RE.match(t):
+        return False
     return True
+
+
+# R23-G : clés à NE PAS descendre pendant la collecte de titres candidats.
+# `lieu.*` (libelleLong, libelleCourt) est de la métadonnée d'adressage ;
+# il ne doit pas remonter comme "titre d'ODJ" via le fallback générique.
+_AGENDA_SKIP_SUBTREES = {"lieu"}
 
 
 def _collect_agenda_titles(root) -> list[str]:
@@ -1394,6 +1426,10 @@ def _collect_agenda_titles(root) -> list[str]:
 
     Retourne une liste dédupliquée, ordonnée par priorité de clé :
     `titreODJ` > `libelleObjet` > `objet` > `libelle` > autres.
+
+    R23-G : ignore les sous-arbres `lieu.*` (le libellé long d'un lieu ne
+    doit jamais servir de titre de réunion — cf. "Salle 6242 – Palais
+    Bourbon" qui s'installait comme titre via la branche `libelleLong`).
     """
     prioritized: dict[int, list[str]] = {}
     seen: set[str] = set()
@@ -1402,6 +1438,9 @@ def _collect_agenda_titles(root) -> list[str]:
         cur, parent_key = stack.pop()
         if isinstance(cur, dict):
             for k, v in cur.items():
+                # R23-G : ne descend pas dans les sous-arbres de lieu.
+                if k in _AGENDA_SKIP_SUBTREES:
+                    continue
                 if isinstance(v, str):
                     if _is_agenda_title_candidate(v):
                         t = v.strip()

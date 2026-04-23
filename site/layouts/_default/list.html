@@ -7,9 +7,23 @@
   <nav class="breadcrumb"><a href="/">Accueil</a> &rsaquo; {{ .Title }}</nav>
   <h1>{{ .Title }}</h1>
   {{ with .Content }}<div class="intro">{{ . }}</div>{{ end }}
+  {{/* R23-H (2026-04-23) : filtre UI par famille de source, affiché
+       uniquement sur /items/communiques/ (les autres listings ont des
+       sources moins diverses — amendements = AN+Senat, questions idem,
+       dossiers_legislatifs idem ; pas de valeur ajoutée). */}}
+  {{ if eq .Type "communiques" }}
+  <nav class="source-family-filter" aria-label="Filtrer par famille de source">
+    <button type="button" class="sff-btn" data-sff="all" aria-pressed="true">Tout</button>
+    <button type="button" class="sff-btn" data-sff="parlement" aria-pressed="false">Parlement</button>
+    <button type="button" class="sff-btn" data-sff="gouvernement" aria-pressed="false">Gouvernement</button>
+    <button type="button" class="sff-btn" data-sff="autorites" aria-pressed="false">Autorités</button>
+    <button type="button" class="sff-btn" data-sff="operateurs" aria-pressed="false">Opérateurs sport</button>
+    <button type="button" class="sff-btn" data-sff="jorf" aria-pressed="false">JORF</button>
+  </nav>
+  {{ end }}
   <ul class="items">
     {{ range (.Paginate .Pages.ByDate.Reverse).Pages }}
-      <li>
+      <li{{ with .Params.family_source }} data-family-source="{{ . }}"{{ end }}>
         {{/* R13-J : auteur (lien fiche député/sénateur) inline AVANT le titre,
              même taille de police. Fixup patch 9. Ouverture nouvel onglet.
              R13-L : barre verticale séparateur entre auteur et titre
@@ -53,4 +67,27 @@
   </ul>
   {{ partial "pagination-inline.html" . }}
 </section>
+
+{{/* R23-H : JS vanilla pour le filtre par famille de source sur
+     /items/communiques/. Le `<script>` est inclus sur toutes les
+     pages _default mais no-op en l'absence de `.source-family-filter`. */}}
+<script>
+(function() {
+  var btns = document.querySelectorAll('.source-family-filter .sff-btn');
+  if (!btns.length) return;
+  var items = document.querySelectorAll('section.listing ul.items > li');
+  function applyFilter(family) {
+    items.forEach(function(li) {
+      var f = li.getAttribute('data-family-source') || 'autres';
+      li.style.display = (family === 'all' || f === family) ? '' : 'none';
+    });
+    btns.forEach(function(b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-sff') === family ? 'true' : 'false');
+    });
+  }
+  btns.forEach(function(b) {
+    b.addEventListener('click', function() { applyFilter(b.getAttribute('data-sff')); });
+  });
+})();
+</script>
 {{ end }}

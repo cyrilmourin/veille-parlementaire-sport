@@ -920,6 +920,37 @@ a:hover { text-decoration: underline; }
   border: 1px solid rgba(0, 0, 0, 0.06);
   margin-right: 2px;
 }
+
+/* R23-H (2026-04-23) — Filtre par famille de source (5 boutons) en
+   tete des listings agenda et communiques. `data-family-source` porte
+   le slug de famille sur chaque <li> ; le JS bascule visibility.
+   Etat actif : aria-pressed="true" -> fond accent. */
+.source-family-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 16px 0;
+  padding: 4px 0;
+}
+.source-family-filter .sff-btn {
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 4px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.source-family-filter .sff-btn:hover {
+  border-color: rgba(0, 0, 0, 0.24);
+}
+.source-family-filter .sff-btn[aria-pressed="true"] {
+  background: var(--accent, #2b5fa8);
+  border-color: var(--accent, #2b5fa8);
+  color: #fff;
+}
 .section-count {
   color: var(--muted);
   font-size: 13px;
