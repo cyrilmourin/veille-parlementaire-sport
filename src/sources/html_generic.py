@@ -351,6 +351,17 @@ def _chamber(domain: str) -> str:
     # injep.fr (non gouv.fr).
     if "injep.fr" in d:
         return "INJEP"
+    # R23-I (2026-04-23) — INSEP (Institut National du Sport, de l'Expertise
+    # et de la Performance). Drupal 11, pas de flux RSS sur /feed mais
+    # /fr/actualites.xml expose un RSS 2.0 propre (Drupal Views). Opérateur
+    # MinSports (établissement public national). Domaine insep.fr (non gouv).
+    if "insep.fr" in d:
+        return "INSEP"
+    # R23-J (2026-04-23) — FDSF (Fondation du Sport Français, reconnue
+    # d'utilité publique, adossée au CNOSF). Site Squarespace — feed RSS
+    # natif via `?format=rss` sur la page blog `/web/fsf/actualites`.
+    if "fondation-du-sport-francais.fr" in d:
+        return "FDSF"
     # R13-J (2026-04-21) : senat_agenda scraper via html_generic (pas de flux
     # JSON/XML officiel pour l'agenda Sénat). Le domaine www.senat.fr ne
     # matche aucun des blocs spécifiques plus haut.

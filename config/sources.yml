@@ -538,6 +538,41 @@ autorites:
       url: https://injep.fr/feed/
       format: rss
 
+    # R23-I (2026-04-23) — INSEP (Institut national du sport, de
+    # l'expertise et de la performance), établissement public national
+    # rattaché au MinSports. Site Drupal 11, aucun flux RSS sur les paths
+    # standard (/feed, /fr/feed, /rss.xml → 404), mais Drupal Views expose
+    # automatiquement le listing actualités en RSS 2.0 via le suffixe .xml :
+    # /fr/actualites.xml → 10 items récents, pubDate RFC 822, description
+    # HTML échappée propre. Vérifié live 2026-04-23 : HTTP 200, 75 Ko,
+    # items 2026-04 récents (feSPORT européen du sport, médaille Milan-
+    # Cortina, etc. — cœur de cible veille sport).
+    # Domaine mappé insep.fr → INSEP dans html_generic._chamber().
+    # Poids 3 : opérateur cœur de cible sport (même niveau que ans,
+    # min_sports_presse, min_sports_actualites).
+    - id: insep
+      category: communiques
+      url: https://www.insep.fr/fr/actualites.xml
+      format: rss
+      poids: 3
+
+    # R23-J (2026-04-23) — Fondation du Sport Français (reconnue d'utilité
+    # publique, adossée au CNOSF, promeut le sport comme vecteur de lien
+    # social via les dispositifs Soutiens Ton Club, Pacte de Performance
+    # et Soutiens Ton Sportif). Site Squarespace — la home n'expose
+    # rien de directement scrappable (rendu JS lourd), mais le blog
+    # /web/fsf/actualites supporte le feed RSS natif Squarespace via
+    # `?format=rss`. Vérifié live 2026-04-23 : HTTP 200, 299 Ko, 20+
+    # items récents avec <description> CDATA + <content:encoded> corps
+    # complet (utile au keyword matcher). Ex. d'items pertinents pour
+    # la veille institutionnelle : "FDSF au Sénat : diplomatie sportive"
+    # (2026-04-09), "Soutiens Ton Sportif franchit 3 M€" (2026-03-31).
+    # Domaine mappé fondation-du-sport-francais.fr → FDSF dans _chamber().
+    - id: fdsf
+      category: communiques
+      url: https://www.fondation-du-sport-francais.fr/web/fsf/actualites?format=rss
+      format: rss
+
     - id: arcom
       category: communiques
       url: https://www.arcom.fr/actualites
