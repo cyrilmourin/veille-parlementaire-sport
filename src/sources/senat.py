@@ -542,10 +542,18 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
             if not uid:
                 continue
             sujet = (titre or rubrique or _first_sentence(texte, 100) or "Question").strip()
+            # R23-D (2026-04-23) : le CSV `senat_questions_1an` liste les
+            # questions écrites sans réponse depuis +1 an, mais Cyril constate
+            # que la date de dépôt affichée est souvent très récente (re-dépôt
+            # automatique côté Sénat ?). Du coup préfixer le titre par
+            # "Question de +1 an sans réponse" était trompeur. On retombe sur
+            # le libellé neutre "Question écrite" ; le sid distinct reste utile
+            # en interne (dedup, compteurs digest) mais n'apparaît plus dans
+            # le titre affiché.
             qtype_label = {
                 "senat_questions": "Question écrite",
                 "senat_qg": "Question au gouvernement",
-                "senat_questions_1an": "Question de +1 an sans réponse",
+                "senat_questions_1an": "Question écrite",
             }.get(sid, "Question")
             # Titre épuré (UX-D 2026-04-21) : {type} n°{num} — {civ prénom
             # nom auteur} ({groupe}) : {objet/sujet}. L'ancien format

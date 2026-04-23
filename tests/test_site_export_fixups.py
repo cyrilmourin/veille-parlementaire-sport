@@ -52,8 +52,12 @@ def test_fix_question_row_strips_ministere_and_sort():
     assert "[En cours]" not in r["title"]
     assert "Sports, jeunesse et vie associative" not in r["title"]
     assert "Gouvernance du comité" in r["title"]
-    # Nouvelle forme : "Question … n°1054S : Gouvernance …"
-    assert "Question de +1 an sans réponse n°1054S" in r["title"]
+    # R23-D (2026-04-23) : le préfixe "Question de +1 an sans réponse" est
+    # réécrit en "Question écrite" (étiquette trompeuse vu les re-dépôts
+    # automatiques côté Sénat). Le sid source reste préservé pour les
+    # compteurs digest.
+    assert "Question écrite n°1054S" in r["title"]
+    assert "Question de +1 an" not in r["title"]
     assert "Cyril Pellevat" not in r["title"]
     assert "(Les Indépendants)" not in r["title"]
 
@@ -599,6 +603,57 @@ def test_fix_question_row_noop_if_no_analyse():
         _fix_question_row(r)
     # Titre inchangé (pas d'analyse à substituer).
     assert r["title"].endswith(": sport scolaire")
+
+
+# ---------- _fix_question_row (R23-D : retire préfixe "+1 an sans réponse") -
+
+def test_fix_question_row_rewrites_1an_prefix_to_question_ecrite():
+    """R23-D (2026-04-23) : le préfixe 'Question de +1 an sans réponse'
+    devient 'Question écrite' (l'étiquette était trompeuse vu les
+    re-dépôts automatiques). Le sid source reste intact côté `source_id`.
+    """
+    with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
+        r = {
+            "category": "questions",
+            "source_id": "senat_questions_1an",
+            "title": "Question de +1 an sans réponse n°12345S : sport scolaire",
+            "raw": {},
+        }
+        _fix_question_row(r)
+    assert r["title"].startswith("Question écrite n°12345S")
+    assert "+1 an" not in r["title"]
+    assert "sans réponse" not in r["title"]
+
+
+def test_fix_question_row_1an_prefix_idempotent():
+    """Idempotent : la réécriture ne s'applique pas deux fois."""
+    with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
+        r = {
+            "category": "questions",
+            "source_id": "senat_questions_1an",
+            "title": "Question écrite n°12345S : sport scolaire",
+            "raw": {},
+        }
+        _fix_question_row(r)
+        first = r["title"]
+        _fix_question_row(r)
+    assert r["title"] == first
+
+
+def test_fix_question_row_1an_prefix_preserves_source_id():
+    """Le `source_id` reste `senat_questions_1an` (utile pour compter les
+    questions longues sans réponse côté digest, même si le titre affiché
+    devient neutre)."""
+    with patch("src.site_export.amo_loader.resolve_acteur", return_value=""):
+        r = {
+            "category": "questions",
+            "source_id": "senat_questions_1an",
+            "title": "Question de +1 an sans réponse n°999S : dopage",
+            "raw": {},
+        }
+        _fix_question_row(r)
+    assert r["source_id"] == "senat_questions_1an"
+    assert r["title"].startswith("Question écrite n°999S")
 
 
 # ---------- _fix_cr_row (R13-G : "Séance AN du" → "Séance du") ------------

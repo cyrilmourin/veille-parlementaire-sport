@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R23c"
+SYSTEM_VERSION_LABEL = "R23d"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -375,6 +375,19 @@ def _fix_question_row(r: dict) -> None:
     # 0) R13-J : retire la date dupliquée du titre AN "Question écrite ·
     #    12/04/2026 — Auteur (Groupe) : Sujet" → "Question écrite — …".
     title = re.sub(r"\s*·\s*\d{2}/\d{2}/\d{4}(?=\s*—|\s|$)", "", title)
+
+    # 0ter) R23-D (2026-04-23) : réécrit le préfixe legacy
+    #       "Question de +1 an sans réponse n°… : …" → "Question écrite n°… : …".
+    #       Le CSV Sénat `senat_questions_1an` listait les questions sans
+    #       réponse depuis >1 an, mais la date visible est souvent récente
+    #       (re-dépôt automatique) donc l'étiquette "+1 an sans réponse"
+    #       était trompeuse dans le titre. Le sid d'origine reste intact
+    #       côté source_id (compteurs digest, filtrage). Idempotent.
+    title = re.sub(
+        r"^Question\s+de\s+\+1\s+an\s+sans\s+réponse\b",
+        "Question écrite",
+        title,
+    )
 
     # 0bis) R13-L (2026-04-21) : retire l'auteur + groupe du titre
     #       (demande Cyril : l'auteur est déjà affiché comme .auteur-inline
