@@ -199,6 +199,12 @@ def _extract_date(a, url: str) -> datetime | None:
     #    mélangent tous les articles et un <time> y piocherait la date
     #    d'un autre item. On n'explore que les descendants proches
     #    (profondeur ≤ 2) de chaque ancêtre retenu.
+    # R22d (2026-04-23) : profondeur étendue à 4 pour couvrir les layouts
+    # Drupal Views où la date siège dans un div cousin profond. Ex. ANS :
+    # <a> → span → .field-content → .views-field-views-field-title → .views-row
+    # (5 niveaux). Les 4 parents retenus remontent jusqu'au .views-row qui
+    # englobe toute la vignette (image, date, titre, corps), permettant à
+    # _DATE_FR_PAT.search() de trouver "01 avril 2026" dans le texte voisin.
     _STOP_TAGS = {"body", "html", "main"}
     parents = []
     for anc in a.parents:
@@ -207,7 +213,7 @@ def _extract_date(a, url: str) -> datetime | None:
         if getattr(anc, "name", None) in _STOP_TAGS:
             break
         parents.append(anc)
-        if len(parents) >= 3:
+        if len(parents) >= 4:
             break
 
     def _close_time(anc) -> datetime | None:
@@ -249,9 +255,11 @@ def _extract_date(a, url: str) -> datetime | None:
         except ValueError:
             pass
     # 3. Date au format français "15 avril 2026" dans texte du lien ou
-    #    des 2 premiers parents (on récupère leur texte complet).
+    #    des 4 premiers parents (on récupère leur texte complet).
+    #    R22d : 2 → 4 pour atteindre la "row" Drupal Views (ANS) où la
+    #    date cohabite avec le lien titre à travers un cousin profond.
     texts = [a.get_text(" ", strip=True) or ""]
-    for anc in parents[:2]:
+    for anc in parents[:4]:
         if hasattr(anc, "get_text"):
             texts.append(anc.get_text(" ", strip=True) or "")
     for text in texts:
