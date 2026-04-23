@@ -29,6 +29,7 @@ from src.site_export import (  # noqa: E402
     _fix_dossier_row,
     _fix_question_row,
     _load,
+    _strip_cr_an_preamble,
 )
 
 
@@ -753,3 +754,73 @@ def test_fix_agenda_row_preserves_good_titles():
         _fix_agenda_row(r)
     m.assert_not_called()
     assert r["title"] == "Audition de M. Durand sur le financement du sport"
+
+
+# ---------- _strip_cr_an_preamble (R23-F : CR AN sans préambule Syceron) ---
+
+def test_strip_cr_an_preamble_cuts_at_presidence_marker():
+    """Préambule Syceron réaliste (CRSANR5L17…, timestamps, numéros isolés,
+    `valide complet public avant_JO PROD`) → la coupe doit se faire à
+    « Présidence » et ne garder que le corps."""
+    raw = (
+        "CRSANR5L17S2026O1N130 RUANR5L17S2026IDS30183 SCR5A2026O1 "
+        "20260128140000000 mercredi 28 janvier 2026 1 130 AN 17 "
+        "Session ordinaire 2025 -2026 20260130 valide complet public "
+        "avant_JO PROD 2026-02-05T18:15:24.000+01:00 Présidence de "
+        "Mme Yaël Braun-Pivet La séance est ouverte à quinze heures."
+    )
+    out = _strip_cr_an_preamble(raw)
+    assert out.startswith("Présidence de Mme Yaël Braun-Pivet")
+    assert "CRSANR5L17" not in out
+    assert "avant_JO PROD" not in out
+
+
+def test_strip_cr_an_preamble_no_marker_returns_unchanged():
+    """Pas de marqueur dans les 600 premiers caractères → haystack inchangé
+    (cas d'un summary déjà propre ou d'un format inattendu)."""
+    raw = (
+        "Texte déjà propre sans préambule technique, compte rendu court "
+        "évoquant le financement du sport amateur."
+    )
+    assert _strip_cr_an_preamble(raw) == raw
+
+
+def test_strip_cr_an_preamble_picks_earliest_marker():
+    """Plusieurs marqueurs présents → on coupe au PLUS TOT (le premier
+    trouvé dans le haystack), pas à l'ordre dans _CR_AN_BODY_MARKERS."""
+    raw = (
+        "CRSANR5L17S2026 PROD 2026-02-05 "
+        "La séance est ouverte à neuf heures. "
+        "Présidence de M. Président. "
+        "Questions au gouvernement suivent."
+    )
+    out = _strip_cr_an_preamble(raw)
+    assert out.startswith("La séance est ouverte")
+    assert "CRSANR5L17" not in out
+
+
+def test_strip_cr_an_preamble_is_idempotent():
+    """Appliquer deux fois = appliquer une fois (le résultat ne recommence
+    pas à couper sur un marqueur déjà rapproché du début)."""
+    raw = (
+        "CRSANR5L17S2026O1N130 PROD 2026-02-05 Présidence de Mme "
+        "Braun-Pivet La séance est ouverte."
+    )
+    once = _strip_cr_an_preamble(raw)
+    twice = _strip_cr_an_preamble(once)
+    assert once == twice
+    assert once.startswith("Présidence")
+
+
+def test_strip_cr_an_preamble_empty_input():
+    """Chaîne vide ou None-like → renvoyée telle quelle sans exception."""
+    assert _strip_cr_an_preamble("") == ""
+
+
+def test_strip_cr_an_preamble_marker_beyond_max_prefix_ignored():
+    """Marqueur au-delà de `max_prefix` caractères → pas de coupe (évite
+    de massacrer un summary long où « Présidence » n'est mentionné qu'en
+    plein milieu d'une phrase)."""
+    prefix = "x" * 700
+    raw = prefix + "Présidence de M. X."
+    assert _strip_cr_an_preamble(raw) == raw

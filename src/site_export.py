@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R23e"
+SYSTEM_VERSION_LABEL = "R23f"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -501,6 +501,55 @@ def _fix_question_row(r: dict) -> None:
             r["summary"] = new_summary[:2000]
 
 
+# R23-F (2026-04-23) — marqueurs de début du corps d'un CR AN.
+# Le summary des CR AN (source Syceron) commence TOUJOURS par un préambule
+# de métadonnées techniques (identifiants CRSANR…, RUANR…, SCR5A…,
+# timestamps ISO, libellés "Session ordinaire", "valide complet public",
+# "avant_JO PROD", numéros de séance isolés `1 130 AN 17 …`, etc.) avant
+# de livrer le vrai débat. Ce préambule monopolise le début du haystack et
+# évince le match du centre de l'extrait (le matcher build_snippet retient
+# autour de la 1ère occurrence du keyword : si elle est à l'intérieur du
+# préambule, on affiche une chaîne d'IDs techniques).
+#
+# Les marqueurs canoniques du début de corps (ordre de priorité) :
+#   1. "Présidence de …" — quasi-systématique sur les CR de séance.
+#   2. "Questions au gouvernement" — CR QAG.
+#   3. "La séance est ouverte" / "La commission …" — fallback.
+# Avant R23-F (R19-G), on testait une regex stricte sur le préambule et on
+# ne coupait que si le résidu non-matché était <20 chars — trop timide,
+# les numéros de séance isolés échappaient à la regex et empêchaient la
+# coupe. R23-F : si l'un des marqueurs est trouvé dans les 600 premiers
+# caractères, on coupe dessus sans condition.
+_CR_AN_BODY_MARKERS = (
+    "Présidence",
+    "Questions au gouvernement",
+    "La séance est ouverte",
+    "La commission",
+)
+
+
+def _strip_cr_an_preamble(haystack: str, max_prefix: int = 600) -> str:
+    """Retire le préambule technique Syceron d'un summary de CR AN.
+
+    Cherche le premier marqueur de début de corps (« Présidence », etc.)
+    dans les `max_prefix` premiers caractères. Si trouvé, renvoie le
+    haystack à partir du marqueur. Sinon, renvoie haystack tel quel.
+    Idempotent (appliquer deux fois donne le même résultat).
+    """
+    if not haystack:
+        return haystack
+    best_idx = -1
+    for marker in _CR_AN_BODY_MARKERS:
+        idx = haystack.find(marker)
+        # idx == 0 (marqueur déjà au début, cf. appels idempotents) est
+        # accepté pour bloquer une re-coupe sur un marqueur *ultérieur*.
+        if 0 <= idx <= max_prefix and (best_idx < 0 or idx < best_idx):
+            best_idx = idx
+    if best_idx > 0:
+        return haystack[best_idx:]
+    return haystack
+
+
 _AMEND_DEPUTE_RE = re.compile(r"Député\s+(PA\d+)")
 
 
@@ -835,30 +884,11 @@ def _load(rows: list[dict]) -> list[dict]:
                     if isinstance(_raw_q, dict) else ""
                 if _texte_q:
                     haystack = _texte_q
-            # R19-G (2026-04-23) : pour les comptes rendus AN, on retire le
-            # préambule de métadonnées Syceron (identifiants techniques
-            # `CRSANR5L17...`, `RUANR...`, `SCR5A...`, timestamps ISO,
-            # libellés `Session ordinaire …`, `valide complet public`,
-            # `avant_JO PROD`) qui pollue le début du summary et évince le
-            # match du centre de l'extrait. On coupe jusqu'à « Présidence »
-            # qui marque le vrai début du débat. Si le marqueur est absent
-            # ou éloigné (>400 chars), on laisse le texte tel quel.
-            if haystack and (r.get("category") == "comptes_rendus"):
-                _prefix_re = re.compile(
-                    r"^(?:CRSAN\S+|RUAN\S+|SCR5\S+|\d{8,}|[\s\-]+|"
-                    r"Session ordinaire \d{4}[\s-]*\d{4}|"
-                    r"valide|complet|public|avant_JO|PROD|AN \d+|"
-                    r"\d{4}-\d{2}-\d{2}T[\d:.+-]+|"
-                    r"(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche) "
-                    r"\d{1,2} \S+ \d{4}|"
-                    r"[\s.])+",
-                    re.IGNORECASE,
-                )
-                p_idx = haystack.find("Présidence")
-                if 0 < p_idx <= 400:
-                    cleaned = _prefix_re.sub("", haystack[:p_idx])
-                    if not cleaned or len(cleaned) < 20:
-                        haystack = haystack[p_idx:]
+            # R23-F (2026-04-23) : pour les comptes rendus AN, retire le
+            # préambule Syceron (cf. _strip_cr_an_preamble).
+            if haystack and (r.get("category") == "comptes_rendus") \
+                    and (r.get("chamber") == "AN"):
+                haystack = _strip_cr_an_preamble(haystack)
             if haystack:
                 _target = SNIPPET_LEN_BY_CATEGORY.get(r.get("category") or "", 800)
                 r["snippet"] = _matcher.build_snippet(haystack, max_len=_target)
