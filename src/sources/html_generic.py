@@ -283,6 +283,11 @@ def _chamber(domain: str) -> str:
         return "CPSF"
     if "cojop" in d:
         return "Alpes2030"
+    # R19+ (2026-04-23) — INJEP (WordPress injep.fr), opérateur MinSports.
+    # Ajout à cette place (avant le bloc *.gouv.fr) car le domaine est
+    # injep.fr (non gouv.fr).
+    if "injep.fr" in d:
+        return "INJEP"
     # R13-J (2026-04-21) : senat_agenda scraper via html_generic (pas de flux
     # JSON/XML officiel pour l'agenda Sénat). Le domaine www.senat.fr ne
     # matche aucun des blocs spécifiques plus haut.

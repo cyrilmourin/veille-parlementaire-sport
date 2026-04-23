@@ -449,6 +449,25 @@ ministeres:
       url: https://www.enseignementsup-recherche.gouv.fr/fr/espace-presse-50621
       format: html
 
+    # R19+ (2026-04-23) — Rapports IGESR (Inspection générale de l'éducation,
+    # du sport et de la recherche). Page Drupal listant les rapports, pas de
+    # flux RSS. Structure vérifiée live :
+    #   <div class="views-row">
+    #     <article class="publication ...">
+    #       <time datetime="2026-04-08T12:00:00Z">
+    #       <h2 class="title"><a href="/fr/slug-NNNNN">Titre</a></h2>
+    #       <div class="section-chapo">résumé</div>
+    # → sélecteur "h2 a" de html_generic capte bien le <a> ; _extract_date
+    # remonte 3 ancêtres et trouve le <time datetime> au niveau <article>.
+    # Domaine déjà mappé `enseignementsup-recherche` → MinESR dans
+    # html_generic._chamber(). Catégorie `communiques` (fenêtre 90j).
+    # NB : `title_prefix` / `chamber` ignorés par html_generic ; le chamber
+    # MinESR est résolu automatiquement depuis le domaine.
+    - id: igesr_rapports
+      category: communiques
+      url: https://www.enseignementsup-recherche.gouv.fr/fr/rapport-igesr
+      format: html
+
 autorites:
   sources:
     - id: ans
@@ -469,6 +488,21 @@ autorites:
     - id: afld
       category: communiques
       url: https://www.afld.fr/feed/
+      format: rss
+
+    # R19+ (2026-04-23) — INJEP (Institut national de la jeunesse et de
+    # l'éducation populaire). Site WordPress avec flux RSS 2.0 standard
+    # exposé en <link rel="alternate"> dans la home. Flux UTF-8, ~10 items
+    # récents, pubDate RFC 822. Les rubriques (Analyser / Mesurer /
+    # Veille documentaire / Mesurer) remontent comme <category> RSS mais
+    # on ne les exploite pas côté matcher (les keywords font le job).
+    # INJEP = opérateur MinSports/MinEduc rattaché à la DJEPVA — ses
+    # publications touchent régulièrement le sport (enquêtes BPJEPS,
+    # licences sportives en QPV, pratique licenciée, etc.).
+    # Mapping chamber "INJEP" ajouté dans html_generic._chamber().
+    - id: injep
+      category: communiques
+      url: https://injep.fr/feed/
       format: rss
 
     - id: arcom
