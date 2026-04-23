@@ -81,19 +81,15 @@ def _session_to_csv(session2: str) -> str:
 
 
 def _strip_html(s: str) -> str:
-    """Retire tags HTML + décode entités + normalise whitespace.
+    """R32 (2026-04-24) : délégué à `src.textclean.strip_html` (audit §4.2).
 
     Les champs Dispositif/Objet arrivent en HTML (`<body><p>…`). Sans
     dégraissage le matcher reçoit du bruit (`<p>`, `&#233;`) plutôt que
-    les mots-clés utiles.
+    les mots-clés utiles. `textclean.strip_html` gère aussi les espaces
+    insécables (\\u00a0, \\u202f, etc.).
     """
-    if not s:
-        return ""
-    s = re.sub(r"<[^>]+>", " ", s)
-    s = html.unescape(s)
-    s = s.replace("\u00a0", " ").replace("\u202f", " ")
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
+    from .. import textclean
+    return textclean.strip_html(s)
 
 
 def _decode(payload: bytes) -> str:

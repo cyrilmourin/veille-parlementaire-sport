@@ -15,18 +15,16 @@ from unidecode import unidecode
 # `senat_amendements` : `<p style="text-align: justify;">Par cet amendement,
 # les d&#x00E9;put&#x00E9;.es du groupe…`. On dépollue à la construction du
 # snippet pour que le site et le digest affichent du texte propre.
-_HTML_TAG_RE = re.compile(r"<[^>]+>")
-_MULTISPACE_RE = re.compile(r"\s+")
+# R32 (2026-04-24) : délégué à `src.textclean.strip_html` (audit §4.2).
+# Wrapper conservé pour compat (tests et imports existants) mais toute
+# nouvelle logique doit importer depuis `textclean` directement.
+from . import textclean as _textclean  # noqa: E402
 
 
 def _clean_html(text: str) -> str:
-    """Strip HTML tags + décode les entités (&#x00E9; → é, &amp; → &)."""
-    if not text:
-        return ""
-    text = _HTML_TAG_RE.sub(" ", text)
-    text = html.unescape(text)
-    text = _MULTISPACE_RE.sub(" ", text).strip()
-    return text
+    """Strip HTML tags + décode les entités + collapse whitespace.
+    Alias de `textclean.strip_html`."""
+    return _textclean.strip_html(text)
 
 
 def _normalize(text: str) -> str:

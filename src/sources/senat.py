@@ -748,19 +748,14 @@ _SENAT_LIEU_RE = re.compile(
     re.DOTALL | re.IGNORECASE,
 )
 
-# Tags HTML pour strip
-_HTML_TAG_STRIP_RE = re.compile(r'<[^>]+>')
-_WS_COLLAPSE_RE = re.compile(r'\s+')
+# R32 (2026-04-24) : délégué à `src.textclean.strip_html` (audit §4.2).
+# Wrapper conservé pour compat (imports locaux par `_parse_senat_event_block`).
+from .. import textclean as _textclean  # noqa: E402
 
 
 def _strip_html(text: str) -> str:
-    """Retire les balises HTML + unescape les entités + collapse whitespace."""
-    if not text:
-        return ""
-    text = _HTML_TAG_STRIP_RE.sub(' ', text)
-    text = html.unescape(text)
-    text = _WS_COLLAPSE_RE.sub(' ', text).strip()
-    return text
+    """Alias de `textclean.strip_html` (R32)."""
+    return _textclean.strip_html(text)
 
 
 def _parse_senat_event_block(body: str, day: datetime, section: str) -> dict | None:
