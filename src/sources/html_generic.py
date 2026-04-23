@@ -21,7 +21,7 @@ from bs4 import BeautifulSoup
 from lxml import etree
 
 from ..models import Item
-from ._common import fetch_text, parse_iso
+from ._common import fetch_bytes, fetch_text, parse_iso
 
 log = logging.getLogger(__name__)
 
@@ -40,11 +40,15 @@ def _from_rss_generic(src: dict) -> list[Item]:
     d'affichage existants.
     """
     try:
-        text = fetch_text(src["url"])
+        # R19-A : passer bytes à feedparser pour respecter l'encoding
+        # déclaré (PI XML ou header Content-Type). Avec str + UTF-8 forcé,
+        # les flux ISO-8859-15 comme les RSS thématiques Sénat produisent
+        # du mojibake "ï¿œ" sur les caractères accentués / signes comme °.
+        payload = fetch_bytes(src["url"])
     except Exception as e:
         log.warning("RSS KO %s : %s", src["id"], e)
         return []
-    d = feedparser.parse(text)
+    d = feedparser.parse(payload)
     domain = urlparse(src["url"]).netloc
     chamber = _chamber(domain)
     out: list[Item] = []

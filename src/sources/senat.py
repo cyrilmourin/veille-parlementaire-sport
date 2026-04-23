@@ -139,7 +139,7 @@ def fetch_source(src: dict) -> list[Item]:
                          sid, name, len(batch), len(rows))
             return items
         if fmt == "rss":
-            return _normalize_rss(src, fetch_text(src["url"]))
+            return _normalize_rss(src, fetch_bytes(src["url"]))
         if fmt == "akn_index":
             # Flux Akoma Ntoso (depots.xml / adoptions.xml) : route vers
             # le parser dédié. Import local pour ne pas charger le module
@@ -582,12 +582,32 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
     # fichiers texte/HTML/XML par session. Voir _fetch_debats_zip().
 
 
-def _normalize_rss(src, text: str) -> list[Item]:
+def _normalize_rss(src, text) -> list[Item]:
+    """R19-A (2026-04-23) : accepte bytes OU str. feedparser.parse(bytes)
+    sait lire la PI XML `<?xml encoding="ISO-8859-15"?>` (flux thème Sénat)
+    et décode correctement. En str, le décodage a déjà eu lieu en amont
+    et on perd l'info encoding (d'où les 'nï¿œ 733' observés avant R19-A).
+
+    R19-B (2026-04-23) : pour `category=dossiers_legislatifs`, on filtre
+    les URLs pour ne garder que les textes INITIAUX :
+      - `/leg/pjl*` (projets de loi) et `/leg/ppl*` (propositions de loi).
+    Les `tas` (textes adoptés — étapes), `rap` (rapports), `a` (avis) et
+    `notice-rapport` sont des pièces *dans* un dossier, pas un dossier.
+    Cyril voit 8+ lignes pour la loi JOP Alpes 2030 alors qu'une seule
+    suffit (la première occurrence). Filtrage strict côté scrape.
+    """
     d = feedparser.parse(text)
     out = []
+    is_dosleg = src.get("category") == "dossiers_legislatifs"
+    # Regex URL : on matche `/leg/pjlXX-YYY.html` et `/leg/ppljXX-YYY.html`.
+    _INITIAL_TEXT_RE = re.compile(r"/leg/(pjl|ppl)[a-z]*\d", re.IGNORECASE)
     for e in d.entries:
         uid = getattr(e, "id", None) or getattr(e, "link", "")
         if not uid:
+            continue
+        link = getattr(e, "link", "") or ""
+        if is_dosleg and link and not _INITIAL_TEXT_RE.search(link):
+            log.debug("senat_rss: skip non-initial %s", link)
             continue
         dt = None
         if getattr(e, "published_parsed", None):
@@ -595,7 +615,7 @@ def _normalize_rss(src, text: str) -> list[Item]:
         out.append(Item(
             source_id=src["id"], uid=uid, category=src["category"], chamber="Senat",
             title=(getattr(e, "title", "") or "")[:220],
-            url=getattr(e, "link", ""),
+            url=link,
             published_at=dt,
             summary=(getattr(e, "summary", "") or "")[:500],
             raw={},

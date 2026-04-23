@@ -199,15 +199,20 @@ senat:
       enabled: false
 
     # R16 (2026-04-22) — Flux RSS Sénat thème "Sports" (N=31).
-    # Vérifié live 2026-04-22 : 200 OK, 10 Ko, ~15 entrées (textes n°51
-    # "JOP 2030", avis n°144 "Budget 2026 Sport", rapports des commissions
-    # thématiques). Compensation au blocage du scraper agenda : on capte
-    # au moins les travaux parlementaires Sénat tagués Sport en entrée
-    # de catégorie dossiers_legislatifs.
+    # R19-B (2026-04-23) : DÉSACTIVÉ. Ce flux remontait des documents
+    # INTERNES à un dossier législatif (rapports, avis, textes adoptés,
+    # textes de commission à plusieurs lectures) et produisait jusqu'à
+    # 8 doublons pour la même loi (JOP Alpes 2030 → pjl24-630 initial +
+    # pjl24-734 com. + pjl25-278 transmis + pjl25-307 com. 2e L +
+    # tas25-051 adopté + rap/l25-306 + rap/a24-711..720 + notice).
+    # Les VRAIS dossiers sont déjà captés par senat_akn_depots,
+    # senat_akn_adoptions et senat_promulguees avec l'URL canonique
+    # /dossier-legislatif/pjlXX-YYY.html. Ce RSS n'ajoute que du bruit.
     - id: senat_theme_sport_rss
       category: dossiers_legislatifs
       url: https://www.senat.fr/themes/rss/therss31.xml
       format: rss
+      enabled: false
 
 # Journal officiel (JORF) — dump DILA OPENDATA (aucun credential nécessaire).
 # L'API PISTE/Légifrance est contournée : le dump XML quotidien DILA contient

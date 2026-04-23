@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R18"
+SYSTEM_VERSION_LABEL = "R19"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -423,6 +423,26 @@ def _fix_question_row(r: dict) -> None:
                 if suffix.lower() != new_analyse.lower():
                     r["title"] = (prefix + new_analyse)[:220]
 
+    # 5) R19-C (2026-04-23) : retire du summary le préfixe redondant
+    #    "{Auteur} ({Groupe}) — " (ou "Député PAxxx (Groupe) — "), puisque
+    #    l'auteur est déjà affiché en en-tête de carte (auteur-inline). Le
+    #    summary doit aller direct à "Destinataire : …" pour un snippet utile.
+    summary = (r.get("summary") or "")
+    if summary:
+        new_summary = re.sub(
+            r"^(?:M\.|Mme|Mlle|Député)\s+[^()—]+?\s*\([^)]+\)\s*(?:—|-)\s*",
+            "",
+            summary,
+        )
+        # Cas fallback : préfixe "Député PAxxx — " sans groupe
+        new_summary = re.sub(
+            r"^Député\s+PA\d+\s*(?:—|-)\s*",
+            "",
+            new_summary,
+        )
+        if new_summary != summary:
+            r["summary"] = new_summary[:2000]
+
 
 _AMEND_DEPUTE_RE = re.compile(r"Député\s+(PA\d+)")
 
@@ -740,6 +760,30 @@ def _load(rows: list[dict]) -> list[dict]:
         # où le passage CR 250→500 n'avait aucun effet visible).
         if r.get("matched_keywords") and not r.get("snippet"):
             haystack = (r.get("summary") or r.get("title") or "").strip()
+            # R19-G (2026-04-23) : pour les comptes rendus AN, on retire le
+            # préambule de métadonnées Syceron (identifiants techniques
+            # `CRSANR5L17...`, `RUANR...`, `SCR5A...`, timestamps ISO,
+            # libellés `Session ordinaire …`, `valide complet public`,
+            # `avant_JO PROD`) qui pollue le début du summary et évince le
+            # match du centre de l'extrait. On coupe jusqu'à « Présidence »
+            # qui marque le vrai début du débat. Si le marqueur est absent
+            # ou éloigné (>400 chars), on laisse le texte tel quel.
+            if haystack and (r.get("category") == "comptes_rendus"):
+                _prefix_re = re.compile(
+                    r"^(?:CRSAN\S+|RUAN\S+|SCR5\S+|\d{8,}|[\s\-]+|"
+                    r"Session ordinaire \d{4}[\s-]*\d{4}|"
+                    r"valide|complet|public|avant_JO|PROD|AN \d+|"
+                    r"\d{4}-\d{2}-\d{2}T[\d:.+-]+|"
+                    r"(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche) "
+                    r"\d{1,2} \S+ \d{4}|"
+                    r"[\s.])+",
+                    re.IGNORECASE,
+                )
+                p_idx = haystack.find("Présidence")
+                if 0 < p_idx <= 400:
+                    cleaned = _prefix_re.sub("", haystack[:p_idx])
+                    if not cleaned or len(cleaned) < 20:
+                        haystack = haystack[p_idx:]
             if haystack:
                 _target = SNIPPET_LEN_BY_CATEGORY.get(r.get("category") or "", 800)
                 r["snippet"] = _matcher.build_snippet(haystack, max_len=_target)

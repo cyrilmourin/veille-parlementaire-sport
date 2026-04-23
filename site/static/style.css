@@ -713,29 +713,29 @@ a:hover { text-decoration: underline; }
 /* R13-M (2026-04-21) : chamber + titre vraiment inline (flex baseline),
    pas de retour chariot entre les deux. Le titre garde son line-clamp 3
    pour ne pas déborder. */
+/* R19-D (2026-04-23) : plus de flex — le badge chambre coule INLINE avec
+   le texte du titre (comme un run de texte HTML). line-clamp 3 est porté
+   sur .side-body pour tronquer l'ensemble sans jamais casser ligne 1 entre
+   le badge et le début du titre. Le badge utilise vertical-align:baseline
+   + un padding-y symétrique pour rester aligné sur la ligne de base du titre. */
 .side-body {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  flex-wrap: wrap;
-  font-size: 12.5px;
-  line-height: 1.35;
-  color: var(--fg);
-}
-.side-body .chamber {
-  flex: 0 0 auto;
-  font-size: 10px;
-  padding: 1px 6px;
-}
-.side-title-link {
-  flex: 1 1 60%;
-  min-width: 0;
-  color: var(--sl-blue);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--fg);
+}
+.side-body .chamber {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  margin-right: 5px;
+  vertical-align: baseline;
+}
+.side-title-link {
+  color: var(--sl-blue);
 }
 .side-title-link:hover { color: var(--sl-red); }
 .side-title-text { color: var(--fg); }
@@ -812,26 +812,23 @@ a:hover { text-decoration: underline; }
   margin: 14px 0;
   box-shadow: 0 1px 3px rgba(18, 37, 73, 0.04);
 }
+/* R19-A (2026-04-23) : fond transparent — les PNG officiels AN/Sénat
+   portent déjà leur fond institutionnel. Le background coloré de R13-M
+   a été retiré à la demande de Cyril. */
 .dosleg-card__icon {
   flex: 0 0 56px;
   height: 56px;
   border-radius: 8px;
-  background: var(--sl-blue);
-  color: #fff;
+  background: transparent;
+  color: inherit;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-title);
-  font-weight: 900;
-  font-size: 14px;
-  letter-spacing: 0.5px;
 }
-.dosleg-card[data-chamber="Senat"] .dosleg-card__icon,
-.dosleg-card[data-chamber="Sénat"] .dosleg-card__icon {
-  background: #62c925;
-}
-.dosleg-card[data-chamber="AN"] .dosleg-card__icon {
-  background: #20acd9;
+.dosleg-card__icon img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 .dosleg-card__body {
   flex: 1 1 auto;
@@ -1276,15 +1273,25 @@ a:hover { text-decoration: underline; }
 }
 
 /* R13-J (2026-04-21) : agenda — chambre + titre inline sur la même ligne
-   (demande Cyril patch 5). */
+   (demande Cyril patch 5).
+   R19-E (2026-04-23) : on abandonne flex pour un flux inline. Avec flex +
+   flex-wrap, quand le titre ne rentre pas il saute à la ligne ENTIÈREMENT
+   sous le badge, créant une ligne 1 "MinSports" + ligne 2 titre. En inline,
+   le badge reste collé au début du titre et la suite du titre wrappe
+   naturellement sans laisser de blanc sous le badge. */
 .agenda-row {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
+  display: block;
+  font-size: 16px;
+  line-height: 1.4;
 }
-.agenda-row .chamber { flex: 0 0 auto; }
-.agenda-row .title { flex: 1 1 auto; }
+.agenda-row .chamber {
+  display: inline-block;
+  margin-right: 10px;
+  vertical-align: baseline;
+}
+.agenda-row .title {
+  display: inline;
+}
 
 /* R13-J (2026-04-21) : cartouche blanc arrondi pour chaque occurrence
    dans les pages de listing (questions, amendements, comptes-rendus,
