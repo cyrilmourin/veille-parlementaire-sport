@@ -2,9 +2,11 @@ name: Veille parlementaire sport — daily
 
 on:
   schedule:
-    # R22f (2026-04-23) : 04:00 Europe/Paris (= 02:00 UTC en été, 03:00 en hiver
-    # — on planifie à 02:00 UTC, alignement heure d'été par défaut comme avant).
+    # R22f (2026-04-23) : 04:00 Europe/Paris (= 02:00 UTC en été, 03:00 en hiver).
     - cron: "0 2 * * *"
+    # R24 (2026-04-23) : ping 17h30 Paris lun-ven (= 15h30 UTC en été).
+    # Déclenche python -m src.main ping — email uniquement si nouveautés.
+    - cron: "30 15 * * 1-5"
   # R18 (2026-04-22) : auto-deploy à chaque push de code sur main pour que
   # les releases (R17, R18…) n'aient plus besoin d'un lancement manuel via
   # workflow_dispatch. On ignore les chemins qui bouclent (commits du bot
@@ -213,6 +215,46 @@ jobs:
         run: |
           git config user.name "veille-bot"
           git config user.email "veille-bot@sideline-conseil.fr"
-          git add data/last_digest.html data/amo_resolved.json data/an_texte_to_dossier.json 2>/dev/null || true
+          git add data/last_digest.html data/amo_resolved.json data/an_texte_to_dossier.json data/ping_state.json 2>/dev/null || true
           git diff --cached --quiet || git commit -m "chore: snapshot digest $(date -u +%Y-%m-%dT%H:%MZ)"
           git push || true
+
+  # ── Job ping 17h30 ─────────────────────────────────────────────────────────
+  # R24 (2026-04-23) : s'exécute uniquement sur le cron 15h30 UTC (lun-ven).
+  # Lit la DB depuis le cache, compare avec ping_state.json du matin,
+  # envoie un email court si nouveautés dans les 4 catégories prioritaires.
+  ping-afternoon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Ne tourne que sur le cron 17h30, pas sur push ni workflow_dispatch
+    if: github.event_name == 'schedule' && github.event.schedule == '30 15 * * 1-5'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Restore SQLite cache (read-only)
+        uses: actions/cache@v4
+        with:
+          path: data/veille.sqlite3
+          key: veille-sqlite-v3-never-match
+          restore-keys: |
+            veille-sqlite-v3-
+
+      - name: Run ping
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          DIGEST_TO: ${{ secrets.DIGEST_TO }}
+        run: python -m src.main ping -v
