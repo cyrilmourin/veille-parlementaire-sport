@@ -143,12 +143,23 @@ a:hover { text-decoration: underline; }
   font-family: var(--font-title);
 }
 .brand-title {
-  font-size: 22px; font-weight: 800; margin-top: 3px;
+  /* R38-C (2026-04-24) : 22 → 26px (demande Cyril). */
+  font-size: 26px; font-weight: 800; margin-top: 3px;
   font-family: var(--font-title);
+  line-height: 1.1;
+}
+.brand-subtitle {
+  /* R38-C (2026-04-24) : sous-titre "Sport & Olympisme" en 20px, même
+     famille/couleur que .brand-title, poids identique. Aligné avec un
+     petit espace vertical pour que les deux lignes respirent sans
+     casser le rythme vertical du header. */
+  font-size: 20px; font-weight: 800; margin-top: 1px;
+  font-family: var(--font-title);
+  line-height: 1.1;
 }
 .brand-tagline {
   font-size: 13px; font-style: italic; color: var(--sl-red);
-  margin-top: 2px; font-weight: 500;
+  margin-top: 3px; font-weight: 500;
 }
 
 .nav {
@@ -248,6 +259,10 @@ a:hover { text-decoration: underline; }
   .brand-text {
     align-items: center;
   }
+  /* R38-C (2026-04-24) : ajustement mobile — on réduit légèrement les
+     deux lignes de titre pour éviter le débordement sur iPhone SE / XS. */
+  .brand-title { font-size: 22px; }
+  .brand-subtitle { font-size: 17px; }
 
   /* Affiche le bouton hamburger */
   .site-header .container {
