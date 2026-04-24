@@ -188,15 +188,20 @@ def fetch_source(src: dict) -> list[Item]:
         if not body_text:
             continue
 
-        # Titre : "<commission_label> — Semaine du D MOIS YYYY".
+        # Titre : juste "Semaine du D MOIS YYYY" — le libellé de commission
+        # n'est PAS injecté ici (R38-E, 2026-04-24). Raison : le label
+        # officiel « Commission culture, éducation, communication et sport »
+        # fait matcher automatiquement chaque CR hebdo via le keyword
+        # « sport » même quand le contenu ne traite pas de sport cette
+        # semaine-là → bruit. On expose le libellé en `raw.commission`
+        # (exploité par le template pour un sous-titre/tag d'affichage)
+        # mais il ne participe pas au matching lexical qui se fait
+        # désormais UNIQUEMENT sur le body réel du CR (haystack_body).
         week_label = ev["label"]
         # Normalise le "Semaine\n du 13 avril 2026" multi-ligne observé
         # sur le listing en "Semaine du 13 avril 2026".
         week_label = _WS_RE.sub(" ", week_label).strip()
-        if commission_label:
-            display_title = f"{commission_label} — {week_label}"
-        else:
-            display_title = week_label
+        display_title = week_label
 
         summary = body_text[:500]
 

@@ -104,7 +104,12 @@ def test_fetch_source_produces_items_with_organe(monkeypatch):
     assert it0.source_id == "senat_cr_culture"
     assert it0.category == "comptes_rendus"
     assert it0.chamber == "Senat"
-    assert it0.title.startswith("Commission culture/éducation/communication/sport — Semaine")
+    # R38-E (2026-04-24) — le title ne contient plus `commission_label` :
+    # celui-ci est exposé via raw.commission seulement. Évite le match
+    # automatique sur "sport" via le libellé officiel de la commission.
+    assert it0.title.startswith("Semaine")
+    assert "Commission culture" not in it0.title
+    assert it0.raw["commission"] == "Commission culture/éducation/communication/sport"
     assert it0.published_at == datetime(2026, 4, 13)
     assert it0.raw["organe"] == "PO211490"
     assert it0.raw["path"] == "senat:cr_commissions_html"

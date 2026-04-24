@@ -2824,6 +2824,12 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
                 fm.append(f'report_type: "{report_type}"')
             if report_label:
                 fm.append(f'report_label: "{report_label}"')
+            # R38-D / R38-E (2026-04-24) — expose le libellé de commission
+            # (CR hebdo Sénat R37-A) en tant que sous-titre d'affichage.
+            # Absent pour les CR de séance plénière (syceron, debats, cri).
+            commission = (raw.get("commission") or "").strip().replace('"', "'")
+            if commission:
+                fm.append(f'commission: "{commission}"')
         fm += [
             "---",
             "",

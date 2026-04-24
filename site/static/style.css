@@ -1095,26 +1095,69 @@ a:hover { text-decoration: underline; }
 .cr-badge-analytique { background: var(--sl-green); }
 .cr-badge-integral   { background: var(--sl-blue); }
 
-/* ---------- Listing : Comptes rendus (R36-N : layout carte type dosleg)
+/* ---------- Listing : Comptes rendus (R36-N layout carte, R38-D filtres)
    Les `.cr-card` partagent les règles `.dosleg-card` (box, flex, icon,
-   body, title, deposit, kws, snippet). Les règles ci-dessous ne posent
-   que les surcharges propres aux CR : le chapeau de type (analytique /
-   intégral) vient sous le titre à la place de `.dosleg-card__type`. */
-.cr-card__type {
-  margin: 4px 0 6px;
+   body, title, deposit, kws, snippet). R38-D : plus de cartouche
+   analytique/intégral demandé par Cyril — les règles `.cr-card__type`
+   ont été retirées. À la place, on expose `.cr-card__commission` pour
+   les CR hebdomadaires de commission Sénat (R37-A/R38-E). */
+.cr-card__commission {
+  margin: 2px 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+  font-style: italic;
 }
-.cr-card__type .cr-badge {
-  display: inline-block;
-  padding: 2px 10px;
-  font-size: 12px;
+
+/* R38-D (2026-04-24) — filtres checkboxes sur /items/comptes_rendus/.
+   Deux groupes indépendants (chambre × type) présentés côte à côte,
+   empilés en vertical sur mobile. Pas d'accent visuel fort pour rester
+   cohérent avec le ton sobre du listing. */
+.cr-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  margin: 14px 0 18px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.cr-filter-group {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+.cr-filter-group legend {
+  font-family: var(--font-title);
   font-weight: 700;
-  letter-spacing: 0.2px;
-  border-radius: 10px;
-  background: var(--muted);
-  color: #fff;
+  font-size: 13px;
+  color: var(--fg);
+  margin-right: 8px;
+  padding: 0;
 }
-.cr-card__type .cr-badge-analytique { background: var(--sl-green); }
-.cr-card__type .cr-badge-integral   { background: var(--sl-blue); }
+.cr-filter-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--fg);
+  user-select: none;
+}
+.cr-filter-group input[type="checkbox"] {
+  accent-color: var(--sl-blue);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .cr-filters { flex-direction: column; gap: 10px; }
+}
 
 /* ---------- Listing : Dossiers législatifs (maquette type AN) ---------- */
 .dosleg-list .dosleg-card {

@@ -2,50 +2,65 @@
 {{/*
   Page dédiée Comptes rendus (Sénat + AN).
 
-  R36-N (2026-04-24) — refonte vers le layout carte type dossiers
-  législatifs (demande Cyril après revue R36). Logo chambre 56x56 à
-  gauche, body (titre + meta + snippet + badge analytique/intégral) à
-  droite. La classe `.cr-card` partage les mêmes règles que `.dosleg-card`
-  (cf. style.css) avec quelques surcharges pour le badge de type (CR
-  analytique vs intégral) et le tag de chambre.
+  R38-D (2026-04-24) — refonte après retour Cyril :
+    - plus de regroupement par chambre (tri global par date desc)
+    - deux axes de filtre en checkboxes :
+        * chambre : AN / Sénat
+        * type    : Séances plénières / Commissions & GE
+      Les deux axes sont cumulatifs (cocher "Séances" + "AN" = plénière AN).
+    - plus de cartouche "Compte rendu intégral/analytique" sous le titre
+      (ni badge visuel — le libellé redevient un simple texte léger).
+    - Pour les CR hebdomadaires de commission Sénat (R37-A), on affiche
+      le libellé de commission en sous-titre de bloc (pris dans
+      `.Params.commission`, exposé par R38-E).
 
-  On garde le regroupement par chambre pour que la lecture reste
-  structurée (AN puis Sénat), et le tri décroissant par date dans
-  chaque chambre.
+  Déterminer le type (plénière / commission) : on bascule via le
+  `source` de l'item. Les 3 sources de séance plénière sont an_syceron
+  (AN hémicycle), senat_debats (CR analytique Sénat) et senat_cri
+  (CR intégral Sénat). Tout le reste (an_cr_commissions R35-B,
+  senat_cr_culture R37-A) est classé "commission".
 */}}
 {{ $monthsFR := slice "" "janvier" "février" "mars" "avril" "mai" "juin" "juillet" "août" "septembre" "octobre" "novembre" "décembre" }}
+{{ $plenieres := slice "an_syceron" "senat_debats" "senat_cri" }}
 {{ $pages := (.Paginate .Pages.ByDate.Reverse).Pages }}
-{{ $byChamber := dict }}
-{{ range $pages }}
-  {{ $cham := .Params.chamber | default "Autre" }}
-  {{ $lst := index $byChamber $cham | default (slice) }}
-  {{ $byChamber = merge $byChamber (dict $cham ($lst | append .)) }}
-{{ end }}
 
 <section class="listing comptes-rendus">
   <nav class="breadcrumb"><a href="/">Accueil</a> &rsaquo; {{ .Title }}</nav>
   <h1>{{ .Title }}</h1>
   {{ with .Content }}<div class="intro">{{ . }}</div>{{ end }}
 
-  {{ range $cham, $lst := $byChamber }}
-  <h2 class="cr-chamber" data-chamber="{{ $cham }}">{{ $cham }} <span class="section-count">({{ len $lst }})</span></h2>
+  {{/* Filtres : deux groupes de checkboxes indépendants (chambre × type).
+       Tout est coché par défaut. Un petit JS vanilla applique le filtre
+       via data-chamber-short et data-cr-kind sur chaque <li>. */}}
+  <nav class="cr-filters" aria-label="Filtrer les comptes rendus">
+    <fieldset class="cr-filter-group">
+      <legend>Chambre</legend>
+      <label><input type="checkbox" class="cr-f-chamber" value="an" checked> Assemblée nationale</label>
+      <label><input type="checkbox" class="cr-f-chamber" value="senat" checked> Sénat</label>
+    </fieldset>
+    <fieldset class="cr-filter-group">
+      <legend>Type</legend>
+      <label><input type="checkbox" class="cr-f-kind" value="pleniere" checked> Séances plénières</label>
+      <label><input type="checkbox" class="cr-f-kind" value="commission" checked> Commissions &amp; Groupes d’études</label>
+    </fieldset>
+  </nav>
+
   <ul class="cr-list dosleg-list">
-    {{ range $lst }}
-      <li class="dosleg-card cr-card" data-report-type="{{ .Params.report_type | default "" }}">
-        {{/* Colonne gauche : logo chambre 56x56 (même cadre visuel que
-             les cards dosleg). Pour les chambres non reconnues (cas
-             marginal, Autre/MinSports…), on retombe sur le partial
-             chamber-badge qui rend un cartouche texte. */}}
-        {{ with .Params.chamber }}
-          {{ $lc := lower . }}
-          {{ if or (eq $lc "an") (eq $lc "senat") (eq $lc "sénat") }}
-            {{ $slug := cond (eq $lc "an") "an" "senat" }}
-            <div class="dosleg-card__icon" aria-hidden="true">
-              <img src="/logos/{{ $slug }}.svg" alt="{{ . }}" title="{{ . }}" loading="lazy" decoding="async" width="56" height="56">
-            </div>
-          {{ else }}
-            <div class="dosleg-card__icon" aria-hidden="true">{{ partial "chamber-badge.html" . }}</div>
-          {{ end }}
+    {{ range $pages }}
+      {{ $sid := .Params.source | default "" }}
+      {{ $kind := cond (in $plenieres $sid) "pleniere" "commission" }}
+      {{ $cham := .Params.chamber | default "" }}
+      {{ $lc := lower $cham }}
+      {{ $chamShort := cond (eq $lc "an") "an" (cond (or (eq $lc "senat") (eq $lc "sénat")) "senat" "autre") }}
+      <li class="dosleg-card cr-card"
+          data-cr-kind="{{ $kind }}"
+          data-chamber-short="{{ $chamShort }}">
+        {{ if or (eq $chamShort "an") (eq $chamShort "senat") }}
+          <div class="dosleg-card__icon" aria-hidden="true">
+            <img src="/logos/{{ $chamShort }}.svg" alt="{{ $cham }}" title="{{ $cham }}" loading="lazy" decoding="async" width="56" height="56">
+          </div>
+        {{ else }}
+          <div class="dosleg-card__icon" aria-hidden="true">{{ partial "chamber-badge.html" $cham }}</div>
         {{ end }}
 
         <div class="dosleg-card__body">
@@ -57,13 +72,11 @@
             {{ end }}
           </h2>
 
-          {{/* Badge type (analytique / intégral) juste sous le titre
-               comme .dosleg-card__type. Couleur différenciée via
-               data-report-type (cf. règles .cr-badge-* dans style.css). */}}
-          {{ with .Params.report_label }}
-            <div class="dosleg-card__type cr-card__type">
-              <span class="cr-badge cr-badge-{{ $.Params.report_type | default "default" }}">{{ . }}</span>
-            </div>
+          {{/* Sous-titre : libellé de commission pour les CR hebdo Sénat
+               (R37-A/R38-E). Plus de cartouche "Compte rendu intégral"
+               (R38-D : Cyril ne veut plus ce badge sous le titre). */}}
+          {{ with .Params.commission }}
+            <div class="cr-card__commission">{{ . }}</div>
           {{ end }}
 
           <div class="dosleg-card__deposit">
@@ -84,12 +97,40 @@
       </li>
     {{ end }}
   </ul>
-  {{ end }}
 
-  {{ if not $byChamber }}
+  {{ if not $pages }}
   <p class="empty-state">Aucun compte rendu récent.</p>
   {{ end }}
 
   {{ partial "pagination-inline.html" . }}
 </section>
+
+{{/* R38-D — JS vanilla pour les filtres checkboxes. Pas de dépendance. */}}
+<script>
+(function(){
+  var items = Array.prototype.slice.call(
+    document.querySelectorAll('.cr-list > li.cr-card')
+  );
+  if (!items.length) return;
+  var chamberBoxes = document.querySelectorAll('.cr-f-chamber');
+  var kindBoxes = document.querySelectorAll('.cr-f-kind');
+  function activeSet(boxes) {
+    var s = {};
+    boxes.forEach(function(b) { if (b.checked) s[b.value] = true; });
+    return s;
+  }
+  function apply() {
+    var chambers = activeSet(chamberBoxes);
+    var kinds = activeSet(kindBoxes);
+    items.forEach(function(li) {
+      var c = li.getAttribute('data-chamber-short') || 'autre';
+      var k = li.getAttribute('data-cr-kind') || 'commission';
+      li.style.display = (chambers[c] && kinds[k]) ? '' : 'none';
+    });
+  }
+  chamberBoxes.forEach(function(b) { b.addEventListener('change', apply); });
+  kindBoxes.forEach(function(b) { b.addEventListener('change', apply); });
+  apply();
+})();
+</script>
 {{ end }}
