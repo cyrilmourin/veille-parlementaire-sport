@@ -306,7 +306,9 @@ theme:
   - Badminton
   - Tennis
   - Tennis de table
-  - Ping-pong
+  # R38-I (2026-04-24) — "Ping-pong" retiré : expression trop utilisée en
+  # métaphore politique ("ping-pong verbal / économique / budgétaire")
+  # pour rester fiable côté matcher. "Tennis de table" couvre la discipline.
   - Canoë-kayak
   - Canoe-kayak
   - Patinage
