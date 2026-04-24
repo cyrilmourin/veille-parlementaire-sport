@@ -20,13 +20,23 @@ législature 17 + archives récentes :
 Commissions permanentes (toujours actives) :
 - PO419604 : Commission des affaires culturelles et de l'éducation (AN)
              — traite sport/EPS, COJO, conventions internationales sportives
+
+R35-D (2026-04-24) : Commissions "Affaires sociales" retirées du bypass.
+Cyril : « dans l'agenda j'ai des occurrences de commission qui ne semblent
+pas connectées à mes sujets (la commission des affaires sociales…) ».
+Ces commissions traitent majoritairement retraites, santé générale,
+assurance maladie, droit du travail et politiques sociales — le volume
+de réunions est très supérieur aux rares sujets sport (dopage, droit du
+travail sportif, santé sportive). Le bypass générait donc >90% de bruit
+off-topic. Les réunions genuinement sport continuent à remonter via le
+matching keyword standard quand « sport », « dopage », « ANS », « JO »,
+etc. apparaissent dans le titre ou l'ordre du jour. Codes retirés :
 - PO420120 : Commission des affaires sociales (AN)
-             — traite dopage, santé sportive, droit du travail sportif
+- PO211493 : Commission des affaires sociales (Sénat)
 
 Commissions permanentes Sénat (incluses pour symétrie, même si l'agenda
 AN n'utilise PAS ces codes — utile si on étend au dump Sénat plus tard) :
 - PO211490 : Commission culture/éducation/communication/sport (Sénat)
-- PO211493 : Commission des affaires sociales (Sénat)
 
 Groupes d'études (non actifs législature 17 pour l'instant, mais codes
 historiquement actifs sous 15/16 — laissés dans le set pour robustesse
@@ -53,10 +63,11 @@ from __future__ import annotations
 SPORT_RELEVANT_ORGANES: set[str] = {
     # Commissions permanentes AN
     "PO419604",  # Affaires culturelles et éducation AN
-    "PO420120",  # Affaires sociales AN
+    # R35-D : PO420120 (Affaires sociales AN) retiré — trop de bruit,
+    # les réunions sport remontent désormais via matching keyword.
     # Commissions permanentes Sénat (symétrie / extension future)
     "PO211490",  # Culture/éducation/communication/sport Sénat
-    "PO211493",  # Affaires sociales Sénat
+    # R35-D : PO211493 (Affaires sociales Sénat) retiré — idem AN.
     # Groupes d'études (souvent en sommeil entre législatures)
     "PO285103",  # Sport et éducation sportive
     "PO746821",  # Économie du sport

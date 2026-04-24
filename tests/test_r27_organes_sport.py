@@ -51,9 +51,18 @@ def _item(
 # ---------------------------------------------------------------------------
 
 def test_whitelist_contains_expected_commissions_permanentes():
-    """Les 2 commissions permanentes AN doivent être dans la liste."""
+    """Commission affaires culturelles/éducation AN dans la whitelist.
+
+    R35-D (2026-04-24) — Les commissions « Affaires sociales » (AN
+    PO420120 et Sénat PO211493) ont été retirées : elles traitent
+    majoritairement retraites/santé/assurance, et le bypass générait
+    >90% de bruit off-topic. Les réunions sport continuent à remonter
+    via matching keyword standard (« dopage », « ANS », « JO »...).
+    """
     assert "PO419604" in SPORT_RELEVANT_ORGANES  # Affaires culturelles AN
-    assert "PO420120" in SPORT_RELEVANT_ORGANES  # Affaires sociales AN
+    # Régression R35-D : ne PAS réintroduire sans revoir le filtrage
+    assert "PO420120" not in SPORT_RELEVANT_ORGANES  # Affaires sociales AN
+    assert "PO211493" not in SPORT_RELEVANT_ORGANES  # Affaires sociales Sénat
 
 
 def test_whitelist_contains_missions_info_jop():
@@ -69,8 +78,11 @@ def test_whitelist_contains_groupes_etudes():
 
 
 def test_whitelist_size_sanity():
-    """12 codes PO documentés. Si on en ajoute, bumper ce seuil."""
-    assert 10 <= len(SPORT_RELEVANT_ORGANES) <= 30
+    """10 codes PO documentés (R35-D : -2 affaires sociales).
+
+    Seuil large — si on en ajoute/retire, bumper ce seuil.
+    """
+    assert 8 <= len(SPORT_RELEVANT_ORGANES) <= 30
 
 
 def test_is_sport_relevant_organe_true_cases():
@@ -150,10 +162,10 @@ def test_apply_organe_bypass_empty_items_list():
 
 
 def test_apply_organe_bypass_multiple_items_mixed():
-    """Mix realiste : 1 commission sport, 1 commission hors-sport, 1 déjà matché."""
+    """Mix realiste : 1 commission sport, 1 affaires sociales (hors bypass R35-D), 1 déjà matché."""
     items = [
-        _item(raw={"organe": "PO419604"}),            # bypass
-        _item(raw={"organe": "PO420120"}),            # bypass
+        _item(raw={"organe": "PO419604"}),            # bypass (culture/éducation)
+        _item(raw={"organe": "PO420120"}),            # R35-D : N'EST PLUS bypass (affaires sociales AN)
         _item(raw={"organe": "PO444444"}),            # non-sport
         _item(
             matched=["Sport"],
@@ -162,9 +174,10 @@ def test_apply_organe_bypass_multiple_items_mixed():
         _item(raw={"organe": "PO825884"}),            # MI femmes et sport
     ]
     n = _apply_organe_bypass(items)
-    assert n == 3
+    assert n == 2
     assert items[0].matched_keywords == [BYPASS_ORGANE_LABEL]
-    assert items[1].matched_keywords == [BYPASS_ORGANE_LABEL]
+    # R35-D : affaires sociales n'est plus bypass, keyword_matched reste vide
+    assert items[1].matched_keywords == []
     assert items[2].matched_keywords == []
     assert items[3].matched_keywords == ["Sport"]
     assert items[4].matched_keywords == [BYPASS_ORGANE_LABEL]
