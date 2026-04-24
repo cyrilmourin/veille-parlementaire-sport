@@ -168,3 +168,71 @@ def test_fetch_source_uid_stable(monkeypatch):
     a = mod.fetch_source(src)
     b = mod.fetch_source(src)
     assert [it.uid for it in a] == [it.uid for it in b]
+
+
+# ---------------------------------------------------------------------------
+# R38-A (2026-04-24) — strip ciblé sur <main> + décodage entités complet
+# + retrait du breadcrumb « Voir le fil d'Ariane ... Comptes rendus ».
+# ---------------------------------------------------------------------------
+
+def test_strip_html_targets_main_block_to_skip_nav():
+    """Le strip ignore le header de nav Sénat présent avant <main>."""
+    html = """
+<html><body>
+<header>
+  <nav>Galaxie Sénat Réseaux sociaux X Facebook LinkedIn Instagram YouTube</nav>
+</header>
+<main>
+  <h1>COMPTES RENDUS DE LA COMMISSION DE LA CULTURE</h1>
+  <p>Audition de M. Dupont sur le dopage et les JO 2030.</p>
+</main>
+<footer>Mentions légales — Contact — Plan du site</footer>
+</body></html>"""
+    out = mod._strip_html(html)
+    assert "Galaxie Sénat" not in out
+    assert "Mentions légales" not in out
+    assert "COMPTES RENDUS DE LA COMMISSION" in out
+    assert "Audition de M. Dupont" in out
+    assert "dopage" in out
+
+
+def test_strip_html_decodes_all_entities():
+    """html.unescape couvre &eacute; &agrave; &#039; &#x2019; &laquo; …"""
+    html = (
+        "<main>COMPTES RENDUS DE LA COMMISSION "
+        "Aujourd&rsquo;hui pr&eacute;sid&eacute; par M. L&eacute;fon "
+        "&laquo; zones grises &raquo; &#039;test&#039; &#x2019;test2&#x2019;"
+        "</main>"
+    )
+    out = mod._strip_html(html)
+    assert "&eacute;" not in out
+    assert "&rsquo;" not in out
+    assert "&laquo;" not in out
+    assert "&#039;" not in out
+    assert "&#x2019;" not in out
+    # Les caractères décodés sont présents
+    assert "présidé" in out
+    assert "Léfon" in out
+    assert "aujourd" in out.lower()
+
+
+def test_strip_html_removes_breadcrumb_preamble():
+    """Le breadcrumb « Voir le fil d'Ariane Accueil Commissions … » est retiré."""
+    html = """
+<main>
+  Voir le fil d'Ariane Accueil Commissions Culture Comptes rendus
+  COMPTES RENDUS DE LA COMMISSION DE LA CULTURE
+  Audition sport amateur
+</main>"""
+    out = mod._strip_html(html)
+    assert not out.startswith("Voir le fil")
+    assert not out.startswith("Accueil")
+    assert out.startswith("COMPTES RENDUS DE LA COMMISSION")
+    assert "Audition sport amateur" in out
+
+
+def test_strip_html_falls_back_to_full_when_no_main():
+    """Si pas de <main> ni <article>, strip la page entière."""
+    html = "<html><body><p>Pas de main tag ici, just text.</p></body></html>"
+    out = mod._strip_html(html)
+    assert out == "Pas de main tag ici, just text."

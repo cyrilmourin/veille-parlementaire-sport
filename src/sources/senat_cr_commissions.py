@@ -21,10 +21,18 @@ Approche prudente R35-D/R35-E : on n'active QUE la commission culture,
 éducation, communication et sport (PO211490, slug Sénat `culture`).
 Les autres commissions peuvent être ajoutées par entrée yaml dédiée — pas
 de découverte automatique pour éviter le bruit « affaires sociales ».
+
+R38-A (2026-04-24) : le strip HTML cible désormais le bloc `<main>` (ou
+`<article>` en fallback) pour exclure le header de navigation Sénat
+(galaxie Sénat, réseaux sociaux, menus langue…) qui polluait le
+haystack + le snippet. On retire aussi le breadcrumb initial « Voir le
+fil d'Ariane … Comptes rendus » et on décode TOUTES les entités HTML
+via `html.unescape` (les &eacute; / &agrave; / … résiduels).
 """
 from __future__ import annotations
 
 import hashlib
+import html as html_lib
 import logging
 import re
 from datetime import datetime
@@ -41,28 +49,58 @@ _ENTRY_RE = re.compile(
     r"([^<]{5,200}?)\s*</a>\s*</h3>",
     re.IGNORECASE,
 )
+_MAIN_BLOCK_RE = re.compile(r"<main[^>]*>([\s\S]*?)</main>", re.IGNORECASE)
+_ARTICLE_BLOCK_RE = re.compile(
+    r"<article[^>]*>([\s\S]*?)</article>", re.IGNORECASE
+)
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _HTML_SCRIPT_RE = re.compile(r"<script[\s\S]*?</script>", re.IGNORECASE)
 _HTML_STYLE_RE = re.compile(r"<style[\s\S]*?</style>", re.IGNORECASE)
 _WS_RE = re.compile(r"\s+")
 
+# Préambule breadcrumb du Sénat : « Voir le fil d'Ariane Accueil
+# Commissions <slug> Comptes rendus ». Retiré avant le texte réel.
+# Le motif « COMPTES RENDUS DE LA COMMISSION … » en majuscules marque
+# la frontière entre breadcrumb et contenu. Si le motif est absent
+# (template différent), on retombe sur le texte stripé complet.
+_BREADCRUMB_END_RE = re.compile(
+    r"COMPTES\s+RENDUS\s+DE\s+LA\s+COMMISSION\b",
+    re.IGNORECASE,
+)
+
 
 def _strip_html(html: str) -> str:
+    """Extrait le texte utile d'une page CR Sénat.
+
+    R38-A (2026-04-24) : on cible `<main>` (ou `<article>` en fallback)
+    avant de stripper les tags, pour laisser de côté le header de
+    navigation + footer Sénat qui polluaient autrefois le snippet.
+    On décode toutes les entités HTML via `html.unescape` (gère tous
+    les &xxx; / &#xxx;). Enfin on retire le breadcrumb initial pour
+    ne garder que le corps du CR lui-même.
+    """
     if not html:
         return ""
-    html = _HTML_SCRIPT_RE.sub(" ", html)
-    html = _HTML_STYLE_RE.sub(" ", html)
-    text = _HTML_TAG_RE.sub(" ", html)
-    # Entités courantes sénat : &nbsp; &#039; &amp;
-    text = (text
-            .replace("&nbsp;", " ")
-            .replace("&#039;", "'")
-            .replace("&rsquo;", "'")
-            .replace("&amp;", "&")
-            .replace("&quot;", '"')
-            .replace("&lt;", "<")
-            .replace("&gt;", ">"))
-    return _WS_RE.sub(" ", text).strip()
+    # Cible le bloc principal. Si <main> absent, fallback <article>,
+    # sinon garde le full HTML (comportement legacy).
+    m = _MAIN_BLOCK_RE.search(html)
+    if m is None:
+        m = _ARTICLE_BLOCK_RE.search(html)
+    block = m.group(1) if m is not None else html
+    block = _HTML_SCRIPT_RE.sub(" ", block)
+    block = _HTML_STYLE_RE.sub(" ", block)
+    text = _HTML_TAG_RE.sub(" ", block)
+    # Décode TOUTES les entités (&eacute;, &agrave;, &#039;, &laquo;,
+    # &#x2019;, etc.). Plus fiable qu'une liste de remplacements ad-hoc.
+    text = html_lib.unescape(text)
+    # Normalise whitespace.
+    text = _WS_RE.sub(" ", text).strip()
+    # Retire le préambule breadcrumb si le motif est détecté — on
+    # coupe AVANT la tête « COMPTES RENDUS DE LA COMMISSION ».
+    br = _BREADCRUMB_END_RE.search(text)
+    if br is not None:
+        text = text[br.start():].strip()
+    return text
 
 
 def _parse_week_date(yyyymmdd: str) -> datetime | None:

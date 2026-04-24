@@ -2453,7 +2453,14 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
         # dédié (layouts/communiques/list.html inexistant) : Hugo
         # retombera sur _default/list.html qui rend correctement la
         # page + le filtre une fois .Type résolu.
-        SPECIFIC_LAYOUT_CATS = {"agenda", "dossiers_legislatifs", "communiques"}
+        # R38-B (2026-04-24) : `comptes_rendus` ajouté au set pour que Hugo
+        # pose `.Type == "comptes_rendus"` sur les _index.md et route vers
+        # le layout dédié `layouts/comptes_rendus/list.html` (R36-N, carte
+        # type dosleg avec logo 56 à gauche). Sans `type:` dans le
+        # frontmatter, Hugo tombait sur `_default/list.html` qui rend une
+        # liste plate et R36-N était invisible en prod.
+        SPECIFIC_LAYOUT_CATS = {"agenda", "dossiers_legislatifs",
+                                 "communiques", "comptes_rendus"}
         lines = [
             "---",
             f'title: "{label}"',
