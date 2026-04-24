@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R36"
+SYSTEM_VERSION_LABEL = "R37"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -974,6 +974,29 @@ def _fix_amendement_row(r: dict) -> None:
     t = re.sub(r"\s{2,}", " ", t).strip()
     if t != r.get("title"):
         r["title"] = t[:220]
+
+    # Étape 4 — R37-C (2026-04-24) : pour les amendements émanant du
+    # Gouvernement (pas d'auteur parlementaire, donc aucune photo
+    # portrait disponible), on pose un placeholder `/logo_Gouv.png`
+    # (image fournie par Cyril dans site/static/). Détection :
+    #   - le champ `auteur` contient "Gouvernement" (casse insensible),
+    #     OU `au_nom_de` le mentionne (côté Sénat, colonne CSV dédiée),
+    #   - ET `auteur_photo_url` est vide (ne remplace pas une vraie photo).
+    # Idempotent.
+    if isinstance(raw, dict):
+        current_photo = (raw.get("auteur_photo_url") or "").strip()
+        if not current_photo:
+            auteur_clear = (raw.get("auteur") or "").strip().lower()
+            au_nom_de = (raw.get("au_nom_de") or "").strip().lower()
+            # "Le Gouvernement", "Gouvernement", "M. le Premier ministre",
+            # "Mme la ministre", "M. le ministre" sont autant de signatures
+            # gouvernementales observées côté AN / Sénat.
+            gov_markers = ("gouvernement", "premier ministre",
+                            "le ministre", "la ministre")
+            if any(m in auteur_clear for m in gov_markers) or any(
+                m in au_nom_de for m in gov_markers
+            ):
+                raw["auteur_photo_url"] = "/logo_Gouv.png"
 
 
 # R13-G : mapping domaine de ministère → badge (copie de html_generic._MIN_MAP).

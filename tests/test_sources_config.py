@@ -42,6 +42,9 @@ _KNOWN_FORMATS = {
     # R35-E (2026-04-24) — agenda HTML d'une commission Sénat (remplace
     # senat_agenda_daily, désactivé depuis R15 sur blocage WAF).
     "senat_commission_agenda_html",
+    # R37-A (2026-04-24) — CR hebdomadaires commission Sénat (scraping
+    # /compte-rendu-commissions/<slug>.html puis fetch de chaque CR).
+    "senat_cr_commissions_html",
 }
 
 

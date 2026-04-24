@@ -235,7 +235,7 @@ jobs:
         run: |
           git config user.name "veille-bot"
           git config user.email "veille-bot@sideline-conseil.fr"
-          git add data/last_digest.html data/amo_resolved.json data/an_texte_to_dossier.json data/ping_state.json data/pipeline_health.json 2>/dev/null || true
+          git add data/last_digest.html data/amo_resolved.json data/an_texte_to_dossier.json data/ping_state.json data/pipeline_health.json data/an_cr_state.json 2>/dev/null || true
           git diff --cached --quiet || git commit -m "chore: snapshot digest $(date -u +%Y-%m-%dT%H:%MZ)"
           git push || true
 

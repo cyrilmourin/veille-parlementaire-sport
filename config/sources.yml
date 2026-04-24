@@ -249,6 +249,24 @@ senat:
       commission_label: Commission culture/éducation/communication/sport
       commission_organe: PO211490
 
+    # R37-A (2026-04-24) — Comptes rendus hebdomadaires commission culture
+    # Sénat. Le Sénat ne publie pas de dump JSON/XML pour les CR de
+    # commissions : on scrape le listing /compte-rendu-commissions/culture.html
+    # qui liste les bulletins hebdomadaires (h3 avec liens vers
+    # /compte-rendu-commissions/YYYYMMDD/cult.html). Chaque CR hebdo agrège
+    # toutes les réunions de la commission sur la semaine. Comme R35-E et
+    # R35-D, on n'active QUE la commission culture côté Sénat pour éviter
+    # le bruit des commissions affaires sociales. Le contenu HTML complet
+    # alimente `raw.haystack_body` pour que le matcher mots-clés le scanne.
+    - id: senat_cr_culture
+      category: comptes_rendus
+      url: https://www.senat.fr/compte-rendu-commissions/culture.html
+      format: senat_cr_commissions_html
+      commission_label: Commission culture/éducation/communication/sport
+      commission_organe: PO211490
+      max_new_per_run: 8
+      body_max_chars: 10000
+
     # R16 (2026-04-22) — Flux RSS Sénat thème "Sports" (N=31).
     # R19-B (2026-04-23) : DÉSACTIVÉ. Ce flux remontait des documents
     # INTERNES à un dossier législatif (rapports, avis, textes adoptés,

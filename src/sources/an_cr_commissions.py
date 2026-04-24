@@ -260,10 +260,20 @@ def fetch_source(src: dict) -> list[Item]:
       - session         : code session (ex. "2526"). Défaut : déduit de
                           la date courante.
       - max_new_per_run : nb max de CR nouveaux scrapés par commission
-                          par run (défaut 10, évite les runaway au bootstrap).
+                          par run (défaut 10).
       - miss_tolerance  : nb de 404 consécutifs avant d'arrêter une commission
-                          (défaut 3).
+                          (défaut 5).
       - max_num         : n° max absolu testé (garde-fou, défaut 99).
+
+    R37-B (2026-04-24) — stratégie de scan inversée. On descend depuis
+    `max_num` vers le bas et on s'arrête dès qu'on a attrapé `max_new`
+    CR OU qu'on a enchaîné `miss_tolerance` 404 consécutifs DANS la zone
+    déjà vue. Ça attrape les CR les plus récents en priorité et évite
+    l'effet « scraper coincé au n°10 parce que le state n'est pas
+    persisté et que max_new=10 limite le progrès ». Cyril (2026-04-24) :
+    le CR 58 de cion-cedu manquait en prod parce que le scan ascendant
+    repartait de 0 à chaque run et butait sur miss_tolerance=3 après
+    quelques numéros absents.
     """
     raw_comm = src.get("commissions") or _DEFAULT_COMMISSIONS
     if isinstance(raw_comm, list):
@@ -272,7 +282,7 @@ def fetch_source(src: dict) -> list[Item]:
         commissions = dict(raw_comm)
 
     max_new = int(src.get("max_new_per_run", 10))
-    miss_tolerance = int(src.get("miss_tolerance", 3))
+    miss_tolerance = int(src.get("miss_tolerance", 5))
     max_num = int(src.get("max_num", 99))
     session = str(src.get("session") or _session_code(datetime.utcnow()))
 
@@ -281,26 +291,47 @@ def fetch_source(src: dict) -> list[Item]:
     items: list[Item] = []
 
     for slug, label in commissions.items():
-        slug_state = session_state.setdefault(slug, {"last_num": 0})
-        start = max(1, int(slug_state.get("last_num", 0)) + 1)
-        num = start
+        slug_state = session_state.setdefault(slug, {
+            "last_num": 0,       # plus grand num jamais vu (historique)
+            "scanned": [],       # nums déjà ingérés, pour skip rapide
+        })
+        scanned = set(slug_state.get("scanned") or [])
+        num = max_num
         miss = 0
         new_count = 0
-        while miss < miss_tolerance and new_count < max_new and num <= max_num:
+        local_max = slug_state.get("last_num", 0)
+        # Scan descendant : du plus récent (max_num) vers le plus ancien.
+        # On skip les nums déjà vus (scanned) pour ne pas refaire 99 →
+        # déjà en DB. Les misses consécutifs s'accumulent ; dès qu'on
+        # en enchaîne `miss_tolerance`, on arrête (on est sorti de la
+        # zone des CR publiés pour cette session).
+        while num >= 1 and miss < miss_tolerance and new_count < max_new:
+            if num in scanned:
+                # déjà ingéré lors d'un run antérieur → on le saute sans
+                # consommer de miss (ce n'est pas un 404)
+                num -= 1
+                continue
             it = _fetch_cr(slug, session, num, label)
             if it is not None:
                 items.append(it)
-                slug_state["last_num"] = num
+                scanned.add(num)
+                if num > local_max:
+                    local_max = num
                 new_count += 1
                 miss = 0
             else:
                 miss += 1
-            num += 1
+            num -= 1
+        slug_state["last_num"] = local_max
+        # On borne la liste scanned pour éviter une croissance indéfinie
+        # dans le JSON d'état : on garde les 200 derniers (largement plus
+        # que le nombre de réunions par commission par session, 50-80).
+        slug_state["scanned"] = sorted(scanned)[-200:]
         session_state[slug] = slug_state
         log.info(
-            "an_cr_commissions %s session=%s : +%d items (last=%d, scan %d..%d)",
-            slug, session, new_count,
-            slug_state["last_num"], start, num - 1,
+            "an_cr_commissions %s session=%s : +%d items "
+            "(last_num=%d, scanned=%d)",
+            slug, session, new_count, local_max, len(scanned),
         )
 
     _save_state(state)

@@ -26,6 +26,7 @@ from .sources import (  # noqa: F401
     piste,
     senat,
     senat_commission_agenda,
+    senat_cr_commissions,
 )
 
 log = logging.getLogger(__name__)
@@ -73,6 +74,15 @@ ROUTER: list[tuple[Callable[[dict, dict], bool], Callable[[dict], list[Item]]]] 
     (
         lambda group, src: src.get("format") == "senat_commission_agenda_html",
         senat_commission_agenda.fetch_source,
+    ),
+    # R37-A (2026-04-24) — Scraper CR hebdomadaires commission Sénat.
+    # URL listing /compte-rendu-commissions/<slug>.html, puis fetch de chaque
+    # CR hebdo /compte-rendu-commissions/YYYYMMDD/<short>.html. Comme R35-E,
+    # une seule commission active à ce stade (culture/sport) — cohérence
+    # avec R35-D pour éviter le bruit affaires sociales.
+    (
+        lambda group, src: src.get("format") == "senat_cr_commissions_html",
+        senat_cr_commissions.fetch_source,
     ),
     # Assemblée nationale — zips JSON
     (lambda group, src: group == "assemblee_nationale", assemblee.fetch_source),

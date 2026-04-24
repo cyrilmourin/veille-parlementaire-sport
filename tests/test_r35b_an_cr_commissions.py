@@ -141,15 +141,21 @@ def test_fetch_cr_html_200_pdf_404_keeps_item(monkeypatch):
 
 
 def test_fetch_source_increments_state(monkeypatch, tmp_path):
-    """Après un run avec 2 CR trouvés, le state persiste last_num=2."""
+    """Après un run qui trouve 2 CR récents, le state persiste last_num au
+    plus grand num trouvé ET la liste scanned.
+
+    R37-B : scan descendant depuis max_num. On fabrique un cas où max_num=4,
+    items publiés aux num 2 et 3 → scan 4(miss), 3(hit), 2(hit), 1(miss,
+    puis stop si miss_tolerance atteint à un moment). Le state enregistre
+    last_num=3 (le plus grand trouvé) et scanned=[2,3].
+    """
     state_file = tmp_path / "an_cr_state.json"
     monkeypatch.setattr(mod, "STATE_PATH", state_file)
 
     def fake_fetch_cr(slug, session, num, label):
         if slug != "cion-cedu":
             return None
-        if num in (1, 2):
-            # Fabrique un item minimal
+        if num in (2, 3):
             from src.models import Item
             return Item(
                 source_id="an_cr_commissions",
@@ -172,7 +178,7 @@ def test_fetch_source_increments_state(monkeypatch, tmp_path):
         "commissions": {"cion-cedu": "CCE"},
         "max_new_per_run": 10,
         "miss_tolerance": 3,
-        "max_num": 99,
+        "max_num": 4,
         "session": "2526",
     }
     items = mod.fetch_source(src)
@@ -180,14 +186,22 @@ def test_fetch_source_increments_state(monkeypatch, tmp_path):
     # State persisté
     import json
     st = json.loads(state_file.read_text(encoding="utf-8"))
-    assert st["2526"]["cion-cedu"]["last_num"] == 2
+    assert st["2526"]["cion-cedu"]["last_num"] == 3
+    assert st["2526"]["cion-cedu"]["scanned"] == [2, 3]
 
 
 def test_fetch_source_resumes_from_state(monkeypatch, tmp_path):
-    """Un run qui démarre avec state={last_num:5} ne retente pas 1..5."""
+    """Un run qui démarre avec scanned=[2,3] ne retente pas 2 ni 3.
+
+    R37-B : la stratégie scan descendant skip les nums déjà vus (via le
+    set `scanned`) sans consommer de miss. Les 404 consécutifs accumulés
+    sur la zone non vue (au-dessus du plus haut) finissent par atteindre
+    miss_tolerance et arrêtent le scan.
+    """
     state_file = tmp_path / "an_cr_state.json"
     state_file.write_text(
-        '{"2526": {"cion-cedu": {"last_num": 5}}}', encoding="utf-8",
+        '{"2526": {"cion-cedu": {"last_num": 3, "scanned": [2, 3]}}}',
+        encoding="utf-8",
     )
     monkeypatch.setattr(mod, "STATE_PATH", state_file)
 
@@ -195,7 +209,7 @@ def test_fetch_source_resumes_from_state(monkeypatch, tmp_path):
 
     def fake_fetch_cr(slug, session, num, label):
         tried_nums.append(num)
-        return None  # simule "aucun nouveau publié"
+        return None  # aucune nouveauté au-delà
 
     monkeypatch.setattr(mod, "_fetch_cr", fake_fetch_cr)
 
@@ -204,13 +218,15 @@ def test_fetch_source_resumes_from_state(monkeypatch, tmp_path):
         "commissions": {"cion-cedu": "CCE"},
         "max_new_per_run": 10,
         "miss_tolerance": 3,
-        "max_num": 99,
+        "max_num": 8,
         "session": "2526",
     }
     items = mod.fetch_source(src)
     assert items == []
-    # On doit avoir tenté 6, 7, 8 (miss_tolerance=3) pas 1..5
-    assert tried_nums == [6, 7, 8]
+    # Scan descendant de 8 : essaie 8, 7, 6 (miss=3 → stop). 5 et 4 ne
+    # sont pas tentés (miss_tolerance dépassée). 2 et 3 sont skippés car
+    # déjà dans scanned (ne consomment pas de miss).
+    assert tried_nums == [8, 7, 6]
 
 
 def test_fetch_source_commissions_as_list(monkeypatch, tmp_path):
