@@ -45,13 +45,31 @@ from typing import Iterable
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # R34 : ajout volumetry_history
 
 # Seuils — valeurs conservatrices pour éviter le bruit. Modifier ici si
 # un run J-1 s'avère trop faux-positif (et noter dans HANDOFF).
 THRESHOLD_ERR_PERSIST_RUNS = 3
 THRESHOLD_FORMAT_DRIFT_MIN_PREV_COUNT = 5
 THRESHOLD_FEED_STALE_DAYS = 60
+
+# R34 (2026-04-24) — Volumétrie : garde un historique des 30 derniers
+# runs (ring buffer) pour détecter un collapse silencieux du pipeline
+# (ex : ingestion passe de 400 items/jour → 20 sans qu'aucune source
+# n'ait déclenché d'alerte individuelle). Seuil : volume J < 50 % de la
+# moyenne des 7 derniers runs ET échantillon J-7 d'au moins 5 runs
+# (pour éviter le faux-positif sur DB fraîche).
+VOLUMETRY_HISTORY_MAX = 30
+VOLUMETRY_COLLAPSE_RATIO = 0.50
+VOLUMETRY_MIN_SAMPLES = 5
+
+# R34 — Seuil de fail CI (opt-in via env var STRICT_MONITORING=1). Ne
+# compte que ERR_PERSIST + VOLUMETRY_COLLAPSE — FEED_STALE/FORMAT_DRIFT
+# peuvent cascader sur plusieurs sources simultanément sur un simple
+# changement CMS, donc ne doivent pas bloquer le CI. Cf. consigne Cyril
+# 2026-04-24 : « pas trop pousser sur la surveillance ».
+STRICT_CI_ALERT_KINDS = frozenset({"ERR_PERSIST", "VOLUMETRY_COLLAPSE"})
+STRICT_CI_FAIL_THRESHOLD = 3
 
 
 @dataclass
@@ -104,18 +122,38 @@ def _max_published_at(items: Iterable) -> datetime | None:
     return max_dt
 
 
+def _empty_state() -> dict:
+    """État neuf (1er run ou fichier corrompu). Factorisé pour que
+    l'ajout de `volumetry_history` en R34 ne multiplie pas les
+    littéraux."""
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "sources": {},
+        "volumetry_history": [],
+        "last_run_at": None,
+    }
+
+
 def load_state(path: str | Path) -> dict:
-    """Charge l'état précédent. Retourne dict vide si absent ou illisible."""
+    """Charge l'état précédent. Retourne un état neuf si absent,
+    illisible ou si le schema_version est plus ancien que le courant
+    (cas upgrade R29 → R34 : on garde les sources mais on initialise
+    `volumetry_history` à vide si absent)."""
     p = Path(path)
     if not p.exists():
-        return {"schema_version": SCHEMA_VERSION, "sources": {}, "last_run_at": None}
+        return _empty_state()
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as e:
         log.warning("pipeline_health.json illisible (%s) — reset état", e)
-        return {"schema_version": SCHEMA_VERSION, "sources": {}, "last_run_at": None}
+        return _empty_state()
     if not isinstance(data, dict) or "sources" not in data:
-        return {"schema_version": SCHEMA_VERSION, "sources": {}, "last_run_at": None}
+        return _empty_state()
+    # Upgrade progressif : si la clé volumetry_history n'existe pas
+    # (state écrit par R29), on la crée vide. Les sources existantes
+    # sont préservées — pas de reset à l'upgrade.
+    data.setdefault("volumetry_history", [])
+    data.setdefault("last_run_at", None)
     return data
 
 
@@ -268,12 +306,145 @@ def compute_state_and_alerts(
         if sid not in new_sources:
             new_sources[sid] = prev
 
+    # R34 — Volumétrie : on ajoute le run courant au ring buffer puis on
+    # calcule le collapse. Le buffer est plafonné à VOLUMETRY_HISTORY_MAX
+    # pour ne pas grossir indéfiniment ; les entrées anciennes sont jetées.
+    # Chaque entrée ne porte que la date + total_fetched (pas de per_source
+    # pour rester léger — les détails par source sont déjà dans new_sources).
+    new_history = list((previous_state or {}).get("volumetry_history") or [])
+    total_fetched = sum(
+        int((s or {}).get("fetched") or 0) for s in fetch_stats.values()
+    )
+    new_history.append({
+        "date": now.isoformat(timespec="seconds"),
+        "total_fetched": total_fetched,
+    })
+    if len(new_history) > VOLUMETRY_HISTORY_MAX:
+        new_history = new_history[-VOLUMETRY_HISTORY_MAX:]
+
+    alerts.extend(_volumetry_collapse_alerts(new_history))
+
     new_state = {
         "schema_version": SCHEMA_VERSION,
         "last_run_at": now.isoformat(timespec="seconds"),
         "sources": new_sources,
+        "volumetry_history": new_history,
     }
     return new_state, alerts
+
+
+def _volumetry_collapse_alerts(history: list[dict]) -> list[Alert]:
+    """Détecte un collapse global : run J < VOLUMETRY_COLLAPSE_RATIO de
+    la moyenne des 7 runs précédents, à condition d'avoir suffisamment
+    d'historique (≥ VOLUMETRY_MIN_SAMPLES runs antérieurs) pour que la
+    moyenne soit significative.
+
+    Ne monitore QUE le total global — pas par source — parce que le
+    scope réduit du projet fait qu'une source peut légitimement être à
+    0 un jour (FORMAT_DRIFT s'en charge déjà). L'intérêt du collapse
+    global est d'attraper une chute silencieuse massive que personne
+    n'a remontée via une alerte individuelle (ex : un refactor qui
+    casse le scoring → 90 % des items filtrés en silence).
+    """
+    if len(history) < VOLUMETRY_MIN_SAMPLES + 1:
+        return []
+    current = int(history[-1].get("total_fetched") or 0)
+    # Fenêtre des 7 derniers runs AVANT le courant (si dispo)
+    window = history[-8:-1] if len(history) >= 8 else history[:-1]
+    if len(window) < VOLUMETRY_MIN_SAMPLES:
+        return []
+    avg = sum(int(e.get("total_fetched") or 0) for e in window) / len(window)
+    if avg <= 0:
+        return []
+    ratio = current / avg
+    if ratio >= VOLUMETRY_COLLAPSE_RATIO:
+        return []
+    return [Alert(
+        kind="VOLUMETRY_COLLAPSE",
+        source_id="*",
+        message=(
+            f"Volume global en chute : {current} items aujourd'hui "
+            f"contre ~{avg:.0f} en moyenne sur les {len(window)} runs "
+            f"précédents (ratio {ratio:.0%}, seuil "
+            f"{VOLUMETRY_COLLAPSE_RATIO:.0%})"
+        ),
+    )]
+
+
+def compute_freshness_snapshot(
+    state: dict, now: datetime | None = None
+) -> list[tuple[str, int]]:
+    """Âge (en jours) du dernier item connu pour chaque source.
+
+    Utilisé pour enrichir le digest : permet de voir d'un coup d'œil
+    les sources qui vieillissent SANS encore avoir franchi le seuil
+    FEED_STALE (par défaut 60 j). Une source sans `last_max_published_at`
+    (jamais eu d'items) est ignorée — pas de signal utilisable.
+
+    Retourne une liste `[(source_id, age_days), ...]` triée par âge
+    décroissant (la plus ancienne en tête).
+    """
+    now = now or _now_utc_naive()
+    sources = (state or {}).get("sources") or {}
+    snapshots: list[tuple[str, int]] = []
+    for sid, entry in sources.items():
+        max_pub = _parse_iso_naive((entry or {}).get("last_max_published_at"))
+        if max_pub is None:
+            continue
+        age_days = (now - max_pub).days
+        snapshots.append((sid, age_days))
+    snapshots.sort(key=lambda x: x[1], reverse=True)
+    return snapshots
+
+
+def compute_volumetry_averages(state: dict) -> dict:
+    """Moyennes J-7 / J-30 du volume total, pour affichage dans le digest.
+
+    Retourne `{"current": int, "avg_7d": float|None, "avg_30d": float|None,
+    "samples": int}`. Les moyennes sont None si l'historique n'a pas assez
+    de runs (minimum 2 runs dans la fenêtre pour qu'une moyenne ait du sens).
+    """
+    history = (state or {}).get("volumetry_history") or []
+    if not history:
+        return {"current": 0, "avg_7d": None, "avg_30d": None, "samples": 0}
+    current = int(history[-1].get("total_fetched") or 0)
+    samples = len(history)
+
+    def _mean(xs: list[dict]) -> float | None:
+        if len(xs) < 2:
+            return None
+        return sum(int(e.get("total_fetched") or 0) for e in xs) / len(xs)
+
+    win_7 = history[-8:-1] if samples >= 8 else history[:-1]
+    win_30 = history[-31:-1] if samples >= 31 else history[:-1]
+    return {
+        "current": current,
+        "avg_7d": _mean(win_7),
+        "avg_30d": _mean(win_30),
+        "samples": samples,
+    }
+
+
+def should_fail_ci(
+    alerts: list[Alert], env_var: str = "STRICT_MONITORING"
+) -> bool:
+    """Retourne True si le CI doit sortir en échec (exit code != 0).
+
+    Opt-in via variable d'environnement (défaut : `STRICT_MONITORING`).
+    Sans la var, retourne toujours False — on ne casse pas le CI quotidien
+    par défaut, l'observation se fait via le digest email.
+
+    Ne compte que les alertes de type STRICT_CI_ALERT_KINDS : les
+    FEED_STALE et FORMAT_DRIFT peuvent cascader simultanément sur
+    plusieurs sources si un CMS change (ex : Élysée R22c), alors que
+    ERR_PERSIST + VOLUMETRY_COLLAPSE sont des signaux « le pipeline est
+    réellement cassé ». Seuil : STRICT_CI_FAIL_THRESHOLD (3).
+    """
+    import os
+    if not os.environ.get(env_var):
+        return False
+    strict_count = sum(1 for a in alerts if a.kind in STRICT_CI_ALERT_KINDS)
+    return strict_count >= STRICT_CI_FAIL_THRESHOLD
 
 
 # ---------------------------------------------------------------------------
@@ -284,6 +455,7 @@ _ALERT_KIND_LABELS = {
     "ERR_PERSIST": "Erreur persistante",
     "FORMAT_DRIFT": "Format cassé",
     "FEED_STALE": "Feed figé",
+    "VOLUMETRY_COLLAPSE": "Volume en chute",
 }
 
 _DIGEST_BLOCK_TEMPLATE = """\

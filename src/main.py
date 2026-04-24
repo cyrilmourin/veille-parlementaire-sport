@@ -230,6 +230,23 @@ def run(since_days: int = 1, send: bool = True, verbose: bool = False) -> int:
     )
 
     store.close()
+
+    # 8. R34 (2026-04-24) — Exit code conditionnel. Par défaut, le CI ne
+    # casse PAS sur des alertes (l'observation passe par le digest email).
+    # Opt-in via variable d'environnement `STRICT_MONITORING=1` côté GHA :
+    # le run sort en code 2 dès que ≥ 3 alertes ERR_PERSIST/VOLUMETRY_COLLAPSE
+    # sont levées. Les FEED_STALE / FORMAT_DRIFT ne comptent pas — peuvent
+    # cascader simultanément sur plusieurs sources lors d'un simple changement
+    # de CMS (cf. consigne « pas trop pousser sur la surveillance »).
+    if monitoring.should_fail_ci(health_alerts):
+        log.error(
+            "STRICT_MONITORING : %d alerte(s) critique(s), exit 2",
+            sum(
+                1 for a in health_alerts
+                if a.kind in monitoring.STRICT_CI_ALERT_KINDS
+            ),
+        )
+        return 2
     return 0
 
 

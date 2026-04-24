@@ -100,8 +100,11 @@ def test_load_state_corrupt_json_returns_empty(tmp_path):
 
 def test_save_load_roundtrip(tmp_path):
     p = tmp_path / "health.json"
+    # R34 : `load_state` upgrade les vieux states en ajoutant les clés
+    # manquantes (`volumetry_history`, `last_run_at`). On persiste donc un
+    # state R34-complete pour ne pas comparer à un dict muté par l'upgrade.
     state = {
-        "schema_version": 1,
+        "schema_version": monitoring.SCHEMA_VERSION,
         "last_run_at": "2026-04-24T06:00:00",
         "sources": {
             "an_rapports": {
@@ -112,10 +115,32 @@ def test_save_load_roundtrip(tmp_path):
                 "last_max_published_at": "2026-04-23T15:30:00",
             }
         },
+        "volumetry_history": [],
     }
     monitoring.save_state(p, state)
     reloaded = monitoring.load_state(p)
     assert reloaded == state
+
+
+def test_load_state_upgrades_r29_schema(tmp_path):
+    """R34 : un state écrit par R29 (sans `volumetry_history`) est
+    upgradable à l'ouverture sans perdre les sources existantes."""
+    p = tmp_path / "health_r29.json"
+    r29_state = {
+        "schema_version": 1,
+        "last_run_at": "2026-04-24T06:00:00",
+        "sources": {
+            "afld": {
+                "last_fetched": 5, "last_error": None,
+                "consecutive_errors": 0, "last_ok_at": "2026-04-24T06:00:00",
+                "last_max_published_at": "2026-04-23T10:00:00",
+            }
+        },
+    }
+    p.write_text(json.dumps(r29_state), encoding="utf-8")
+    reloaded = monitoring.load_state(p)
+    assert reloaded["sources"] == r29_state["sources"]
+    assert reloaded["volumetry_history"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -448,3 +473,268 @@ def test_log_alerts_warns_each(caplog):
     warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
     # 1 synthèse + 2 détails minimum
     assert len(warnings) >= 3
+
+
+# ===========================================================================
+# R34 (2026-04-24) — Volumétrie, freshness snapshot, should_fail_ci
+# ===========================================================================
+
+
+class TestVolumetryHistory:
+    """Le ring buffer `volumetry_history` est alimenté automatiquement par
+    `compute_state_and_alerts`. On vérifie l'ajout, le plafonnement et le
+    contenu de l'entrée."""
+
+    def test_history_gets_appended_each_run(self):
+        previous = {"sources": {}, "volumetry_history": []}
+        fetch_stats = {
+            "a": {"fetched": 10, "error": None},
+            "b": {"fetched": 5, "error": None},
+        }
+        new_state, _ = monitoring.compute_state_and_alerts(
+            previous, fetch_stats, [], now=_NOW,
+        )
+        assert len(new_state["volumetry_history"]) == 1
+        entry = new_state["volumetry_history"][0]
+        assert entry["total_fetched"] == 15
+        assert entry["date"] == _NOW.isoformat(timespec="seconds")
+
+    def test_history_caps_at_max(self):
+        # On pré-remplit avec VOLUMETRY_HISTORY_MAX entrées fictives, puis
+        # on pousse un run — la plus vieille doit être jetée.
+        old_entries = [
+            {"date": f"2026-03-{i:02d}T06:00:00", "total_fetched": i}
+            for i in range(1, monitoring.VOLUMETRY_HISTORY_MAX + 1)
+        ]
+        previous = {
+            "sources": {},
+            "volumetry_history": old_entries,
+        }
+        fetch_stats = {"a": {"fetched": 999, "error": None}}
+        new_state, _ = monitoring.compute_state_and_alerts(
+            previous, fetch_stats, [], now=_NOW,
+        )
+        hist = new_state["volumetry_history"]
+        assert len(hist) == monitoring.VOLUMETRY_HISTORY_MAX
+        # Le dernier est le run courant, les suivants sont les plus récents
+        # des précédents (donc l'entrée i=1 a été jetée).
+        assert hist[-1]["total_fetched"] == 999
+        assert hist[0]["total_fetched"] == 2
+
+    def test_history_ignores_none_fetched(self):
+        """Un fetch_stats avec `fetched: None` (bug parser) ne doit pas
+        planter le calcul — coerce en 0."""
+        previous = {"sources": {}, "volumetry_history": []}
+        fetch_stats = {
+            "a": {"fetched": 10, "error": None},
+            "b": {"fetched": None, "error": None},
+        }
+        new_state, _ = monitoring.compute_state_and_alerts(
+            previous, fetch_stats, [], now=_NOW,
+        )
+        assert new_state["volumetry_history"][0]["total_fetched"] == 10
+
+
+class TestVolumetryCollapse:
+    """Alerte `VOLUMETRY_COLLAPSE` : volume J < 50 % moyenne 7 derniers runs."""
+
+    def _history_runs(self, totals: list[int]) -> list[dict]:
+        return [
+            {"date": f"2026-04-{i+1:02d}T06:00:00", "total_fetched": t}
+            for i, t in enumerate(totals)
+        ]
+
+    def test_no_alert_if_not_enough_samples(self):
+        """< VOLUMETRY_MIN_SAMPLES échantillons passés : on ne peut pas
+        conclure — pas d'alerte (faux-positif DB fraîche)."""
+        previous = {
+            "sources": {},
+            "volumetry_history": self._history_runs([100, 100]),
+        }
+        fetch_stats = {"a": {"fetched": 5, "error": None}}  # 5 vs ~100
+        _, alerts = monitoring.compute_state_and_alerts(
+            previous, fetch_stats, [], now=_NOW,
+        )
+        assert "VOLUMETRY_COLLAPSE" not in [a.kind for a in alerts]
+
+    def test_triggers_below_ratio(self):
+        """5 runs à 100 items puis 20 items aujourd'hui : ratio 20% < 50%."""
+        previous = {
+            "sources": {},
+            "volumetry_history": self._history_runs([100] * 5),
+        }
+        fetch_stats = {"a": {"fetched": 20, "error": None}}
+        _, alerts = monitoring.compute_state_and_alerts(
+            previous, fetch_stats, [], now=_NOW,
+        )
+        collapse = [a for a in alerts if a.kind == "VOLUMETRY_COLLAPSE"]
+        assert len(collapse) == 1
+        assert collapse[0].source_id == "*"
+        # Le message doit contenir les volumes pour diagnostic
+        assert "20" in collapse[0].message
+        assert "100" in collapse[0].message
+
+    def test_does_not_trigger_when_above_ratio(self):
+        """Run J à 60 items sur moyenne 100 : ratio 60% ≥ 50% → pas d'alerte."""
+        previous = {
+            "sources": {},
+            "volumetry_history": self._history_runs([100] * 5),
+        }
+        fetch_stats = {"a": {"fetched": 60, "error": None}}
+        _, alerts = monitoring.compute_state_and_alerts(
+            previous, fetch_stats, [], now=_NOW,
+        )
+        assert "VOLUMETRY_COLLAPSE" not in [a.kind for a in alerts]
+
+    def test_does_not_trigger_when_previous_mean_zero(self):
+        """Moyenne passée à 0 (DB vide historiquement) : pas de référence,
+        pas d'alerte (division par 0 évitée)."""
+        previous = {
+            "sources": {},
+            "volumetry_history": self._history_runs([0] * 5),
+        }
+        fetch_stats = {"a": {"fetched": 0, "error": None}}
+        _, alerts = monitoring.compute_state_and_alerts(
+            previous, fetch_stats, [], now=_NOW,
+        )
+        assert "VOLUMETRY_COLLAPSE" not in [a.kind for a in alerts]
+
+
+class TestComputeFreshnessSnapshot:
+    """`compute_freshness_snapshot` lit `state["sources"]` et retourne
+    l'âge en jours du dernier item par source."""
+
+    def test_empty_state(self):
+        assert monitoring.compute_freshness_snapshot({}, now=_NOW) == []
+
+    def test_sorted_by_age_desc(self):
+        state = {
+            "sources": {
+                "fresh": {
+                    "last_max_published_at": (
+                        _NOW - timedelta(days=2)
+                    ).isoformat(timespec="seconds"),
+                },
+                "stale": {
+                    "last_max_published_at": (
+                        _NOW - timedelta(days=50)
+                    ).isoformat(timespec="seconds"),
+                },
+            }
+        }
+        snap = monitoring.compute_freshness_snapshot(state, now=_NOW)
+        assert snap == [("stale", 50), ("fresh", 2)]
+
+    def test_skips_sources_without_max_pub(self):
+        state = {
+            "sources": {
+                "never_fetched": {"last_max_published_at": None},
+                "ok": {
+                    "last_max_published_at": (
+                        _NOW - timedelta(days=1)
+                    ).isoformat(timespec="seconds"),
+                },
+            }
+        }
+        snap = monitoring.compute_freshness_snapshot(state, now=_NOW)
+        assert snap == [("ok", 1)]
+
+
+class TestComputeVolumetryAverages:
+    """Agrégats pour affichage digest : current, avg_7d, avg_30d."""
+
+    def test_empty_history(self):
+        result = monitoring.compute_volumetry_averages({})
+        assert result == {"current": 0, "avg_7d": None, "avg_30d": None, "samples": 0}
+
+    def test_single_run_no_averages(self):
+        """1 run seul : current OK mais les moyennes restent None
+        (on ne fait pas de moyenne sur 0 run antérieur)."""
+        state = {"volumetry_history": [
+            {"date": "2026-04-24T06:00:00", "total_fetched": 100}
+        ]}
+        r = monitoring.compute_volumetry_averages(state)
+        assert r["current"] == 100
+        assert r["avg_7d"] is None
+        assert r["avg_30d"] is None
+        assert r["samples"] == 1
+
+    def test_multiple_runs_averages(self):
+        """10 runs : avg_7d calcule sur 7 derniers avant courant,
+        avg_30d sur les 9 avant courant."""
+        history = [
+            {"date": f"2026-04-{i:02d}T06:00:00", "total_fetched": 100}
+            for i in range(1, 11)
+        ]
+        # Dernier run différent pour vérifier qu'il n'est PAS dans la moyenne
+        history[-1]["total_fetched"] = 20
+        state = {"volumetry_history": history}
+        r = monitoring.compute_volumetry_averages(state)
+        assert r["current"] == 20
+        assert r["avg_7d"] == 100.0  # les 7 avant sont tous à 100
+        assert r["avg_30d"] == 100.0
+        assert r["samples"] == 10
+
+
+class TestShouldFailCi:
+    """`should_fail_ci` opt-in via env var, ne compte que les alertes
+    strictes (ERR_PERSIST + VOLUMETRY_COLLAPSE)."""
+
+    def test_returns_false_without_env_var(self, monkeypatch):
+        monkeypatch.delenv("STRICT_MONITORING", raising=False)
+        alerts = [
+            monitoring.Alert("ERR_PERSIST", "a", "m"),
+            monitoring.Alert("ERR_PERSIST", "b", "m"),
+            monitoring.Alert("ERR_PERSIST", "c", "m"),
+        ]
+        assert monitoring.should_fail_ci(alerts) is False
+
+    def test_returns_true_above_threshold_with_env_var(self, monkeypatch):
+        monkeypatch.setenv("STRICT_MONITORING", "1")
+        alerts = [
+            monitoring.Alert("ERR_PERSIST", "a", "m"),
+            monitoring.Alert("ERR_PERSIST", "b", "m"),
+            monitoring.Alert("VOLUMETRY_COLLAPSE", "*", "m"),
+        ]
+        assert monitoring.should_fail_ci(alerts) is True
+
+    def test_returns_false_below_threshold(self, monkeypatch):
+        monkeypatch.setenv("STRICT_MONITORING", "1")
+        alerts = [
+            monitoring.Alert("ERR_PERSIST", "a", "m"),
+            monitoring.Alert("ERR_PERSIST", "b", "m"),
+        ]
+        assert monitoring.should_fail_ci(alerts) is False
+
+    def test_ignores_non_strict_kinds(self, monkeypatch):
+        """FEED_STALE + FORMAT_DRIFT ne comptent pas (cascade CMS)."""
+        monkeypatch.setenv("STRICT_MONITORING", "1")
+        alerts = [
+            monitoring.Alert("FEED_STALE", "a", "m"),
+            monitoring.Alert("FEED_STALE", "b", "m"),
+            monitoring.Alert("FORMAT_DRIFT", "c", "m"),
+            monitoring.Alert("FORMAT_DRIFT", "d", "m"),
+        ]
+        assert monitoring.should_fail_ci(alerts) is False
+
+    def test_custom_env_var(self, monkeypatch):
+        monkeypatch.delenv("STRICT_MONITORING", raising=False)
+        monkeypatch.setenv("MY_STRICT", "yes")
+        alerts = [
+            monitoring.Alert("ERR_PERSIST", "a", "m"),
+            monitoring.Alert("ERR_PERSIST", "b", "m"),
+            monitoring.Alert("ERR_PERSIST", "c", "m"),
+        ]
+        assert monitoring.should_fail_ci(alerts, env_var="MY_STRICT") is True
+
+
+class TestDigestBlockVolumetryLabel:
+    """Le rendu doit savoir traduire VOLUMETRY_COLLAPSE en label humain."""
+
+    def test_volumetry_label_in_block(self):
+        alerts = [monitoring.Alert(
+            "VOLUMETRY_COLLAPSE", "*",
+            "Volume en chute : 20 items contre 100",
+        )]
+        html = monitoring.render_digest_block(alerts)
+        assert "Volume en chute" in html
