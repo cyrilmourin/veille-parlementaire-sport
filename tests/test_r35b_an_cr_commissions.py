@@ -193,10 +193,10 @@ def test_fetch_source_increments_state(monkeypatch, tmp_path):
 def test_fetch_source_resumes_from_state(monkeypatch, tmp_path):
     """Un run qui démarre avec scanned=[2,3] ne retente pas 2 ni 3.
 
-    R37-B : la stratégie scan descendant skip les nums déjà vus (via le
-    set `scanned`) sans consommer de miss. Les 404 consécutifs accumulés
-    sur la zone non vue (au-dessus du plus haut) finissent par atteindre
-    miss_tolerance et arrêtent le scan.
+    R38-J : scan en deux phases. En phase 1 (avant 1er hit), on tolère
+    tous les misses jusqu'à trouver un CR ou épuiser le range — sans
+    ça le scraper ne pouvait pas atteindre les n° éloignés de max_num
+    (cas cion-cedu n°58 avec max_num=99).
     """
     state_file = tmp_path / "an_cr_state.json"
     state_file.write_text(
@@ -223,10 +223,60 @@ def test_fetch_source_resumes_from_state(monkeypatch, tmp_path):
     }
     items = mod.fetch_source(src)
     assert items == []
-    # Scan descendant de 8 : essaie 8, 7, 6 (miss=3 → stop). 5 et 4 ne
-    # sont pas tentés (miss_tolerance dépassée). 2 et 3 sont skippés car
-    # déjà dans scanned (ne consomment pas de miss).
-    assert tried_nums == [8, 7, 6]
+    # Phase 1 : scan descendant de 8, pas de stop sur miss tant qu'aucun
+    # CR trouvé. On tente 8, 7, 6, 5, 4 (tous miss), puis skip 3 et 2
+    # (déjà dans `scanned`), puis tente 1 (miss). Aucun hit → on est
+    # resté en phase 1 tout du long et on va jusqu'à num=0.
+    assert tried_nums == [8, 7, 6, 5, 4, 1]
+
+
+def test_fetch_source_reaches_distant_cr_in_phase1(monkeypatch, tmp_path):
+    """R38-J : phase 1 doit traverser une longue zone de 404 pour
+    atteindre un CR éloigné de max_num. Cas concret : cion-cedu session
+    2526 dont le CR le plus haut est n°58 alors que max_num=99. Avec
+    l'ancienne logique (miss_tolerance=3 dès le démarrage), le scan
+    s'arrêtait à 96 et manquait le 58."""
+    state_file = tmp_path / "an_cr_state.json"
+    monkeypatch.setattr(mod, "STATE_PATH", state_file)
+
+    HIGH_NUM = 8   # équivalent scaled du n°58 réel
+    MAX_NUM = 20   # équivalent scaled du max_num=99
+
+    def fake_fetch_cr(slug, session, num, label):
+        if num > HIGH_NUM:
+            return None  # tous les n° > 8 sont 404
+        if num in (HIGH_NUM, HIGH_NUM - 1, HIGH_NUM - 2):
+            from src.models import Item
+            return Item(
+                source_id="an_cr_commissions",
+                uid=f"an-cr-{slug}-{session}-{num:03d}",
+                category="comptes_rendus",
+                chamber="AN",
+                title=f"CR {num}",
+                url=f"http://ex/{num}",
+                published_at=datetime(2026, 4, 22),
+                summary="x",
+                raw={"haystack_body": "body", "slug": slug,
+                     "session": session, "num": num},
+            )
+        return None
+
+    monkeypatch.setattr(mod, "_fetch_cr", fake_fetch_cr)
+
+    src = {
+        "id": "an_cr_commissions",
+        "commissions": {"cion-cedu": "CCE"},
+        "max_new_per_run": 10,
+        "miss_tolerance": 3,
+        "max_num": MAX_NUM,
+        "session": "2526",
+    }
+    items = mod.fetch_source(src)
+    # Les 3 CR existants (6, 7, 8) sont tous ingérés — phase 1 a
+    # traversé la zone 20..9 sans s'arrêter sur miss.
+    assert len(items) == 3
+    nums = sorted(int(it.raw["num"]) for it in items)
+    assert nums == [HIGH_NUM - 2, HIGH_NUM - 1, HIGH_NUM]
 
 
 def test_fetch_source_commissions_as_list(monkeypatch, tmp_path):

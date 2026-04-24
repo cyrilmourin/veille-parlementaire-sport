@@ -297,18 +297,25 @@ def fetch_source(src: dict) -> list[Item]:
         })
         scanned = set(slug_state.get("scanned") or [])
         num = max_num
-        miss = 0
+        miss_streak = 0
         new_count = 0
         local_max = slug_state.get("last_num", 0)
-        # Scan descendant : du plus récent (max_num) vers le plus ancien.
-        # On skip les nums déjà vus (scanned) pour ne pas refaire 99 →
-        # déjà en DB. Les misses consécutifs s'accumulent ; dès qu'on
-        # en enchaîne `miss_tolerance`, on arrête (on est sorti de la
-        # zone des CR publiés pour cette session).
-        while num >= 1 and miss < miss_tolerance and new_count < max_new:
+        found_first = False
+        # Scan descendant en DEUX PHASES (R38-J, 2026-04-24) :
+        # - Phase 1 (avant le 1er hit de ce run) : on tolère TOUS les
+        #   misses jusqu'à trouver le premier CR publié. Nécessaire
+        #   parce que `max_num=99` ne correspond jamais au n° le plus
+        #   haut réellement publié (ex. cion-cedu session 2526 plafonne
+        #   à ~58). Sans cette phase, le scan s'arrêtait à 96 après 3
+        #   misses et n'atteignait jamais le 58, faisant manquer tous
+        #   les CR cion-cedu en prod.
+        # - Phase 2 (après 1er hit) : `miss_tolerance` s'applique
+        #   normalement pour stopper quand on sort de la zone active
+        #   des CR publiés (les n° d'avant le début de session).
+        # Les nums déjà dans `scanned` sont skippés sans consommer de
+        # miss (ils ne sont pas 404, juste déjà ingérés).
+        while num >= 1 and new_count < max_new:
             if num in scanned:
-                # déjà ingéré lors d'un run antérieur → on le saute sans
-                # consommer de miss (ce n'est pas un 404)
                 num -= 1
                 continue
             it = _fetch_cr(slug, session, num, label)
@@ -318,9 +325,15 @@ def fetch_source(src: dict) -> list[Item]:
                 if num > local_max:
                     local_max = num
                 new_count += 1
-                miss = 0
+                miss_streak = 0
+                found_first = True
             else:
-                miss += 1
+                miss_streak += 1
+                # Phase 2 : stop si on a déjà trouvé un CR et qu'on
+                # enchaîne trop de misses.
+                if found_first and miss_streak >= miss_tolerance:
+                    break
+                # Phase 1 : pas de stop. On continue à descendre.
             num -= 1
         slug_state["last_num"] = local_max
         # On borne la liste scanned pour éviter une croissance indéfinie
@@ -330,8 +343,9 @@ def fetch_source(src: dict) -> list[Item]:
         session_state[slug] = slug_state
         log.info(
             "an_cr_commissions %s session=%s : +%d items "
-            "(last_num=%d, scanned=%d)",
+            "(last_num=%d, scanned=%d, phase1_scan=%s)",
             slug, session, new_count, local_max, len(scanned),
+            "depassée" if found_first else "inaboutie",
         )
 
     _save_state(state)
