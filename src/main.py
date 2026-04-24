@@ -67,14 +67,25 @@ DEFAULT_SITE_URL = os.environ.get("SITE_URL", "https://veille.sideline-conseil.f
 # store.fetch_matched_since(). Le libellé est visible côté site comme
 # un kw-tag — voulu : Cyril saura que l'item est remonté "au titre de
 # la source" et pas d'un mot-clé métier.
+# R35-C (2026-04-24) — Retrait de CNOSF, france_paralympique, FDSF.
+# Cyril : « dans les publications j'ai encore des trucs bizarres du CNOSF
+# et du CPSF (avec mention flux complet) ». Le bypass "flux complet" faisait
+# remonter TOUT ce que publient ces mouvements sportifs RUP, y compris les
+# annonces internes (recrutements, événements associatifs, gouvernance
+# interne de clubs, campagnes marketing). Non pertinent pour une veille
+# institutionnelle sport orientée Parlement / Gouvernement.
+# En pratique, les articles CNOSF/CPSF/FDSF vraiment institutionnels citent
+# toujours explicitement un keyword (CNOSF, CIO, JO, olympique, ministère,
+# fédération, Pass'Sport, loi sport, Tony Estanguet…) — ils continuent
+# donc à remonter via le matching standard. Les items qui ne matchent
+# aucun keyword étaient les "trucs bizarres" visés.
+# On garde le bypass pour les opérateurs publics sport (ANS, INSEP, INJEP,
+# AFLD) et MinSports : leurs publications sont par nature institutionnelles.
 BYPASS_KEYWORDS_SOURCES: set[str] = {
     "ans",
     "insep",
     "injep",
     "afld",
-    "cnosf",
-    "france_paralympique",
-    "fdsf",
     "min_sports_actualites",
     "min_sports_presse",
 }
