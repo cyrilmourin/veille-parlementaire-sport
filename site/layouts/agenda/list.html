@@ -53,10 +53,18 @@
       <li{{ with .Params.family_source }} data-family-source="{{ . }}"{{ end }}>
         <div class="agenda-row">
           {{ with .Params.chamber }}{{ partial "chamber-badge.html" . }}{{ end }}
-          {{ if eq (.Params.chamber | default "") "AN" }}
-            <a class="title" href="https://www2.assemblee-nationale.fr/agendas/les-agendas" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
-          {{ else if .Params.source_url }}
+          {{/* R36-H (2026-04-24) : plus de hardcode "les-agendas" pour AN.
+               On utilise .Params.source_url (issu de _agenda_url côté
+               parseur AN, désormais /dyn/17/organes/<code> pour les
+               réunions rattachées à un organe, et fallback agenda-an
+               pour le reste). Cohérent avec le Sénat qui utilise déjà
+               source_url (page agenda commission R35-E). */}}
+          {{ if .Params.source_url }}
             <a class="title" href="{{ .Params.source_url }}" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
+          {{ else if eq (.Params.chamber | default "") "AN" }}
+            <a class="title" href="https://www.assemblee-nationale.fr/dyn/agendas-parlementaires/agenda-an" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
+          {{ else if eq (.Params.chamber | default "") "Senat" }}
+            <a class="title" href="https://www.senat.fr/travaux-parlementaires/commissions" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
           {{ else }}
             <span class="title no-link">{{ .Title }}</span>
           {{ end }}
@@ -85,10 +93,18 @@
       <li{{ with .Params.family_source }} data-family-source="{{ . }}"{{ end }}>
         <div class="agenda-row">
           {{ with .Params.chamber }}{{ partial "chamber-badge.html" . }}{{ end }}
-          {{ if eq (.Params.chamber | default "") "AN" }}
-            <a class="title" href="https://www2.assemblee-nationale.fr/agendas/les-agendas" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
-          {{ else if .Params.source_url }}
+          {{/* R36-H (2026-04-24) : plus de hardcode "les-agendas" pour AN.
+               On utilise .Params.source_url (issu de _agenda_url côté
+               parseur AN, désormais /dyn/17/organes/<code> pour les
+               réunions rattachées à un organe, et fallback agenda-an
+               pour le reste). Cohérent avec le Sénat qui utilise déjà
+               source_url (page agenda commission R35-E). */}}
+          {{ if .Params.source_url }}
             <a class="title" href="{{ .Params.source_url }}" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
+          {{ else if eq (.Params.chamber | default "") "AN" }}
+            <a class="title" href="https://www.assemblee-nationale.fr/dyn/agendas-parlementaires/agenda-an" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
+          {{ else if eq (.Params.chamber | default "") "Senat" }}
+            <a class="title" href="https://www.senat.fr/travaux-parlementaires/commissions" target="_blank" rel="noopener noreferrer">{{ .Title }}</a>
           {{ else }}
             <span class="title no-link">{{ .Title }}</span>
           {{ end }}

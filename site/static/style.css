@@ -543,6 +543,12 @@ a:hover { text-decoration: underline; }
   font-weight: 600;
   color: var(--sl-blue);
   font-size: 15.5px;
+  /* R36-D (2026-04-24) : léger resserrement des caractères + réduction
+     d'interligne sur les titres d'occurrences (demande Cyril). Ne
+     concerne QUE les titres d'items, pas les titres de catégorie ni
+     les H1/H2 de page. */
+  letter-spacing: -0.2px;
+  line-height: 1.35;
 }
 .items li a.title:hover { color: var(--sl-red); text-decoration: none; }
 /* Item sans URL publique (ex : réunions AN) : rendu titre en texte simple */
@@ -552,6 +558,8 @@ a:hover { text-decoration: underline; }
   color: var(--sl-blue);
   font-size: 15.5px;
   display: inline-block;
+  letter-spacing: -0.2px;
+  line-height: 1.35;
 }
 .items .meta {
   color: var(--muted); font-size: 12.5px;
@@ -1103,8 +1111,10 @@ a:hover { text-decoration: underline; }
   font-family: var(--font-title);
   font-size: 17px;
   font-weight: 800;
-  line-height: 1.3;
-  letter-spacing: -0.2px;
+  /* R36-D (2026-04-24) : -0.3px d'interligne supplémentaire, déjà
+     resserré -0.2px côté letter-spacing depuis la maquette. */
+  line-height: 1.27;
+  letter-spacing: -0.4px;
 }
 .dosleg-card__title a {
   color: var(--sl-blue);
@@ -1185,14 +1195,24 @@ a:hover { text-decoration: underline; }
   font-weight: 600;
 }
 @media (max-width: 640px) {
+  /* R36-C (2026-04-24) : en mobile on garde le logo à gauche et le titre
+     à droite (row) plutôt que de basculer en column, qui envoyait le titre
+     en dessous du logo et cassait la lecture. Cyril a remonté le
+     désalignement le 2026-04-24. On réduit juste le gap et la taille du
+     logo pour économiser de la largeur. */
   .dosleg-list .dosleg-card {
-    flex-direction: column;
-    gap: 10px;
+    flex-direction: row;
+    gap: 12px;
+    padding: 14px 14px 12px;
   }
   .dosleg-card__icon {
-    width: 48px;
-    height: 48px;
-    flex: 0 0 48px;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    align-self: flex-start;
+  }
+  .dosleg-card__title {
+    font-size: 15.5px;
   }
   .dosleg-card__links {
     justify-content: flex-start;

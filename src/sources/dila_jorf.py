@@ -308,19 +308,36 @@ def fetch_source(src: dict) -> list[Item]:
                 if article_body:
                     info["body_head"] = article_body[:3000]
 
-            # Catégorisation : nomination si le titre le suggère.
+            # Catégorisation : nomination si le titre OU le corps le suggère.
             # On élargit le pattern pour capter aussi : "portant nomination",
             # "fin de fonctions", "renouvellement du mandat", "désignation",
             # formulations courantes dans les décrets JORF sport.
+            # R36-L (2026-04-24) : le corps du texte (body_head) est aussi
+            # scruté, parce que beaucoup d'arrêtés portant nomination ont un
+            # titre générique "Arrêté du <date> fixant…" et ne disent
+            # explicitement "M. X est chargé des fonctions de …" que dans le
+            # corps. Cas concret : arrêté CREPS qui charge une personne des
+            # fonctions de directeur — titre neutre, corps explicite.
             title_low = info["title"].lower()
+            body_head_low = (info.get("body_head") or "").lower()
             cat = src["category"]
             _NOM_HINTS = (
                 "nomination", "nommé", "nommée",
                 "désigné", "désignée", "désignation",
                 "cessation de fonctions", "fin de fonctions",
                 "renouvellement du mandat", "renouvellement de mandat",
+                # R36-L : formulations "est chargé(e) des fonctions de" /
+                # "est chargé(e) de la direction" typiques des arrêtés
+                # nominations de directeurs d'établissements publics sport
+                # (CREPS, INSEP, ENVSN…). Masculin et féminin.
+                "est chargé des fonctions",
+                "est chargée des fonctions",
+                "est chargé de la direction",
+                "est chargée de la direction",
             )
-            if any(h in title_low for h in _NOM_HINTS):
+            if any(h in title_low for h in _NOM_HINTS) or any(
+                h in body_head_low for h in _NOM_HINTS
+            ):
                 cat = "nominations"
 
             # R26 — summary : NOTICE DILA si présente (résumé officiel,

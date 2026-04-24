@@ -1098,6 +1098,26 @@ def _normalize_dosleg(obj, src, cat):
 
     status_label = _format_status(last_mapping)
 
+    # R36-E (2026-04-24) — enrichir le haystack matcher pour les dossiers
+    # dont le titre est générique (typique : propositions de résolution
+    # "Proposition de résolution n°XX" sans mot-clé sport en ligne 1).
+    # Avant ce patch, le matcher ne voyait que `title` + `titreChemin`
+    # (quasi-redondants). On concatène désormais l'ensemble des libellés
+    # d'actes utiles (dépôt, renvoi en commission, rapport, adoption…) —
+    # ces libellés contiennent souvent l'objet réel du texte ("rapport
+    # sur la proposition de résolution relative à la candidature JO
+    # d'hiver 2030"), ce qui permet au matcher de capter par mot-clé même
+    # quand le titre ne cite pas le sport. On déduplique pour limiter le
+    # bruit et on borne à 40 libellés comme actes_timeline.
+    libelles_uniq: list[str] = []
+    seen_lib: set[str] = set()
+    for a in actes_timeline:
+        lib = (a.get("libelle") or "").strip()
+        if lib and lib not in seen_lib:
+            seen_lib.add(lib)
+            libelles_uniq.append(lib)
+    libelles_haystack = " · ".join(libelles_uniq[-40:])[:3000]
+
     yield Item(
         source_id=src["id"],
         uid=uid,
@@ -1130,6 +1150,10 @@ def _normalize_dosleg(obj, src, cat):
             # Timeline pour la maquette AN-like — borner à 40 étapes pour
             # garder le JSON raisonnable (certains dossiers ont 70+ actes).
             "actes_timeline": actes_timeline[-40:],
+            # R36-E (2026-04-24) — cumul des libellés d'actes pour le
+            # matcher mots-clés. Non affiché en UI (consommé uniquement
+            # par `KeywordMatcher.apply` qui concatène title+summary+raw).
+            "libelles_haystack": libelles_haystack,
         },
     )
 
@@ -1472,31 +1496,40 @@ def _agenda_url(uid: str, xsi_type: str, dt, cr_ref: str = "",
 
     Priorité (du + spécifique au + générique) :
     1. Séance avec idCR → page du compte rendu de séance (lien le + utile).
-    2. Réunion de commission (organe_ref connu) → page agenda de la commission
-       filtrée par jour — le portail AN accepte `#commission-{organe}/jour-{d}`.
-    3. Date connue → ancre jour dans l'agenda global.
+    2. Réunion de commission / groupe d'études (organe_ref connu) → page
+       publique de l'organe AN (`/dyn/17/organes/<code>`), qui agrège
+       composition, travaux, agenda récent de la commission ou du groupe
+       d'études. C'est la page canonique AN, stable, indexée, pas une
+       deep-link SPA (R36-H, 2026-04-24).
+    3. Séance plénière sans idCR → agenda AN global (pas de page dédiée
+       stable par jour côté portail AN).
     4. Dernier recours → agenda global.
 
-    Avant ce patch, toute réunion sans idCR retombait direct sur le cas 4 —
-    tous les items d'agenda pointaient alors vers la MÊME URL générique,
-    donnant l'impression d'items statiques ("rien ne change, liens morts").
+    R36-H (2026-04-24) — les anciennes URLs `#agenda-commissions/…` pointaient
+    vers une SPA AngularJS côté `/dyn/agendas-parlementaires/`, dont les
+    deep-links n'ouvraient pas toujours la bonne ancre selon l'état de
+    chargement. Cyril avait signalé que "les liens d'agenda ne fonctionnent
+    pas très bien". On bascule donc sur la page organe officielle
+    `/dyn/17/organes/<code>` — plus générique mais toujours utile (agenda
+    et travaux récents visibles en haut de page), et robuste au deep-link.
     """
     # 1. Séance avec compte rendu : CRSANR5L17S2026O1N039 → page CR séance
     #    URL canonique : /dyn/17/comptes-rendus/seance/{cr_ref}
     if "seance" in xsi_type and cr_ref:
         return f"https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/seance/{cr_ref}"
-    # 2. Réunion rattachée à un organe connu (commission, délégation…) :
-    #    on peut cibler l'agenda de CET organe au lieu de l'agenda global.
-    #    Plus ciblé = distinct par réunion = clic utile côté lecteur.
-    if organe_ref and dt is not None:
-        return (
-            "https://www.assemblee-nationale.fr/dyn/agendas-parlementaires/"
-            f"agenda-commissions#{organe_ref}/jour-{dt.date().isoformat()}"
-        )
+    # 2. Réunion rattachée à un organe connu (commission permanente,
+    #    commission spéciale, commission d'enquête, mission d'information,
+    #    délégation, groupe d'études) : page organe AN officielle.
+    #    Ex. `/dyn/17/organes/PO419604` (Commission culture/éducation),
+    #        `/dyn/17/organes/cion-cedu` (même organe, slug alternatif
+    #        accepté par le portail AN pour les 8 commissions permanentes).
+    #    Le code `PO…` fonctionne pour tous les organes connus de l'AMO,
+    #    slug littéral ne marche que pour les commissions permanentes —
+    #    on préfère le code PO (plus universel). Pour les groupes d'études
+    #    (GE Sport = PO800824…), ça renvoie la page GE avec travaux récents.
     if organe_ref:
         return (
-            "https://www.assemblee-nationale.fr/dyn/agendas-parlementaires/"
-            f"agenda-commissions#{organe_ref}"
+            f"https://www.assemblee-nationale.fr/dyn/17/organes/{organe_ref}"
         )
     # 3. Date connue sans organe : ancre jour dans l'agenda global.
     if dt is not None:

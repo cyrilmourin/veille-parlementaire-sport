@@ -25,7 +25,7 @@ from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 # (R13-J : déplacé depuis la sidebar) pour que Cyril puisse identifier
 # rapidement quelle révision du pipeline a généré la page en ligne. À
 # incrémenter à chaque cumul de patches UX.
-SYSTEM_VERSION_LABEL = "R35"
+SYSTEM_VERSION_LABEL = "R36"
 
 # Fenêtre de publication visible sur le site (jours) — par défaut pour les
 # flux à forte rotation (questions, CR, amendements, communiqués, agenda).
@@ -52,7 +52,12 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     # donc > cutoff), donc 30j garde tout le futur + les 30 derniers jours.
     "agenda": 30,
     # Publications (communiqués de presse, actualités ministères / autorités
-    # indépendantes) : 3 mois. Au-delà la page perd en pertinence opérationnelle.
+    # indépendantes) : 3 mois par défaut. R36-J (2026-04-24) : la sous-
+    # catégorie « rapports parlementaires » (senat_rapports + an_rapports)
+    # bénéficie d'une fenêtre élargie à 2 ans via WINDOW_DAYS_BY_SOURCE_ID
+    # ci-dessous (un rapport reste référent beaucoup plus longtemps qu'un
+    # communiqué, Cyril voulait pouvoir remonter à ~730 j sur cette seule
+    # sous-catégorie sans dégrader la pertinence du bucket principal).
     "communiques": 90,
     # Comptes rendus : 6 mois. Avant R11g (UX-E), la fenêtre 30j tuait
     # quasi tous les CR sport — `_fix_cr_row` recale `published_at` sur la
@@ -70,6 +75,29 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     # STRICT_DATED_CATEGORIES ci-dessous, ça garantit qu'aucun item sans
     # `published_at` valide ne passe via le fallback `inserted_at`.
     "questions": 90,
+    # R36-G (2026-04-24) : amendements 30 → 90j. Cyril veut la même fenêtre
+    # que les questions — un amendement déposé en commission il y a 2 mois
+    # peut encore être utile au suivi, et certaines navettes durent > 30j.
+    # Le volume reste maîtrisé (quelques amendements matchés / mois côté
+    # sport).
+    "amendements": 90,
+    # R36-K (2026-04-24) : JORF 30 → 90j. Cyril : la fenêtre 30j faisait
+    # sortir du radar des arrêtés sport intéressants pris il y a ~2 mois
+    # (nominations mises à part, elles ont leur propre page).
+    "jorf": 90,
+}
+
+# R36-J (2026-04-24) — Override par source_id pour la sous-catégorie
+# « rapports parlementaires » (AN + Sénat). Les rapports d'information
+# durent longtemps en pertinence éditoriale (mission d'information de
+# plusieurs mois, rapports annuels d'activité des commissions). 90j de
+# communiques était trop court pour cette sous-catégorie sans pour autant
+# vouloir étendre tout le bucket. Clé = source_id, valeur = jours.
+# `_window_for` accepte désormais un `source_id` optionnel pour prioriser
+# cet override sur la fenêtre catégorie.
+WINDOW_DAYS_BY_SOURCE_ID: dict[str, int] = {
+    "an_rapports": 730,     # 2 ans — rapports AN (R28)
+    "senat_rapports": 730,  # 2 ans — rapports Sénat
 }
 
 # Catégories pour lesquelles on exige une vraie `published_at` ≤ now (pas de
@@ -1149,11 +1177,37 @@ def _fix_agenda_row(r: dict) -> None:
             r["title"] = (organe_label or "Réunion parlementaire")[:220]
 
 
-def _window_for(category: str | None) -> int:
-    """Fenêtre (jours) applicable à une catégorie donnée."""
+def _window_for(category: str | None, source_id: str | None = None) -> int:
+    """Fenêtre (jours) applicable à un (source_id, category) donné.
+
+    Priorité : WINDOW_DAYS_BY_SOURCE_ID (R36-J, override fin) >
+    WINDOW_DAYS_BY_CATEGORY (override catégorie) > WINDOW_DAYS (défaut).
+    """
+    if source_id and source_id in WINDOW_DAYS_BY_SOURCE_ID:
+        return WINDOW_DAYS_BY_SOURCE_ID[source_id]
     if category and category in WINDOW_DAYS_BY_CATEGORY:
         return WINDOW_DAYS_BY_CATEGORY[category]
     return WINDOW_DAYS
+
+
+def _format_window_human(days: int) -> str:
+    """Formate une fenêtre (jours) en libellé humain court.
+
+    R36-F (2026-04-24) — Cyril préfère « depuis 3 ans » plutôt que « depuis
+    1095 jours » sur la page dossiers législatifs. Seuils retenus :
+    - ≤ 90 j : "N jours"
+    - 91-363 j : "N mois" (approximation 30 j/mois)
+    - ≥ 365 j : "N ans" si multiple de ~365, sinon "N mois" jusqu'à 23 mois
+    """
+    if days <= 90:
+        return f"{days} jours"
+    if days < 365:
+        mois = round(days / 30)
+        return f"{mois} mois"
+    ans = round(days / 365)
+    if ans <= 1:
+        return "1 an"
+    return f"{ans} ans"
 
 # Sous-fenêtre "mises à jour du jour" pour le haut de la home.
 RECENT_HOURS = 24
@@ -1392,7 +1446,10 @@ def _filter_window(rows: list[dict]) -> list[dict]:
     kept = []
     for r in rows:
         cat = r.get("category") or ""
-        window = _window_for(cat)
+        sid = r.get("source_id") or ""
+        # R36-J (2026-04-24) : override par source_id (rapports parlementaires
+        # à 2 ans sans élargir tout le bucket communiques).
+        window = _window_for(cat, source_id=sid)
         cutoff = now - timedelta(days=window)
         dt = _parse_dt(r.get("published_at"))
         if cat in STRICT_DATED_CATEGORIES:
@@ -2123,13 +2180,28 @@ def _fmt_item_line(it: dict, with_tags: bool = True,
     dominant_fam = fams[0] if fams else ""
     snippet = (it.get("snippet") or "").replace("\n", " ").strip()
 
-    # Chambre : badge HTML avec data-chamber pour coloration AN/Senat distincte
+    # Chambre : badge HTML avec data-chamber pour coloration AN/Senat distincte.
+    # R36-B (2026-04-24) : pour AN / Sénat on pose le logo SVG (cohérent avec
+    # les pages dédiées dosleg/CR qui l'utilisent déjà). Les autres chambres
+    # (CE, CC, Cour des comptes, ARCOM, ANJ, ministères, opérateurs…) restent
+    # en cartouche texte coloré selon la palette R25-E.
     chamber_html = ""
     if chamber:
-        chamber_html = (
-            f'<span class="chamber" data-chamber="{_escape(chamber)}">'
-            f'{_escape(chamber)}</span>'
-        )
+        lc = chamber.lower()
+        if lc in ("an", "senat", "sénat"):
+            slug = "an" if lc == "an" else "senat"
+            chamber_html = (
+                f'<img class="chamber-logo" src="/logos/{slug}.svg" '
+                f'alt="{_escape(chamber)}" title="{_escape(chamber)}" '
+                f'loading="lazy" decoding="async" '
+                f'onerror="this.style.display=\'none\'" '
+                f'width="22" height="22">'
+            )
+        else:
+            chamber_html = (
+                f'<span class="chamber" data-chamber="{_escape(chamber)}">'
+                f'{_escape(chamber)}</span>'
+            )
 
     # Statut procédural (dossiers législatifs) : badge dédié à droite de la
     # chambre, ex. "1ère lecture · commission". Source : raw["status_label"]
@@ -2258,7 +2330,9 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         # "fenêtre X j" jugé technique par Cyril).
         window_label = HOMEPAGE_WINDOW_LABEL_BY_CATEGORY.get(cat)
         if window_label is None:
-            window_label = f"Depuis {display_window} jours"
+            # R36-F (2026-04-24) : affichage humain (ex. "Depuis 3 ans" plutôt
+            # que "Depuis 1095 jours") aligné sur la page dédiée.
+            window_label = f"Depuis {_format_window_human(display_window)}"
         # <details> HTML brut — rendu nativement par tous les navigateurs,
         # pas de JS. `open` n'est PAS positionné par défaut → tout est plié.
         # Le summary contient le compteur et la fenêtre.
@@ -2314,11 +2388,61 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
         ]
         if cat in SPECIFIC_LAYOUT_CATS:
             lines.append(f'type: "{cat}"')
+
+        # R36-F / R36-J / R36-K (2026-04-24) — libellés de fenêtre spécifiques
+        # par catégorie, avec durée exprimée en années quand > 1 an.
+        window_human = _format_window_human(window)
+        if cat == "dossiers_legislatifs":
+            # R36-F : "3 ans" plutôt que "1095 jours".
+            description = (
+                f"Veille {label.lower()} — {count} dossiers sur les "
+                f"{window_human} derniers."
+            )
+            body_line = (
+                f"{count} dossier{'s' if count > 1 else ''} législatif"
+                f"{'s' if count > 1 else ''} dans la veille sur les "
+                f"{window_human} derniers."
+            )
+        elif cat == "communiques":
+            # R36-J : libellé générique qui couvre à la fois les communiqués
+            # (90j) et les rapports parlementaires (2 ans via override
+            # WINDOW_DAYS_BY_SOURCE_ID), sans laisser entendre que tous les
+            # items respectent la même fenêtre.
+            description = (
+                f"Veille {label.lower()} — {count} publications, rapports "
+                f"et communiqués récents."
+            )
+            body_line = (
+                f"{count} publication{'s' if count > 1 else ''} — "
+                "publications, rapports et communiqués récents."
+            )
+        elif cat == "jorf":
+            # R36-K : fenêtre 90j + mention explicite "hors nominations"
+            # avec un lien markdown vers la catégorie dédiée.
+            description = (
+                f"Veille {label.lower()} — {count} textes sur {window_human}, "
+                f"hors nominations."
+            )
+            body_line = (
+                f"{count} texte{'s' if count > 1 else ''} au JO sur les "
+                f"{window_human} derniers, **hors nominations** "
+                "([voir la page Nominations](/items/nominations/))."
+            )
+        else:
+            description = (
+                f"Veille {label.lower()} — {count} items sur {window_human} "
+                "glissants."
+            )
+            body_line = (
+                f"{count} publication{'s' if count > 1 else ''} dans cette "
+                f"catégorie sur les {window_human} derniers."
+            )
+
         lines += [
-            f'description: "Veille {label.lower()} — {count} items sur {window} jours glissants."',
+            f'description: "{description}"',
             "---",
             "",
-            f"{count} publication{'s' if count > 1 else ''} dans cette catégorie sur les {window} derniers jours.",
+            body_line,
             "",
         ]
         (d / "_index.md").write_text("\n".join(lines), encoding="utf-8")

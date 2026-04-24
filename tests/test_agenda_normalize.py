@@ -152,9 +152,11 @@ def test_normalize_agenda_commission_audition():
     assert it.title.startswith("Audition de M. Alain Dupuy"), it.title
     assert it.published_at.date().isoformat() == "2025-06-11"
 
-    # URL : pas de compteRenduRef → lien vers agenda par jour
-    assert "agenda" in it.url.lower(), it.url
-    assert "2025-06-11" in it.url
+    # URL : pas de compteRenduRef, mais organe_ref connu (PO861472) →
+    # page publique de l'organe AN (R36-H, 2026-04-24). L'ancienne URL
+    # deep-link `#agenda-commissions/jour-<date>` a été abandonnée car
+    # la SPA AngularJS ne résolvait pas le deep-link de manière fiable.
+    assert "/dyn/17/organes/PO861472" in it.url, it.url
 
     assert it.raw["xsi_type"] == "reunioncommission_type"
 

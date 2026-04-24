@@ -46,6 +46,12 @@ log = logging.getLogger(__name__)
 # (convention AN). Liste figée ici volontairement : on ne scrape QUE les
 # commissions qui sont susceptibles d'aborder le sport (toutes y touchent
 # via PLF/PLFSS et auditions transverses). Pour élargir, étendre le dict.
+# R36-A (2026-04-24) — ajout du groupe d'études Sport. Les GE publient leurs
+# comptes rendus / bulletins sous le même chemin `/dyn/17/comptes-rendus/<slug>/`
+# que les commissions, sur le portail AN. Cyril a confirmé le gap : les GE
+# (Sport en priorité) n'étaient pas couverts. Le slug `ge-sport` est le slug
+# officiel AN pour le groupe d'études Sport (vérifié sur /dyn/17/organes/ge-sport
+# qui existe).
 _DEFAULT_COMMISSIONS: dict[str, str] = {
     "cion-cedu":  "Commission des affaires culturelles et de l'éducation",
     "cion-soc":   "Commission des affaires sociales",
@@ -55,6 +61,8 @@ _DEFAULT_COMMISSIONS: dict[str, str] = {
     "cion-eco":   "Commission des affaires économiques",
     "cion-fin":   "Commission des finances",
     "cion-lois":  "Commission des lois",
+    # R36-A (2026-04-24) — groupe d'études Sport (GE Sport).
+    "ge-sport":   "Groupe d'études Sport",
 }
 
 # State file : mémorise par session { slug: { last_num: int } }. Sans ça,

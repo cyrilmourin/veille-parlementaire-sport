@@ -25,4 +25,17 @@
 }}
 {{ $chamber := . }}
 {{ $display := index $labels $chamber | default $chamber -}}
-<span class="chamber" data-chamber="{{ $chamber }}">{{ $display }}</span>
+{{/* R36-B (2026-04-24) — pour les chambres parlementaires AN / Sénat on
+     rend un logo (SVG) à la place du cartouche texte, par cohérence avec
+     les dossiers législatifs et les comptes rendus (qui utilisaient déjà
+     le logo en dur dans leurs layouts dédiés). Ça retire le doublon
+     visuel "logo + badge texte" sur la home + les autres pages catégorie.
+     Les chambres non-parlementaires (CE, CC, ARCOM, ANJ, etc.) restent
+     en span texte avec palette R25-E. */}}
+{{ $lc := lower $chamber }}
+{{ if or (eq $lc "an") (eq $lc "senat") (eq $lc "sénat") -}}
+  {{ $slug := cond (eq $lc "an") "an" "senat" }}
+  <img class="chamber-logo" src="/logos/{{ $slug }}.svg" alt="{{ $display }}" title="{{ $display }}" loading="lazy" decoding="async" onerror="this.style.display='none'" width="22" height="22">
+{{- else -}}
+  <span class="chamber" data-chamber="{{ $chamber }}">{{ $display }}</span>
+{{- end }}
