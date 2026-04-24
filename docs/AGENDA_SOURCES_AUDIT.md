@@ -2,6 +2,8 @@
 
 _Rédigé : 2026-04-22. Contexte : demande Cyril d'étendre la veille agenda à tous les ministères + AAI + juridictions, tout en corrigeant les bugs de date._
 
+> **Mise à jour 2026-04-24 (R35-E)** — la section « Sénat agenda » (§1.2 ci-dessous) est partiellement résolue. Contournement officiel : la page `/travaux-parlementaires/commissions/{slug}/agenda-de-la-commission.html` répond HTTP 200 (non WAF-bloquée) et contient un bloc TYPO3 structuré « Prochaines réunions ». Nouveau connecteur `src/sources/senat_commission_agenda.py` (format yaml `senat_commission_agenda_html`). Une seule source active à ce stade : commission culture/éducation/communication/sport (PO211490). Pour élargir la couverture à d'autres commissions permanentes Sénat pertinentes (lois, finances, affaires étrangères), ajouter une entrée yaml dédiée avec `commission_label` + `commission_organe`. Décision volontaire : ne pas activer les commissions « affaires sociales » (R35-D, >90 % de bruit off-topic). La source historique `senat_agenda` (scraping `/agenda/`) reste `enabled: false` — le chemin commission est plus fiable et plus ciblé._
+
 ---
 
 ## 0. Résumé exécutif

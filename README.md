@@ -23,11 +23,16 @@ veille-parlementaire-sport/
 │   ├── site_export.py    # génération JSON + Markdown pour Hugo
 │   ├── models.py         # Item pivot (pydantic v2)
 │   └── sources/
-│       ├── assemblee.py  # zips JSON open data AN
-│       ├── senat.py      # CSV/ZIP/RSS data.senat.fr
-│       ├── elysee.py     # sitemap.static.xml
-│       ├── piste.py      # Légifrance / JORF via API PISTE (OAuth2)
-│       └── html_generic.py  # scraping ministères + autorités
+│       ├── assemblee.py               # zips JSON open data AN
+│       ├── assemblee_rapports.py      # rapports AN (HTML listing, R28)
+│       ├── an_cr_commissions.py       # CR commissions AN (HTML + PDF pypdf, R35-B)
+│       ├── senat.py                   # CSV/ZIP/RSS data.senat.fr
+│       ├── senat_amendements.py       # amendements Sénat per-texte
+│       ├── senat_commission_agenda.py # agenda commissions Sénat (page HTML officielle, R35-E)
+│       ├── elysee.py                  # sitemap.static.xml
+│       ├── dila_jorf.py               # JORF DILA (NOTICE + articles CID, R26/R35-A)
+│       ├── piste.py                   # Légifrance / JORF via API PISTE (OAuth2, optionnel)
+│       └── html_generic.py            # scraping ministères + autorités
 ├── site/                 # site Hugo (layouts, content, data, static)
 ├── scripts/
 │   ├── audit_sources.py  # ping HEAD toutes les sources
@@ -129,11 +134,12 @@ Deux options :
 
 ## 6. Extensions possibles (roadmap)
 
-- Commission de la culture / sport : fil RSS dédié lorsqu'il sera publié côté AN.
+- Élargir la couverture agenda commissions Sénat — R35-E a activé Commission culture (PO211490) ; ajouter Commission des lois, Commission des finances, Commission des affaires étrangères en 1 ligne yaml chacune (cf. HANDOFF §TODO priorité haute).
 - Alerte temps réel sur les nominations sport au JORF (webhook).
 - Digest hebdomadaire thématique (Alpes 2030, Pass'Sport, intégrité).
 - API JSON publique sur le site pour intégration dans un autre outil Sideline.
 - Ajout d'un filtre "chambre" (AN / Sénat / Élysée…) dans l'email.
+- Vague 3 audit (cf. `docs/AUDIT_R19.md` §5) — refonte dédup autour de `dossier_id` comme clé primaire + fiche de dossier (document + événements rattachés) + JSON schema versionné.
 
 ## 7. Développement
 
