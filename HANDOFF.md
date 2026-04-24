@@ -156,6 +156,32 @@ Environ **45 000 items ingérés** / run reset_db. Matchés sport : questions ~1
 - **URL agenda AN unitaires cassées** — `/dyn/17/reunions/RUANR...` 404. Template agenda force AN vers `https://www2.assemblee-nationale.fr/agendas/les-agendas` (R13-J).
 - **actes_timeline vide** — certains dossiers AN pré-2026 ingèrent `actes_timeline = []`. Empêche la détection automatique du retrait. Cause à investiguer (cf. TODO §1.3).
 
+### Bascule de législature AN (checklist manuelle)
+
+Le pipeline hardcode aujourd'hui `/17/` dans ≈ 34 emplacements (URLs `repository/17/*` du yaml, chemins `/dyn/17/*` construits dans `assemblee.py` et `an_cr_commissions.py`, codes session type `L17` dans les UIDs CR Syceron). La 17e législature est la seule dans la fenêtre 3 ans actuelle, donc un refactor paramétrique (module `legislatures.py` + templates URL + `active_legislatures()` + cache AMO multi-indexé) n'apporterait rien d'immédiat et coûterait 2-4 h de refactor + tests pour ~ 30 min de bascule manuelle économisée tous les 5 ans. Arbitrage 2026-04-25 : on garde l'approche `/17/` en dur et on documente la bascule comme checklist.
+
+Quand la 18e s'ouvrira (dissolution ou fin de mandat), appliquer dans cet ordre :
+
+1. Search-replace global dans le repo :
+   ```bash
+   cd veille-parlementaire-sport
+   sed -i '' -e 's|/repository/17/|/repository/18/|g' \
+             -e 's|/dyn/17/|/dyn/18/|g' \
+             config/sources.yml src/sources/assemblee.py \
+             src/sources/an_cr_commissions.py
+   ```
+2. Remplacer manuellement les occurrences de `L17` → `L18` dans `src/sources/assemblee.py` (regex CR Syceron `CRSANR5L17…`, doc de chemins) et `src/sources/an_cr_commissions.py` (comment + pattern URL `l17<slug>…_compte-rendu`).
+3. Rafraîchir le cache AMO pour la nouvelle législature :
+   ```bash
+   python scripts/refresh_amo_cache.py
+   ```
+4. Bumper `SYSTEM_VERSION_LABEL` (par exemple `R40-legis18`) pour tracer la transition sur le site.
+5. `workflow_dispatch` avec `reset_db=1` pour ré-ingérer l'ensemble du corpus sur la nouvelle législature — indispensable parce que les UIDs AN (`AN17-dossier-<n>`) changent avec la législature et seraient perçus comme nouveaux items sinon, créant une explosion de doublons visuels entre vieux dossiers 17e et nouveaux dossiers 18e.
+6. Vérifier que les 3 caches persistés re-peuplent correctement :
+   `data/amo_resolved.json`, `data/an_texte_to_dossier.json`, `data/an_texte_to_libelles.json`. Ils sont versionnés par git add dans le workflow.
+
+Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif visuelle. Ne pas oublier de mettre à jour ce piège après la bascule pour refléter le nouveau numéro de législature actif.
+
 ### Données Sénat
 
 - **`senat_ameli.zip` = dump PostgreSQL** (pas CSV zip). Désactivé définitivement, remplacé par `senat_amendements` per-texte.
