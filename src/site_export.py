@@ -1243,6 +1243,31 @@ def _format_window_human(days: int) -> str:
         return "1 an"
     return f"{ans} ans"
 
+
+def _format_window_recent(days: int) -> str:
+    """Comme `_format_window_human` mais retourne la locution au féminin ou
+    masculin pluriel à placer APRÈS « sur les … » (R36-F bis, 2026-04-24).
+
+    Usage : `f"sur les {_format_window_recent(days)}"` →
+        - "sur les 30 derniers jours"
+        - "sur les 3 derniers mois"
+        - "sur les 3 dernières années"
+        - "sur les 1 dernière année"
+
+    Cyril (2026-04-24) : on ne dit pas « sur les 3 ans derniers » mais
+    « sur les 3 dernières années ». Même logique pour les autres unités
+    (derniers/dernières + unité au pluriel).
+    """
+    if days <= 90:
+        return f"{days} derniers jours"
+    if days < 365:
+        mois = round(days / 30)
+        return f"{mois} derniers mois"
+    ans = round(days / 365)
+    if ans <= 1:
+        return "dernière année"
+    return f"{ans} dernières années"
+
 # Sous-fenêtre "mises à jour du jour" pour le haut de la home.
 RECENT_HOURS = 24
 
@@ -2415,17 +2440,19 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
 
         # R36-F / R36-J / R36-K (2026-04-24) — libellés de fenêtre spécifiques
         # par catégorie, avec durée exprimée en années quand > 1 an.
-        window_human = _format_window_human(window)
+        # R36-F bis (2026-04-24) — « sur les 3 dernières années » (pas
+        # « sur les 3 ans derniers »). `_format_window_recent` retourne
+        # la locution entière avec adjectif accordé AVANT le nom.
+        window_recent = _format_window_recent(window)
         if cat == "dossiers_legislatifs":
-            # R36-F : "3 ans" plutôt que "1095 jours".
             description = (
                 f"Veille {label.lower()} — {count} dossiers sur les "
-                f"{window_human} derniers."
+                f"{window_recent}."
             )
             body_line = (
                 f"{count} dossier{'s' if count > 1 else ''} législatif"
                 f"{'s' if count > 1 else ''} dans la veille sur les "
-                f"{window_human} derniers."
+                f"{window_recent}."
             )
         elif cat == "communiques":
             # R36-J : libellé générique qui couvre à la fois les communiqués
@@ -2444,22 +2471,22 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
             # R36-K : fenêtre 90j + mention explicite "hors nominations"
             # avec un lien markdown vers la catégorie dédiée.
             description = (
-                f"Veille {label.lower()} — {count} textes sur {window_human}, "
-                f"hors nominations."
+                f"Veille {label.lower()} — {count} textes sur les "
+                f"{window_recent}, hors nominations."
             )
             body_line = (
                 f"{count} texte{'s' if count > 1 else ''} au JO sur les "
-                f"{window_human} derniers, **hors nominations** "
+                f"{window_recent}, **hors nominations** "
                 "([voir la page Nominations](/items/nominations/))."
             )
         else:
             description = (
-                f"Veille {label.lower()} — {count} items sur {window_human} "
-                "glissants."
+                f"Veille {label.lower()} — {count} items sur les "
+                f"{window_recent}."
             )
             body_line = (
                 f"{count} publication{'s' if count > 1 else ''} dans cette "
-                f"catégorie sur les {window_human} derniers."
+                f"catégorie sur les {window_recent}."
             )
 
         lines += [
