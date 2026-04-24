@@ -216,6 +216,23 @@ evenement:
   - Coupe du monde de ski
   - Tour de France cycliste
   - Roland-Garros
+  # R38-H (2026-04-24) — ajout événements majeurs. Pas de "Tour de France"
+  # nu (homonymes géopolitiques/promo, Cyril : garder le contexte vélo).
+  - Coupe du monde de football
+  - Coupe du Monde FIFA
+  - FIFA
+  - UEFA
+  - Ligue des champions
+  - Championnat du monde de football
+  - Championnat d'Europe de football
+  - Euro football
+  - Championnats du monde d'athlétisme
+  - Championnats d'Europe d'athlétisme
+  - Championnats du monde de ski
+  - Formule 1
+  - Grand Prix de France
+  - 24 heures du Mans
+  - Marathon de Paris
 
 theme:
   - Violences dans le sport
@@ -257,3 +274,44 @@ theme:
   - Sport scolaire
   - Compétitions sportives
   - Competitions sportives
+  # R38-H (2026-04-24) — disciplines sportives listées en noms propres
+  # SANS équivoque (pas d'homonyme courant en français politique/médiatique).
+  # Cyril : on n'ajoute PAS "ski", "voile", "surf", "marathon", "roller",
+  # "tennis de plage" seuls (risques homonymes), mais OK pour celles-ci.
+  - Football
+  - Rugby
+  - Basketball
+  - Basket-ball
+  - Volleyball
+  - Volley-ball
+  - Handball
+  - Athlétisme
+  - Athletisme
+  - Natation
+  - Cyclisme
+  - Équitation
+  - Equitation
+  - Sport équestre
+  - Sport equestre
+  - Escrime
+  - Gymnastique
+  - Judo
+  - Karaté
+  - Karate
+  - Taekwondo
+  - Aviron
+  - Triathlon
+  - Biathlon
+  - Pentathlon
+  - Badminton
+  - Tennis
+  - Tennis de table
+  - Ping-pong
+  - Canoë-kayak
+  - Canoe-kayak
+  - Patinage
+  - Escalade sportive
+  - Sports de combat
+  - Tir à l'arc
+  - Tir a l'arc
+  - Golf
