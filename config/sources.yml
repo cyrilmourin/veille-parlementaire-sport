@@ -80,6 +80,26 @@ assemblee_nationale:
       url: https://www2.assemblee-nationale.fr/documents/liste?type=rapports&legis=17
       format: an_rapports_html
 
+    # R35-B (2026-04-24) — Comptes rendus de commissions AN.
+    # L'agenda AN (`an_agenda`) expose les réunions de commission mais pas
+    # leur corps — le compte rendu (PDF) est publié après la réunion sur
+    # une URL dépendante du numéro séquentiel dans la session, qui n'est
+    # pas dans le dump agenda. On itère par force brute par commission,
+    # état persisté dans data/an_cr_state.json (delta court aux runs
+    # suivants). Le handler `an_cr_commissions.fetch_source` extrait le
+    # texte du PDF via pypdf et le pose dans haystack_body pour que le
+    # matcher mots-clés l'exploite (R26).
+    # Cas déclencheur : cion-cedu réunion 58 (2026-04-22), « Table ronde
+    # sur la gouvernance des autres sports que le football » — non matché
+    # par le titre agenda seul.
+    - id: an_cr_commissions
+      category: comptes_rendus
+      url: https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/
+      format: an_cr_commissions
+      max_new_per_run: 10
+      miss_tolerance: 3
+      max_num: 99
+
 senat:
   sources:
     # ----- Dossiers législatifs : flux Akoma Ntoso (titre + statut + date)

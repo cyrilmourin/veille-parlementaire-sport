@@ -37,6 +37,8 @@ _KNOWN_FORMATS = {
     "elysee_agenda_html",
     # R28 (2026-04-23) — parser dédié rapports AN (HTML listing)
     "an_rapports_html",
+    # R35-B (2026-04-24) — scraper CR commissions AN (HTML + PDF pypdf)
+    "an_cr_commissions",
 }
 
 

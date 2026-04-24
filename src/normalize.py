@@ -15,6 +15,7 @@ import yaml
 
 from .models import Item
 from .sources import (  # noqa: F401
+    an_cr_commissions,
     assemblee,
     assemblee_rapports,
     data_gouv,
@@ -54,6 +55,14 @@ ROUTER: list[tuple[Callable[[dict, dict], bool], Callable[[dict], list[Item]]]] 
     (
         lambda group, src: src.get("format") == "an_rapports_html",
         assemblee_rapports.fetch_source,
+    ),
+    # R35-B (2026-04-24) — Scraper CR de commissions AN. Routé par format
+    # `an_cr_commissions` pour passer AVANT la règle générique `group ==
+    # assemblee_nationale` qui pointerait sinon sur `assemblee.fetch_source`
+    # (fait pour les dumps json_zip / xml_zip uniquement).
+    (
+        lambda group, src: src.get("format") == "an_cr_commissions",
+        an_cr_commissions.fetch_source,
     ),
     # Assemblée nationale — zips JSON
     (lambda group, src: group == "assemblee_nationale", assemblee.fetch_source),

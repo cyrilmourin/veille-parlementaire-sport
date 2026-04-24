@@ -21,6 +21,12 @@ dependencies = [
   # education/interieur/economie/justice + info.gouv, qui bloquent httpx
   # standard en 403). Fallback silencieux dans _common si import KO.
   "curl_cffi>=0.7",
+  # R35-B (2026-04-24) : extraction texte des PDFs des comptes rendus de
+  # commissions AN. pypdf est un fallback léger (pas de deps natives) utile
+  # pour parser /dyn/17/comptes-rendus/{slug}/l17..._compte-rendu.pdf sans
+  # avoir à installer libpoppler. Rendu best-effort : si l'extraction
+  # échoue, le matcher retombe sur le titre seul.
+  "pypdf>=4.0",
 ]
 
 [project.optional-dependencies]
