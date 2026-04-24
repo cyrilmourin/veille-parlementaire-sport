@@ -1111,10 +1111,14 @@ a:hover { text-decoration: underline; }
   font-family: var(--font-title);
   font-size: 17px;
   font-weight: 800;
-  /* R36-D (2026-04-24) : -0.3px d'interligne supplémentaire, déjà
-     resserré -0.2px côté letter-spacing depuis la maquette. */
-  line-height: 1.27;
-  letter-spacing: -0.4px;
+  line-height: 1.3;
+  /* R36-D bis (2026-04-24) : Cyril ne veut pas de serrage supplémentaire
+     sur ce sélecteur parce que le template rend un <h2> ici. On revient
+     aux valeurs de la maquette d'origine (letter-spacing -0.2px, inchangé
+     depuis la mise en place du layout cards). Le resserrement demandé en
+     R36-D s'applique aux titres d'items plats (.items li a.title et
+     .items li .title.no-link) qui sont des <a>/<span>, pas des H2. */
+  letter-spacing: -0.2px;
 }
 .dosleg-card__title a {
   color: var(--sl-blue);
