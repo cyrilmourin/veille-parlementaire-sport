@@ -123,16 +123,17 @@ senat:
     # Le CSV ne fournit pas de date ni de statut de procédure : ces sources
     # complètent le flux AKN sur les dossiers anciens, mais le titre / la
     # date ne sont pas garantis.
-    # senat_dosleg : DÉSACTIVÉ en R11g-1 (2026-04-21).
-    # Produit 0 item depuis longtemps (le dosleg.zip était déjà vide à
-    # l'audit). Remplacé fonctionnellement par `senat_akn` (Akoma Ntoso)
-    # qui couvre les dossiers législatifs Sénat avec date + titre fiables.
-    # Conservé en config pour mémoire, réactivable si besoin.
+    # senat_dosleg : R11g-1 avait désactivé ce flux parce que le .zip
+    # était vide. R39-A (2026-04-25, import audit Lidl) réactive avec la
+    # bonne URL : le Sénat expose désormais un CSV direct stable
+    # `dossiers-legislatifs.csv` (360 Ko, HTTP 200 confirmé en live).
+    # Complément de `senat_akn_depots/adoptions` (Akoma Ntoso) qui couvre
+    # les textes récents ; ce flux CSV ramène l'historique complet des
+    # dossiers Sénat (filtre par fenêtre côté site_export).
     - id: senat_dosleg
       category: dossiers_legislatifs
-      url: https://data.senat.fr/data/dosleg/dosleg.zip
-      format: csv_zip
-      enabled: false
+      url: https://data.senat.fr/data/dosleg/dossiers-legislatifs.csv
+      format: csv
 
     - id: senat_ppl
       category: dossiers_legislatifs

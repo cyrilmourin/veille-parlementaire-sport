@@ -521,6 +521,17 @@ def fetch_source(src: dict) -> list[Item]:
             log.warning("Flush cache texte→dossier KO : %s", e)
         _TEXTE_TO_DOSSIER_ACCUM.clear()
 
+    # R39-B (2026-04-25, import audit Lidl) — flush du cache jumeau
+    # `texteLegislatifRef → libelles_haystack` du dossier parent. Consommé
+    # par `_normalize_amendement` pour enrichir le haystack des amendements
+    # même quand le dispositif ne cite pas explicitement les mots-clés.
+    if src["id"] == "an_dossiers_legislatifs" and _TEXTE_TO_LIBELLES_ACCUM:
+        try:
+            amo_loader.write_texte_libelles_cache(_TEXTE_TO_LIBELLES_ACCUM)
+        except Exception as e:
+            log.warning("Flush cache texte→libelles KO : %s", e)
+        _TEXTE_TO_LIBELLES_ACCUM.clear()
+
     return items
 
 
@@ -714,8 +725,17 @@ def _normalize_amendement(obj, src, cat):
     # "sport", "clubs sportifs") ressortent dans le haystack du matcher.
     texte_ref = _text_of(_first(root, "texteLegislatifRef", default=""))
     dossier_titre = ""
+    dossier_libelles = ""
     if texte_ref:
         dossier_titre = amo_loader.resolve_texte_dossier(texte_ref) or ""
+        # R39-B (2026-04-25) — héritage du haystack d'actes du dossier
+        # parent. Consommé par `KeywordMatcher.apply` via `raw.libelles_haystack`
+        # (mécanique R36-E côté dossiers : déjà branchée, rien à modifier
+        # dans keywords.py). Capte les amendements dont le dispositif ne
+        # cite pas les mots-clés sport mais dont la procédure du dossier
+        # parent les contient (ex : « rapport sur la proposition de loi
+        # relative aux Jeux olympiques 2030 »).
+        dossier_libelles = amo_loader.resolve_texte_libelles(texte_ref) or ""
 
     # Summary ciblé : on va DIRECTEMENT au contenu utile pour le matching
     # (dispositif + exposé sommaire) en les mettant en tête. Le shotgun
@@ -799,6 +819,9 @@ def _normalize_amendement(obj, src, cat):
              ),
              "dossier": dossier_titre,
              "texte_ref": texte_ref,
+             # R39-B (2026-04-25) — hérite du haystack d'actes du dossier
+             # parent, consommé par le matcher via le chemin R36-E.
+             "libelles_haystack": dossier_libelles,
              # R13-J : sort / etat séparés pour que site_export puisse
              # générer le chip coloré (sort > etat comme fallback).
              # R23-A : sousEtat ajouté comme fallback intermédiaire (utile
@@ -966,6 +989,11 @@ _DOSLEG_MAX_AGE_PROMULGATED_DAYS = 548  # promulgués : < 18 mois
 # pour que le titre du dossier parent (ex : "Sécurité des JO 2024") figure
 # dans le haystack matching des amendements (R11b).
 _TEXTE_TO_DOSSIER_ACCUM: dict[str, str] = {}
+
+# R39-B — accumulateur jumeau `texteLegislatifRef → libelles_haystack`
+# (cumul des libellés d'actes utiles du dossier parent). Consommé par
+# les amendements pour exposer le thème procédural au matcher lexical.
+_TEXTE_TO_LIBELLES_ACCUM: dict[str, str] = {}
 
 # Pattern d'identifiant de texte législatif AN (préfixes validés via JSON
 # unitaire `/dyn/opendata/<uid>.json`, avril 2026) :
@@ -1138,6 +1166,14 @@ def _normalize_dosleg(obj, src, cat):
             seen_lib.add(lib)
             libelles_uniq.append(lib)
     libelles_haystack = " · ".join(libelles_uniq[-40:])[:3000]
+
+    # R39-B (2026-04-25) — harvest du haystack vers le cache jumeau
+    # `texteLegislatifRef → libelles_haystack`. Même logique que
+    # `_harvest_texte_refs` qui collecte les refs de textes depuis
+    # l'arbre du dossier, mais on mappe vers le haystack d'actes
+    # plutôt que vers le titre du dossier.
+    if libelles_haystack:
+        _harvest_texte_refs(root, libelles_haystack, _TEXTE_TO_LIBELLES_ACCUM)
 
     yield Item(
         source_id=src["id"],

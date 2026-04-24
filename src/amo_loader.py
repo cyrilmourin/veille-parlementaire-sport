@@ -50,6 +50,18 @@ _DEFAULT_TXT_CACHE = Path("data/an_texte_to_dossier.json")
 _txt_lock = threading.Lock()
 _txt_loaded: dict | None = None
 
+# R39-B (2026-04-25, import audit Lidl) — cache jumeau du précédent pour
+# le haystack (libellés d'actes cumulés) du dossier parent. Consommé par
+# `_normalize_amendement` pour poser `raw.libelles_haystack` sur les
+# amendements, ce qui permet au matcher (R26) de voir les libellés
+# d'actes du dossier parent même quand l'amendement lui-même ne cite
+# pas les mots-clés. Symétrie avec `_txt_*` pour éviter les surprises
+# à la maintenance.
+_LIB_CACHE_ENV = "VEILLE_AN_TEXTE_LIBELLES_CACHE"
+_DEFAULT_LIB_CACHE = Path("data/an_texte_to_libelles.json")
+_lib_lock = threading.Lock()
+_lib_loaded: dict | None = None
+
 
 def _resolve_path() -> Path:
     env = os.environ.get(_CACHE_PATH_ENV)
@@ -63,6 +75,13 @@ def _resolve_txt_path() -> Path:
     if env:
         return Path(env)
     return _DEFAULT_TXT_CACHE
+
+
+def _resolve_lib_path() -> Path:
+    env = os.environ.get(_LIB_CACHE_ENV)
+    if env:
+        return Path(env)
+    return _DEFAULT_LIB_CACHE
 
 
 def load_cache(path: Path | None = None, force_reload: bool = False) -> dict:
@@ -106,12 +125,14 @@ def load_cache(path: Path | None = None, force_reload: bool = False) -> dict:
 
 def reset() -> None:
     """Utile dans les tests."""
-    global _loaded, _load_error, _txt_loaded
+    global _loaded, _load_error, _txt_loaded, _lib_loaded
     with _lock:
         _loaded = None
         _load_error = None
     with _txt_lock:
         _txt_loaded = None
+    with _lib_lock:
+        _lib_loaded = None
 
 
 def _load_txt_cache(path: Path | None = None) -> dict:
@@ -176,6 +197,79 @@ def resolve_texte_dossier(texte_ref: str) -> str:
     if not texte_ref or not isinstance(texte_ref, str):
         return ""
     data = _load_txt_cache()
+    return data["textes"].get(texte_ref.strip(), "") or ""
+
+
+# ---------------------------------------------------------------------------
+# R39-B — cache `texteLegislatifRef` → `libelles_haystack` du dossier parent
+# (symétrie avec `texteLegislatifRef` → `dossier_title` ci-dessus).
+# ---------------------------------------------------------------------------
+
+
+def _load_lib_cache(path: Path | None = None) -> dict:
+    """Charge le cache `texteLegislatifRef → libelles_haystack` du dossier.
+
+    Tolère l'absence (retour dict vide) — à ce stade tous les amendements
+    reçoivent `""`, le matcher retombe sur title+summary comme avant R39-B.
+    """
+    global _lib_loaded
+    with _lib_lock:
+        if _lib_loaded is not None:
+            return _lib_loaded
+        target = path or _resolve_lib_path()
+        if not target.exists():
+            log.info(
+                "Cache texte→libelles introuvable (%s) — amendements sans "
+                "haystack dossier parent", target,
+            )
+            _lib_loaded = {"textes": {}, "generated_at": None}
+            return _lib_loaded
+        try:
+            data = json.loads(target.read_text())
+        except Exception as exc:
+            log.warning("Cache texte→libelles corrompu (%s) : %s", target, exc)
+            _lib_loaded = {"textes": {}, "generated_at": None}
+            return _lib_loaded
+        data.setdefault("textes", {})
+        _lib_loaded = data
+        log.info(
+            "Cache texte→libelles chargé : %d entrées (gen %s)",
+            len(data["textes"]), data.get("generated_at") or "?",
+        )
+        return _lib_loaded
+
+
+def write_texte_libelles_cache(
+    textes: dict[str, str], path: Path | None = None,
+) -> Path:
+    """Persiste le mapping `texteLegislatifRef → libelles_haystack`.
+
+    Appelé par `_normalize_dosleg` via `assemblee.fetch_source` en fin de
+    passe, comme `write_texte_dossier_cache`. Fichier versionné dans
+    `data/an_texte_to_libelles.json`.
+    """
+    global _lib_loaded
+    target = path or _resolve_lib_path()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "textes": dict(textes),
+    }
+    target.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+    with _lib_lock:
+        _lib_loaded = payload
+    log.info(
+        "Cache texte→libelles écrit : %d entrées → %s", len(textes), target,
+    )
+    return target
+
+
+def resolve_texte_libelles(texte_ref: str) -> str:
+    """Renvoie le haystack d'actes cumulés du dossier parent pour un
+    `texteLegislatifRef`. Vide si inconnu."""
+    if not texte_ref or not isinstance(texte_ref, str):
+        return ""
+    data = _load_lib_cache()
     return data["textes"].get(texte_ref.strip(), "") or ""
 
 
