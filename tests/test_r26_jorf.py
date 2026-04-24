@@ -288,6 +288,12 @@ def _patch_dila(monkeypatch, xml_list: list[bytes]) -> None:
     )
     monkeypatch.setattr(mod, "fetch_bytes", lambda url: b"fake-tar")
     monkeypatch.setattr(mod, "_iter_texte_versions", lambda raw: iter(xml_list))
+    # R35-A : le parseur appelle aussi _index_articles_by_cid(raw) pour
+    # aller chercher le corps dans les fichiers ARTICLE du tarball. En
+    # mode test inline on renvoie un dict vide : le body_head récupéré
+    # via <TEXTE>/<CORPS> du TEXTE_VERSION reste la source primaire
+    # (cohérent avec les fixtures qui embarquent déjà un corps minimal).
+    monkeypatch.setattr(mod, "_index_articles_by_cid", lambda raw: {})
 
 
 # -----------------------------------------------------------------

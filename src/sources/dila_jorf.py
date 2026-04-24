@@ -207,6 +207,70 @@ def _iter_texte_versions(tarball_bytes: bytes):
                 yield data
 
 
+def _index_articles_by_cid(tarball_bytes: bytes) -> dict[str, str]:
+    """R35-A (2026-04-24) — indexe le corps de chaque JORFARTI*.xml par son
+    cid parent (JORFTEXT...).
+
+    Contexte : sur le dump DILA JORF, le fichier `.../texte/version/.../
+    JORFTEXT*.xml` contient les métadonnées (titre, nature, dates, ministère)
+    mais pas le corps du texte. Le corps réel — visas, articles numérotés,
+    listes de nominations — est éclaté dans des fichiers `.../article/.../
+    JORFARTI*.xml` distincts. Le rattachement au texte parent se fait via
+    `<CONTEXTE><TEXTE cid="JORFTEXT..."/>` à l'intérieur de chaque article.
+
+    R26 cherchait `<TEXTE>` / `<CORPS>` dans le TEXTE_VERSION → presque
+    toujours vide (tous les `<CONTENU/>` des `<NOTICE>`, `<VISAS>`, `<SM>`,
+    etc. sont vides dans TEXTE_VERSION). Conséquence : `haystack_body=""`
+    pour 100 % des décrets → le matcher ne voyait que le titre. Ex. du
+    cas remonté par Cyril : JORFTEXT000053930076 « Décret du 22 avril 2026
+    portant promotion et nomination… Légion d'honneur » dont le corps
+    énumère Fillon-Maillet, Jeanmonnot, Perrot… en biathlon, ski, Jeux
+    Olympiques de Milan-Cortina — aucun mot « sport » dans le titre mais
+    dense dans l'article 1 (JORFARTI000053930077).
+
+    On concatène tous les articles d'un même cid parent (la liste peut
+    contenir plusieurs articles pour les décrets longs) et on cape à
+    8000 c par texte (le matcher lit `body_head[:3000]` mais on réserve
+    du rab pour un éventuel fallback summary).
+    """
+    by_cid: dict[str, list[str]] = {}
+    with tarfile.open(fileobj=io.BytesIO(tarball_bytes), mode="r:gz") as tf:
+        for member in tf:
+            if not member.isfile():
+                continue
+            name = member.name.lower()
+            if "/article/" not in name or not name.endswith(".xml"):
+                continue
+            f = tf.extractfile(member)
+            if f is None:
+                continue
+            data = f.read()
+            if b"<ARTICLE" not in data:
+                continue
+            try:
+                root = etree.fromstring(data)
+            except etree.XMLSyntaxError:
+                continue
+            # Rattachement au texte parent : <CONTEXTE><TEXTE cid="…"/>
+            texte_el = root.find(".//CONTEXTE/TEXTE")
+            cid = (texte_el.get("cid") if texte_el is not None else "") or ""
+            if not cid:
+                continue
+            # Corps : <BLOC_TEXTUEL><CONTENU> — contient des <p>, <br/> et
+            # parfois des listes <ul>/<li>. itertext() aplatit en texte brut.
+            bloc = root.find(".//BLOC_TEXTUEL/CONTENU")
+            body_txt = _collect_inner_text(bloc, max_len=8000)
+            if not body_txt:
+                continue
+            by_cid.setdefault(cid, []).append(body_txt)
+    # Concatène par cid et cape à 8000 c
+    out: dict[str, str] = {}
+    for cid, parts in by_cid.items():
+        merged = " ".join(parts)
+        out[cid] = merged[:8000]
+    return out
+
+
 def fetch_source(src: dict) -> list[Item]:
     days_back = int(src.get("days_back", 8))
     dumps = _list_recent_dumps(n=days_back)
@@ -223,6 +287,10 @@ def fetch_source(src: dict) -> list[Item]:
             log.warning("DILA %s KO: %s", url, e)
             continue
 
+        # R35-A : index (cid → body concaténé) des articles du tarball. On
+        # le construit une fois par dump pour éviter 2 passes tarball.
+        articles_by_cid = _index_articles_by_cid(raw)
+
         for xml_bytes in _iter_texte_versions(raw):
             info = _parse_texte_version(xml_bytes)
             if not info:
@@ -230,6 +298,15 @@ def fetch_source(src: dict) -> list[Item]:
             if info["id"] in seen:
                 continue
             seen.add(info["id"])
+
+            # R35-A : si le corps n'a pas été trouvé dans TEXTE_VERSION
+            # (cas ultra-majoritaire : le TEXTE_VERSION ne contient que
+            # des <CONTENU/> vides), on prend le corps des fichiers
+            # ARTICLE rattachés via le cid.
+            if not info.get("body_head"):
+                article_body = articles_by_cid.get(info["id"], "")
+                if article_body:
+                    info["body_head"] = article_body[:3000]
 
             # Catégorisation : nomination si le titre le suggère.
             # On élargit le pattern pour capter aussi : "portant nomination",
