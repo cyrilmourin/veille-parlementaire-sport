@@ -234,6 +234,21 @@ senat:
       printable: true
       enabled: false
 
+    # R35-E (2026-04-24) — Agenda HTML de la commission culture/éducation/
+    # communication/sport (Sénat). Alternative au senat_agenda_daily
+    # bloqué par WAF : chaque commission expose sa propre page
+    # `agenda-de-la-commission.html` qui répond en HTTP 200 normal et
+    # liste les "Prochaines réunions" (date + titre + salle + heure).
+    # On ne couvre QUE la commission culture/sport côté Sénat (pas
+    # affaires sociales ni finances) pour rester cohérent avec R35-D :
+    # les commissions off-topic produisent trop de bruit agenda.
+    - id: senat_agenda_culture
+      category: agenda
+      url: https://www.senat.fr/travaux-parlementaires/commissions/commission-de-la-culture-de-leducation-et-de-la-communication/agenda-de-la-commission.html
+      format: senat_commission_agenda_html
+      commission_label: Commission culture/éducation/communication/sport
+      commission_organe: PO211490
+
     # R16 (2026-04-22) — Flux RSS Sénat thème "Sports" (N=31).
     # R19-B (2026-04-23) : DÉSACTIVÉ. Ce flux remontait des documents
     # INTERNES à un dossier législatif (rapports, avis, textes adoptés,

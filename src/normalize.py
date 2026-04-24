@@ -25,6 +25,7 @@ from .sources import (  # noqa: F401
     min_sports,
     piste,
     senat,
+    senat_commission_agenda,
 )
 
 log = logging.getLogger(__name__)
@@ -63,6 +64,15 @@ ROUTER: list[tuple[Callable[[dict, dict], bool], Callable[[dict], list[Item]]]] 
     (
         lambda group, src: src.get("format") == "an_cr_commissions",
         an_cr_commissions.fetch_source,
+    ),
+    # R35-E (2026-04-24) — Agenda HTML d'une commission Sénat (remplace
+    # `senat_agenda_daily` désactivé depuis R15 parce que
+    # /agenda/Global/agl*Print.html renvoie "Accès restreint" en prod).
+    # Route par format pour passer AVANT `group == "senat"` qui enverrait
+    # sinon sur `senat.fetch_source` (dédié aux formats CSV/AKN/RSS).
+    (
+        lambda group, src: src.get("format") == "senat_commission_agenda_html",
+        senat_commission_agenda.fetch_source,
     ),
     # Assemblée nationale — zips JSON
     (lambda group, src: group == "assemblee_nationale", assemblee.fetch_source),

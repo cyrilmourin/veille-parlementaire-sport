@@ -39,6 +39,9 @@ _KNOWN_FORMATS = {
     "an_rapports_html",
     # R35-B (2026-04-24) — scraper CR commissions AN (HTML + PDF pypdf)
     "an_cr_commissions",
+    # R35-E (2026-04-24) — agenda HTML d'une commission Sénat (remplace
+    # senat_agenda_daily, désactivé depuis R15 sur blocage WAF).
+    "senat_commission_agenda_html",
 }
 
 
