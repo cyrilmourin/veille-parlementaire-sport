@@ -45,3 +45,8 @@ deploy_*.command
 finish_*.command
 run_clean_*.command
 cleanup_*.command
+# R38 : scripts diag + reset ciblés (one-shot, auto-supprimés à l'exécution)
+diag_*.command
+reset_*.command
+# Exception : reset_db_full.command est un utilitaire réutilisable (voir ci-dessus)
+!reset_db_full.command
