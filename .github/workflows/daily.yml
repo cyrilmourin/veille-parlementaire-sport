@@ -2,9 +2,12 @@ name: Veille parlementaire sport — daily
 
 on:
   schedule:
-    # R22f (2026-04-23) : 04:00 Europe/Paris (= 02:00 UTC en été, 03:00 en hiver).
+    # R38-F (2026-04-24) : 08:00 Europe/Paris heure d'été (= 06:00 UTC),
+    # 07:00 Europe/Paris en hiver (UTC constant). Auparavant 04:00 Paris
+    # (= 02:00 UTC) — Cyril préfère recevoir le digest vers 8h plutôt que
+    # 4h du matin, plus confortable pour la lecture en début de journée.
     # Digest email complet + rebuild/deploy Hugo.
-    - cron: "0 2 * * *"
+    - cron: "0 6 * * *"
     # R24 (2026-04-23) → R24b (2026-04-23) : 17h30 Paris lun-ven (= 15h30 UTC).
     # Refetch + export + rebuild/deploy Hugo + ping (email court si nouveautés
     # depuis le matin, dedupe via data/ping_state.json). Pas de digest complet.

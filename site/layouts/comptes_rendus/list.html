@@ -56,8 +56,13 @@
           data-cr-kind="{{ $kind }}"
           data-chamber-short="{{ $chamShort }}">
         {{ if or (eq $chamShort "an") (eq $chamShort "senat") }}
+          {{/* R38-F (2026-04-24) : bascule de .svg vers .png pour aligner
+               avec le template dossiers législatifs qui utilise les
+               logos officiels PNG fournis par Cyril (an.png / senat.png
+               dans site/static/logos/). Les .svg étaient des versions
+               stylisées maison, visuellement différentes. */}}
           <div class="dosleg-card__icon" aria-hidden="true">
-            <img src="/logos/{{ $chamShort }}.svg" alt="{{ $cham }}" title="{{ $cham }}" loading="lazy" decoding="async" width="56" height="56">
+            <img src="/logos/{{ $chamShort }}.png" alt="{{ $cham }}" title="{{ $cham }}" loading="lazy" decoding="async" width="56" height="56">
           </div>
         {{ else }}
           <div class="dosleg-card__icon" aria-hidden="true">{{ partial "chamber-badge.html" $cham }}</div>
