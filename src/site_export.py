@@ -772,9 +772,6 @@ def _enrich_senat_question_photo(r: dict, cache: dict[str, tuple[str, str]]) -> 
     raw = r.get("raw") if isinstance(r.get("raw"), dict) else None
     if not isinstance(raw, dict):
         return
-    # Déjà enrichi (par amo_loader ou run précédent) : ne rien faire.
-    if (raw.get("auteur_photo_url") or "").strip():
-        return
     # Reconstruit le nom depuis les colonnes CSV Sénat si dispo, sinon
     # tombe sur raw["auteur"].
     civ = (raw.get("Civilité") or raw.get("civilite") or "").strip()
@@ -782,8 +779,28 @@ def _enrich_senat_question_photo(r: dict, cache: dict[str, tuple[str, str]]) -> 
     nom = (raw.get("Nom") or raw.get("nom") or "").strip()
     full = (raw.get("auteur") or "").strip()
     candidate = " ".join(p for p in [civ, prenom, nom] if p).strip() or full
+    # R38-G (2026-04-24) — backfill des clés minuscules `auteur` /
+    # `auteur_groupe` pour les items Sénat questions pré-R38-G ingérés en
+    # DB avec uniquement les colonnes CSV majuscules ("Civilité", "Prénom",
+    # "Nom", "Groupe", "Auteur"). Sans ces clés minuscules, le frontmatter
+    # Hugo ne pose pas `auteur:` et la ligne `auteur-inline` avant le
+    # titre reste vide côté Sénat (visible côté AN parce que le parseur
+    # AN pose lui-même `raw["auteur"]`). Idempotent.
+    if candidate and not raw.get("auteur"):
+        raw["auteur"] = candidate
+    if not raw.get("auteur_groupe"):
+        groupe_csv = (raw.get("Groupe") or raw.get("groupe") or "").strip()
+        if groupe_csv:
+            raw["auteur_groupe"] = groupe_csv
+    # Déjà enrichi avec une photo (par amo_loader ou run précédent) :
+    # on sort APRÈS avoir posé auteur/auteur_groupe pour ne pas oublier
+    # les items qui ont déjà une photo mais pas les clés minuscules.
+    if (raw.get("auteur_photo_url") or "").strip():
+        r["raw"] = raw
+        return
     key = _normalize_auteur_name_senat(candidate)
     if not key:
+        r["raw"] = raw
         return
     photo, fiche = "", ""
     # 1) Priorité au cache R23-N (amendements Sénat de la fenêtre).

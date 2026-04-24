@@ -602,6 +602,18 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
             # corps dans la colonne "Texte".
             if texte:
                 r["texte_question"] = texte
+            # R38-G (2026-04-24) : clés minuscules `auteur` / `auteur_groupe`
+            # exposées au frontmatter Hugo (le template `_default/list.html`
+            # lit `.Params.auteur` pour afficher le nom en inline avant le
+            # titre). Le dict CSV brut n'avait que les clés majuscules
+            # ("Civilité", "Prénom", "Nom", "Groupe") → le frontmatter ne
+            # posait pas `auteur:` et la ligne "auteur-inline" restait vide
+            # (visible côté questions AN mais pas Sénat — cf. capture
+            # Cyril 2026-04-24). On pose les clés minuscules ici.
+            if auteur:
+                r["auteur"] = auteur
+            if groupe:
+                r["auteur_groupe"] = groupe
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
                 title=" ".join(title_bits)[:220],
