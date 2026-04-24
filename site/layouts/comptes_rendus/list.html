@@ -2,15 +2,16 @@
 {{/*
   Page dédiée Comptes rendus (Sénat + AN).
 
-  Le template générique _default/list.html affichait une liste plate, sans
-  distinction entre compte rendu analytique (publication rapide) et intégral
-  (publication J+1/J+2), et sans regroupement par chambre.
+  R36-N (2026-04-24) — refonte vers le layout carte type dossiers
+  législatifs (demande Cyril après revue R36). Logo chambre 56x56 à
+  gauche, body (titre + meta + snippet + badge analytique/intégral) à
+  droite. La classe `.cr-card` partage les mêmes règles que `.dosleg-card`
+  (cf. style.css) avec quelques surcharges pour le badge de type (CR
+  analytique vs intégral) et le tag de chambre.
 
-  Ici on :
-    1. Groupe d'abord par chambre (AN / Sénat)
-    2. Dans chaque chambre, tri décroissant par date
-    3. Affiche le type (analytique / intégral) sous forme de badge
-    4. Rend cliquable le titre vers le sommaire officiel de la séance
+  On garde le regroupement par chambre pour que la lecture reste
+  structurée (AN puis Sénat), et le tri décroissant par date dans
+  chaque chambre.
 */}}
 {{ $monthsFR := slice "" "janvier" "février" "mars" "avril" "mai" "juin" "juillet" "août" "septembre" "octobre" "novembre" "décembre" }}
 {{ $pages := (.Paginate .Pages.ByDate.Reverse).Pages }}
@@ -28,44 +29,58 @@
 
   {{ range $cham, $lst := $byChamber }}
   <h2 class="cr-chamber" data-chamber="{{ $cham }}">{{ $cham }} <span class="section-count">({{ len $lst }})</span></h2>
-  <ul class="items cr-list">
+  <ul class="cr-list dosleg-list">
     {{ range $lst }}
-      <li class="cr-item" data-report-type="{{ .Params.report_type | default "" }}">
-        <div class="cr-row">
-          {{ with .Params.report_label }}<span class="cr-badge cr-badge-{{ $.Params.report_type | default "default" }}">{{ . }}</span>{{ end }}
-          {{ if .Params.source_url }}
-          <a href="{{ .Params.source_url }}" class="title" rel="noopener" target="_blank">{{ .Title }}</a>
+      <li class="dosleg-card cr-card" data-report-type="{{ .Params.report_type | default "" }}">
+        {{/* Colonne gauche : logo chambre 56x56 (même cadre visuel que
+             les cards dosleg). Pour les chambres non reconnues (cas
+             marginal, Autre/MinSports…), on retombe sur le partial
+             chamber-badge qui rend un cartouche texte. */}}
+        {{ with .Params.chamber }}
+          {{ $lc := lower . }}
+          {{ if or (eq $lc "an") (eq $lc "senat") (eq $lc "sénat") }}
+            {{ $slug := cond (eq $lc "an") "an" "senat" }}
+            <div class="dosleg-card__icon" aria-hidden="true">
+              <img src="/logos/{{ $slug }}.svg" alt="{{ . }}" title="{{ . }}" loading="lazy" decoding="async" width="56" height="56">
+            </div>
           {{ else }}
-          <span class="title no-link">{{ .Title }}</span>
+            <div class="dosleg-card__icon" aria-hidden="true">{{ partial "chamber-badge.html" . }}</div>
           {{ end }}
-        </div>
-        <div class="item-meta">
-          <span class="meta-main">
-            {{/* R23-E (2026-04-23) : logo chambre (SVG) a la place du badge
-                 texte. AN -> /logos/an.svg, Senat -> /logos/senat.svg. Les
-                 fichiers existent deja dans site/static/logos/. Fallback
-                 gracieux sur .chamber texte pour chambres inconnues
-                 (MinSports, JORF, etc.). onerror masque l'img si 404 (ne
-                 devrait pas arriver pour les assets Hugo locaux). */}}
-            {{ with .Params.chamber }}
-              {{ $lc := lower . }}
-              {{ if or (eq $lc "an") (eq $lc "senat") (eq $lc "sénat") }}
-                {{ $slug := cond (eq $lc "an") "an" "senat" }}
-                <img class="chamber-logo" src="/logos/{{ $slug }}.svg" alt="{{ . }}" title="{{ . }}" loading="lazy" decoding="async" onerror="this.style.display='none'" width="22" height="22">
-              {{ else }}
-                {{ partial "chamber-badge.html" . }}
-              {{ end }}
+        {{ end }}
+
+        <div class="dosleg-card__body">
+          <h2 class="dosleg-card__title">
+            {{ if .Params.source_url }}
+              <a href="{{ .Params.source_url }}" rel="noopener" target="_blank">{{ .Title }}</a>
+            {{ else }}
+              <span class="no-link">{{ .Title }}</span>
             {{ end }}
-            {{ if not .Date.IsZero }} · <time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ printf "%d %s %d" .Date.Day (index $monthsFR (int .Date.Month)) .Date.Year }}</time>{{ end }}
-          </span>
+          </h2>
+
+          {{/* Badge type (analytique / intégral) juste sous le titre
+               comme .dosleg-card__type. Couleur différenciée via
+               data-report-type (cf. règles .cr-badge-* dans style.css). */}}
+          {{ with .Params.report_label }}
+            <div class="dosleg-card__type cr-card__type">
+              <span class="cr-badge cr-badge-{{ $.Params.report_type | default "default" }}">{{ . }}</span>
+            </div>
+          {{ end }}
+
+          <div class="dosleg-card__deposit">
+            {{ if not .Date.IsZero }}
+              <time datetime="{{ .Date.Format "2006-01-02" }}">{{ printf "%d %s %d" .Date.Day (index $monthsFR (int .Date.Month)) .Date.Year }}</time>
+            {{ end }}
+          </div>
+
           {{ with .Params.keywords }}
-            <span class="meta-tags">
+            <div class="dosleg-card__kws">
               {{ $fam := "" }}{{ with $.Params.families }}{{ $fam = index . 0 }}{{ end }}
               {{ range first 8 . }}<span class="kw-tag"{{ with $fam }} data-family="{{ . }}"{{ end }}>{{ . }}</span>{{ end }}
-            </span>
+            </div>
           {{ end }}
+
+          {{ with .Params.snippet }}<div class="snippet-inline">« {{ . }} »</div>{{ end }}
         </div>
-        {{ with .Params.snippet }}<div class="snippet-inline">« {{ . }} »</div>{{ end }}
       </li>
     {{ end }}
   </ul>

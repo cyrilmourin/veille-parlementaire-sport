@@ -1130,6 +1130,40 @@ def _fix_agenda_row(r: dict) -> None:
                     # et le tag date ci-dessous porteront le contexte).
                     r["title"] = "Réunion parlementaire"
 
+    # R36-O (2026-04-24) : titre "Réunion — Assemblée nationale de la
+    # 17ème législature" (observé en prod, cf. capture utilisateur).
+    # Cas où l'organe_ref résolu pointe sur le PO souche de l'AN entière
+    # (l'AN au complet, pas une commission spécifique). Ce libellé
+    # d'organe n'apporte aucune info utile à la liste. On réécrit en
+    # « Séance publique AN — <date> » pour rester lisible, ou simplement
+    # « Séance publique AN » si la date est manquante. Idempotent : la
+    # regex match spécifiquement le pattern souche, pas les libellés
+    # commission qui commencent aussi par « Assemblée nationale ».
+    if cat == "agenda":
+        cur = r.get("title") or ""
+        if re.match(
+            r"^R[ée]union\s*[—\-–]\s*Assembl[ée]e\s+nationale\s+de\s+la\s+"
+            r"\d+\s*[eèé]me\s+l[ée]gislature\b",
+            cur,
+        ):
+            pa = r.get("published_at") or ""
+            if isinstance(pa, str) and re.match(r"^\d{4}-\d{2}-\d{2}", pa):
+                y, mo, dd = pa[:10].split("-")
+                r["title"] = f"Séance publique AN — {dd}/{mo}/{y}"
+            else:
+                r["title"] = "Séance publique AN"
+        # Symétrie Sénat : fallback générique si l'organe pointait sur le
+        # PO souche du Sénat.
+        elif re.match(
+            r"^R[ée]union\s*[—\-–]\s*S[ée]nat\s*$", cur, re.IGNORECASE
+        ):
+            pa = r.get("published_at") or ""
+            if isinstance(pa, str) and re.match(r"^\d{4}-\d{2}-\d{2}", pa):
+                y, mo, dd = pa[:10].split("-")
+                r["title"] = f"Séance publique Sénat — {dd}/{mo}/{y}"
+            else:
+                r["title"] = "Séance publique Sénat"
+
     # R23-G (2026-04-23) : nettoyage des titres AN agenda legacy qui
     # transportent un LIEU comme suffixe (« — Salle 6242 – Palais
     # Bourbon, 2ème sous-sol ») ou un préfixe "ordinal chambre (à
@@ -2181,27 +2215,17 @@ def _fmt_item_line(it: dict, with_tags: bool = True,
     snippet = (it.get("snippet") or "").replace("\n", " ").strip()
 
     # Chambre : badge HTML avec data-chamber pour coloration AN/Senat distincte.
-    # R36-B (2026-04-24) : pour AN / Sénat on pose le logo SVG (cohérent avec
-    # les pages dédiées dosleg/CR qui l'utilisent déjà). Les autres chambres
-    # (CE, CC, Cour des comptes, ARCOM, ANJ, ministères, opérateurs…) restent
-    # en cartouche texte coloré selon la palette R25-E.
+    # R36-M (2026-04-24) : rollback de R36-B — retour au cartouche texte
+    # pour TOUTES les chambres. Seules les pages dédiées dosleg (cards 56x56)
+    # et CR (22x22 inline dans comptes_rendus/list.html) rendent un logo
+    # SVG, via leurs layouts spécifiques. Cyril a jugé le logo 22x22 trop
+    # petit quand il était poussé en partial partout (capture 2026-04-24).
     chamber_html = ""
     if chamber:
-        lc = chamber.lower()
-        if lc in ("an", "senat", "sénat"):
-            slug = "an" if lc == "an" else "senat"
-            chamber_html = (
-                f'<img class="chamber-logo" src="/logos/{slug}.svg" '
-                f'alt="{_escape(chamber)}" title="{_escape(chamber)}" '
-                f'loading="lazy" decoding="async" '
-                f'onerror="this.style.display=\'none\'" '
-                f'width="22" height="22">'
-            )
-        else:
-            chamber_html = (
-                f'<span class="chamber" data-chamber="{_escape(chamber)}">'
-                f'{_escape(chamber)}</span>'
-            )
+        chamber_html = (
+            f'<span class="chamber" data-chamber="{_escape(chamber)}">'
+            f'{_escape(chamber)}</span>'
+        )
 
     # Statut procédural (dossiers législatifs) : badge dédié à droite de la
     # chambre, ex. "1ère lecture · commission". Source : raw["status_label"]

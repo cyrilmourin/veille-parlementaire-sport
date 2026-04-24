@@ -163,14 +163,35 @@ def _all_text(node) -> str:
 
 # Patterns de bruit techniques à retirer du shotgun agenda avant affichage.
 # Gardés hors fonction pour compilation unique.
+# R36-O (2026-04-24) : patterns renforcés après capture prod montrant des
+# fragments « 0:00.000+01:00 », « 2025-12-15+01:00 », « DLR5L17N52100 »,
+# « ODJPR », « CRSANR5L17S2026O1N093 », « podjSeanceConfPres_type » qui
+# passaient entre les mailles de la première liste.
 _AGENDA_NOISE_PATTERNS = [
+    # UIDs AN d'acteurs + statut présence (PAxxx absent/présent).
     re.compile(r"\bPA\d{5,7}\b(?:\s+(?:absent|pr[ée]sent|excus[ée]))?"),
+    # Codes organes AN (POxxx) et dossiers législatifs (DLR…).
     re.compile(r"\bPO\d{5,7}\b"),
-    re.compile(r"\b(?:RUANR|SLAN|PRANR|SEANR|TAANR)\w+\b"),  # UIDs réunions/salles/séances AN
+    re.compile(r"\bDLR\w+\b", re.IGNORECASE),
+    # UIDs réunions / salles / séances / textes adoptés / CR / sous-ODJ.
+    re.compile(r"\b(?:RUANR|SLAN|PRANR|SEANR|TAANR|CRSANR|IDS?\d*|IDC?\d*)\w*\b"),
+    re.compile(r"\bpodj\w+\b"),           # sous-types ordre du jour (podjSeanceConfPres…)
+    re.compile(r"\bODJ\w*\b"),            # ODJ, ODJPR, ODJG, etc.
+    # Timestamps : full ISO, xs:date avec offset, fragments heure orphelins.
     re.compile(r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?\b"),
+    re.compile(r"\b\d{4}-\d{2}-\d{2}(?:[+-]\d{2}:\d{2})?\b"),
+    re.compile(r"\b\d{1,2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2})?\b"),
+    # URIs + marqueurs de schéma + booléens XML.
     re.compile(r"https?://\S+"),
-    re.compile(r"\b\w+_type\b"),  # xsi:type markers (reunionCommission_type, etc.)
+    re.compile(r"\b\w+_type\b"),          # reunionCommission_type, podjSeanceConfPres_type…
     re.compile(r"\b(?:true|false)\b", re.IGNORECASE),
+    # Chaînes techniques isolées observées en prod.
+    re.compile(r"\bConfirm[ée]\b"),
+    re.compile(r"\bDiscussion\s+(?:true|false)\b", re.IGNORECASE),
+    re.compile(r"\bUnique\b"),
+    # Numérotations nues type « 93 20260093 » : séquences de 8 chiffres +
+    # indice 1-3 chiffres collés (codes IDC/IDS déshabillés de leur préfixe).
+    re.compile(r"\b\d{8}\b"),
 ]
 
 

@@ -1080,6 +1080,27 @@ a:hover { text-decoration: underline; }
 .cr-badge-analytique { background: var(--sl-green); }
 .cr-badge-integral   { background: var(--sl-blue); }
 
+/* ---------- Listing : Comptes rendus (R36-N : layout carte type dosleg)
+   Les `.cr-card` partagent les règles `.dosleg-card` (box, flex, icon,
+   body, title, deposit, kws, snippet). Les règles ci-dessous ne posent
+   que les surcharges propres aux CR : le chapeau de type (analytique /
+   intégral) vient sous le titre à la place de `.dosleg-card__type`. */
+.cr-card__type {
+  margin: 4px 0 6px;
+}
+.cr-card__type .cr-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border-radius: 10px;
+  background: var(--muted);
+  color: #fff;
+}
+.cr-card__type .cr-badge-analytique { background: var(--sl-green); }
+.cr-card__type .cr-badge-integral   { background: var(--sl-blue); }
+
 /* ---------- Listing : Dossiers législatifs (maquette type AN) ---------- */
 .dosleg-list .dosleg-card {
   display: flex;

@@ -30,20 +30,34 @@
   <h1>{{ .Title }}</h1>
   {{ with .Content }}<div class="intro">{{ . }}</div>{{ end }}
 
-  {{/* R23-H (2026-04-23) + R23-O (2026-04-23) : filtre UI par famille
-       de source. Toggle CSS sur l'attribut data-family-source posé sur
-       chaque <li>. Par défaut toutes les familles sont visibles ; un
-       bouton `aria-pressed="true"` signale l'état actif, seul l'item
-       correspondant reste visible.
-       R23-O : 5 familles stables validées par Cyril, retrait du bouton
-       JORF (page dédiée dans la nav), split Opérateurs / Mouvement. */}}
+  {{/* R23-H + R23-O (2026-04-23) : filtre UI par famille de source.
+       R36-P (2026-04-24) : on ne rend que les boutons pour lesquels au
+       moins une page de la catégorie agenda porte cette famille. Évite
+       d'afficher « Mouvement sportif » alors qu'aucune source agenda
+       n'est scrapée pour CNOSF/CPSF/FDSF (idem opérateurs publics et
+       autres autorités à ce jour). Le bouton « Tout » reste visible par
+       défaut. Le calcul se fait au build Hugo en parcourant $pages,
+       pas en JS, pour que les boutons absents ne flashent pas à l'écran. */}}
+  {{ $families := dict
+      "parlement" "Parlement"
+      "gouvernement" "Gouvernement"
+      "operateurs_publics" "Opérateurs publics"
+      "autorites" "Autres autorités"
+      "mouvement_sportif" "Mouvement sportif"
+  }}
+  {{ $present := dict }}
+  {{ range .Pages }}
+    {{ with .Params.family_source }}
+      {{ $present = merge $present (dict . true) }}
+    {{ end }}
+  {{ end }}
   <nav class="source-family-filter" aria-label="Filtrer par famille de source">
     <button type="button" class="sff-btn" data-sff="all" aria-pressed="true">Tout</button>
-    <button type="button" class="sff-btn" data-sff="parlement" aria-pressed="false">Parlement</button>
-    <button type="button" class="sff-btn" data-sff="gouvernement" aria-pressed="false">Gouvernement</button>
-    <button type="button" class="sff-btn" data-sff="operateurs_publics" aria-pressed="false">Opérateurs publics</button>
-    <button type="button" class="sff-btn" data-sff="autorites" aria-pressed="false">Autres autorités</button>
-    <button type="button" class="sff-btn" data-sff="mouvement_sportif" aria-pressed="false">Mouvement sportif</button>
+    {{ range $slug, $label := $families }}
+      {{ if index $present $slug }}
+        <button type="button" class="sff-btn" data-sff="{{ $slug }}" aria-pressed="false">{{ $label }}</button>
+      {{ end }}
+    {{ end }}
   </nav>
 
   {{ if $upcoming }}

@@ -25,17 +25,11 @@
 }}
 {{ $chamber := . }}
 {{ $display := index $labels $chamber | default $chamber -}}
-{{/* R36-B (2026-04-24) — pour les chambres parlementaires AN / Sénat on
-     rend un logo (SVG) à la place du cartouche texte, par cohérence avec
-     les dossiers législatifs et les comptes rendus (qui utilisaient déjà
-     le logo en dur dans leurs layouts dédiés). Ça retire le doublon
-     visuel "logo + badge texte" sur la home + les autres pages catégorie.
-     Les chambres non-parlementaires (CE, CC, ARCOM, ANJ, etc.) restent
-     en span texte avec palette R25-E. */}}
-{{ $lc := lower $chamber }}
-{{ if or (eq $lc "an") (eq $lc "senat") (eq $lc "sénat") -}}
-  {{ $slug := cond (eq $lc "an") "an" "senat" }}
-  <img class="chamber-logo" src="/logos/{{ $slug }}.svg" alt="{{ $display }}" title="{{ $display }}" loading="lazy" decoding="async" onerror="this.style.display='none'" width="22" height="22">
-{{- else -}}
-  <span class="chamber" data-chamber="{{ $chamber }}">{{ $display }}</span>
-{{- end }}
+{{/* R36-M (2026-04-24) — rollback de R36-B. Retour au cartouche texte
+     coloré pour toutes les chambres, y compris AN / Sénat. Les pages
+     dédiées dosleg (.dosleg-card__icon) et CR (.chamber-logo en dur dans
+     comptes_rendus/list.html) continuent d'utiliser leur logo local en
+     grand format (56 / 22 px), mais ce partial reste du texte. Cyril
+     (capture 2026-04-24) : le logo 22x22 injecté partout était trop
+     petit et cassait la lecture en liste. */}}
+<span class="chamber" data-chamber="{{ $chamber }}">{{ $display }}</span>
