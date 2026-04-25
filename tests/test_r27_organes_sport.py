@@ -113,12 +113,15 @@ def test_is_sport_relevant_organe_false_cases():
 # _apply_organe_bypass
 # ---------------------------------------------------------------------------
 
-def test_apply_organe_bypass_injects_pseudo_keyword_on_match():
+def test_apply_organe_bypass_disabled_no_op():
+    """R39-K (2026-04-25) — le bypass organe est DÉSACTIVÉ. Le test
+    couvre désormais le no-op : même un item dans la whitelist organe
+    n'est pas enrichi ; il faut un vrai match keyword pour remonter.
+    """
     items = [_item(raw={"path": "assemblee:reunion", "organe": "PO419604"})]
     n = _apply_organe_bypass(items)
-    assert n == 1
-    assert items[0].matched_keywords == [BYPASS_ORGANE_LABEL]
-    # keyword_families reste vide — ce n'est pas un match thématique
+    assert n == 0
+    assert items[0].matched_keywords == []
     assert items[0].keyword_families == []
 
 
@@ -167,44 +170,44 @@ def test_apply_organe_bypass_empty_items_list():
     assert _apply_organe_bypass([]) == 0
 
 
-def test_apply_organe_bypass_skips_comptes_rendus(_item_factory=_item):
-    """R39-J (2026-04-25) — le bypass organe ne doit PLUS s'appliquer
-    aux items de catégorie `comptes_rendus`. Cyril veut un match
-    keyword explicite sur le contenu des CR (sinon impossible de
-    vérifier d'un coup d'œil pourquoi le CR sort)."""
+def test_apply_organe_bypass_disabled_for_all_categories():
+    """R39-K (2026-04-25) — le bypass est désactivé partout (CR ET
+    agenda). Cyril veut un match keyword explicite quelle que soit
+    la catégorie."""
     items = [
         _item(category="comptes_rendus", raw={"organe": "PO419604"}),
         _item(category="comptes_rendus", raw={"organe": "PO825884"}),
-        # même PO mais en agenda → bypass appliqué (contrôle)
         _item(category="agenda", raw={"organe": "PO419604"}),
+        _item(category="agenda", raw={"organe": "PO825884"}),
     ]
     n = _apply_organe_bypass(items)
-    assert n == 1  # seul l'agenda matche
-    assert items[0].matched_keywords == []
-    assert items[1].matched_keywords == []
-    assert items[2].matched_keywords == [BYPASS_ORGANE_LABEL]
+    assert n == 0
+    for it in items:
+        assert it.matched_keywords == []
 
 
-def test_apply_organe_bypass_multiple_items_mixed():
-    """Mix realiste : 1 commission sport, 1 affaires sociales (hors bypass R35-D), 1 déjà matché."""
+def test_apply_organe_bypass_multiple_items_mixed_disabled():
+    """R39-K : bypass désactivé. Aucun item de la whitelist n'est
+    enrichi. Seul l'item avec un match keyword explicite garde sa
+    valeur (préservée — la fonction n'écrase pas les matches).
+    """
     items = [
-        _item(raw={"organe": "PO419604"}),            # bypass (culture/éducation)
-        _item(raw={"organe": "PO420120"}),            # R35-D : N'EST PLUS bypass (affaires sociales AN)
+        _item(raw={"organe": "PO419604"}),            # culture/éducation
+        _item(raw={"organe": "PO420120"}),            # affaires sociales AN
         _item(raw={"organe": "PO444444"}),            # non-sport
         _item(
             matched=["Sport"],
             raw={"organe": "PO419604"},
-        ),                                             # déjà matché, no-op
+        ),                                             # match préservé
         _item(raw={"organe": "PO825884"}),            # MI femmes et sport
     ]
     n = _apply_organe_bypass(items)
-    assert n == 2
-    assert items[0].matched_keywords == [BYPASS_ORGANE_LABEL]
-    # R35-D : affaires sociales n'est plus bypass, keyword_matched reste vide
+    assert n == 0
+    assert items[0].matched_keywords == []
     assert items[1].matched_keywords == []
     assert items[2].matched_keywords == []
     assert items[3].matched_keywords == ["Sport"]
-    assert items[4].matched_keywords == [BYPASS_ORGANE_LABEL]
+    assert items[4].matched_keywords == []
 
 
 # ---------------------------------------------------------------------------

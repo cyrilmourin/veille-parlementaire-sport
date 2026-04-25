@@ -112,46 +112,38 @@ def _apply_source_bypass(items) -> int:
 def _apply_organe_bypass(items) -> int:
     """R27 (2026-04-23) : bypass keyword pour items d'un organe sport/JOP.
 
-    Injecte le pseudo-keyword `(organe sport/JOP)` sur les items agenda
-    dont le code organe appartient à `SPORT_RELEVANT_ORGANES`. But :
-    remonter les réunions de la Commission culture/éducation AN, des
-    missions d'information JOP 2024, de la commission d'enquête
-    fédérations etc. même quand le titre d'ordre du jour n'accroche
-    aucun mot-clé.
+    R39-J (2026-04-25) → R39-K (2026-04-25) : DÉSACTIVÉ.
+    Cyril ne veut PAS d'item qui remonte sans qu'un keyword thématique
+    matche dans le contenu — ni en CR (R39-J), ni en agenda (R39-K),
+    car le but de la veille est de pouvoir vérifier d'un coup d'œil
+    pourquoi un item sort. Une réunion / un CR de commission culture
+    AN qui ne traite pas de sport remontait via ce bypass ; désormais
+    seul le matching keyword décide.
 
-    R39-J (2026-04-25) — restriction du scope à `agenda` UNIQUEMENT.
-    Cyril ne veut pas de CR de commission qui sortent sans qu'un
-    keyword thématique soit présent dans le contenu : sinon impossible
-    de vérifier d'un coup d'œil pourquoi le CR est là. Sur l'agenda
-    le bypass reste utile (une réunion peut être pertinente sans titre
-    explicite, l'utilisateur ne perd rien à voir un peu de bruit). Sur
-    les CR le contenu est riche, donc si aucun keyword n'y matche, on
-    considère que le sujet n'est pas sport et on ne le retient pas.
+    La fonction reste branchée pour conservation historique mais
+    retourne 0 sans rien faire. Pour la réactiver à l'avenir, retirer
+    le `return 0` ci-dessous et restreindre éventuellement le scope.
 
-    Opère in-place. N'enrichit que les items SANS match préalable (ne
-    double pas les keywords métier déjà trouvés). Retourne le compte
-    pour logging.
-
-    Le code organe est lu dans `item.raw["organe"]` (peuplé par le
-    parser an_agenda — voir `src/sources/assemblee.py` L1687 — et
-    senat_commission_agenda / senat_cr_commissions).
+    Le module `src/assemblee_organes.py` reste utile pour la whitelist
+    `SPORT_RELEVANT_ORGANES` (potentiellement réutilisable plus tard
+    pour un boost de score, par exemple).
     """
-    enriched = 0
-    for it in items:
-        if getattr(it, "matched_keywords", None):
-            continue
-        # R39-J : limiter le bypass à l'agenda. Pas d'application sur
-        # les CR — Cyril veut un match keyword explicite sur le contenu.
-        if getattr(it, "category", "") != "agenda":
-            continue
-        raw = getattr(it, "raw", None)
-        if not isinstance(raw, dict):
-            continue
-        organe_ref = raw.get("organe") or ""
-        if is_sport_relevant_organe(organe_ref):
-            it.matched_keywords = [BYPASS_ORGANE_LABEL]
-            enriched += 1
-    return enriched
+    return 0
+    # (Code historique conservé pour mémoire — non exécuté depuis R39-K)
+    # enriched = 0
+    # for it in items:
+    #     if getattr(it, "matched_keywords", None):
+    #         continue
+    #     if getattr(it, "category", "") != "agenda":
+    #         continue
+    #     raw = getattr(it, "raw", None)
+    #     if not isinstance(raw, dict):
+    #         continue
+    #     organe_ref = raw.get("organe") or ""
+    #     if is_sport_relevant_organe(organe_ref):
+    #         it.matched_keywords = [BYPASS_ORGANE_LABEL]
+    #         enriched += 1
+    # return enriched
 
 
 def _setup_logging(verbose: bool = False):
