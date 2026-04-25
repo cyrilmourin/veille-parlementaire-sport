@@ -29,12 +29,18 @@ from src.main import _apply_organe_bypass, _apply_source_bypass
 def _item(
     *,
     source_id: str = "an_agenda",
-    category: str = "reunions_agenda",
+    category: str = "agenda",
     matched: list[str] | None = None,
     raw: dict | None = None,
     title: str = "T",
 ) -> SimpleNamespace:
-    """Fabrique un item minimal avec l'API attendue par le bypass."""
+    """Fabrique un item minimal avec l'API attendue par le bypass.
+
+    R39-J (2026-04-25) : default category passé de 'reunions_agenda' à
+    'agenda' pour refléter la catégorie publique utilisée en prod et
+    permettre au bypass R27 (restreint à 'agenda' depuis R39-J) de
+    s'appliquer dans les tests qui le ciblent.
+    """
     return SimpleNamespace(
         source_id=source_id,
         category=category,
@@ -159,6 +165,24 @@ def test_apply_organe_bypass_tolerates_raw_non_dict():
 
 def test_apply_organe_bypass_empty_items_list():
     assert _apply_organe_bypass([]) == 0
+
+
+def test_apply_organe_bypass_skips_comptes_rendus(_item_factory=_item):
+    """R39-J (2026-04-25) — le bypass organe ne doit PLUS s'appliquer
+    aux items de catégorie `comptes_rendus`. Cyril veut un match
+    keyword explicite sur le contenu des CR (sinon impossible de
+    vérifier d'un coup d'œil pourquoi le CR sort)."""
+    items = [
+        _item(category="comptes_rendus", raw={"organe": "PO419604"}),
+        _item(category="comptes_rendus", raw={"organe": "PO825884"}),
+        # même PO mais en agenda → bypass appliqué (contrôle)
+        _item(category="agenda", raw={"organe": "PO419604"}),
+    ]
+    n = _apply_organe_bypass(items)
+    assert n == 1  # seul l'agenda matche
+    assert items[0].matched_keywords == []
+    assert items[1].matched_keywords == []
+    assert items[2].matched_keywords == [BYPASS_ORGANE_LABEL]
 
 
 def test_apply_organe_bypass_multiple_items_mixed():

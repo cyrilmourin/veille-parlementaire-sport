@@ -113,23 +113,36 @@ def _apply_organe_bypass(items) -> int:
     """R27 (2026-04-23) : bypass keyword pour items d'un organe sport/JOP.
 
     Injecte le pseudo-keyword `(organe sport/JOP)` sur les items agenda
-    (et le cas échéant CR si `raw.organe` est peuplé un jour) dont le
-    code organe appartient à `SPORT_RELEVANT_ORGANES`. But : remonter
-    les réunions de la Commission culture/éducation AN, des missions
-    d'information JOP 2024, de la commission d'enquête fédérations etc.
-    même quand le titre d'ordre du jour n'accroche aucun mot-clé.
+    dont le code organe appartient à `SPORT_RELEVANT_ORGANES`. But :
+    remonter les réunions de la Commission culture/éducation AN, des
+    missions d'information JOP 2024, de la commission d'enquête
+    fédérations etc. même quand le titre d'ordre du jour n'accroche
+    aucun mot-clé.
+
+    R39-J (2026-04-25) — restriction du scope à `agenda` UNIQUEMENT.
+    Cyril ne veut pas de CR de commission qui sortent sans qu'un
+    keyword thématique soit présent dans le contenu : sinon impossible
+    de vérifier d'un coup d'œil pourquoi le CR est là. Sur l'agenda
+    le bypass reste utile (une réunion peut être pertinente sans titre
+    explicite, l'utilisateur ne perd rien à voir un peu de bruit). Sur
+    les CR le contenu est riche, donc si aucun keyword n'y matche, on
+    considère que le sujet n'est pas sport et on ne le retient pas.
 
     Opère in-place. N'enrichit que les items SANS match préalable (ne
     double pas les keywords métier déjà trouvés). Retourne le compte
     pour logging.
 
-    Scope : catégories `reunions_agenda` et `comptes_rendus` côté AN.
     Le code organe est lu dans `item.raw["organe"]` (peuplé par le
-    parser an_agenda — voir `src/sources/assemblee.py` L1687).
+    parser an_agenda — voir `src/sources/assemblee.py` L1687 — et
+    senat_commission_agenda / senat_cr_commissions).
     """
     enriched = 0
     for it in items:
         if getattr(it, "matched_keywords", None):
+            continue
+        # R39-J : limiter le bypass à l'agenda. Pas d'application sur
+        # les CR — Cyril veut un match keyword explicite sur le contenu.
+        if getattr(it, "category", "") != "agenda":
             continue
         raw = getattr(it, "raw", None)
         if not isinstance(raw, dict):
