@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-04-25T08:51:54+00:00",
+  "last_run_at": "2026-04-25T13:24:46+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419865B2632P0D1N000492",
@@ -20,6 +20,7 @@
     ],
     "comptes_rendus": [
       "an_cr_commissions::an-cr-cion-cedu-2526-058",
+      "an_cr_commissions::an-cr-cion-dvp-2526-019",
       "an_cr_commissions::an-cr-cion-dvp-2526-032",
       "an_cr_commissions::an-cr-cion-soc-2526-061",
       "an_syceron::0243de31b4488e5e",
