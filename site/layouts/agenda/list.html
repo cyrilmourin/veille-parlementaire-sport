@@ -94,6 +94,10 @@
             </span>
           {{ end }}
         </div>
+        {{/* R39-H (2026-04-25) — raison du match (bypass organe). */}}
+        {{ with .Params.match_reason }}
+          <div class="match-reason-inline">⊕ {{ . }}</div>
+        {{ end }}
         {{ with .Params.snippet }}<div class="snippet-inline">« {{ . }} »</div>{{ end }}
       </li>
     {{ end }}
@@ -134,6 +138,10 @@
             </span>
           {{ end }}
         </div>
+        {{/* R39-H (2026-04-25) — raison du match (bypass organe). */}}
+        {{ with .Params.match_reason }}
+          <div class="match-reason-inline">⊕ {{ . }}</div>
+        {{ end }}
         {{ with .Params.snippet }}<div class="snippet-inline">« {{ . }} »</div>{{ end }}
       </li>
     {{ end }}

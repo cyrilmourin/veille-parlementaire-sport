@@ -68,21 +68,31 @@ _BREADCRUMB_END_RE = re.compile(
     re.IGNORECASE,
 )
 
-# R39-E (2026-04-25) : la ligne « COMPTES RENDUS DE LA COMMISSION DE LA
-# CULTURE, DE L'EDUCATION, DE LA COMMUNICATION ET DU SPORT » s'affichait
-# en tête d'extrait — bruit visuel + fait croire au lecteur que le
-# match vient du mot « SPORT » du libellé de commission alors que R38-E
-# avait justement neutralisé ce match côté title. On coupe cette ligne
-# d'entête, ainsi que les sous-titres en majuscules (« Mardi 14 avril
-# 2026 »), pour aller direct au contenu (« Mission d'information sur… »,
-# « Audition de M. … »). On capte tout préambule en MAJUSCULES jusqu'au
-# premier mot de contenu en casse normale.
+# R39-E (2026-04-25) / R39-I (2026-04-25 fix) : retire la ligne d'entête
+# « COMPTES RENDUS DE LA COMMISSION DE LA CULTURE, DE L'EDUCATION, DE LA
+# COMMUNICATION ET DU SPORT » (et le numéro de législature côté AN), pour
+# aller direct au contenu (« Mardi 14 avril 2026 Mission d'information…»,
+# « Audition de M. … »).
+#
+# R39-I : précédente regex utilisait `[A-ZÀÉÈÊÎÔÛÇ\s,'’\-]` qui n'incluait
+# PAS l'apostrophe ASCII `'` (présente après `html.unescape("&#039;")`),
+# ce qui faisait échouer le match au niveau de « DE L'EDUCATION ». Et la
+# classe ne couvrait pas les minuscules (le bloc d'entête contient parfois
+# des minuscules dans les sous-titres). Réécriture en `.{1,400}?` non-greedy
+# + DOTALL pour gérer tous les cas y compris le retour ligne et apostrophes.
 _SENAT_HEADER_RE = re.compile(
-    r"COMPTES\s+RENDUS\s+DE\s+LA\s+COMMISSION\s+DE\s+LA\s+[A-ZÀÉÈÊÎÔÛÇ\s,'’\-]{20,300}?"
+    r"COMPTES\s+RENDUS\s+DE\s+LA\s+COMMISSION\b"
+    r".{1,400}?"
+    # R39-I (2026-04-25 fix v2) : `Communication` retiré du lookahead
+    # parce qu'il apparaît systématiquement dans le libellé Sénat
+    # « DE LA COMMUNICATION ET DU SPORT » et coupait au mauvais endroit.
+    # Si un CR commence par « Communication de M. … » (rare), il sera
+    # capturé via la suite naturelle de l'extrait — pas un cas typique.
     r"(?=\s+(?:Mardi|Mercredi|Jeudi|Vendredi|Lundi|Samedi|Dimanche|"
-    r"Présidence|Mission|Audition|Examen|Communication|Table|Réunion|"
-    r"Constitution|Désignation)\s)",
-    re.IGNORECASE,
+    r"Présidence|Mission|Audition|Examen|Table|Réunion|"
+    r"Constitution|Désignation|Discussion|Suite|Nomination|"
+    r"Approbation|Adoption)\b)",
+    re.IGNORECASE | re.DOTALL,
 )
 
 

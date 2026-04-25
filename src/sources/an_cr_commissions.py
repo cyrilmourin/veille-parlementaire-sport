@@ -158,19 +158,28 @@ def _extract_pdf_text(pdf_bytes: bytes, max_chars: int = 10000) -> str:
     return merged[:max_chars]
 
 
-# R39-E (2026-04-25) — pattern préambule institutionnel des CR AN PDF.
-# PyPDF rend les titres de page « 1 7 e   L É G I S L A T U R E   A S S
-# E M B L É E   N A T I O N A L E   Compte rendu   Commission des
-# affaires sociales – ». On collapse cette séquence en un seul motif
-# pour la matcher aisément, puis on coupe AVANT le premier verbe
-# d'audition / examen / mission qui marque le début du contenu réel.
+# R39-E (2026-04-25) / R39-I (2026-04-25 fix) — pattern préambule
+# institutionnel des CR AN PDF. PyPDF rend les titres de page
+# « 1 7 e   L É G I S L A T U R E   A S S E M B L É E   N A T I O N A L E
+# Compte rendu   Commission des affaires sociales – ». On coupe avant
+# le premier verbe d'audition / examen / mission qui marque le début
+# du contenu réel.
+#
+# R39-I : retrait de `re.IGNORECASE` — il neutralisait la classe négative
+# `[^A-ZÀÂÄÉÈÊËÎÏÔÖÛÜÇ]` (avec IGNORECASE, la négation exclut aussi les
+# minuscules, donc ` des affaires sociales` ne matchait plus). Sans
+# IGNORECASE, on garde l'exclusion sur les majuscules uniquement, donc
+# tout le segment ` des affaires sociales – ` (entre "Commission" et le
+# verbe en majuscule "Examen") est bien capturé. On utilise désormais
+# `.{1,400}?` pour plus de tolérance.
 _AN_PREAMBLE_RE = re.compile(
-    r"^\s*\d?\s*\d\s*e\s+L\s*É\s*G\s*I\s*S\s*L\s*A\s*T\s*U\s*R\s*E\s+"
-    r"A\s*S\s*S\s*E\s*M\s*B\s*L\s*É\s*E\s+N\s*A\s*T\s*I\s*O\s*N\s*A\s*L\s*E\s+"
-    r"Compte\s+rendu\s+Commission[^A-ZÀÂÄÉÈÊËÎÏÔÖÛÜÇ]{1,200}?"
-    r"(?=(?:Examen|Audition|Mission|Communication|Table|Présidence|Réunion|"
-    r"Constitution|Désignation|Discussion|Suite))",
-    re.IGNORECASE,
+    r"^\s*\d?\s*\d\s*e\s+L\s*[ÉE]\s*G\s*I\s*S\s*L\s*A\s*T\s*U\s*R\s*E\s+"
+    r"A\s*S\s*S\s*E\s*M\s*B\s*L\s*[ÉE]\s*E\s+N\s*A\s*T\s*I\s*O\s*N\s*A\s*L\s*E\s+"
+    r"Compte\s+rendu\s+Commission\b"
+    r".{1,400}?"
+    r"(?=\b(?:Examen|Audition|Mission|Communication|Table|Présidence|Réunion|"
+    r"Constitution|Désignation|Discussion|Suite|Nomination|Approbation)\b)",
+    re.DOTALL,
 )
 
 

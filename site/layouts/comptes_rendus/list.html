@@ -83,6 +83,13 @@
           {{ with .Params.commission }}
             <div class="cr-card__commission">{{ . }}</div>
           {{ end }}
+          {{/* R39-H (2026-04-25) : si l'item ne matche que via un bypass
+               (organe whitelist R27 ou flux complet R25-H), `match_reason`
+               est posé au frontmatter pour expliquer la raison du match.
+               Affichage discret en italique grisé. */}}
+          {{ with .Params.match_reason }}
+            <div class="cr-card__match-reason">⊕ {{ . }}</div>
+          {{ end }}
 
           <div class="dosleg-card__deposit">
             {{ if not .Date.IsZero }}

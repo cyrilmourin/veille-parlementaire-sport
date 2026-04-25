@@ -71,6 +71,11 @@
               </span>
             {{ end }}
           </div>
+          {{/* R39-H (2026-04-25) — raison du match si l'item ne ping
+               que via bypass (organe whitelist / flux complet). */}}
+          {{ with .Params.match_reason }}
+            <div class="match-reason-inline">⊕ {{ . }}</div>
+          {{ end }}
           {{ with .Params.snippet }}<div class="snippet-inline">« {{ . }} »</div>{{ end }}
         </div>
       </li>

@@ -1108,6 +1108,18 @@ a:hover { text-decoration: underline; }
   font-weight: 500;
   font-style: italic;
 }
+/* R39-H (2026-04-25) — raison du match (bypass organe / flux complet)
+   exposée quand l'item n'a pas de keyword thématique visible. Tag
+   discret en italique grisé pour signaler "ce CR n'a pas de keyword
+   sport explicite mais matche via le périmètre de la commission". */
+.cr-card__match-reason,
+.match-reason-inline {
+  margin: 2px 0 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-style: italic;
+  opacity: 0.85;
+}
 
 /* R38-D (2026-04-24) — filtres checkboxes sur /items/comptes_rendus/.
    Deux groupes indépendants (chambre × type) présentés côte à côte,

@@ -181,23 +181,31 @@ def test_fetch_source_uid_stable(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_strip_html_targets_main_block_to_skip_nav():
-    """Le strip ignore le header de nav Sénat présent avant <main>."""
+    """Le strip ignore le header de nav Sénat présent avant <main>.
+
+    R39-I (2026-04-25) : la ligne d'entête « COMPTES RENDUS DE LA COMMISSION
+    DE LA CULTURE… » est désormais aussi retirée jusqu'au premier verbe de
+    contenu (Audition / Mission / Examen / etc.) — Cyril ne veut plus voir
+    le nom de la commission ni le numéro de législature en début d'extrait.
+    """
     html = """
 <html><body>
 <header>
   <nav>Galaxie Sénat Réseaux sociaux X Facebook LinkedIn Instagram YouTube</nav>
 </header>
 <main>
-  <h1>COMPTES RENDUS DE LA COMMISSION DE LA CULTURE</h1>
-  <p>Audition de M. Dupont sur le dopage et les JO 2030.</p>
+  COMPTES RENDUS DE LA COMMISSION DE LA CULTURE
+  Audition de M. Dupont sur le dopage et les JO 2030.
 </main>
 <footer>Mentions légales — Contact — Plan du site</footer>
 </body></html>"""
     out = mod._strip_html(html)
     assert "Galaxie Sénat" not in out
     assert "Mentions légales" not in out
-    assert "COMPTES RENDUS DE LA COMMISSION" in out
-    assert "Audition de M. Dupont" in out
+    # R39-I : l'entête majuscule est retirée, l'extrait demarre directement
+    # sur le verbe de contenu.
+    assert not out.startswith("COMPTES RENDUS")
+    assert out.startswith("Audition de M. Dupont")
     assert "dopage" in out
 
 
@@ -221,8 +229,12 @@ def test_strip_html_decodes_all_entities():
     assert "aujourd" in out.lower()
 
 
-def test_strip_html_removes_breadcrumb_preamble():
-    """Le breadcrumb « Voir le fil d'Ariane Accueil Commissions … » est retiré."""
+def test_strip_html_removes_breadcrumb_and_header_preamble():
+    """Le breadcrumb « Voir le fil d'Ariane Accueil … » ET la ligne
+    d'entête « COMPTES RENDUS DE LA COMMISSION DE LA CULTURE… » sont
+    tous deux retirés. R39-I (2026-04-25) — l'extrait démarre direct
+    sur le contenu (verbe Audition / Mission / Examen / Mardi / etc.).
+    """
     html = """
 <main>
   Voir le fil d'Ariane Accueil Commissions Culture Comptes rendus
@@ -232,8 +244,8 @@ def test_strip_html_removes_breadcrumb_preamble():
     out = mod._strip_html(html)
     assert not out.startswith("Voir le fil")
     assert not out.startswith("Accueil")
-    assert out.startswith("COMPTES RENDUS DE LA COMMISSION")
-    assert "Audition sport amateur" in out
+    assert not out.startswith("COMPTES RENDUS")
+    assert out.startswith("Audition sport amateur")
 
 
 def test_strip_html_falls_back_to_full_when_no_main():
