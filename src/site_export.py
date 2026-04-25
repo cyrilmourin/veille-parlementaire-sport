@@ -779,19 +779,21 @@ def _enrich_senat_question_photo(r: dict, cache: dict[str, tuple[str, str]]) -> 
     nom = (raw.get("Nom") or raw.get("nom") or "").strip()
     full = (raw.get("auteur") or "").strip()
     candidate = " ".join(p for p in [civ, prenom, nom] if p).strip() or full
-    # R38-G (2026-04-24) — backfill des clés minuscules `auteur` /
-    # `auteur_groupe` pour les items Sénat questions pré-R38-G ingérés en
-    # DB avec uniquement les colonnes CSV majuscules ("Civilité", "Prénom",
-    # "Nom", "Groupe", "Auteur"). Sans ces clés minuscules, le frontmatter
-    # Hugo ne pose pas `auteur:` et la ligne `auteur-inline` avant le
-    # titre reste vide côté Sénat (visible côté AN parce que le parseur
-    # AN pose lui-même `raw["auteur"]`). Idempotent.
+    # R38-G (2026-04-24) / R39-D (2026-04-25) — backfill des clés
+    # minuscules `auteur` / `groupe` pour les items Sénat questions
+    # pré-R39 ingérés en DB avec uniquement les colonnes CSV majuscules
+    # ("Civilité", "Prénom", "Nom", "Groupe", "Auteur"). Sans ces clés
+    # minuscules, le frontmatter Hugo ne pose pas `auteur:` ni
+    # `auteur_groupe:` (le code `_write_item_pages` lit `raw["groupe"]`
+    # SANS préfixe — même clé que côté AN). R38-G initial posait
+    # `raw["auteur_groupe"]` ce qui ne matchait pas → R39-D corrige.
+    # Idempotent.
     if candidate and not raw.get("auteur"):
         raw["auteur"] = candidate
-    if not raw.get("auteur_groupe"):
-        groupe_csv = (raw.get("Groupe") or raw.get("groupe") or "").strip()
+    if not raw.get("groupe"):
+        groupe_csv = (raw.get("Groupe") or "").strip()
         if groupe_csv:
-            raw["auteur_groupe"] = groupe_csv
+            raw["groupe"] = groupe_csv
     # Déjà enrichi avec une photo (par amo_loader ou run précédent) :
     # on sort APRÈS avoir posé auteur/auteur_groupe pour ne pas oublier
     # les items qui ont déjà une photo mais pas les clés minuscules.

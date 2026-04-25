@@ -602,18 +602,21 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
             # corps dans la colonne "Texte".
             if texte:
                 r["texte_question"] = texte
-            # R38-G (2026-04-24) : clés minuscules `auteur` / `auteur_groupe`
-            # exposées au frontmatter Hugo (le template `_default/list.html`
-            # lit `.Params.auteur` pour afficher le nom en inline avant le
-            # titre). Le dict CSV brut n'avait que les clés majuscules
-            # ("Civilité", "Prénom", "Nom", "Groupe") → le frontmatter ne
-            # posait pas `auteur:` et la ligne "auteur-inline" restait vide
-            # (visible côté questions AN mais pas Sénat — cf. capture
-            # Cyril 2026-04-24). On pose les clés minuscules ici.
+            # R38-G (2026-04-24) / R39-D (2026-04-25) : clés minuscules
+            # `auteur` / `groupe` exposées au frontmatter Hugo. Le code
+            # `site_export._write_item_pages` lit `raw["auteur"]` et
+            # `raw["groupe"]` (sans préfixe) pour construire les variables
+            # frontmatter `auteur:` et `auteur_groupe:`. On harmonise donc
+            # sur les MÊMES noms de clé que ceux posés par les parseurs AN
+            # (assemblee.py:_normalize_amendement / _normalize_question).
+            # R38-G initial avait posé `auteur_groupe` au lieu de `groupe`,
+            # ce qui faisait que la chip de groupe (DEM, SOC, UC, SER…)
+            # s'affichait côté AN mais pas côté Sénat — cf. capture Cyril
+            # du 2026-04-25 sur /items/questions/.
             if auteur:
                 r["auteur"] = auteur
             if groupe:
-                r["auteur_groupe"] = groupe
+                r["groupe"] = groupe
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
                 title=" ".join(title_bits)[:220],
