@@ -1112,16 +1112,34 @@ a:hover { text-decoration: underline; }
 /* R38-D (2026-04-24) — filtres checkboxes sur /items/comptes_rendus/.
    Deux groupes indépendants (chambre × type) présentés côte à côte,
    empilés en vertical sur mobile. Pas d'accent visuel fort pour rester
-   cohérent avec le ton sobre du listing. */
+   cohérent avec le ton sobre du listing.
+   R39-F (2026-04-25) : espacement augmenté entre groupes (Cyril) +
+   bandeau qui sert de référence largeur pour les cards CR (.cr-list
+   reprend la même width via 100% du container parent). */
 .cr-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px 24px;
+  gap: 16px 56px; /* R39-F : 24 → 56 entre groupes Chambre / Type */
   margin: 14px 0 18px;
-  padding: 12px 14px;
+  padding: 12px 18px;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--radius);
+}
+/* R39-F (2026-04-25) — sur la page CR, on aligne la largeur des cards
+   sur celle du bandeau de filtres : les deux occupent 100% de
+   `.layout-main` qui est le container parent. Côté `.dosleg-card`
+   l'élément <li> a déjà `width:100%` via le `<ul>`, mais on
+   confirme explicitement pour éviter les surprises de marge. */
+.comptes-rendus .cr-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  width: 100%;
+}
+.comptes-rendus .cr-list .dosleg-card {
+  margin-left: 0;
+  margin-right: 0;
 }
 .cr-filter-group {
   border: 0;

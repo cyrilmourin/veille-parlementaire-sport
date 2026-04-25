@@ -68,6 +68,23 @@ _BREADCRUMB_END_RE = re.compile(
     re.IGNORECASE,
 )
 
+# R39-E (2026-04-25) : la ligne « COMPTES RENDUS DE LA COMMISSION DE LA
+# CULTURE, DE L'EDUCATION, DE LA COMMUNICATION ET DU SPORT » s'affichait
+# en tête d'extrait — bruit visuel + fait croire au lecteur que le
+# match vient du mot « SPORT » du libellé de commission alors que R38-E
+# avait justement neutralisé ce match côté title. On coupe cette ligne
+# d'entête, ainsi que les sous-titres en majuscules (« Mardi 14 avril
+# 2026 »), pour aller direct au contenu (« Mission d'information sur… »,
+# « Audition de M. … »). On capte tout préambule en MAJUSCULES jusqu'au
+# premier mot de contenu en casse normale.
+_SENAT_HEADER_RE = re.compile(
+    r"COMPTES\s+RENDUS\s+DE\s+LA\s+COMMISSION\s+DE\s+LA\s+[A-ZÀÉÈÊÎÔÛÇ\s,'’\-]{20,300}?"
+    r"(?=\s+(?:Mardi|Mercredi|Jeudi|Vendredi|Lundi|Samedi|Dimanche|"
+    r"Présidence|Mission|Audition|Examen|Communication|Table|Réunion|"
+    r"Constitution|Désignation)\s)",
+    re.IGNORECASE,
+)
+
 
 def _strip_html(html: str) -> str:
     """Extrait le texte utile d'une page CR Sénat.
@@ -100,6 +117,13 @@ def _strip_html(html: str) -> str:
     br = _BREADCRUMB_END_RE.search(text)
     if br is not None:
         text = text[br.start():].strip()
+    # R39-E (2026-04-25) : retire aussi la ligne d'entête majuscule
+    # « COMPTES RENDUS DE LA COMMISSION DE LA CULTURE… » pour aller
+    # direct au contenu réel. Coupe avant le premier verbe d'auditon
+    # / mission / examen identifié.
+    hdr = _SENAT_HEADER_RE.match(text)
+    if hdr is not None:
+        text = text[hdr.end():].strip()
     return text
 
 

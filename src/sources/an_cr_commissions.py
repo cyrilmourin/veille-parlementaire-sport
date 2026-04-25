@@ -120,6 +120,15 @@ def _extract_pdf_text(pdf_bytes: bytes, max_chars: int = 10000) -> str:
 
     Si pypdf indisponible (dépendance non installée), renvoie "" sans
     planter — le matcher retombe alors sur le titre du CR seul.
+
+    R39-E (2026-04-25) : nettoyage du préambule institutionnel des CR AN
+    (« 1 7 e L É G I S L A T U R E A S S E M B L É E N A T I O N A L E
+    Compte rendu Commission des affaires sociales – Examen… »). PyPDF
+    extrait les titres de page avec espacement caractère par caractère
+    (`1 7 e L É G I S L A T U R E`), bruit visible en début d'extrait
+    sur le site (capture Cyril 2026-04-25). On collapse ces séquences
+    en un seul mot puis on coupe avant le premier mot de contenu réel
+    (« Examen », « Audition », « Mission », etc.).
     """
     try:
         from pypdf import PdfReader  # type: ignore
@@ -145,7 +154,38 @@ def _extract_pdf_text(pdf_bytes: bytes, max_chars: int = 10000) -> str:
         if total >= max_chars:
             break
     merged = re.sub(r"\s+", " ", " ".join(out)).strip()
+    merged = _strip_an_pdf_preamble(merged)
     return merged[:max_chars]
+
+
+# R39-E (2026-04-25) — pattern préambule institutionnel des CR AN PDF.
+# PyPDF rend les titres de page « 1 7 e   L É G I S L A T U R E   A S S
+# E M B L É E   N A T I O N A L E   Compte rendu   Commission des
+# affaires sociales – ». On collapse cette séquence en un seul motif
+# pour la matcher aisément, puis on coupe AVANT le premier verbe
+# d'audition / examen / mission qui marque le début du contenu réel.
+_AN_PREAMBLE_RE = re.compile(
+    r"^\s*\d?\s*\d\s*e\s+L\s*É\s*G\s*I\s*S\s*L\s*A\s*T\s*U\s*R\s*E\s+"
+    r"A\s*S\s*S\s*E\s*M\s*B\s*L\s*É\s*E\s+N\s*A\s*T\s*I\s*O\s*N\s*A\s*L\s*E\s+"
+    r"Compte\s+rendu\s+Commission[^A-ZÀÂÄÉÈÊËÎÏÔÖÛÜÇ]{1,200}?"
+    r"(?=(?:Examen|Audition|Mission|Communication|Table|Présidence|Réunion|"
+    r"Constitution|Désignation|Discussion|Suite))",
+    re.IGNORECASE,
+)
+
+
+def _strip_an_pdf_preamble(text: str) -> str:
+    """Retire l'entête institutionnelle des CR AN extraits via pypdf.
+
+    Idempotent : si le pattern n'est pas détecté, retourne le texte
+    inchangé.
+    """
+    if not text:
+        return text
+    m = _AN_PREAMBLE_RE.match(text)
+    if m is not None:
+        return text[m.end():].strip()
+    return text
 
 
 def _parse_title(html_text: str, commission_label: str, num: int) -> str:

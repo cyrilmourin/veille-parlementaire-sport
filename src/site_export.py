@@ -2771,13 +2771,25 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         # parlement | gouvernement | autorites | operateurs | jorf
         # (fallback "autres"). cf. _source_family().
         family_source = _source_family(r.get("source_id"), r.get("chamber"))
+        # R39-G (2026-04-25) : on retire les pseudo-keywords techniques
+        # `(organe sport/JOP)` (R27 bypass) et `(flux complet)` (R25-H
+        # bypass) du frontmatter Hugo. Ils sont nécessaires côté store
+        # pour passer le filtre `matched_keywords != []` mais ne sont
+        # pas des keywords thématiques — Cyril a remonté qu'ils
+        # remontaient comme chips parasites sur les CR commission Sénat
+        # (capture 2026-04-25). Les keywords commençant par '(' sont
+        # par convention des marqueurs internes, on les filtre tous.
+        public_keywords = [
+            k for k in (r.get("matched_keywords") or [])
+            if not (isinstance(k, str) and k.startswith("("))
+        ]
         fm += [
             f"category: {cat}",
             f'chamber: "{r.get("chamber") or ""}"',
             f'source: "{r.get("source_id") or ""}"',
             f'family_source: "{family_source}"',
             f'source_url: "{source_url}"',
-            f"keywords: {json.dumps(r.get('matched_keywords') or [], ensure_ascii=False)}",
+            f"keywords: {json.dumps(public_keywords, ensure_ascii=False)}",
             f"families: {json.dumps(r.get('keyword_families') or [], ensure_ascii=False)}",
             f'snippet: "{snippet}"',
             f'status_label: "{status_label}"',
