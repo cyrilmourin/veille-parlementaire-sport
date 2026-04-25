@@ -578,12 +578,26 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
             # "Question <nature> : sujet".
             title_bits = [qtype_label]
             title_bits.append(f": {sujet}")
+            # R39-L (2026-04-25) — summary ré-ordonné : corps de la question
+            # EN PREMIER (`texte`), puis sujet/titre, puis métadonnées en
+            # queue. Avant R39-L, l'ordre était `auteur — groupe —
+            # Destinataire — Rubrique — Sort — texte — titre` ce qui
+            # produisait des snippets redondants côté UI : le snippet
+            # affichait `M. Hervé Maurey — UC — Destinataire : Sports —
+            # Sort : En cours — …` alors que toutes ces infos figurent
+            # déjà sur la card (chip groupe, badge chambre, sous-titre).
+            # Côté matcher, il scanne title + summary + raw, donc les
+            # métadonnées restent atteignables même reléguées en queue.
+            # Quand le keyword n'est que dans le titre (texte vide côté
+            # CSV Sénat), le summary tombe sur titre/sujet — déjà visible
+            # mais sans les méta polluantes.
             summary = " — ".join(p for p in [
+                texte, sujet, titre,
+                # Métadonnées en queue (utiles seulement au matcher).
                 auteur, groupe,
                 f"Destinataire : {ministere}" if ministere else "",
                 f"Rubrique : {rubrique}" if rubrique else "",
                 f"Sort : {sort}" if sort else "",
-                texte, titre,
             ] if p)[:2000]
             # R22i (2026-04-23) : la colonne CSV Sénat s'appelle exactement
             # `URL Question` et livre du `http://…/base/YYYY/qSEQYYMM<num>.html`.
