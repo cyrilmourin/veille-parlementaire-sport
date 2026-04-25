@@ -1,20 +1,53 @@
 {
   "2526": {
     "cion-cedu": {
-      "last_num": 0,
-      "scanned": []
+      "last_num": 67,
+      "scanned": [
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67
+      ]
     },
     "cion-def": {
       "last_num": 0,
       "scanned": []
     },
     "cion-dvp": {
-      "last_num": 0,
-      "scanned": []
+      "last_num": 39,
+      "scanned": [
+        29,
+        30,
+        31,
+        32,
+        33,
+        35,
+        36,
+        37,
+        38,
+        39
+      ]
     },
     "cion-eco": {
-      "last_num": 0,
-      "scanned": []
+      "last_num": 79,
+      "scanned": [
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79
+      ]
     },
     "cion-etran": {
       "last_num": 0,
@@ -29,8 +62,19 @@
       "scanned": []
     },
     "cion-soc": {
-      "last_num": 0,
-      "scanned": []
+      "last_num": 66,
+      "scanned": [
+        56,
+        57,
+        58,
+        59,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66
+      ]
     },
     "ge-sport": {
       "last_num": 0,
