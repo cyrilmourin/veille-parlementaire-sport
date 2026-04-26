@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-04-26T12:56:40+00:00",
+  "last_run_at": "2026-04-26T13:35:31+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419865B2632P0D1N000492",
@@ -19,6 +19,11 @@
       "senat_amendements::ebbb31dc5631a32d"
     ],
     "comptes_rendus": [
+      "an_cr_commissions::an-cr-cion-cedu-2526-018",
+      "an_cr_commissions::an-cr-cion-cedu-2526-022",
+      "an_cr_commissions::an-cr-cion-cedu-2526-023",
+      "an_cr_commissions::an-cr-cion-cedu-2526-024",
+      "an_cr_commissions::an-cr-cion-cedu-2526-025",
       "an_cr_commissions::an-cr-cion-cedu-2526-033",
       "an_cr_commissions::an-cr-cion-cedu-2526-043",
       "an_cr_commissions::an-cr-cion-cedu-2526-045",
@@ -26,6 +31,7 @@
       "an_cr_commissions::an-cr-cion-dvp-2526-005",
       "an_cr_commissions::an-cr-cion-dvp-2526-019",
       "an_cr_commissions::an-cr-cion-dvp-2526-032",
+      "an_cr_commissions::an-cr-cion-eco-2526-033",
       "an_cr_commissions::an-cr-cion-soc-2526-061",
       "an_syceron::0243de31b4488e5e",
       "an_syceron::2debebfa8480a69e",
@@ -105,14 +111,8 @@
       "senat_cri::f849f4a2017311e4"
     ],
     "dossiers_legislatifs": [
-      "an_dossiers_legislatifs::DLR5L17N50379",
-      "an_dossiers_legislatifs::DLR5L17N50431",
-      "an_dossiers_legislatifs::DLR5L17N50599",
       "an_dossiers_legislatifs::DLR5L17N50771",
-      "an_dossiers_legislatifs::DLR5L17N51011",
-      "an_dossiers_legislatifs::DLR5L17N51736",
       "an_dossiers_legislatifs::DLR5L17N52100",
-      "an_dossiers_legislatifs::DLR5L17N52432",
       "an_dossiers_legislatifs::DLR5L17N52756",
       "an_dossiers_legislatifs::DLR5L17N52766",
       "an_dossiers_legislatifs::DLR5L17N52874",
@@ -157,19 +157,7 @@
       "senat_promulguees::87-1132",
       "senat_promulguees::90-1144",
       "senat_promulguees::93-1435",
-      "senat_promulguees::99-223",
-      "senat_theme_sport_rss::http://www.senat.fr/leg/pjl24-630.html",
-      "senat_theme_sport_rss::http://www.senat.fr/leg/pjl24-734.html",
-      "senat_theme_sport_rss::http://www.senat.fr/leg/pjl25-278.html",
-      "senat_theme_sport_rss::http://www.senat.fr/leg/pjl25-307.html",
-      "senat_theme_sport_rss::http://www.senat.fr/leg/tas24-158.html",
-      "senat_theme_sport_rss::http://www.senat.fr/leg/tas25-051.html",
-      "senat_theme_sport_rss::http://www.senat.fr/rap/a24-711/a24-711.html",
-      "senat_theme_sport_rss::http://www.senat.fr/rap/a24-714/a24-714.html",
-      "senat_theme_sport_rss::http://www.senat.fr/rap/a24-715/a24-715.html",
-      "senat_theme_sport_rss::http://www.senat.fr/rap/a24-720/a24-720.html",
-      "senat_theme_sport_rss::http://www.senat.fr/rap/l24-733/l24-733.html",
-      "senat_theme_sport_rss::http://www.senat.fr/rap/l25-306/l25-306.html"
+      "senat_promulguees::99-223"
     ],
     "questions": [
       "an_questions_ecrites::QANR5L17QE13939",
