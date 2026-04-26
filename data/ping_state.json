@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-04-26T13:35:31+00:00",
+  "last_run_at": "2026-04-26T14:11:17+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419865B2632P0D1N000492",
@@ -19,6 +19,7 @@
       "senat_amendements::ebbb31dc5631a32d"
     ],
     "comptes_rendus": [
+      "an_cr_commissions::an-cr-cion-cedu-2526-013",
       "an_cr_commissions::an-cr-cion-cedu-2526-018",
       "an_cr_commissions::an-cr-cion-cedu-2526-022",
       "an_cr_commissions::an-cr-cion-cedu-2526-023",
