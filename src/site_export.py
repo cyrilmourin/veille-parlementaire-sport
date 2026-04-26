@@ -1411,6 +1411,21 @@ def _load(rows: list[dict]) -> list[dict]:
                     if isinstance(_raw_q, dict) else ""
                 if _texte_q:
                     haystack = _texte_q
+            else:
+                # R40-I (2026-04-26) : pour les CR (commissions + plénières)
+                # et JORF, on préfère `raw.haystack_body` (jusqu'à 200k chars)
+                # au summary tronqué à 2000 chars — le snippet sera centré
+                # sur le keyword qui a réellement matché, pas sur l'intro
+                # du document. Symétrique au fix R40-I dans
+                # `keywords.KeywordMatcher.apply()`.
+                try:
+                    _raw_any = json.loads(r.get("raw") or "{}")
+                except Exception:
+                    _raw_any = {}
+                if isinstance(_raw_any, dict):
+                    _hb = (_raw_any.get("haystack_body") or "").strip()
+                    if _hb:
+                        haystack = _hb
             # R23-F (2026-04-23) : pour les comptes rendus AN, retire le
             # préambule Syceron (cf. _strip_cr_an_preamble).
             if haystack and (r.get("category") == "comptes_rendus") \

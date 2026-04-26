@@ -191,10 +191,24 @@ class KeywordMatcher:
         """Annote in-place une liste d'Item (keywords + snippet).
 
         R26 (2026-04-23) : si `item.raw` contient une clé `haystack_body`
-        (JORF notamment), on l'ajoute au match — permet de capter des
-        textes dont le titre est générique mais dont le corps mentionne
-        les thèmes surveillés. Le snippet reste construit depuis
-        `summary` pour rester court côté affichage.
+        (JORF + CR), on l'ajoute au match — permet de capter des textes
+        dont le titre est générique mais dont le corps mentionne les
+        thèmes surveillés.
+
+        R40-I (2026-04-26) : le snippet est construit depuis le haystack
+        complet (haystack_body si présent, sinon summary) pour qu'il soit
+        centré sur le mot-clé qui a effectivement matché. Avant : snippet
+        depuis `summary` uniquement → si le match venait du haystack_body
+        au-delà du summary (cas typique : CR plénier de 200k chars où le
+        sport est mentionné à la position 100k), `build_snippet` ne
+        retrouvait pas le keyword dans `summary` (2000 chars) et tombait
+        sur le fallback `text[:max_len]` — l'utilisateur voyait
+        l'introduction du CR sans contexte sur le match. Vérifié : pour
+        les 4 sources CR (an_cr_commissions, senat_cr_commissions,
+        senat._fetch_debats_zip, assemblee._normalize_syceron) le
+        `summary` est un strict préfixe du `haystack_body` — pas de
+        risque d'introduire du bruit nouveau (HTML / tags / entités) qui
+        aurait été nettoyé en amont du summary mais pas du haystack_body.
         """
         for item in items:
             extra_haystack = ""
@@ -204,6 +218,15 @@ class KeywordMatcher:
             kws, fams = self.match(item.title, item.summary, extra_haystack)
             item.matched_keywords = kws
             item.keyword_families = fams
-            # Snippet : priorité au summary (plus riche), fallback sur le titre
-            item.snippet = self.build_snippet(item.summary or item.title or "")
+            # R40-I : snippet construit depuis le texte le plus complet
+            # disponible — haystack_body si présent (jusqu'à 200k chars
+            # pour les CR), sinon fallback summary, sinon titre. Garantit
+            # que le snippet contient le keyword qui a déclenché le match.
+            snippet_source = (
+                extra_haystack
+                or item.summary
+                or item.title
+                or ""
+            )
+            item.snippet = self.build_snippet(snippet_source)
         return items
