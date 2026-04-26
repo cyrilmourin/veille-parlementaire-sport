@@ -1484,6 +1484,18 @@ def _filter_disabled_sources(rows: list[dict]) -> list[dict]:
 # d'autres items légitimes). Cf. config/blocklist.yml.
 _BLOCKLIST_PATH = Path(__file__).resolve().parent.parent / "config" / "blocklist.yml"
 
+# R40-D (2026-04-26) — Garde-fou : la forme NAVIGABLE des URLs d'amendements
+# AN (`…/amendements/<TEXTE>/CION-<XXX>/<CD<NUM>>`) n'est JAMAIS stockée en
+# DB. Le pipeline stocke la forme TECHNIQUE `…/amendements/<UID_TECHNIQUE>`
+# (cf. assemblee.py:_normalize_amendement). Une entrée blocklist au format
+# navigable ne match donc jamais. On détecte le pattern à `_load_blocklist`
+# pour logger un WARNING explicite — sinon le bug est silencieux et l'item
+# continue d'apparaître sur le site sans qu'on comprenne pourquoi.
+_AN_AMDT_NAVIGABLE_RE = re.compile(
+    r"/amendements/\d+/CION-[A-Z]+/[A-Z]+\d+",
+    re.IGNORECASE,
+)
+
 
 def _canon_block_url(u: str) -> str:
     """Canonicalise une URL pour le matching blocklist : strip scheme,
@@ -1544,9 +1556,22 @@ def _load_blocklist() -> tuple[set[str], set[str]]:
             continue
         u = e.get("url")
         if isinstance(u, str) and u.strip():
-            c = _canon_block_url(u)
-            if c:
-                blocked_urls.add(c)
+            # R40-D : refuser silencieusement la forme NAVIGABLE des URLs
+            # d'amendements AN — elle ne match JAMAIS la forme technique
+            # stockée en DB. Log warning + skip pour signaler le bug sans
+            # casser le filtre sur les autres entrées.
+            if _AN_AMDT_NAVIGABLE_RE.search(u):
+                import logging
+                logging.getLogger(__name__).warning(
+                    "blocklist : URL amendement AN au format navigable ignorée "
+                    "(ne matche jamais la DB) : %s — utiliser plutôt "
+                    "`uid: an_amendements::AMANR5L17…` (cf. en-tête de blocklist.yml)",
+                    u,
+                )
+            else:
+                c = _canon_block_url(u)
+                if c:
+                    blocked_urls.add(c)
         uid = e.get("uid")
         if isinstance(uid, str) and uid.strip():
             blocked_uids.add(uid.strip())

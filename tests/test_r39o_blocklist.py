@@ -98,34 +98,38 @@ def test_filter_blocklist_no_op_when_yaml_empty(tmp_path, monkeypatch):
 
 
 def test_filter_blocklist_drops_row_by_url(tmp_path, monkeypatch):
+    """Note R40-D : on utilise une URL non-navigable (pattern Sénat,
+    catégorie dossier ou format technique AN). Le pattern URL navigable
+    AN amendements `…/amendements/<n>/CION-XXX/CD<n>` est désormais
+    skip + warn par `_load_blocklist` (cf. tests R40-D dédiés)."""
     p = tmp_path / "yml.yml"
     p.write_text(
         "blocklist:\n"
-        "  - url: https://www.assemblee-nationale.fr/dyn/17/amendements/2632/CION-DVP/CD495\n"
+        "  - url: https://example.test/blocked-item-fixture\n"
         "    reason: Faux positif\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(se, "_BLOCKLIST_PATH", p)
     rows = [
-        _row(url="https://www.assemblee-nationale.fr/dyn/17/amendements/2632/CION-DVP/CD495"),
-        _row(url="https://www.assemblee-nationale.fr/dyn/17/amendements/2632/CION-DVP/CD492"),
+        _row(url="https://example.test/blocked-item-fixture"),
+        _row(url="https://example.test/other-item-fixture"),
     ]
     out = se._filter_blocklist(rows)
     assert len(out) == 1
-    assert "CD492" in out[0]["url"]
+    assert "other-item-fixture" in out[0]["url"]
 
 
 def test_filter_blocklist_url_match_is_scheme_insensitive(tmp_path, monkeypatch):
     p = tmp_path / "yml.yml"
     p.write_text(
         "blocklist:\n"
-        "  - url: https://www.assemblee-nationale.fr/dyn/17/amendements/2632/CION-DVP/CD495\n",
+        "  - url: https://example.test/blocked-item-fixture\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(se, "_BLOCKLIST_PATH", p)
     rows = [
         # Variante http:// + trailing slash + casse différente
-        _row(url="HTTP://www.assemblee-nationale.fr/dyn/17/amendements/2632/CION-DVP/CD495/"),
+        _row(url="HTTP://example.test/blocked-item-fixture/"),
     ]
     out = se._filter_blocklist(rows)
     assert out == []
@@ -164,27 +168,35 @@ def test_filter_blocklist_idempotent(tmp_path, monkeypatch):
 
 def test_filter_blocklist_real_yaml_blocks_two_amendements():
     """Sanity check sur le vrai fichier `config/blocklist.yml` versionné :
-    les deux amendements PJL ESR n°2632 sont bien présents et filtrés.
+    les deux amendements PJL agricoles n°2632 sont filtrés via leur UID
+    technique. R40-D (2026-04-26) : avant, ce test passait avec l'URL
+    navigable parce que le filtre URL était silencieusement no-op
+    (cf. test_r40d_blocklist_an_amdt_navigable.py). Maintenant on
+    matche par UID, ce qui correspond effectivement au comportement prod.
     """
+    uid_cd495 = "AMANR5L17PO419865B2632P0D1N000495"
+    uid_cd492 = "AMANR5L17PO419865B2632P0D1N000492"
     rows = [
         _row(
             sid="an_amendements",
-            uid="amdt-2632-CION-DVP-CD495",
-            url="https://www.assemblee-nationale.fr/dyn/17/amendements/2632/CION-DVP/CD495",
+            uid=uid_cd495,
+            url=f"https://www.assemblee-nationale.fr/dyn/17/amendements/{uid_cd495}",
         ),
         _row(
             sid="an_amendements",
-            uid="amdt-2632-CION-DVP-CD492",
-            url="https://www.assemblee-nationale.fr/dyn/17/amendements/2632/CION-DVP/CD492",
+            uid=uid_cd492,
+            url=f"https://www.assemblee-nationale.fr/dyn/17/amendements/{uid_cd492}",
         ),
         _row(
             sid="an_amendements",
-            uid="legit-001",
-            url="https://www.assemblee-nationale.fr/dyn/17/amendements/9999/CION-FOO/CD123",
+            uid="AMANR5L17PO419865B9999P0D1N000123",
+            url=("https://www.assemblee-nationale.fr/dyn/17/amendements/"
+                 "AMANR5L17PO419865B9999P0D1N000123"),
         ),
     ]
     out = se._filter_blocklist(rows)
-    urls = [r["url"] for r in out]
-    assert all("CD495" not in u for u in urls)
-    assert all("CD492" not in u for u in urls)
-    assert any("CD123" in u for u in urls)
+    out_uids = [r["uid"] for r in out]
+    assert uid_cd495 not in out_uids, "amendement CD495 PJL agricoles non filtré"
+    assert uid_cd492 not in out_uids, "amendement CD492 PJL agricoles non filtré"
+    assert "AMANR5L17PO419865B9999P0D1N000123" in out_uids, (
+        "amendement légitime supprimé à tort")
