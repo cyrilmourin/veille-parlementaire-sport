@@ -286,6 +286,22 @@ senat:
       commission_label: Commission affaires étrangères Sénat
       commission_organe: PO211491
 
+    # R40-E (2026-04-26) — Agenda Commission affaires sociales Sénat
+    # (PO211493). R35-D avait sorti cette commission du bypass organe R27
+    # parce qu'elle générait >90 % de bruit off-topic (retraites, sécu,
+    # droit du travail, assurance maladie). MAIS R39-K (2026-04-25) a
+    # complètement désactivé le bypass organe R27 — désormais SEUL le
+    # matching keyword métier décide ce qui remonte. Donc inclure
+    # affaires sociales ne crée plus de bruit : seules les rares réunions
+    # genuinement sport (santé sportive, dopage médical, retraites athlètes
+    # de haut niveau, sport sur ordonnance) remonteront via match keyword.
+    - id: senat_agenda_affaires_sociales
+      category: agenda
+      url: https://www.senat.fr/travaux-parlementaires/commissions/commission-des-affaires-sociales/agenda-de-la-commission.html
+      format: senat_commission_agenda_html
+      commission_label: Commission affaires sociales Sénat
+      commission_organe: PO211493
+
     # R37-A (2026-04-24) — Comptes rendus hebdomadaires commission culture
     # Sénat. Le Sénat ne publie pas de dump JSON/XML pour les CR de
     # commissions : on scrape le listing /compte-rendu-commissions/culture.html
@@ -342,6 +358,20 @@ senat:
       format: senat_cr_commissions_html
       commission_label: Commission affaires étrangères Sénat
       commission_organe: PO211491
+      max_new_per_run: 8
+      body_max_chars: 10000
+
+    # R40-E (2026-04-26) — CR hebdo Commission affaires sociales Sénat
+    # (PO211493). Symétrique avec senat_agenda_affaires_sociales : R39-K
+    # a désactivé le bypass organe R27, donc l'argument R35-D (>90 %
+    # off-topic) ne tient plus pour cette source. Seuls les CR avec
+    # match keyword sport remontent. Slug listing `affaires-sociales.html`.
+    - id: senat_cr_affaires_sociales
+      category: comptes_rendus
+      url: https://www.senat.fr/compte-rendu-commissions/affaires-sociales.html
+      format: senat_cr_commissions_html
+      commission_label: Commission affaires sociales Sénat
+      commission_organe: PO211493
       max_new_per_run: 8
       body_max_chars: 10000
 

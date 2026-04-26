@@ -57,10 +57,13 @@ def _load_senat_agenda_sources() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def test_yaml_4_sources_senat_commission_agenda():
-    """1 R35-E + 3 R40-B = 4 sources actives en agenda commission Sénat."""
+def test_yaml_5_sources_senat_commission_agenda():
+    """1 R35-E + 3 R40-B + 1 R40-E = 5 sources actives.
+    R40-E (2026-04-26) a réintégré la commission affaires sociales
+    (PO211493) après que R39-K ait désactivé le bypass organe R27 — le
+    blocage R35-D ne se justifiait plus."""
     sources = _load_senat_agenda_sources()
-    assert len(sources) == 4
+    assert len(sources) == 5
 
 
 def test_yaml_r40b_three_new_ids_present():
@@ -84,17 +87,18 @@ def test_yaml_r40b_codes_organes_distincts():
     assert len(codes) == len(set(codes))
 
 
-def test_yaml_r40b_no_affaires_sociales():
-    """Régression R35-D : la commission affaires sociales (PO211493) ne
-    doit JAMAIS être ajoutée — décision arbitrée 2026-04-24, >90% bruit."""
-    sources = _load_senat_agenda_sources()
-    for s in sources:
-        assert s["commission_organe"] != "PO211493", (
-            f"Régression R35-D : {s['id']} pointe sur PO211493 "
-            "(Commission affaires sociales Sénat, exclue volontairement)"
-        )
-        label_low = (s.get("commission_label") or "").lower()
-        assert "affaires sociales" not in label_low
+def test_yaml_r40e_affaires_sociales_reintegree():
+    """R40-E (2026-04-26) — réintégration de la commission affaires
+    sociales (PO211493) après que R39-K ait désactivé le bypass organe
+    R27. Le blocage R35-D (>90 % off-topic) ne se justifiait plus puisque
+    désormais SEUL le matching keyword décide ce qui remonte. Ce test
+    remplace l'ancien `test_yaml_r40b_no_affaires_sociales` qui durcissait
+    R35-D — supprimé en R40-E pour permettre la réintégration."""
+    by_id = {s["id"]: s for s in _load_senat_agenda_sources()}
+    assert "senat_agenda_affaires_sociales" in by_id
+    assert by_id["senat_agenda_affaires_sociales"]["commission_organe"] == "PO211493"
+    label_low = by_id["senat_agenda_affaires_sociales"]["commission_label"].lower()
+    assert "affaires sociales" in label_low
 
 
 def test_yaml_r40b_urls_pointent_vers_bonne_commission():

@@ -1,7 +1,7 @@
 ---
 title: Veille Parlementaire Sport — Handoff
 maintainer: Cyril Mourin
-last_updated: 2026-04-26 (après R22 → R22h, R23-A → R23-O, R24-A → R24b, R25-A → R25-H, R23-N, R25b-A/B/C, R26, R27, R28, R29, R30, R31, R32, R33, R34, R35-A → R35-E, R36-A → R36-P, R37-A/B/C, R38-A → R38-J, R39-A → R39-O, R40-A/B/C/D)
+last_updated: 2026-04-26 (après R22 → R22h, R23-A → R23-O, R24-A → R24b, R25-A → R25-H, R23-N, R25b-A/B/C, R26, R27, R28, R29, R30, R31, R32, R33, R34, R35-A → R35-E, R36-A → R36-P, R37-A/B/C, R38-A → R38-J, R39-A → R39-O, R40-A/B/C/D/E)
 ---
 
 # Handoff — Veille Parlementaire Sport
@@ -240,6 +240,13 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 ---
 
 ## Historique
+
+- 2026-04-26 (après-midi, post-revue Cyril) : **R40-E — Réintégration commission affaires sociales Sénat (agenda + CR)**. Question Cyril « pourquoi avons-nous sorti la commission des affaires sociales ? ». Investigation : R35-D (2026-04-24) avait sorti PO211493 (Sénat) et PO420120 (AN) du `SPORT_RELEVANT_ORGANES` parce que **dans le contexte du bypass organe R27 ACTIF**, ces commissions remontaient automatiquement avec >90 % de bruit off-topic (retraites, sécu, droit du travail, assurance maladie). MAIS R39-K (2026-04-25) a complètement désactivé le bypass organe R27 — désormais SEUL le matching keyword métier décide ce qui remonte. **L'argument R35-D ne tient donc plus pour R40-B/R40-C/R40-E** : ajouter affaires sociales aux sources YAML ne crée pas de nouveau bruit, seules les rares réunions genuinement sport (santé sportive, dopage médical, retraites athlètes de haut niveau, sport sur ordonnance) remontent via match keyword.
+  **2 nouvelles entrées YAML** (toutes côté Sénat — l'agenda AN couvre déjà toutes commissions globalement) :
+  - `senat_agenda_affaires_sociales` (PO211493, slug standard `commission-des-affaires-sociales/agenda-de-la-commission.html`)
+  - `senat_cr_affaires_sociales` (PO211493, slug listing `affaires-sociales.html`)
+  **Pas de modification de `assemblee_organes.py`** : `SPORT_RELEVANT_ORGANES` reste sans PO211493/PO420120 — le set n'étant plus consulté depuis R39-K, le toucher serait du bruit historique. Le commentaire R35-D dans le module reste valide pour traçabilité.
+  **Tests R40-B et R40-C ajustés** : remplacement des assertions `test_yaml_r40b_no_affaires_sociales` / `test_yaml_r40c_no_affaires_sociales` (qui durcissaient R35-D) par `test_yaml_r40e_affaires_sociales_reintegree` / `..._cr` qui valident l'inverse — la commission affaires sociales doit être présente. `test_yaml_4_sources_*` renommé en `..._5_sources_*` (4 → 5 commissions actives par catégorie). 665 → 665 tests verts (substitutions, pas additions). Affaires économiques + Aménagement du territoire restent écartées (slugs CR différents et faible recoupement avec sport — à reconsidérer si angle mort observé).
 
 - 2026-04-26 (après-midi, post-revue Cyril) : **R40-D — Fix blocklist : URL navigable amendements AN ne matchait jamais**. Bug structurel découvert via Cyril qui a constaté en prod le 2026-04-26 que les 2 amendements `2632/CION-DVP/CD495` et `CD492` qu'il avait blocklistés en R39-O étaient toujours visibles sur https://veille.sideline-conseil.fr/items/amendements/. Cause racine : le pipeline `assemblee.py:_normalize_amendement` ligne 799 stocke l'URL au format **technique** `https://www.assemblee-nationale.fr/dyn/17/amendements/<UID_TECHNIQUE>` (où `UID_TECHNIQUE = AMANR5L17PO419865B2632P0D1N000495`), pas au format **navigable** `https://www.assemblee-nationale.fr/dyn/17/amendements/<TEXTE>/CION-<XXX>/<CD<NUM>>` qui apparaît dans la barre du navigateur. Les 2 entrées URL R39-O utilisaient la forme navigable → match toujours raté → items toujours visibles.
   **Fix R40-D en 3 axes** :

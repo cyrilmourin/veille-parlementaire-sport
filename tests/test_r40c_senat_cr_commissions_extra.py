@@ -62,10 +62,12 @@ def _load_senat_cr_sources() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def test_yaml_4_sources_senat_cr_commissions():
-    """1 R37-A + 3 R40-C = 4 sources actives en CR commission Sénat."""
+def test_yaml_5_sources_senat_cr_commissions():
+    """1 R37-A + 3 R40-C + 1 R40-E = 5 sources actives.
+    R40-E (2026-04-26) a réintégré la commission affaires sociales
+    (PO211493) après que R39-K ait désactivé le bypass organe R27."""
     sources = _load_senat_cr_sources()
-    assert len(sources) == 4
+    assert len(sources) == 5
 
 
 def test_yaml_r40c_three_new_ids_present():
@@ -86,12 +88,15 @@ def test_yaml_r40c_codes_organes_distincts():
     assert len(codes) == len(set(codes))
 
 
-def test_yaml_r40c_no_affaires_sociales():
-    """Régression R35-D : la commission affaires sociales (PO211493) ne
-    doit JAMAIS être ajoutée côté CR non plus."""
-    for s in _load_senat_cr_sources():
-        assert s["commission_organe"] != "PO211493"
-        assert "affaires sociales" not in (s.get("commission_label") or "").lower()
+def test_yaml_r40e_affaires_sociales_reintegree_cr():
+    """R40-E (2026-04-26) — symétrique côté CR : réintégration de la
+    commission affaires sociales (PO211493). Remplace l'ancien
+    `test_yaml_r40c_no_affaires_sociales` qui durcissait R35-D —
+    supprimé en R40-E (R39-K rend R35-D obsolète)."""
+    by_id = {s["id"]: s for s in _load_senat_cr_sources()}
+    assert "senat_cr_affaires_sociales" in by_id
+    assert by_id["senat_cr_affaires_sociales"]["commission_organe"] == "PO211493"
+    assert by_id["senat_cr_affaires_sociales"]["url"].endswith("/affaires-sociales.html")
 
 
 def test_yaml_r40c_urls_pointent_vers_compte_rendu_commissions():
