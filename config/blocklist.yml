@@ -63,3 +63,44 @@ blocklist:
     reason: "Faux positif keyword football sur PJL agricoles n°2632 (métaphore terrain de football)"
   - uid: an_amendements::AMANR5L17PO419865B2632P0D1N000492
     reason: "Faux positif keyword football sur PJL agricoles n°2632 (métaphore terrain de football)"
+
+  # 2026-04-26 (R40-F) — Pages "régions" du site CPSF (france-paralympique.fr)
+  # exposées par maladresse dans le flux/listing HTML : ce sont des index
+  # régionaux non datés, pas des actualités, qui remontent en `communiques`
+  # à chaque run avec un slug-based title vide d'information utile pour la
+  # veille. Source upstream à corriger côté CPSF, blocklist en attendant.
+  # Note : URL fournie par Cyril a un double slash `//region/` qui reflète
+  # exactement le bug de génération côté Drupal CPSF (vérifié via curl du
+  # listing HTML 2026-04-26) — ne PAS dédupliquer en `/region/`.
+  - url: https://france-paralympique.fr/actualites//region/auvergne-rhone-alpes
+    reason: "Page index régional CPSF (pas une actualité)"
+  - url: https://france-paralympique.fr/actualites//region/bourgogne-franche-comte
+    reason: "Page index régional CPSF (pas une actualité)"
+  - url: https://france-paralympique.fr/actualites//region/bretagne
+    reason: "Page index régional CPSF (pas une actualité)"
+  - url: https://france-paralympique.fr/actualites//region/centre-val-de-loire
+    reason: "Page index régional CPSF (pas une actualité)"
+  - url: https://france-paralympique.fr/actualites//region/grand-est
+    reason: "Page index régional CPSF (pas une actualité)"
+  - url: https://france-paralympique.fr/actualites//region/hauts-de-france
+    reason: "Page index régional CPSF (pas une actualité)"
+  - url: https://france-paralympique.fr/actualites//region/ile-de-france
+    reason: "Page index régional CPSF (pas une actualité)"
+  - url: https://france-paralympique.fr/actualites//region/normandie
+    reason: "Page index régional CPSF (pas une actualité)"
+  - url: https://france-paralympique.fr/actualites//region/nouvelle-aquitaine
+    reason: "Page index régional CPSF (pas une actualité)"
+  - url: https://france-paralympique.fr/actualites//region/occitanie
+    reason: "Page index régional CPSF (pas une actualité)"
+  - url: https://france-paralympique.fr/actualites//region/pays-de-la-loire
+    reason: "Page index régional CPSF (pas une actualité)"
+  - url: https://france-paralympique.fr/actualites//region/provence-alpes-cote-dazur
+    reason: "Page index régional CPSF (pas une actualité)"
+
+  # 2026-04-26 (R40-F) — Page statique de présentation du Comité de
+  # déontologie du CNOSF, exposée par le sitemap en tant que ressource
+  # mais sans valeur d'actualité pour la veille (pas de date, pas de
+  # contenu événementiel). Faux positif keyword via « comité » /
+  # « déontologie » / « CNOSF ».
+  - url: https://cnosf.franceolympique.com/comite-de-deontologie-du-cnosf
+    reason: "Page statique CNOSF (pas une actualité, structure permanente)"
