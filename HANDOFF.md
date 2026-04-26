@@ -1,7 +1,7 @@
 ---
 title: Veille Parlementaire Sport — Handoff
 maintainer: Cyril Mourin
-last_updated: 2026-04-26 (après R22 → R22h, R23-A → R23-O, R24-A → R24b, R25-A → R25-H, R23-N, R25b-A/B/C, R26, R27, R28, R29, R30, R31, R32, R33, R34, R35-A → R35-E, R36-A → R36-P, R37-A/B/C, R38-A → R38-J, R39-A → R39-O, R40-A/B/C/D/E/F/G)
+last_updated: 2026-04-26 (après R22 → R22h, R23-A → R23-O, R24-A → R24b, R25-A → R25-H, R23-N, R25b-A/B/C, R26, R27, R28, R29, R30, R31, R32, R33, R34, R35-A → R35-E, R36-A → R36-P, R37-A/B/C, R38-A → R38-J, R39-A → R39-O, R40-A/B/C/D/E/F/G/H)
 ---
 
 # Handoff — Veille Parlementaire Sport
@@ -240,6 +240,8 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 ---
 
 ## Historique
+
+- 2026-04-26 (après-midi, alignement cross-repo Lidl) : **R40-H — Bump limite extraction CR 100k → 200k chars** (×2). Cyril a porté R40-G côté veille parlementaire Lidl en retenant 200 000 chars comme nouveau plafond (vs 100k initialement choisi côté Sport). Alignement cross-repo cohérent : même architecture, mêmes types de CR, mêmes sources upstream (Sénat / AN open data). 200k couvre encore mieux les CR plénières les plus longs (200-400k chars) et garde une marge confortable sur les commissions multi-sujets. Coût inchangé : ~6 Mo SQLite supplémentaires (vs 5 Mo avec 100k), négligeable. Modifs mécaniques `100000` → `200000` sur 6 fichiers (4 sources Python + YAML + tests). Tests R40-G renommés/ajustés (`test_an_extract_pdf_text_default_max_chars_100k` → `..._200k`, etc.). 677 → 677 tests verts (substitutions). Re-déclenchement nécessaire de `reset_category=comptes_rendus` après merge pour que les CR ré-ingérés en R40-G (avec 100k) soient ré-ré-ingérés avec 200k.
 
 - 2026-04-26 (après-midi, signalement Cyril cross-repo Lidl + question CR plénières) : **R40-G — Limite extraction CR PDF/HTML 10k → 100k chars (×10) sur 4 sources : commissions ET séances plénières**. Information remontée par Cyril depuis une session de la veille parlementaire Lidl où 5/9 CR de test rataient le matching keyword à cause de la troncature à 10 000 caractères dans `_extract_pdf_text` — sur les CR longs (60-180k chars), les keywords cibles apparaissent souvent au-delà du 10k-ème caractère. Cyril a aussi soulevé la question de la symétrie pour les CR de séances plénières.
   **Audit révèle un problème encore plus marqué côté plénières** : `senat_debats` / `senat_cri` / `an_syceron` n'exposaient PAS de `haystack_body` du tout — le matcher ne voyait que `summary[:2000]`. Pour une séance plénière qui couvre 5-10 sujets sur 200-400k chars, le bloc sport peut tomber à la position 100k → CR ignoré à tort.

@@ -400,12 +400,12 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
 
         # Résumé : tronqué à 2000 caractères pour l'affichage UI.
         summary = text[:2000]
-        # R40-G (2026-04-26) : haystack_body 100k chars exposé au matcher
+        # R40-G (2026-04-26) : haystack_body 200k chars exposé au matcher
         # mots-clés. Avant ce patch, le matcher ne voyait que `summary[:2000]`
         # — pour une séance plénière de 200-400k chars couvrant 5-10 sujets,
-        # le bloc sport pouvait être à la position 100k, hors haystack →
+        # le bloc sport pouvait être à la position 200k, hors haystack →
         # CR plénier non matché alors qu'il discutait du sport. La limite
-        # 100k aligne `senat_debats`/`senat_cri` et `an_syceron` sur le
+        # 200k aligne `senat_debats`/`senat_cri` et `an_syceron` sur le
         # même budget que les CR commissions (an_cr_commissions PDF +
         # senat_cr_commissions HTML).
 
@@ -431,7 +431,7 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
                 # R40-G : haystack consommé par KeywordMatcher.apply pour
                 # scanner le contenu complet de la séance, pas juste le
                 # summary tronqué à 2000 chars.
-                "haystack_body": text[:100000],
+                "haystack_body": text[:200000],
                 # Date officielle de séance (depuis timeStampDebut du XML).
                 # Consommée par _fix_cr_row : permet au rebuild du site
                 # d'écrire le titre correct même pour les items déjà en DB.

@@ -320,7 +320,7 @@ senat:
       commission_label: Commission culture/éducation/communication/sport
       commission_organe: PO211490
       max_new_per_run: 8
-      body_max_chars: 100000
+      body_max_chars: 200000
 
     # R40-C (2026-04-26) — CR hebdo Commission des lois Sénat. Slug
     # listing court `lois.html`. Les CR commission contiennent souvent
@@ -334,7 +334,7 @@ senat:
       commission_label: Commission des lois Sénat
       commission_organe: PO211495
       max_new_per_run: 8
-      body_max_chars: 100000
+      body_max_chars: 200000
 
     # R40-C (2026-04-26) — CR hebdo Commission des finances Sénat. Slug
     # listing `finances.html`. Sujets sport courants : budget MinSports,
@@ -346,7 +346,7 @@ senat:
       commission_label: Commission des finances Sénat
       commission_organe: PO211494
       max_new_per_run: 8
-      body_max_chars: 100000
+      body_max_chars: 200000
 
     # R40-C (2026-04-26) — CR hebdo Commission affaires étrangères, défense
     # et forces armées Sénat. Slug listing `affaires-etrangeres.html`.
@@ -359,7 +359,7 @@ senat:
       commission_label: Commission affaires étrangères Sénat
       commission_organe: PO211491
       max_new_per_run: 8
-      body_max_chars: 100000
+      body_max_chars: 200000
 
     # R40-E (2026-04-26) — CR hebdo Commission affaires sociales Sénat
     # (PO211493). Symétrique avec senat_agenda_affaires_sociales : R39-K
@@ -373,7 +373,7 @@ senat:
       commission_label: Commission affaires sociales Sénat
       commission_organe: PO211493
       max_new_per_run: 8
-      body_max_chars: 100000
+      body_max_chars: 200000
 
     # R16 (2026-04-22) — Flux RSS Sénat thème "Sports" (N=31).
     # R19-B (2026-04-23) : DÉSACTIVÉ. Ce flux remontait des documents

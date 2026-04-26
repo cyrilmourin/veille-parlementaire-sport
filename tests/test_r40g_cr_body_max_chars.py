@@ -1,4 +1,4 @@
-"""R40-G (2026-04-26) — Limite extraction CR PDF/HTML 10k → 100k chars.
+"""R40-G (2026-04-26) — Limite extraction CR PDF/HTML 10k → 200k chars.
 
 Contexte : signalé par Cyril 2026-04-26 depuis une session de la veille
 Lidl où 5/9 CR de test rataient le matching keyword à cause de la
@@ -12,10 +12,10 @@ Symétrie côté veille sport :
 - Sénat : `body_max_chars` en YAML + default dans
   `src/sources/senat_cr_commissions.py`
 
-Trade-off : 100k chars = ~100 pages PDF stripées, couvre >95 % des CR
+Trade-off : 200k chars = ~100 pages PDF stripées, couvre >95 % des CR
 sport-relevants (Commission culture/sport notamment, qui examine
 souvent audiovisuel + école + ESR + sport + JOP en une séance). Coût
-mémoire ~100k × 32 CR/run = 3 Mo, négligeable.
+mémoire ~200k × 32 CR/run = ~6 Mo, négligeable.
 """
 from __future__ import annotations
 
@@ -38,19 +38,19 @@ SOURCES_YAML = Path(__file__).resolve().parent.parent / "config" / "sources.yml"
 # ---------------------------------------------------------------------------
 
 
-def test_an_extract_pdf_text_default_max_chars_100k():
-    """Le default de `_extract_pdf_text` est désormais 100 000 (×10 vs R39)."""
+def test_an_extract_pdf_text_default_max_chars_200k():
+    """Le default de `_extract_pdf_text` est désormais 200 000 (×10 vs R39)."""
     import inspect
     sig = inspect.signature(an_mod._extract_pdf_text)
-    assert sig.parameters["max_chars"].default == 100000
+    assert sig.parameters["max_chars"].default == 200000
 
 
-def test_senat_cr_default_body_max_100k():
-    """Le default de `body_max_chars` côté Sénat est aussi à 100 000.
+def test_senat_cr_default_body_max_200k():
+    """Le default de `body_max_chars` côté Sénat est aussi à 200 000.
     Vérifié indirectement via fetch_source : sans `body_max_chars` dans
-    le src, on prend 100k. Smoke check sur un body fictif > 10k."""
+    le src, on prend 200k. Smoke check sur un body fictif > 10k."""
     # Body de ~30k chars de bruit + keyword à la position ~30k (au-delà
-    # de l'ancienne limite 10k mais sous la nouvelle limite 100k).
+    # de l'ancienne limite 10k mais sous la nouvelle limite 200k).
     filler = "X " * 15000  # 30k chars
     long_body_with_match = filler + " mot-cle-au-milieu-tres-loin " + filler
     listing = (
@@ -87,7 +87,7 @@ def test_senat_cr_default_body_max_100k():
 
 
 # ---------------------------------------------------------------------------
-# 2. YAML — toutes les sources senat_cr_commissions_html sont à 100k
+# 2. YAML — toutes les sources senat_cr_commissions_html sont à 200k
 # ---------------------------------------------------------------------------
 
 
@@ -104,17 +104,17 @@ def _load_senat_cr_sources() -> list[dict]:
     return out
 
 
-def test_yaml_toutes_sources_cr_a_100k():
+def test_yaml_toutes_sources_cr_a_200k():
     """Les 5 sources `senat_cr_*` (culture + lois + finances + etrangeres
-    + affaires_sociales) doivent avoir `body_max_chars: 100000`.
+    + affaires_sociales) doivent avoir `body_max_chars: 200000`.
     Régression du R40-G : éviter qu'une nouvelle source soit ajoutée
     avec l'ancien default 10k par habitude copier-coller."""
     sources = _load_senat_cr_sources()
     assert len(sources) >= 5  # 1 R37-A + 3 R40-C + 1 R40-E
     for s in sources:
         bm = s.get("body_max_chars")
-        assert bm == 100000, (
-            f"{s['id']} : body_max_chars={bm} (attendu 100000). "
+        assert bm == 200000, (
+            f"{s['id']} : body_max_chars={bm} (attendu 200000). "
             "Si on baisse volontairement, mettre un commentaire en YAML.")
 
 
@@ -145,18 +145,18 @@ def test_an_extract_respecte_max_chars_explicite():
     sys.modules["pypdf"] = fake_pypdf
     try:
         out_5k = an_mod._extract_pdf_text(b"unused", max_chars=5000)
-        out_100k = an_mod._extract_pdf_text(b"unused", max_chars=100000)
+        out_200k = an_mod._extract_pdf_text(b"unused", max_chars=200000)
         out_default = an_mod._extract_pdf_text(b"unused")
     finally:
         del sys.modules["pypdf"]
 
     # max_chars=5000 → 5k chars max
     assert len(out_5k) <= 5000
-    # max_chars=100000 → on doit sortir entre 50k et 100k (les 200 pages
-    # contiennent 200k, tronqué à 100k)
-    assert 50000 <= len(out_100k) <= 100000
-    # default : 100k
-    assert 50000 <= len(out_default) <= 100000
+    # max_chars=200000 → on doit sortir entre 50k et 200k (les 200 pages
+    # contiennent 200k, tronqué à 200k)
+    assert 50000 <= len(out_200k) <= 200000
+    # default : 200k
+    assert 50000 <= len(out_default) <= 200000
 
 
 def test_an_extract_pdf_text_default_couvre_au_dela_de_10k():
@@ -194,7 +194,7 @@ def test_an_extract_pdf_text_default_couvre_au_dela_de_10k():
         del sys.modules["pypdf"]
 
     # Avec l'ancien default 10k, "sport" en page 2 (offset ~30k) était
-    # tronqué hors haystack. Avec 100k, il doit y être.
+    # tronqué hors haystack. Avec 200k, il doit y être.
     assert "sport" in out
     assert "dopage" in out
     assert len(out) > 30000, (
@@ -203,7 +203,7 @@ def test_an_extract_pdf_text_default_couvre_au_dela_de_10k():
 
 # ---------------------------------------------------------------------------
 # 4. CR plénières (Sénat senat_debats/senat_cri + AN an_syceron) :
-#    haystack_body 100k désormais exposé. Avant R40-G, NI summary 2000c
+#    haystack_body 200k désormais exposé. Avant R40-G, NI summary 2000c
 #    NI haystack_body → matcher ne voyait que les premiers 2000c du CR
 #    plénier de 200-400k chars. Bug pire que le 10k des commissions.
 # ---------------------------------------------------------------------------
@@ -217,9 +217,9 @@ def test_senat_plenary_haystack_body_present_dans_raw():
     src_path = senat_plen_mod.__file__
     with open(src_path, encoding="utf-8") as f:
         src_code = f.read()
-    # La clé doit être assignée dans le raw avec la limite 100k
-    assert '"haystack_body": text[:100000]' in src_code, (
-        "senat.py:_fetch_debats_zip doit exposer haystack_body[:100000] "
+    # La clé doit être assignée dans le raw avec la limite 200k
+    assert '"haystack_body": text[:200000]' in src_code, (
+        "senat.py:_fetch_debats_zip doit exposer haystack_body[:200000] "
         "(R40-G)")
 
 
@@ -228,6 +228,6 @@ def test_an_syceron_haystack_body_present_dans_raw():
     src_path = an_plen_mod.__file__
     with open(src_path, encoding="utf-8") as f:
         src_code = f.read()
-    assert '"haystack_body": text[:100000]' in src_code, (
-        "assemblee.py:_normalize_syceron doit exposer haystack_body[:100000] "
+    assert '"haystack_body": text[:200000]' in src_code, (
+        "assemblee.py:_normalize_syceron doit exposer haystack_body[:200000] "
         "(R40-G)")

@@ -188,7 +188,7 @@ def fetch_source(src: dict) -> list[Item]:
       - commission_label: libellé long à préfixer au titre (R35-E)
       - commission_organe: code PO pour bypass organe (R27)
       - max_new_per_run : nb max de CR hebdo fetchés par run (défaut 8)
-      - body_max_chars  : taille max du haystack_body (défaut 100000 —
+      - body_max_chars  : taille max du haystack_body (défaut 200000 —
                           R40-G, voir doc dans an_cr_commissions.py
                           `_extract_pdf_text`)
     """
@@ -198,7 +198,7 @@ def fetch_source(src: dict) -> list[Item]:
     commission_label = (src.get("commission_label") or "").strip()
     commission_organe = (src.get("commission_organe") or "").strip()
     max_new = int(src.get("max_new_per_run", 8))
-    body_max = int(src.get("body_max_chars", 100000))
+    body_max = int(src.get("body_max_chars", 200000))
 
     try:
         listing_html = fetch_text(listing_url)
