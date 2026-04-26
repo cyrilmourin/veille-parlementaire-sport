@@ -294,6 +294,85 @@ def _strip_xml(text: str) -> str:
     return _WS_RE.sub(" ", no_tags).strip()
 
 
+# R40-J (2026-04-27) — pattern : tag XML d'ouverture porteur d'un attribut
+# `id_syceron="<n>"`. Présent sur les éléments structurels du XML Syceron
+# (compteRendu AN) : <para>, <titreStruct>, <presidentSeance>, <sommaire1/2/3>,
+# <lienAdt>, etc. La page HTML AN /dyn/17/comptes-rendus/seance/<cr_ref>
+# expose ces mêmes valeurs en attribut HTML `id="<n>"` standard, ce qui
+# permet une URL `…#<id_syceron>` qui scrolle au paragraphe précis sur
+# tous les navigateurs (Firefox inclus).
+_SYCERON_ID_OPEN_RE = re.compile(r'<\w+\s+[^>]*id_syceron="(\d+)"[^>]*>')
+
+
+def _strip_xml_with_anchors(text: str) -> tuple[str, list[tuple[int, str]]]:
+    """R40-J — strip XML Syceron en track les positions `id_syceron`.
+
+    Retourne `(stripped_text, anchors)` où `anchors` est une liste
+    `[(char_offset_in_stripped, id_syceron), ...]` triée par offset.
+    Permet à l'export site_export de retrouver, après matching keyword,
+    l'`id_syceron` du paragraphe qui contient le 1er match — pour
+    construire une URL ancre absolue `…#<id>` (scroll multi-navigateur).
+
+    Algorithme single-pass O(N) : on parcourt le XML par chunks
+    délimités par les tags d'ouverture porteurs d'`id_syceron`. Pour
+    chaque chunk on strippe les tags + collapse les whitespaces, puis
+    on cumule la longueur dans `cumul`. À chaque tag avec id_syceron
+    rencontré, on note `(cumul, id)` qui correspond approximativement
+    à la position où commence le contenu de ce paragraphe dans le
+    texte stripé final.
+
+    Approximation : la collapse-and-strip par chunk introduit ±2 chars
+    d'imprécision aux bornes de chunk, négligeable pour un usage
+    "trouver le paragraphe contenant l'offset X" (les paragraphes
+    Syceron font typiquement 100-1000 chars, l'imprécision est < 1 %).
+
+    Si le pattern n'apparaît pas (XML non-Syceron, ou Syceron très
+    ancien sans id_syceron), retourne `(text_strippé, [])` —
+    comportement identique à `_strip_xml`.
+    """
+    parts: list[str] = []
+    anchors: list[tuple[int, str]] = []
+    cumul = 0
+    last_end = 0
+
+    for m in _SYCERON_ID_OPEN_RE.finditer(text):
+        # Strippe le chunk entre last_end et m.start() (inclut éventuels
+        # tags non-id_syceron + le tag d'ouverture précédent).
+        chunk = text[last_end:m.start()]
+        stripped = _TAG_RE.sub(" ", chunk)
+        normalized = _WS_RE.sub(" ", stripped).strip()
+        if normalized:
+            if parts:
+                parts.append(" ")
+                cumul += 1
+            parts.append(normalized)
+            cumul += len(normalized)
+        # Le contenu de ce paragraphe commence après le tag d'ouverture.
+        # On note l'ancre à la position cumul actuelle.
+        if parts:
+            # Espace de transition pour bien séparer du chunk précédent
+            parts.append(" ")
+            cumul += 1
+        anchors.append((cumul, m.group(1)))
+        last_end = m.end()
+
+    # Queue : tout après le dernier tag-avec-id.
+    chunk = text[last_end:]
+    stripped = _TAG_RE.sub(" ", chunk)
+    normalized = _WS_RE.sub(" ", stripped).strip()
+    if normalized:
+        if parts:
+            parts.append(" ")
+        parts.append(normalized)
+
+    out_text = "".join(parts).strip()
+    # Re-collapse final (les " " que parts contient peuvent doubler
+    # après strip d'un chunk vide). Mais ça décale les anchors. Pour
+    # rester simple : on ne fait PAS de re-collapse final, on a déjà
+    # collapsé chaque chunk individuellement.
+    return out_text, anchors
+
+
 def _decode(payload: bytes) -> str:
     """Décode un payload texte (XML/HTML) en essayant utf-8 puis cp1252."""
     for enc in ("utf-8", "cp1252", "iso-8859-1"):
@@ -340,7 +419,11 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
         except Exception as e:
             log.debug("decode KO %s: %s", name, e)
             continue
-        text = _strip_xml(raw)
+        # R40-J (2026-04-27) — strip avec tracking des id_syceron pour
+        # permettre une ancre absolue `…#<id>` à l'export (scroll
+        # multi-navigateur, Firefox inclus). Si le XML ne contient
+        # aucun id_syceron, retombe sur strip naïf (anchors vide).
+        text, syceron_anchors = _strip_xml_with_anchors(raw)
         if not text:
             continue
 
@@ -432,6 +515,17 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
                 # scanner le contenu complet de la séance, pas juste le
                 # summary tronqué à 2000 chars.
                 "haystack_body": text[:200000],
+                # R40-J (2026-04-27) — index `[(char_offset, id_syceron), ...]`
+                # qui mappe les positions dans `haystack_body` aux IDs des
+                # paragraphes Syceron. Consommé à l'export (site_export R13-K)
+                # pour construire une URL ancre absolue `…#<id_syceron>` qui
+                # scrolle au paragraphe précis (Firefox inclus). Bornage : on
+                # ne garde que les ancres dont l'offset tombe dans le
+                # haystack tronqué à 200k — au-delà l'ancre serait orpheline.
+                "syceron_index": [
+                    [off, aid] for off, aid in syceron_anchors
+                    if off < 200000
+                ],
                 # Date officielle de séance (depuis timeStampDebut du XML).
                 # Consommée par _fix_cr_row : permet au rebuild du site
                 # d'écrire le titre correct même pour les items déjà en DB.

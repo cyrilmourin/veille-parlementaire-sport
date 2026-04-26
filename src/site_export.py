@@ -2797,12 +2797,59 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         # au navigateur (Chrome, Edge, Safari 16.4+) de sauter directement
         # à la 1re occurrence du kw dans la page AN/Sénat. Firefox le
         # dégrade silencieusement (URL normale). Pas d'ancre si pas de kw.
+        #
+        # R40-J (2026-04-27) — pour les CR plénières AN (`an_syceron`) on
+        # utilise une ancre absolue `…#<id_syceron>` quand on en a une.
+        # Le XML Syceron expose un `id_syceron="<n>"` sur chaque paragraphe
+        # et la page HTML AN expose ces mêmes valeurs en attribut HTML
+        # `id="<n>"` standard — donc l'ancre fonctionne sur TOUS les
+        # navigateurs (Firefox inclus), pas seulement Chromium/WebKit.
+        # `raw.syceron_index` (posé par assemblee._normalize_syceron) liste
+        # `[[char_offset, id_syceron], ...]` triable. On bisect pour trouver
+        # le paragraphe contenant le 1er match keyword dans `haystack_body`.
+        # Sources autres que `an_syceron` : pas d'index Syceron → fallback
+        # text-fragment R13-K (Chrome/Edge/Safari OK, Firefox dégradé).
         if cat == "comptes_rendus" and source_url and "#" not in source_url:
             kws = r.get("matched_keywords") or []
             if kws:
-                from urllib.parse import quote
-                fragment = quote(str(kws[0]), safe="")
-                source_url = f"{source_url}#:~:text={fragment}"
+                anchor_used = False
+                # R40-J : tentative ancre absolue Syceron
+                _raw_cr = (
+                    r.get("raw") if isinstance(r.get("raw"), dict) else {}
+                )
+                if not isinstance(_raw_cr, dict):
+                    _raw_cr = {}
+                _idx = _raw_cr.get("syceron_index") or []
+                _hb = (_raw_cr.get("haystack_body") or "")
+                if _idx and _hb:
+                    # Cherche la position du 1er kw dans le haystack
+                    # (case-insensitive, sans normalisation lourde —
+                    # `find` sur lower est suffisant pour des keywords
+                    # typiques type 'sport', 'JOP', 'AFLD' qui n'ont
+                    # pas de variantes accentuées au cœur).
+                    _hb_low = _hb.lower()
+                    _kw_pos = -1
+                    for _kw in kws:
+                        _p = _hb_low.find(str(_kw).lower())
+                        if _p >= 0:
+                            _kw_pos = _p
+                            break
+                    if _kw_pos >= 0:
+                        # Bisect : plus grand offset <= _kw_pos
+                        import bisect as _bi
+                        _offsets = [it[0] for it in _idx if isinstance(it, list)]
+                        if _offsets:
+                            _i = _bi.bisect_right(_offsets, _kw_pos) - 1
+                            if 0 <= _i < len(_idx):
+                                _anchor = _idx[_i][1]
+                                if _anchor:
+                                    source_url = f"{source_url}#{_anchor}"
+                                    anchor_used = True
+                # Fallback R13-K : text-fragment (dégrade sur Firefox)
+                if not anchor_used:
+                    from urllib.parse import quote
+                    fragment = quote(str(kws[0]), safe="")
+                    source_url = f"{source_url}#:~:text={fragment}"
         # R13-D / R14 : la longueur du snippet est désormais imposée en
         # amont dans `_load` via `build_snippet(..., max_len=target)`.
         # Ici on ne fait plus que :
