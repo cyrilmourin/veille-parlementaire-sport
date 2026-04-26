@@ -1499,6 +1499,52 @@ def _filter_disabled_sources(rows: list[dict]) -> list[dict]:
 # d'autres items légitimes). Cf. config/blocklist.yml.
 _BLOCKLIST_PATH = Path(__file__).resolve().parent.parent / "config" / "blocklist.yml"
 
+# R40-L (2026-04-27) — Bascule Sénat /dossier-legislatif/ → /leg/ pour les
+# slugs modernes, afin que le text-fragment `#:~:text=<kw>` matche sur le
+# corps complet du texte législatif au lieu d'un INDEX (titre + timeline).
+#
+# La page `/dossier-legislatif/<slug>.html` est un index : titre, timeline,
+# statut, mais PAS le corps du texte. Conséquence : un text-fragment ne
+# matche que si le keyword se trouve dans le titre — sinon le navigateur
+# reste au top de la page. Côté AN (`/dyn/17/dossiers/<uid>`) c'est moins
+# visible : la page répète titre + libellés des actes, le keyword s'y
+# trouve souvent.
+#
+# La page `/leg/<slug>.html` contient l'exposé des motifs + articles +
+# signatures = matériel riche en mots-clés thématiques. Empiriquement :
+#   - sessions 2019-2026 : /leg/ publié (HTTP 200) tant que le numéro a
+#     été utilisé pour un dépôt
+#   - sessions 2018 et avant : 404 systématiques (textes non migrés sous
+#     la nouvelle URL)
+#
+# La regex restreint aux sessions 2019-2029 pour éviter de casser les
+# liens anciens.
+#
+# Source : port côté veille parlementaire Lidl 2026-04-27, signalé par
+# Cyril ; vérifié live sur 5 slugs Sport (ppl24-247, ppr25-069, pjl23-020,
+# pjl22-220 JOP 2024, pjl24-630 JOP 2030 = tous 200 OK).
+_SENAT_LEG_BASCULE_RE = re.compile(
+    r"(?P<base>https?://(?:www\.)?senat\.fr)"
+    r"/dossier-legislatif/(?P<slug>(?:ppl|ppr|pjl)(?:19|2\d)-\d+)\.html?",
+    re.IGNORECASE,
+)
+
+
+def _senat_dosleg_to_leg(url: str) -> str:
+    """Bascule `/dossier-legislatif/<slug>.html` → `/leg/<slug>.html`
+    pour les slugs Sénat modernes (sessions 2019-2029).
+
+    Idempotent : URL inchangée si déjà `/leg/`, si AN, si autre domaine,
+    ou si slug ancien (préfixe session ≠ 19/2x). Cf. doc en tête de fichier.
+    """
+    if not url:
+        return url
+    m = _SENAT_LEG_BASCULE_RE.search(url)
+    if not m:
+        return url
+    return f"{m.group('base')}/leg/{m.group('slug')}.html"
+
+
 # R40-D (2026-04-26) — Garde-fou : la forme NAVIGABLE des URLs d'amendements
 # AN (`…/amendements/<TEXTE>/CION-<XXX>/<CD<NUM>>`) n'est JAMAIS stockée en
 # DB. Le pipeline stocke la forme TECHNIQUE `…/amendements/<UID_TECHNIQUE>`
@@ -2792,7 +2838,7 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         frontmatter_date = published_at_real or _inserted_at
         has_real_date = bool(published_at_real)
         source_url = (r.get("url") or "").replace('"', "")
-        # R13-K (2026-04-21) : pour les comptes rendus, on ajoute un
+        # R13-K (2026-04-21) : pour les comptes rendus, on ajoutait un
         # text-fragment (#:~:text=<kw>) sur le 1er mot-clé matché. Permet
         # au navigateur (Chrome, Edge, Safari 16.4+) de sauter directement
         # à la 1re occurrence du kw dans la page AN/Sénat. Firefox le
@@ -2809,46 +2855,72 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         # le paragraphe contenant le 1er match keyword dans `haystack_body`.
         # Sources autres que `an_syceron` : pas d'index Syceron → fallback
         # text-fragment R13-K (Chrome/Edge/Safari OK, Firefox dégradé).
-        if cat == "comptes_rendus" and source_url and "#" not in source_url:
+        #
+        # R40-L (2026-04-27) — élargissement du scope hors `comptes_rendus` :
+        # toutes les URLs AN/Sénat/Légifrance (dossiers législatifs,
+        # amendements, questions, JORF, communiqués officiels) bénéficient
+        # désormais du text-fragment. Bascule Sénat dosleg → /leg/ avant
+        # le fragment quand applicable (cf. `_senat_dosleg_to_leg`). Choix
+        # du keyword le plus long (max(kws, key=len)) plutôt que le 1er :
+        # un keyword long est plus distinctif → moins de collisions sur
+        # les pages riches en contenu varié (ex. « JOP 2030 » meilleur que
+        # « JO ». Source : port côté veille parlementaire Lidl 2026-04-27.
+        if (
+            source_url
+            and "#" not in source_url
+            and any(h in source_url.lower() for h in (
+                "assemblee-nationale.fr", "senat.fr", "legifrance.gouv.fr",
+            ))
+        ):
             kws = r.get("matched_keywords") or []
             if kws:
                 anchor_used = False
-                # R40-J : tentative ancre absolue Syceron
-                _raw_cr = (
-                    r.get("raw") if isinstance(r.get("raw"), dict) else {}
-                )
-                if not isinstance(_raw_cr, dict):
-                    _raw_cr = {}
-                _idx = _raw_cr.get("syceron_index") or []
-                _hb = (_raw_cr.get("haystack_body") or "")
-                if _idx and _hb:
-                    # Cherche la position du 1er kw dans le haystack
-                    # (case-insensitive, sans normalisation lourde —
-                    # `find` sur lower est suffisant pour des keywords
-                    # typiques type 'sport', 'JOP', 'AFLD' qui n'ont
-                    # pas de variantes accentuées au cœur).
-                    _hb_low = _hb.lower()
-                    _kw_pos = -1
-                    for _kw in kws:
-                        _p = _hb_low.find(str(_kw).lower())
-                        if _p >= 0:
-                            _kw_pos = _p
-                            break
-                    if _kw_pos >= 0:
-                        # Bisect : plus grand offset <= _kw_pos
-                        import bisect as _bi
-                        _offsets = [it[0] for it in _idx if isinstance(it, list)]
-                        if _offsets:
-                            _i = _bi.bisect_right(_offsets, _kw_pos) - 1
-                            if 0 <= _i < len(_idx):
-                                _anchor = _idx[_i][1]
-                                if _anchor:
-                                    source_url = f"{source_url}#{_anchor}"
-                                    anchor_used = True
-                # Fallback R13-K : text-fragment (dégrade sur Firefox)
+                # R40-J : tentative ancre absolue Syceron (CR AN seulement)
+                if cat == "comptes_rendus":
+                    _raw_cr = (
+                        r.get("raw") if isinstance(r.get("raw"), dict) else {}
+                    )
+                    if not isinstance(_raw_cr, dict):
+                        _raw_cr = {}
+                    _idx = _raw_cr.get("syceron_index") or []
+                    _hb = (_raw_cr.get("haystack_body") or "")
+                    if _idx and _hb:
+                        # Cherche la position du 1er kw dans le haystack
+                        # (case-insensitive, sans normalisation lourde —
+                        # `find` sur lower est suffisant pour des keywords
+                        # typiques type 'sport', 'JOP', 'AFLD' qui n'ont
+                        # pas de variantes accentuées au cœur).
+                        _hb_low = _hb.lower()
+                        _kw_pos = -1
+                        for _kw in kws:
+                            _p = _hb_low.find(str(_kw).lower())
+                            if _p >= 0:
+                                _kw_pos = _p
+                                break
+                        if _kw_pos >= 0:
+                            # Bisect : plus grand offset <= _kw_pos
+                            import bisect as _bi
+                            _offsets = [it[0] for it in _idx if isinstance(it, list)]
+                            if _offsets:
+                                _i = _bi.bisect_right(_offsets, _kw_pos) - 1
+                                if 0 <= _i < len(_idx):
+                                    _anchor = _idx[_i][1]
+                                    if _anchor:
+                                        source_url = f"{source_url}#{_anchor}"
+                                        anchor_used = True
+                # Fallback R13-K + R40-L : bascule Sénat puis text-fragment
                 if not anchor_used:
                     from urllib.parse import quote
-                    fragment = quote(str(kws[0]), safe="")
+                    # R40-L : bascule /dossier-legislatif/<slug>.html
+                    # → /leg/<slug>.html pour les slugs modernes (texte
+                    # intégral disponible). No-op pour AN, Légifrance,
+                    # ou slugs Sénat anciens. Cf. _senat_dosleg_to_leg.
+                    source_url = _senat_dosleg_to_leg(source_url)
+                    # R40-L : keyword le plus long → plus distinctif.
+                    # En cas d'égalité de longueur, max() prend le 1er
+                    # rencontré, comportement stable.
+                    kw_choice = max(kws, key=lambda k: len(str(k)))
+                    fragment = quote(str(kw_choice), safe="")
                     source_url = f"{source_url}#:~:text={fragment}"
         # R13-D / R14 : la longueur du snippet est désormais imposée en
         # amont dans `_load` via `build_snippet(..., max_len=target)`.
