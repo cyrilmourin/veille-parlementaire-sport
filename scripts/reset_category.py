@@ -70,6 +70,30 @@ def main():
     conn.commit()
     print(f"Supprimé : {cur.rowcount} items.")
 
+    # R39-M (2026-04-25) — purger aussi les state files des scrapers
+    # incrémentaux dont la catégorie correspond. Sans ça, le scraper
+    # voit ses numéros déjà dans `scanned` et SKIP au prochain run :
+    # les items purgés de la DB ne sont jamais re-créés.
+    _purge_incremental_state(args.category, args.source_id)
+
+
+def _purge_incremental_state(category: str, source_id: str | None) -> None:
+    """Purge les state files des scrapers incrémentaux concernés par la
+    catégorie. Aujourd'hui : `data/an_cr_state.json` pour les CR AN.
+    Idempotent : si le fichier n'existe pas, no-op."""
+    if category != "comptes_rendus":
+        return
+    if source_id and source_id != "an_cr_commissions":
+        return
+    state_path = ROOT / "data" / "an_cr_state.json"
+    if not state_path.exists():
+        return
+    try:
+        state_path.unlink()
+        print(f"State file purgé : {state_path}")
+    except OSError as exc:
+        print(f"Échec purge state {state_path} : {exc}", file=sys.stderr)
+
 
 if __name__ == "__main__":
     main()
