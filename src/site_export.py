@@ -1731,18 +1731,45 @@ def _merge_ids_into_winner(winner: dict, loser: dict) -> None:
     Sénat sur `pjl24-630.html` en gardant senat_promulguees (date desc),
     mais senat_promulguees n'a pas `url_an` — donc passe 2c perd le lien
     vers DLR5L17N52100 côté AN et les 2 items (AN + Sénat) restent.
+
+    R39-N (2026-04-26) — propage aussi les flags `is_promulgated` et
+    `status_label="Promulguée"` du loser vers le winner. Sans ça, depuis
+    R39-A (réactivation `senat_dosleg`), le CSV historique des dossiers
+    Sénat (qui contient TOUS les pjl, y compris les promulgués, mais
+    sans le flag promulgation) écrasait `senat_promulguees` au tiebreak
+    `_prefer()` (date de dépôt = date de promulgation → égalité → premier
+    rencontré → ordre alphabétique fetch : `senat_dosleg` < `senat_promulguees`)
+    et la chip « Promulguée » disparaissait du site (cas pjl22-220 / JOP 2024,
+    pjl24-630 / JOP 2030 confirmés en prod 2026-04-26). Le merge est
+    asymétrique : le loser ne peut QU'AJOUTER de l'info au winner, jamais
+    écraser. Si le winner a déjà `status_label="Retiré"` (R13-L) ou un
+    autre statut explicite, on ne le remplace pas. Si le loser a un
+    `status_label="Retiré"` (cas extrêmement rare), on prend la valeur la
+    plus informative selon une priorité fixe : Retiré > Promulguée > reste.
     """
     raw_w = winner.get("raw")
+    raw_l = loser.get("raw") if isinstance(loser.get("raw"), dict) else {}
     if not isinstance(raw_w, dict):
         return
     loser_ids = _item_dossier_ids(loser)
-    if not loser_ids:
-        return
-    existing = raw_w.get("_merged_dossier_ids")
-    if not isinstance(existing, list):
-        existing = []
-    cumul = set(existing) | loser_ids
-    raw_w["_merged_dossier_ids"] = sorted(cumul)
+    if loser_ids:
+        existing = raw_w.get("_merged_dossier_ids")
+        if not isinstance(existing, list):
+            existing = []
+        cumul = set(existing) | loser_ids
+        raw_w["_merged_dossier_ids"] = sorted(cumul)
+
+    # R39-N — fusion des métadonnées de statut "informatif" (promulgation,
+    # retrait). is_promulgated : OR logique. status_label : on prend la
+    # valeur la plus informative selon une priorité fixe.
+    if raw_l.get("is_promulgated") is True and not raw_w.get("is_promulgated"):
+        raw_w["is_promulgated"] = True
+
+    PRIORITY = {"Retiré": 3, "Promulguée": 2}
+    cur = (raw_w.get("status_label") or "").strip()
+    cand = (raw_l.get("status_label") or "").strip()
+    if cand and PRIORITY.get(cand, 0) > PRIORITY.get(cur, 1 if cur else 0):
+        raw_w["status_label"] = cand
 
 
 def _dedup(rows: list[dict]) -> list[dict]:
