@@ -1,0 +1,36 @@
+# Liste rouge — items à masquer du site (filtre à l'export, pas de purge DB).
+#
+# Usage : ajouter une entrée { url: ..., reason: ... } pour exclure un item
+# spécifique (typiquement un faux positif keyword qu'on ne veut pas faire
+# disparaître via une réécriture du dictionnaire keywords, parce que celle-ci
+# élargirait le retrait à d'autres items légitimes).
+#
+# Comment ça marche :
+#   - Le filtre `_filter_blocklist` dans `src/site_export.py` est appliqué à
+#     l'export, juste après `_filter_disabled_sources` (R22b).
+#   - L'item reste en DB et continue d'être ingéré au prochain run — donc
+#     retirer une entrée de cette liste le fait réapparaître au build suivant
+#     sans reset_db ni reset_category. Symétrique à `_filter_disabled_sources`.
+#   - Match par URL exacte (canonicalisée : strip scheme + lowercase host +
+#     pas de trailing slash) OU par UID préfixé `uid:<source_id>::<uid>`.
+#
+# Convention :
+#   - URL exacte recommandée pour les amendements / questions / dossiers
+#     (URL stable et identifiante).
+#   - UID en repli quand l'URL n'est pas stable / change selon le scrape.
+#   - Toujours documenter la raison dans `reason` — utile à la relecture
+#     dans 6 mois pour décider si l'entrée est encore pertinente.
+#
+# Garde-fou : `reason` libre mais court (<200 chars). Pas de PII ni d'info
+# sensible — ce fichier est versionné en clair sur GitHub public.
+
+blocklist:
+  # 2026-04-26 — PJL ESR n°2632 (texte 2632 en commission DVP). Ces deux
+  # amendements matchent le keyword sport via leur dispositif/objet mais
+  # n'ont aucun lien avec la veille sport-institutionnel : faux positif
+  # à exclure ponctuellement plutôt qu'en réécrivant le dictionnaire
+  # keywords (qui ferait disparaître d'autres items légitimes).
+  - url: https://www.assemblee-nationale.fr/dyn/17/amendements/2632/CION-DVP/CD495
+    reason: "Faux positif keyword sport sur PJL ESR n°2632 (texte CION-DVP)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/amendements/2632/CION-DVP/CD492
+    reason: "Faux positif keyword sport sur PJL ESR n°2632 (texte CION-DVP)"

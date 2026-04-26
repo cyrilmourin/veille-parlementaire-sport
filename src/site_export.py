@@ -1478,6 +1478,115 @@ def _filter_disabled_sources(rows: list[dict]) -> list[dict]:
     return [r for r in rows if (r.get("source_id") or "").strip() not in disabled]
 
 
+# R39-O (2026-04-26) — Liste rouge d'items à exclure du site (faux positifs
+# keyword qu'on ne veut pas faire disparaître via une réécriture du
+# dictionnaire keywords, parce que celle-ci élargirait le retrait à
+# d'autres items légitimes). Cf. config/blocklist.yml.
+_BLOCKLIST_PATH = Path(__file__).resolve().parent.parent / "config" / "blocklist.yml"
+
+
+def _canon_block_url(u: str) -> str:
+    """Canonicalise une URL pour le matching blocklist : strip scheme,
+    lowercase host, retrait du fragment et trailing slash. Reflète
+    `_url_canon` du dédup, mais tolère aussi le 's' en https/http.
+    """
+    if not isinstance(u, str):
+        return ""
+    s = u.strip().lower()
+    if not s:
+        return ""
+    # Strip scheme
+    if s.startswith("http://"):
+        s = s[len("http://"):]
+    elif s.startswith("https://"):
+        s = s[len("https://"):]
+    # Strip fragment
+    s = s.split("#", 1)[0]
+    # Strip trailing slash
+    if s.endswith("/"):
+        s = s[:-1]
+    return s
+
+
+def _load_blocklist() -> tuple[set[str], set[str]]:
+    """Lit config/blocklist.yml et retourne `(blocked_urls, blocked_uids)`.
+
+    `blocked_urls` est canonicalisé via `_canon_block_url` ; `blocked_uids`
+    est de la forme `{source_id}::{uid}`. Format YAML attendu :
+
+        blocklist:
+          - url: https://...
+            reason: "..."
+          - uid: source_id::uid
+            reason: "..."
+
+    Safe : si le fichier est absent ou mal formé, retourne deux sets vides
+    (aucun filtre appliqué).
+    """
+    blocked_urls: set[str] = set()
+    blocked_uids: set[str] = set()
+    try:
+        import yaml as _yaml  # type: ignore
+    except Exception:
+        return blocked_urls, blocked_uids
+    if not _BLOCKLIST_PATH.exists():
+        return blocked_urls, blocked_uids
+    try:
+        with _BLOCKLIST_PATH.open("r", encoding="utf-8") as f:
+            data = _yaml.safe_load(f) or {}
+    except Exception:
+        return blocked_urls, blocked_uids
+    entries = data.get("blocklist") if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        return blocked_urls, blocked_uids
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        u = e.get("url")
+        if isinstance(u, str) and u.strip():
+            c = _canon_block_url(u)
+            if c:
+                blocked_urls.add(c)
+        uid = e.get("uid")
+        if isinstance(uid, str) and uid.strip():
+            blocked_uids.add(uid.strip())
+    return blocked_urls, blocked_uids
+
+
+def _filter_blocklist(rows: list[dict]) -> list[dict]:
+    """R39-O — retire les rows listés en `config/blocklist.yml`. Filtre à
+    l'export uniquement : les items restent en DB, donc retirer une entrée
+    de la blocklist les fait réapparaître au prochain build (symétrique
+    à `_filter_disabled_sources`). Pas de purge nécessaire.
+
+    Match par URL canonicalisée OU par `source_id::uid` exact.
+    Idempotent, safe : YAML manquant ou mal formé → retourne `rows`.
+    """
+    blocked_urls, blocked_uids = _load_blocklist()
+    if not blocked_urls and not blocked_uids:
+        return rows
+    kept: list[dict] = []
+    dropped = 0
+    for r in rows:
+        url_c = _canon_block_url(r.get("url") or "")
+        if url_c and url_c in blocked_urls:
+            dropped += 1
+            continue
+        sid = (r.get("source_id") or "").strip()
+        uid = (r.get("uid") or "").strip()
+        if sid and uid and f"{sid}::{uid}" in blocked_uids:
+            dropped += 1
+            continue
+        kept.append(r)
+    if dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "site_export : %d items écartés par blocklist (config/blocklist.yml)",
+            dropped,
+        )
+    return kept
+
+
 # R28 (2026-04-23) — Filtre « publications parlementaires ».
 # Sur la page /items/communiques/, le bucket family_source=parlement ne
 # doit lister QUE les rapports (AN + Sénat), pas les actualités RSS
@@ -2059,6 +2168,11 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # publication visible. On le fait AVANT _fix_* (évite du travail inutile
     # sur des items qu'on va jeter de toute façon).
     rows = _filter_disabled_sources(rows)
+    # R39-O (2026-04-26) : liste rouge d'items à exclure (faux positifs
+    # keyword non corrigeables via le dictionnaire sans collateral). Lue
+    # depuis config/blocklist.yml. Filtre à l'export uniquement, items
+    # restent en DB → retirer une entrée les fait réapparaître au build.
+    rows = _filter_blocklist(rows)
     # R28 (2026-04-23) : dans la famille parlement x publications, on ne
     # garde que les rapports officiels (AN + Sénat). Les actualités RSS
     # Sénat (senat_rss) sont exclues de ce bucket (cf. docstring).
