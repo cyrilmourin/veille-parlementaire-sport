@@ -291,16 +291,57 @@ senat:
     # commissions : on scrape le listing /compte-rendu-commissions/culture.html
     # qui liste les bulletins hebdomadaires (h3 avec liens vers
     # /compte-rendu-commissions/YYYYMMDD/cult.html). Chaque CR hebdo agrège
-    # toutes les réunions de la commission sur la semaine. Comme R35-E et
-    # R35-D, on n'active QUE la commission culture côté Sénat pour éviter
-    # le bruit des commissions affaires sociales. Le contenu HTML complet
-    # alimente `raw.haystack_body` pour que le matcher mots-clés le scanne.
+    # toutes les réunions de la commission sur la semaine. Le contenu HTML
+    # complet alimente `raw.haystack_body` pour que le matcher mots-clés
+    # le scanne.
+    # R40-C (2026-04-26) : élargi à 3 autres commissions permanentes Sénat
+    # (lois, finances, affaires étrangères) — symétrie exacte avec R40-B
+    # côté agenda. Affaires sociales reste exclue (R35-D, >90% bruit).
     - id: senat_cr_culture
       category: comptes_rendus
       url: https://www.senat.fr/compte-rendu-commissions/culture.html
       format: senat_cr_commissions_html
       commission_label: Commission culture/éducation/communication/sport
       commission_organe: PO211490
+      max_new_per_run: 8
+      body_max_chars: 10000
+
+    # R40-C (2026-04-26) — CR hebdo Commission des lois Sénat. Slug
+    # listing court `lois.html`. Les CR commission contiennent souvent
+    # des sujets sport (éthique/dopage, intégrité sport pro, voile
+    # sportif). Bypass organe R27 désactivé depuis R39-K → seuls les
+    # CR avec match keyword métier remontent.
+    - id: senat_cr_lois
+      category: comptes_rendus
+      url: https://www.senat.fr/compte-rendu-commissions/lois.html
+      format: senat_cr_commissions_html
+      commission_label: Commission des lois Sénat
+      commission_organe: PO211495
+      max_new_per_run: 8
+      body_max_chars: 10000
+
+    # R40-C (2026-04-26) — CR hebdo Commission des finances Sénat. Slug
+    # listing `finances.html`. Sujets sport courants : budget MinSports,
+    # financement ANS, fiscalité sport, paris sportifs.
+    - id: senat_cr_finances
+      category: comptes_rendus
+      url: https://www.senat.fr/compte-rendu-commissions/finances.html
+      format: senat_cr_commissions_html
+      commission_label: Commission des finances Sénat
+      commission_organe: PO211494
+      max_new_per_run: 8
+      body_max_chars: 10000
+
+    # R40-C (2026-04-26) — CR hebdo Commission affaires étrangères, défense
+    # et forces armées Sénat. Slug listing `affaires-etrangeres.html`.
+    # Sujets sport : JO/JP comme outil diplomatique, géopolitique
+    # sportive, sport militaire, accueil grands événements.
+    - id: senat_cr_etrangeres
+      category: comptes_rendus
+      url: https://www.senat.fr/compte-rendu-commissions/affaires-etrangeres.html
+      format: senat_cr_commissions_html
+      commission_label: Commission affaires étrangères Sénat
+      commission_organe: PO211491
       max_new_per_run: 8
       body_max_chars: 10000
 
