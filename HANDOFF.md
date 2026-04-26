@@ -120,6 +120,14 @@ _(Vide — toutes les priorités hautes du cycle R39 ont été closes par R40-A/
 
 ### Priorité moyenne
 
+- **R40-K — Ancre absolue Sénat plénière (étude faite, non implémentée 2026-04-27)**. Étude lancée par Cyril 2026-04-27 sur la symétrie avec R40-J (qui a ajouté l'ancre absolue côté AN syceron). Verdict :
+  - **Confirmation** : le Sénat publie bien des CR très structurés avec une nomenclature d'ancres élaborée. Le XML CRI (`/data/debats/cri.zip`) expose `<a name="zzNiv1_SOM<n>">`, `<a name="zzorat<n>">`, `<a name="zzR<article>">` — hiérarchie sommaire / présidence / orateurs numérotés / articles. Les pages HTML individuelles `s20260416NNN.html` exposent les **mêmes ancres** (sans le préfixe `zz` côté HTML : `name="oratNN"`, `name="Niv1_SOM<n>"`). Cohérence XML ↔ HTML vérifiée live.
+  - **Blocage architectural** : le pipeline stocke aujourd'hui l'URL parent `/sYYYYMM/sYYYYMMDD/` qui est une SPA wrapper Vue.js (sans contenu HTML server-rendered). Les ancres ne marchent QUE sur les pages individuelles `s20260416NNN.html`. Pour utiliser les ancres, il faudrait identifier **quelle page individuelle** correspond au paragraphe XML CRI qui a matché — info absente du XML lui-même (numérotation `Niv1_SOM1/2/3` qui ne mappe pas directement aux suffixes `NNN`).
+  - **Voies d'implémentation possibles** (toutes non triviales) :
+    1. Scraper l'index `/sYYYYMM/sYYYYMMDD/` avec un headless browser → coûteux, fragile, risque WAF Sénat (cf. R16 sur l'agenda).
+    2. Re-architecturer `senat_cri` pour ingérer **1 Item par séance individuelle** (vs 1 Item par jour aujourd'hui), en scrapant directement les `s20260416NNN.html` avec extraction d'ancres similaire à R40-J — chantier R-niveau complet.
+    3. Deviner par convention (`Niv1_SOM1` → `s001.html`, etc.) → fragile, sans garantie.
+  - **Statut** : en attendant, Sénat plénière conserve le text-fragment R13-K (`#:~:text=<kw>`) — marche sur Chrome/Edge/Safari 16.4+, dégrade sur Firefox. Le snippet R40-I centré sur le match limite déjà la frustration UX (l'utilisateur voit le passage pertinent avant de cliquer).
 - **CC → JORF** — vérifier que chaque décision CC classée en `jorf` a bien fait l'objet d'une publication au JO. Aujourd'hui le flux QPC360 "décisions" est reclassé par défaut. Ne pas mélanger "rendue publique sur CC" et "publiée au JO".
 - **Procédure législative** — maîtriser dépôt → commission → séance → adoption → CC → promulgation avant de patcher `_map_code_acte` et `status_label`. Débloquerait le ticket "JO 2030 affiché Conseil Constit côté AN alors que promulgué".
 - **Cache AMO évolutif** — fusionner le dump historique `/17/` avec `AMO10_deputes_actifs_mandats_actifs_organes_divises_XVII.json.zip` (organes actifs, mis à jour en quasi temps-réel) pour résoudre les POxxx / PAxxx ultra-récents absents du dump historique.
