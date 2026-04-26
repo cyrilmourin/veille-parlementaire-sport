@@ -240,15 +240,51 @@ senat:
     # bloqué par WAF : chaque commission expose sa propre page
     # `agenda-de-la-commission.html` qui répond en HTTP 200 normal et
     # liste les "Prochaines réunions" (date + titre + salle + heure).
-    # On ne couvre QUE la commission culture/sport côté Sénat (pas
-    # affaires sociales ni finances) pour rester cohérent avec R35-D :
-    # les commissions off-topic produisent trop de bruit agenda.
+    # R40-B (2026-04-26) : élargi à 3 autres commissions permanentes
+    # (lois, finances, affaires étrangères) — décrites ci-dessous.
+    # Affaires sociales reste exclue (R35-D, >90% off-topic).
     - id: senat_agenda_culture
       category: agenda
       url: https://www.senat.fr/travaux-parlementaires/commissions/commission-de-la-culture-de-leducation-et-de-la-communication/agenda-de-la-commission.html
       format: senat_commission_agenda_html
       commission_label: Commission culture/éducation/communication/sport
       commission_organe: PO211490
+
+    # R40-B (2026-04-26) — Agenda Commission des lois Sénat (PO211495).
+    # Recoupe sport sur : éthique/dopage, intégrité du sport pro, lutte
+    # contre les violences/discriminations dans le sport, encadrement
+    # des supporters, voile sportif. Slug agenda non standard
+    # (`agenda-de-la-commission-1.html` au lieu de `agenda-de-la-commission.html`).
+    # Le bypass organe R27 étant désactivé (R39-K), seuls les agendas
+    # avec match keyword métier remonteront — pas de risque de bruit.
+    - id: senat_agenda_lois
+      category: agenda
+      url: https://www.senat.fr/travaux-parlementaires/commissions/commission-des-lois/agenda-de-la-commission-1.html
+      format: senat_commission_agenda_html
+      commission_label: Commission des lois Sénat
+      commission_organe: PO211495
+
+    # R40-B (2026-04-26) — Agenda Commission des finances Sénat (PO211494).
+    # Recoupe sport sur : budget MinSports, financement ANS, fiscalité
+    # sport pro/amateur, marché des paris sportifs. Slug standard.
+    - id: senat_agenda_finances
+      category: agenda
+      url: https://www.senat.fr/travaux-parlementaires/commissions/commission-des-finances/agenda-de-la-commission.html
+      format: senat_commission_agenda_html
+      commission_label: Commission des finances Sénat
+      commission_organe: PO211494
+
+    # R40-B (2026-04-26) — Agenda Commission affaires étrangères, défense
+    # et forces armées Sénat (PO211491). Recoupe sport sur : JO/JP comme
+    # outil diplomatique, accueil de grands événements (Coupe du monde
+    # rugby, JOP 2030), sport militaire, géopolitique sportive. Slug
+    # agenda non standard (`agenda-de-la-commission-des-affaires-etrangeres.html`).
+    - id: senat_agenda_etrangeres
+      category: agenda
+      url: https://www.senat.fr/travaux-parlementaires/commissions/commission-des-affaires-etrangeres-de-la-defense-et-des-forces-armees/agenda-de-la-commission-des-affaires-etrangeres.html
+      format: senat_commission_agenda_html
+      commission_label: Commission affaires étrangères Sénat
+      commission_organe: PO211491
 
     # R37-A (2026-04-24) — Comptes rendus hebdomadaires commission culture
     # Sénat. Le Sénat ne publie pas de dump JSON/XML pour les CR de
