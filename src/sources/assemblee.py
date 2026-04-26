@@ -863,6 +863,32 @@ _DOSLEG_IGNORED_PREFIX = ("AN20-", "AN21-", "AN-APPLI-")
 _DOSLEG_IGNORED_SUBSTR = ("AVIS-RAPPORT", "-DPTLETTRECT")
 
 
+def _libelle_acte_text(node) -> str:
+    """Extrait le libellé humain d'un `libelleActe` du JSON dossier AN.
+
+    R40-A (2026-04-26) — le dump open data AN sérialise désormais
+    `libelleActe` comme un dict `{nomCanonique, libelleCourt}`. Avant ce
+    helper, le parser faisait `str(libelleActe)` qui produisait la repr
+    Python du dict (`"{'nomCanonique': '...'}"`), ce qui empoisonnait :
+    - `actes_timeline.libelle` (texte technique inutilisable côté UI)
+    - `raw.libelle_acte` (idem)
+    - `libelles_haystack` du matcher mots-clés (R36-E) qui voyait du
+      JSON-string au lieu de libellés humains, dégradant la couverture.
+
+    Priorité `nomCanonique` > `libelleCourt` > string brute (legacy).
+    Retourne `""` si aucune forme exploitable.
+    """
+    if isinstance(node, dict):
+        for k in ("nomCanonique", "libelleCourt"):
+            v = node.get(k)
+            if isinstance(v, str) and v.strip():
+                return v
+        return ""
+    if isinstance(node, str):
+        return node
+    return ""
+
+
 def _iter_actes(node):
     """Parcours récursif de l'arbre `actesLegislatifs` : yield chaque dict
     d'acte portant (typiquement) codeActe / libelleActe / dateActe /
@@ -1094,7 +1120,7 @@ def _normalize_dosleg(obj, src, cat):
                 continue
             code = str(acte.get("codeActe") or "")
             xsi = str(acte.get("@xsi:type") or "")
-            libelle_acte_raw = str(acte.get("libelleActe") or "")
+            libelle_acte_raw = _libelle_acte_text(acte.get("libelleActe"))
             # R13-N : détection retrait sur code + libellé.
             low_code = code.upper()
             low_lib = libelle_acte_raw.lower()
@@ -1111,7 +1137,7 @@ def _normalize_dosleg(obj, src, cat):
             if mapping["ignored"]:
                 continue
             nb_actes_utiles += 1
-            libelle_acte = str(acte.get("libelleActe") or "")[:180]
+            libelle_acte = _libelle_acte_text(acte.get("libelleActe"))[:180]
             actes_timeline.append({
                 "date": dt.date().isoformat(),
                 "code": code,
