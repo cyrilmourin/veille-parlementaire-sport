@@ -115,7 +115,7 @@ def _session_code(d: datetime) -> str:
     return f"{(y - 1) % 100:02d}{y % 100:02d}"
 
 
-def _extract_pdf_text(pdf_bytes: bytes, max_chars: int = 10000) -> str:
+def _extract_pdf_text(pdf_bytes: bytes, max_chars: int = 100000) -> str:
     """Extrait le texte brut d'un PDF avec pypdf, tronque à max_chars.
 
     Si pypdf indisponible (dépendance non installée), renvoie "" sans
@@ -129,6 +129,20 @@ def _extract_pdf_text(pdf_bytes: bytes, max_chars: int = 10000) -> str:
     sur le site (capture Cyril 2026-04-25). On collapse ces séquences
     en un seul mot puis on coupe avant le premier mot de contenu réel
     (« Examen », « Audition », « Mission », etc.).
+
+    R40-G (2026-04-26) : limite passée de 10 000 à 100 000 caractères
+    (×10). Avant : 5/9 CR test rataient le matching keyword côté veille
+    Lidl pour cause de troncature trop précoce — les keywords cibles
+    apparaissaient au-delà du 10 000ᵉ caractère sur les CR longs (60-180k
+    chars). Symétrie inter-repos : signalé par Cyril 2026-04-26. Pour la
+    veille sport, le risque équivalent existe sur la commission culture
+    qui examine plusieurs sujets dans une même séance (audiovisuel +
+    école + ESR + sport + JOP) : le bloc sport peut être en 4ᵉ position,
+    au-delà du 10k. Trade-off : 100k = ~100 pages PDF stripées, couvre
+    >95 % des CR sport-relevants ; coût mémoire ~100k × 32 CR/run = 3 Mo
+    de haystack en mémoire, ~3 Mo supplémentaires en SQLite (négligeable
+    sur la DB ~100 Mo). Configurable par l'appelant si besoin de borner
+    plus serré sur une commission spécifique.
     """
     try:
         from pypdf import PdfReader  # type: ignore

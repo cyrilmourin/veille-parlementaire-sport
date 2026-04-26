@@ -300,6 +300,14 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
                 # Thème extrait du corps du CR (utile pour diagnostic + pour
                 # enrichir le titre côté export si celui en base est vieux).
                 "theme": theme,
+                # R40-G (2026-04-26) : haystack 100k chars consommé par
+                # KeywordMatcher.apply pour scanner le contenu complet
+                # de la séance plénière (pas juste summary[:2000]). Pour
+                # une séance plénière qui couvre 5-10 sujets sur 200-400k
+                # chars, le bloc sport peut tomber à la position 100k —
+                # hors fenêtre 2000 chars → CR ignoré à tort. Aligné sur
+                # le budget des CR commissions (an/senat_cr_commissions).
+                "haystack_body": text[:100000],
             },
         ))
 
