@@ -50,3 +50,9 @@ diag_*.command
 reset_*.command
 # Exception : reset_db_full.command est un utilitaire réutilisable (voir ci-dessus)
 !reset_db_full.command
+
+# Claude Code — settings.json est versionné (allowlist projet), settings.local.json
+# perso est exclu (overrides locaux + token éventuel). Le sous-dossier worktrees/
+# est aussi exclu (état de session Claude Code, branches éphémères).
+.claude/settings.local.json
+.claude/worktrees/
