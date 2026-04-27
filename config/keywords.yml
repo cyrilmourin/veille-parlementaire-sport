@@ -60,6 +60,7 @@ acteur:
   - Groupe parlementaire sport
   - AMA sport                   # Agence mondiale antidopage
   - Agence mondiale antidopage
+  - Agence Mondial Antidopage   # R40-S — variante typographique fréquente (sans 'e' final)
   # R40-P (2026-04-27) — `CIO` seul retiré du dictionnaire. Trop ambigu :
   # matche aussi Cnil, Crio, ou des sigles d'organisations privées
   # ("CIO Cap Investissement Open" et autres). On garde uniquement la
@@ -130,6 +131,15 @@ federation:
   - OM sport                    # veille contentieuse
   - OL sport
   - Clubs professionnels
+  # R40-S (2026-04-27) — clubs pro français demandés par Cyril.
+  # Expressions exactes uniquement, pas de variante "<club> sport"
+  # parce que le nom du club est suffisamment univoque.
+  - Olympique de Marseille
+  - Olympique Lyonnais
+  - Stade Toulousain
+  - Stade Rennais
+  - FC Nantes
+  - Girondins de Bordeaux
 
 dispositif:
   - Pass'Sport
@@ -245,6 +255,8 @@ evenement:
   - Coupe du monde de ski
   - Tour de France cycliste
   - Roland-Garros
+  # R40-S (2026-04-27) — événement multi-sports demandé par Cyril.
+  - Jeux de la Francophonie
   # R38-H (2026-04-24) — ajout événements majeurs. Pas de "Tour de France"
   # nu (homonymes géopolitiques/promo, Cyril : garder le contexte vélo).
   - Coupe du monde de football
@@ -264,6 +276,9 @@ evenement:
   - Marathon de Paris
 
 theme:
+  # R40-S (2026-04-27) — diplomatie sportive (sujet récurrent en
+  # commission affaires étrangères, JO, accords bilatéraux).
+  - diplomatie sportive
   - Violences dans le sport
   - Violences sexuelles et sexistes dans le sport
   - Violences sexuelles dans le sport
