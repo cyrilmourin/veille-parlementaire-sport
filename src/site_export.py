@@ -85,6 +85,14 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     # sortir du radar des arrêtés sport intéressants pris il y a ~2 mois
     # (nominations mises à part, elles ont leur propre page).
     "jorf": 90,
+    # R41-A (2026-04-27) : nominations 12 mois. Volume attendu très faible
+    # (10-30 items / 6 mois selon estimation Cyril, montant à ~30-60 sur
+    # 1 an). Une nomination reste référente longtemps (le nouveau
+    # président d'une fédération reste présent plusieurs années — l'item
+    # de l'élection garde sa valeur informationnelle bien après les 90j
+    # standards de communiques). 365j est un compromis lisibilité /
+    # exhaustivité.
+    "nominations": 365,
 }
 
 # R36-J (2026-04-24) — Override par source_id pour la sous-catégorie
@@ -1530,6 +1538,54 @@ def _load_disabled_source_ids(config_path: str = "config/sources.yml") -> set[st
     return disabled
 
 
+def _reroute_to_nominations(rows: list[dict]) -> list[dict]:
+    """R41-A (2026-04-27) — Re-route automatique des items qui matchent
+    la famille `nomination_event` du dictionnaire keywords vers la
+    catégorie `nominations`.
+
+    Avant ce filtre, un communiqué CNOSF/CPSF/MinSports type « X est élu
+    président de la FFR » tombait en `communiques`. Reroute vers
+    `nominations` pour exposer ces actes dans la page dédiée.
+
+    Critère de re-route : `keyword_families` contient `nomination_event`.
+    Sources visées : tous les items de catégorie `communiques` matchés
+    avec au moins une expression performative (élu président, nommé
+    DG, prend la tête, etc.). Les items déjà en `nominations` (JORF
+    décrets de nomination) sont conservés tels quels.
+
+    Idempotent : un re-passage ne change rien (les items déjà en
+    `nominations` n'ont plus à être routés). Symétrique à
+    `_filter_blocklist` (R39-O) et `_filter_disabled_sources` (R22b).
+
+    Note : on filtre seulement la catégorie `communiques` pour ne pas
+    re-router accidentellement des items des autres catégories
+    (questions, amendements, dossiers) qui contiendraient des
+    expressions performatives dans leur texte sans être des
+    annonces de nomination.
+    """
+    rerouted_count = 0
+    for r in rows:
+        cat = r.get("category") or ""
+        if cat != "communiques":
+            continue
+        families = r.get("keyword_families") or []
+        if isinstance(families, str):
+            try:
+                families = json.loads(families)
+            except Exception:
+                families = []
+        if "nomination_event" in families:
+            r["category"] = "nominations"
+            rerouted_count += 1
+    if rerouted_count:
+        import logging
+        logging.getLogger(__name__).info(
+            "R41-A : %d items re-routés communiques → nominations",
+            rerouted_count,
+        )
+    return rows
+
+
 def _resolve_agenda_odj_item(
     odj_items: list,
     matched_keywords: list[str],
@@ -2413,6 +2469,14 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # garde que les rapports officiels (AN + Sénat). Les actualités RSS
     # Sénat (senat_rss) sont exclues de ce bucket (cf. docstring).
     rows = _filter_parlement_publications(rows)
+    # R41-A (2026-04-27) : items qui matchent la famille nomination_event
+    # sont re-routés de `communiques` vers `nominations` pour exposer
+    # les actes d'élection / nomination de présidents fédé / DG / DTN
+    # / etc. dans la page dédiée. Doit tourner AVANT _filter_window
+    # car la fenêtre nominations (365j) est plus large que communiques
+    # (90j) — un re-route après filter_window perdrait des items
+    # nominations qui auraient été drop par la fenêtre 90j.
+    rows = _reroute_to_nominations(rows)
     # R23-N (2026-04-23) : cache nom_auteur_normalisé → (photo, fiche) bâti
     # depuis les amendements Sénat. Utilisé pour enrichir les questions Sénat
     # qui, à l'ingestion, n'ont pas de colonne « Fiche Sénateur » exploitable.

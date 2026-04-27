@@ -369,3 +369,99 @@ theme:
   - Tir à l'arc
   - Tir a l'arc
   - Golf
+
+# R41-A (2026-04-27) — Famille `nomination_event` : expressions
+# performatives multi-mots qui combinent un verbe d'acte (élu, nommé,
+# prend la tête…) ET une fonction stratégique. Volontairement
+# expressives pour éviter les faux positifs descriptifs type "le
+# nouveau président de la FFR s'est rendu à…" (qui matcherait
+# « nouveau président » seul s'il était dans le dictionnaire).
+#
+# Cette famille déclenche un re-route automatique de la catégorie de
+# l'item de `communiques` → `nominations` à l'export (cf.
+# site_export._reroute_to_nominations). Volume attendu très faible
+# (10-30 items / 6 mois), donc on peut ajouter ponctuellement à la
+# blocklist les rares faux positifs.
+#
+# Volontairement EXCLUS : "nouveau président", "nouvelle présidente",
+# "actuel président", "depuis sa nomination", "fraîchement élu" —
+# usages descriptifs sans acte de nomination.
+nomination_event:
+  # Verbes performatifs masculin + fonction stratégique
+  - élu président
+  - elu president
+  - réélu président
+  - reelu president
+  - nommé président
+  - nomme president
+  - nommé président-directeur général
+  - nomme president-directeur general
+  - nommé directeur général
+  - nomme directeur general
+  - nommé directeur technique
+  - nomme directeur technique
+  - nommé directeur technique national
+  - nomme directeur technique national
+  - nommé directeur sportif
+  - nomme directeur sportif
+  - nommé secrétaire général
+  - nomme secretaire general
+  - nommé directeur de cabinet
+  - nomme directeur de cabinet
+  - nommé directeur conseil
+  - nomme directeur conseil
+  - a été nommé président
+  - a ete nomme president
+  - a été élu président
+  - a ete elu president
+  - a été nommé directeur
+  - a ete nomme directeur
+  # Verbes performatifs féminin + fonction stratégique
+  - élue présidente
+  - elue presidente
+  - réélue présidente
+  - reelue presidente
+  - nommée présidente
+  - nommee presidente
+  - nommée directrice générale
+  - nommee directrice generale
+  - nommée directrice technique
+  - nommee directrice technique
+  - nommée directrice technique nationale
+  - nommee directrice technique nationale
+  - nommée directrice sportive
+  - nommee directrice sportive
+  - nommée secrétaire générale
+  - nommee secretaire generale
+  - nommée directrice de cabinet
+  - nommee directrice de cabinet
+  - nommée directrice conseil
+  - nommee directrice conseil
+  - a été nommée présidente
+  - a ete nommee presidente
+  - a été élue présidente
+  - a ete elue presidente
+  - a été nommée directrice
+  - a ete nommee directrice
+  # Verbes performatifs autonomes (sans fonction directe collée)
+  - prend la présidence
+  - prend la presidence
+  - prendra la présidence
+  - prendra la presidence
+  - prend la tête de
+  - prend la tete de
+  - prendra la tête de
+  - prendra la tete de
+  - succède à la tête
+  - succede a la tete
+  - succèdera à la tête
+  - succedera a la tete
+  - succède à la présidence
+  - succede a la presidence
+  - élection à la présidence
+  - election a la presidence
+  - nomination au poste de
+  - nomination à la tête
+  - nomination a la tete
+  - prendra ses fonctions
+  - entrera en fonction le
