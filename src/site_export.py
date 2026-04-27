@@ -1585,6 +1585,132 @@ def _reroute_to_nominations(rows: list[dict]) -> list[dict]:
     return rows
 
 
+def _normalize_and_dedup_nominations(rows: list[dict]) -> list[dict]:
+    """R41-E (2026-04-27) — Normalisation + dédup des items en catégorie
+    `nominations`.
+
+    Pour chaque item de catégorie `nominations` :
+    - Si la source est OFFICIELLE (JORF, ministères, fédérations…) →
+      on PRÉSERVE le titre original et l'URL (l'utilisateur a besoin
+      du lien faisant foi pour vérifier le décret / communiqué).
+    - Sinon (presse business : Olbia, Café, Sport Stratégies…) → on
+      tente d'extraire `(person, function, organization)` depuis le
+      titre OU le summary, et on remplace `r["title"]` par la version
+      canonique « <Personne> devient <Fonction> de <Structure> ». On
+      met aussi `r["url"] = ""` pour ne PAS afficher de lien presse
+      (le titre normalisé suffit).
+
+    DÉDUP : groupage par clé canonique (nom + fonction + organisation
+    normalisés, ordre-insensible). Pour chaque groupe :
+    - Priorité aux items de source officielle (URL JORF préservée)
+    - Sinon, on garde le 1er rencontré
+
+    Idempotent : un 2e passage ne change rien (les items déjà
+    normalisés produisent la même clé canonique → dédup déjà appliquée).
+    Symétrique à `_reroute_to_nominations` (R41-A) qui tourne avant.
+    """
+    from src.nominations import (
+        canonical_key,
+        extract_nomination_facts,
+        format_normalized_title,
+        is_official_source,
+    )
+
+    def _try_extract(r: dict):
+        """Tente extraction sur title puis summary séparément (pas de
+        concat pour éviter que le regex person remonte trop loin et
+        capture des duplicats type "Eric Woerth Eric Woerth")."""
+        for field in ("title", "summary"):
+            text = (r.get(field) or "").strip()
+            if not text:
+                continue
+            facts = extract_nomination_facts(text)
+            if facts:
+                return facts
+        return None
+
+    # --- Phase 1 : extraction + normalisation des items presse ---
+    enriched: list[dict] = []
+    for r in rows:
+        if r.get("category") != "nominations":
+            enriched.append(r)
+            continue
+        sid = (r.get("source_id") or "").strip()
+        facts = _try_extract(r)
+        r["_nomination_facts"] = facts
+        if is_official_source(sid):
+            # Source officielle : on conserve titre + URL ; les facts
+            # servent uniquement à la dédup en phase 2 (si une source
+            # presse relaie la même nomination).
+            r["_nomination_official"] = True
+        else:
+            r["_nomination_official"] = False
+            if facts:
+                # Source presse + extraction OK → titre canonique +
+                # URL masquée (Cyril : « pas besoin de la source /
+                # lien dans ce cas »).
+                norm_title = format_normalized_title(facts)
+                if norm_title:
+                    r["title"] = norm_title
+                r["url"] = ""
+        enriched.append(r)
+
+    # --- Phase 2 : dédup par clé canonique ---
+    # On groupe les items qui ont une clé non vide. Les items sans
+    # facts extraits restent tels quels (pas de dédup).
+    by_key: dict[str, list[dict]] = {}
+    for r in enriched:
+        if r.get("category") != "nominations":
+            continue
+        facts = r.get("_nomination_facts")
+        if not facts:
+            continue
+        k = canonical_key(facts)
+        if not k or k == "||":
+            continue
+        by_key.setdefault(k, []).append(r)
+
+    drop_ids: set[int] = set()  # id() des rows à drop
+    for k, group in by_key.items():
+        if len(group) <= 1:
+            continue
+        # Choix du gagnant :
+        # 1. Source officielle prioritaire (URL JORF préservée)
+        # 2. Sinon : la plus récente par published_at
+        # 3. Sinon : la 1ère rencontrée
+        official = [r for r in group if r.get("_nomination_official")]
+        if official:
+            winner = official[0]
+        else:
+            # Trie par published_at desc (les rows sans date passent
+            # à la fin)
+            def _sortable_dt(r):
+                return r.get("published_at") or ""
+            winner = sorted(group, key=_sortable_dt, reverse=True)[0]
+        for r in group:
+            if r is not winner:
+                drop_ids.add(id(r))
+
+    # --- Phase 3 : nettoyage des champs internes + filtrage drop ---
+    out: list[dict] = []
+    for r in enriched:
+        if id(r) in drop_ids:
+            continue
+        # Strip champs internes (préfixe _ pour bien marquer le
+        # caractère privé) — pas exposés au frontmatter.
+        r.pop("_nomination_facts", None)
+        r.pop("_nomination_official", None)
+        out.append(r)
+
+    if drop_ids:
+        import logging
+        logging.getLogger(__name__).info(
+            "R41-E : %d items nominations dédupliqués via clé canonique",
+            len(drop_ids),
+        )
+    return out
+
+
 def _resolve_agenda_odj_item(
     odj_items: list,
     matched_keywords: list[str],
@@ -2476,6 +2602,13 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # (90j) — un re-route après filter_window perdrait des items
     # nominations qui auraient été drop par la fenêtre 90j.
     rows = _reroute_to_nominations(rows)
+    # R41-E (2026-04-27) : pour les items en catégorie `nominations`,
+    # extraire (Personne, Fonction, Structure) et normaliser le titre
+    # en « X devient Y de Z » sur les sources presse business (Olbia,
+    # Café, Sport Stratégies…). Sources officielles (JORF, ministères,
+    # fédérations) gardent titre + URL d'origine. Dédup inter-sources
+    # via clé canonique (nom+fonction+structure normalisés).
+    rows = _normalize_and_dedup_nominations(rows)
     # R23-N (2026-04-23) : cache nom_auteur_normalisé → (photo, fiche) bâti
     # depuis les amendements Sénat. Utilisé pour enrichir les questions Sénat
     # qui, à l'ingestion, n'ont pas de colonne « Fiche Sénateur » exploitable.
