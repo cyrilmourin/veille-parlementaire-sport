@@ -130,3 +130,56 @@ def test_r41b_pas_de_doublon_id(all_sources):
         f"IDs dupliqués détectés : "
         f"{sorted(set(x for x in ids if ids.count(x) > 1))}"
     )
+
+
+# ---------------------------------------------------------------------------
+# R41-C — Presse spécialisée sport business
+# ---------------------------------------------------------------------------
+
+
+def test_r41c_olbia_conseil(all_sources):
+    s = _by_id(all_sources).get("olbia_conseil")
+    assert s is not None
+    assert s["format"] == "rss"
+    assert "olbia-conseil.com" in s["url"]
+    assert s.get("enabled", True) is not False
+
+
+def test_r41c_cafe_sport_business(all_sources):
+    """Sitemap + impersonate (Cloudflare protège les pages mais pas le
+    sitemap)."""
+    s = _by_id(all_sources).get("cafe_sport_business")
+    assert s is not None
+    assert s["format"] == "sitemap"
+    assert s.get("impersonate") is True, (
+        "Cloudflare protège les pages → impersonate requis pour fetch_meta"
+    )
+    # url_filter cible les éditions /p/<slug>
+    assert "/p/" in s.get("url_filter", [None])[0]
+
+
+def test_r41c_sport_buzz_business(all_sources):
+    """Note URL : pas de slash final (le /feed/ redirige vers /feed)."""
+    s = _by_id(all_sources).get("sport_buzz_business")
+    assert s is not None
+    assert s["format"] == "rss"
+    assert s["url"].endswith("/feed"), (
+        "URL Sport Buzz Business doit pointer sur /feed (sans slash)"
+    )
+
+
+def test_r41c_sport_business_club(all_sources):
+    s = _by_id(all_sources).get("sport_business_club")
+    assert s is not None
+    assert s["format"] == "rss"
+    assert "sportbusiness.club" in s["url"]
+
+
+def test_r41c_toutes_en_communiques(all_sources):
+    """Comme les autres sources nominations, en `communiques` avec
+    re-route automatique vers nominations via R41-A."""
+    by_id = _by_id(all_sources)
+    for sid in ("olbia_conseil", "cafe_sport_business",
+                "sport_buzz_business", "sport_business_club"):
+        s = by_id[sid]
+        assert s["category"] == "communiques"

@@ -933,6 +933,57 @@ autorites:
       enabled: false
       chamber: FFR
 
+    # R41-C (2026-04-27) — Presse spécialisée sport business française.
+    # 4 sources actives qui couvrent les nominations / mouvements de
+    # dirigeants au-delà des canaux institutionnels. Combinées au
+    # reroute R41-A (famille `nomination_event`), elles enrichissent
+    # la catégorie nominations sans polluer (le matcher filtre les
+    # items qui ne matchent aucun keyword).
+
+    # Olbia Conseil — cabinet de conseil sport business qui publie une
+    # newsletter hebdo « Cette semaine, Olbia a appris que… » très
+    # référencée pour les nominations / mouvements dirigeants. RSS
+    # WordPress standard, ~20 items récents.
+    - id: olbia_conseil
+      category: communiques
+      url: https://www.olbia-conseil.com/feed/
+      format: rss
+      poids: 2
+
+    # Le Café du Sport Business (lecafedusportbiz.fr) — newsletter
+    # quotidienne de référence (8500+ pros, 100k mails ouverts/mois)
+    # qui relaie l'actu sport business (incluant nominations). Pages
+    # protégées par Cloudflare (403 sans impersonate). Le sitemap.xml
+    # est lui accessible sans Cloudflare (200 OK direct, 804 URLs).
+    # Format sitemap + impersonate pour les fetch_meta sur les pages.
+    # url_filter `/p/` pour ne garder que les éditions (slug parlant
+    # type « le-budget-de-paris-2024-…»).
+    - id: cafe_sport_business
+      category: communiques
+      url: https://www.lecafedusportbiz.fr/sitemap.xml
+      format: sitemap
+      url_filter: ["/p/"]
+      impersonate: true
+      fetch_meta: true
+      fetch_meta_limit: 60
+      poids: 2
+
+    # Sport Buzz Business — média marketing sportif. RSS WordPress
+    # avec redirect /feed/ → /feed (suivi automatiquement par httpx).
+    - id: sport_buzz_business
+      category: communiques
+      url: https://www.sportbuzzbusiness.fr/feed
+      format: rss
+      poids: 2
+
+    # Sport Business Club (sportbusiness.club) — média B2B sport
+    # economy / sponsoring. RSS WordPress standard.
+    - id: sport_business_club
+      category: communiques
+      url: https://www.sportbusiness.club/feed/
+      format: rss
+      poids: 2
+
     - id: alpes_2030_cojop
       category: communiques
       # cojop.fr : domaine inexistant (DNS KO) au 2026-04-22. Le COJOP
