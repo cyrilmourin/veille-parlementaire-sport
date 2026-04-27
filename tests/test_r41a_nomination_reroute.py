@@ -225,11 +225,12 @@ def test_reroute_mix_de_rows():
 # ---------------------------------------------------------------------------
 
 
-def test_window_nominations_365j():
-    """R41-A : la catégorie nominations a une fenêtre étendue à 12 mois
-    (vs 90j pour communiques par défaut). Une nomination reste
-    référente longtemps."""
-    assert WINDOW_DAYS_BY_CATEGORY.get("nominations") == 365
+def test_window_nominations_90j():
+    """R41-A : la catégorie nominations est alignée à 90j en cohérence
+    avec la fenêtre JORF (qui contient déjà les décrets de nomination).
+    Cyril a arbitré la cohérence inter-catégories. Si le rappel est
+    trop bas, on élargira."""
+    assert WINDOW_DAYS_BY_CATEGORY.get("nominations") == 90
 
 
 # ---------------------------------------------------------------------------

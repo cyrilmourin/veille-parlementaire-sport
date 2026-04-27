@@ -85,14 +85,13 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     # sortir du radar des arrêtés sport intéressants pris il y a ~2 mois
     # (nominations mises à part, elles ont leur propre page).
     "jorf": 90,
-    # R41-A (2026-04-27) : nominations 12 mois. Volume attendu très faible
-    # (10-30 items / 6 mois selon estimation Cyril, montant à ~30-60 sur
-    # 1 an). Une nomination reste référente longtemps (le nouveau
-    # président d'une fédération reste présent plusieurs années — l'item
-    # de l'élection garde sa valeur informationnelle bien après les 90j
-    # standards de communiques). 365j est un compromis lisibilité /
-    # exhaustivité.
-    "nominations": 365,
+    # R41-A (2026-04-27) : nominations 90j en cohérence avec la fenêtre
+    # JORF (qui contient déjà les décrets de nomination). Cyril a
+    # arbitré la cohérence inter-catégories sur ce point. Si le rappel
+    # est trop bas après quelques semaines d'observation, on pourra
+    # élargir à 180 ou 365j sans risque vu le volume attendu (10-30
+    # items / 6 mois).
+    "nominations": 90,
 }
 
 # R36-J (2026-04-24) — Override par source_id pour la sous-catégorie

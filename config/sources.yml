@@ -867,6 +867,72 @@ autorites:
       fetch_meta: true
       fetch_meta_limit: 40
 
+    # R41-B (2026-04-27) — Sources presse spécialisée + fédérations
+    # majeures pour étoffer la couverture nominations sport (couche 2,
+    # complète R41-A qui re-route les nominations détectées dans les
+    # sources déjà ingérées). Sites server-rendered uniquement (FFR et
+    # FFBB sont des SPA Nuxt sans HTML scrapable, écartées : à creuser
+    # via headless browser ou attendre relais Sport Stratégies / etc.).
+    #
+    # Le matcher keyword (R41-A famille `nomination_event` + reste du
+    # dictionnaire) fait le tri à chaque run : seuls les items qui
+    # matchent un keyword sport-relevant OU une expression performative
+    # de nomination remontent. Pas de pollution attendue par les flux
+    # massifs (résultats matchs, transferts joueurs).
+
+    # Sport Stratégies — référence du secteur business sport en France.
+    # Couvre nominations, deals, sponsoring, organisation événements.
+    # RSS dédié + valide (vérifié 2026-04-27 : 10 items récents).
+    - id: sport_strategies
+      category: communiques
+      url: https://www.sportstrategies.com/feed/
+      format: rss
+      fetch_meta: false  # le RSS contient déjà titre + description
+      poids: 2
+
+    # Fédération française de football — actualités officielles.
+    # FFF.fr/articles : 32 liens listés (server-rendered). Pas de RSS
+    # public stable (les flux /actus.xml et /rss/* redirect vers la
+    # home). Format html scraping avec enrichissement meta.
+    - id: fff_actualites
+      category: communiques
+      url: https://www.fff.fr/articles
+      format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
+      chamber: FFF
+
+    # Fédération française de tennis — /actualites server-rendered.
+    - id: fft_actualites
+      category: communiques
+      url: https://www.fft.fr/actualites
+      format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
+      chamber: FFT
+
+    # Fédération française d'athlétisme (athle.fr).
+    - id: ffa_actualites
+      category: communiques
+      url: https://www.athle.fr/actualites/
+      format: html
+      fetch_meta: true
+      fetch_meta_limit: 40
+      chamber: FFA
+
+    # Fédération française de rugby — DÉSACTIVÉ. Le site est une SPA
+    # Nuxt qui sert un HTML quasi vide (`<div id="root"></div>` + JS).
+    # Le sitemap.xml est un sitemap-index dont les sous-sitemaps ne
+    # listent pas les actualités. À réactiver avec un scraping headless
+    # browser dédié (chantier R-niveau) si un cas concret de nomination
+    # FFR est manqué côté Sport Stratégies / autres relais.
+    - id: ffr_actualites
+      category: communiques
+      url: https://www.ffr.fr/actualites
+      format: html
+      enabled: false
+      chamber: FFR
+
     - id: alpes_2030_cojop
       category: communiques
       # cojop.fr : domaine inexistant (DNS KO) au 2026-04-22. Le COJOP
