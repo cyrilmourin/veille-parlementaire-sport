@@ -206,6 +206,16 @@ dispositif:
   - equipement sportif
   - équipements sportifs
   - equipements sportifs
+  # R40-R (2026-04-27) — `sport professionnel` univoque (au sens de
+  # « secteur du sport pro »). Cas déclencheur : PPL n°1560 « relative
+  # à l'organisation, à la gestion et au financement du sport
+  # professionnel », adoptée par le Sénat, dont la désignation du
+  # rapporteur est à l'ODJ commission affaires culturelles AN du 28/04.
+  # Avant ce keyword, ni le titre PPL ni l'ODJ agenda ne matchait.
+  - sport professionnel
+  - sports professionnels
+  - sport pro
+  - sports pros
   - infrastructure sportive
   - infrastructures sportives
   - enceinte sportive
