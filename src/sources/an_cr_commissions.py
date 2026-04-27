@@ -257,8 +257,31 @@ def _fetch_silent(url: str, timeout: float = 20.0) -> tuple[int, bytes]:
 
 
 def _fetch_cr(slug: str, session: str, num: int,
-              commission_label: str) -> Item | None:
-    """Tente de récupérer un CR (slug, session, num). None si inexistant."""
+              commission_label: str) -> tuple[Item | None, bool]:
+    """Tente de récupérer un CR (slug, session, num).
+
+    Returns :
+        Tuple `(item, has_body)` :
+        - `item` : Item si la page HTML existe (200), None si 404
+        - `has_body` : True si le PDF a été extrait avec un body
+          significatif (≥ 200 chars). Sert à la boucle `fetch_source`
+          pour décider si le num doit être marqué `scanned` ou laissé
+          en attente d'un futur run.
+
+    R41-G (2026-04-27) — port côté Sport du fix Lidl. Avant, la signature
+    était `Item | None` et la boucle `fetch_source` marquait `scanned`
+    dès qu'un Item était produit. Conséquence : si le HTML était 200
+    mais le PDF 404 (cas typique : page mise en ligne quelques jours
+    après l'audition, transcript publié 1-2 semaines plus tard),
+    l'Item était ingéré avec `haystack_body=""` → matched_keywords=[]
+    → exclu du site, mais `num` marqué scanned → JAMAIS re-essayé.
+    Cas concret signalé : audition cion-eco N076 du 14/04/2026 (côté
+    Lidl, équivalent attendu côté Sport sur des CR transverses).
+
+    Le fix laisse la 1ère partie inchangée (HTML check + Item produit
+    pour la trace), mais ajoute le flag `has_body` qui devient le
+    critère pour marquer scanned.
+    """
     base = (
         f"https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/"
         f"{slug}/l17{slug}{session}{num:03d}_compte-rendu"
@@ -266,10 +289,14 @@ def _fetch_cr(slug: str, session: str, num: int,
     html_url = base
     pdf_url = base + ".pdf"
 
-    # 1) Vérifier que la page HTML existe (200). 404 → CR pas publié.
+    # 1) Vérifier que la page HTML existe (200). 404 → CR pas publié
+    #    du tout. On retourne (None, False) pour que la boucle
+    #    décrémente miss_streak. Compat ascendante : `result is None`
+    #    devient `result == (None, False)` → tester `it is None` après
+    #    destructuring fait toujours sens.
     status, html_content = _fetch_silent(html_url)
     if status != 200 or not html_content:
-        return None
+        return (None, False)
     html_text = html_content.decode("utf-8", errors="replace")
 
     # 2) Récupérer le PDF (source du corps). Best-effort : si 404 ou erreur,
@@ -277,6 +304,11 @@ def _fetch_cr(slug: str, session: str, num: int,
     #    rien renvoyer (la page HTML existe, donc le CR est référencé).
     pdf_status, pdf_bytes = _fetch_silent(pdf_url, timeout=30.0)
     body = _extract_pdf_text(pdf_bytes) if pdf_status == 200 else ""
+
+    # R41-G : `has_body` distingue un PDF "audition vidéo seulement"
+    # (3 pages, ~1500 chars d'intro déjà ingestible) d'un PDF absent.
+    # Seuil 200 chars retenu côté Lidl, porté tel quel côté Sport.
+    has_body = pdf_status == 200 and len(body) >= 200
 
     # 3) Date : on cherche d'abord dans le PDF (page de garde), sinon dans
     #    le HTML, sinon on pose "aujourd'hui" (le CR vient d'être publié).
@@ -293,7 +325,7 @@ def _fetch_cr(slug: str, session: str, num: int,
     # Summary : début du corps pour l'affichage site (fallback: titre).
     summary = (body[:2000] if body else title).strip()
 
-    return Item(
+    item = Item(
         source_id="an_cr_commissions",
         uid=uid,
         category="comptes_rendus",
@@ -312,6 +344,7 @@ def _fetch_cr(slug: str, session: str, num: int,
             "haystack_body": body,
         },
     )
+    return (item, has_body)
 
 
 def fetch_source(src: dict) -> list[Item]:
@@ -381,10 +414,25 @@ def fetch_source(src: dict) -> list[Item]:
             if num in scanned:
                 num -= 1
                 continue
-            it = _fetch_cr(slug, session, num, label)
+            result = _fetch_cr(slug, session, num, label)
+            # R41-G (2026-04-27) — destructure le tuple (item, has_body).
+            # Compat ascendante : si quelqu'un wrappe _fetch_cr et
+            # retourne encore l'ancien `Item | None`, on tolère.
+            if isinstance(result, tuple):
+                it, has_body = result
+            else:
+                # Forme legacy : Item | None (avant R41-G)
+                it, has_body = result, (result is not None)
             if it is not None:
                 items.append(it)
-                scanned.add(num)
+                # R41-G — ne marquer scanned QUE si le PDF a été
+                # effectivement extrait (≥ 200 chars de body). Sinon
+                # l'item est ingéré pour la trace mais le num reste
+                # « pending » : il sera ré-essayé au prochain run, ce
+                # qui permet de capter le contenu PDF dès qu'il est
+                # publié (parfois 1-2 semaines après la page HTML).
+                if has_body:
+                    scanned.add(num)
                 if num > local_max:
                     local_max = num
                 new_count += 1

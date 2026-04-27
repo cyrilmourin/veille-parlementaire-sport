@@ -75,11 +75,12 @@ def test_parse_date_none_on_junk():
 
 
 def test_fetch_cr_returns_none_on_404(monkeypatch):
-    """Si la page HTML renvoie 404, _fetch_cr retourne None (CR pas publié)."""
+    """Si la page HTML renvoie 404, _fetch_cr retourne (None, False)
+    (CR pas publié). R41-G : signature passée à `tuple[Item|None, bool]`."""
     monkeypatch.setattr(mod, "_fetch_silent", _stub_fetch_silent({}))
     # aussi : no pdf extractor appelé (html 404 → shortcut)
     result = mod._fetch_cr("cion-cedu", "2526", 99, "Commission X")
-    assert result is None
+    assert result == (None, False)
 
 
 def test_fetch_cr_builds_item_with_body(monkeypatch):
@@ -97,18 +98,26 @@ def test_fetch_cr_builds_item_with_body(monkeypatch):
             pdf_url: (200, fake_pdf),
         }),
     )
-    # Court-circuit pypdf : simule l'extraction
+    # Court-circuit pypdf : simule l'extraction. R41-G : le seuil
+    # `has_body` est ≥ 200 chars, donc on génère un body suffisamment
+    # long pour passer la barre.
     monkeypatch.setattr(
         mod, "_extract_pdf_text",
         lambda b, max_chars=10000: (
             "La commission auditionne sur la gouvernance des autres sports "
-            "que le football. Table ronde — Philippe Bana, Fédération..."
+            "que le football. Table ronde — Philippe Bana, Fédération "
+            "française de handball, présente les enjeux de gouvernance "
+            "et les perspectives de financement public et privé pour "
+            "les disciplines hors football."
         ),
     )
-    it = mod._fetch_cr(
+    # R41-G : signature retourne tuple (item, has_body).
+    result = mod._fetch_cr(
         "cion-cedu", "2526", 58,
         "Commission des affaires culturelles et de l'éducation",
     )
+    assert isinstance(result, tuple)
+    it, has_body = result
     assert it is not None
     assert it.source_id == "an_cr_commissions"
     assert it.category == "comptes_rendus"
@@ -121,10 +130,14 @@ def test_fetch_cr_builds_item_with_body(monkeypatch):
     assert "gouvernance" in hs
     # date parsée depuis le HTML
     assert it.published_at == datetime(2026, 4, 22)
+    # R41-G : body extrait > 200 chars → has_body=True
+    assert has_body is True
 
 
 def test_fetch_cr_html_200_pdf_404_keeps_item(monkeypatch):
-    """HTML existe mais PDF en 404 : on garde un item (titre seul)."""
+    """HTML existe mais PDF en 404 : on garde un item (titre seul) ET
+    `has_body=False` pour permettre la ré-ingestion au run suivant
+    (R41-G — fix bug du num scanned trop tôt)."""
     html_url = (
         "https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/"
         "cion-cedu/l17cion-cedu2526058_compte-rendu"
@@ -134,10 +147,45 @@ def test_fetch_cr_html_200_pdf_404_keeps_item(monkeypatch):
         _stub_fetch_silent({html_url: (200, _html_ok())}),
     )
     monkeypatch.setattr(mod, "_extract_pdf_text", lambda b, max_chars=10000: "")
-    it = mod._fetch_cr("cion-cedu", "2526", 58, "Commission X")
+    result = mod._fetch_cr("cion-cedu", "2526", 58, "Commission X")
+    assert isinstance(result, tuple)
+    it, has_body = result
     assert it is not None
     # haystack_body vide mais item présent
     assert it.raw.get("haystack_body", "") == ""
+    # R41-G : body vide → has_body=False → la boucle ne marquera PAS
+    # ce num comme scanned, permettant de retenter au run suivant.
+    assert has_body is False
+
+
+def test_fetch_cr_pdf_body_court_pas_marque_scanned(monkeypatch):
+    """R41-G : un PDF avec très peu de contenu (< 200 chars) est traité
+    comme « PDF pas encore prêt » → has_body=False → on ré-essaie."""
+    html_url = (
+        "https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/"
+        "cion-cedu/l17cion-cedu2526077_compte-rendu"
+    )
+    pdf_url = html_url + ".pdf"
+    monkeypatch.setattr(
+        mod, "_fetch_silent",
+        _stub_fetch_silent({
+            html_url: (200, _html_ok()),
+            pdf_url: (200, b"x"),
+        }),
+    )
+    # Body court (< 200 chars) — cas typique d'un PDF "page de garde
+    # uniquement" sans transcript publié.
+    monkeypatch.setattr(
+        mod, "_extract_pdf_text",
+        lambda b, max_chars=10000: "Compte rendu n°77",  # ~16 chars
+    )
+    result = mod._fetch_cr("cion-cedu", "2526", 77, "Commission X")
+    it, has_body = result
+    assert it is not None
+    assert has_body is False, (
+        "PDF court (<200 chars) doit être traité comme has_body=False "
+        "pour permettre la ré-ingestion quand le transcript est publié"
+    )
 
 
 def test_fetch_source_increments_state(monkeypatch, tmp_path):
