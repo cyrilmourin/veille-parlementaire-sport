@@ -1868,19 +1868,29 @@ def _normalize_agenda(obj, src, cat):
     # Société française des professionnels en activité physique
     # adaptée"). Quand `main_title` est vide, on les utilise pour
     # enrichir le titre avec le sujet réel de la réunion.
-    if not main_title:
-        odj_candidates = []
-        for path in ("ODJ.resumeODJ.item", "ODJ.convocationODJ.item"):
-            node = _first(root, path, default=None)
-            if isinstance(node, list):
-                for it in node:
-                    s = _text_of(it) if it else ""
-                    if isinstance(s, str) and _is_agenda_title_candidate(s):
-                        odj_candidates.append(s.strip().lstrip("-—•").strip())
-            elif isinstance(node, str) and _is_agenda_title_candidate(node):
-                odj_candidates.append(node.strip().lstrip("-—•").strip())
-        if odj_candidates:
-            main_title = odj_candidates[0][:180]
+    #
+    # R40-T (2026-04-27) — collecte SYSTÉMATIQUE des items ODJ (pas
+    # seulement quand main_title est vide), exposés en `raw.odj_items`
+    # pour permettre à l'export de réécrire le titre avec l'item qui
+    # contient effectivement le keyword matché. Avant ce patch, sur les
+    # réunions multi-points (ex. RUANR5L17S2026IDC459749 : audition
+    # ingérences étrangères + désignation rapporteur PPL sport pro), le
+    # titre affichait le 1er point ("ingérences étrangères") alors que
+    # le 2e point ("sport professionnel") était celui qui matchait — UX
+    # confuse pour Cyril qui ne comprend pas pourquoi cette réunion
+    # remonte dans la veille sport.
+    odj_candidates: list[str] = []
+    for path in ("ODJ.resumeODJ.item", "ODJ.convocationODJ.item"):
+        node = _first(root, path, default=None)
+        if isinstance(node, list):
+            for it in node:
+                s = _text_of(it) if it else ""
+                if isinstance(s, str) and _is_agenda_title_candidate(s):
+                    odj_candidates.append(s.strip().lstrip("-—•").strip())
+        elif isinstance(node, str) and _is_agenda_title_candidate(node):
+            odj_candidates.append(node.strip().lstrip("-—•").strip())
+    if not main_title and odj_candidates:
+        main_title = odj_candidates[0][:180]
 
     if is_seance:
         quant = _text_of(_deep_find(root, "quantieme") or "")
@@ -1969,5 +1979,19 @@ def _normalize_agenda(obj, src, cat):
             "organe_label": organe_label,
             "lieu": lieu,
             "xsi_type": xsi_type,
+            # R40-T (2026-04-27) — items ODJ structurés (titres + résumés
+            # ODJ collectés depuis convocationODJ + resumeODJ). Consommés
+            # par site_export pour réécrire le titre de la réunion avec
+            # l'item ODJ qui contient effectivement le keyword matché
+            # (au lieu du 1er item seul). Borné à 20 items pour éviter
+            # les ODJ pathologiques.
+            "odj_items": (
+                # Préfère `titles` (collecté par _collect_agenda_titles
+                # qui filtre déjà le bruit) puis complète avec les
+                # candidats résumés ODJ s'il manque.
+                list(dict.fromkeys(
+                    list(titles) + list(odj_candidates)
+                ))[:20]
+            ),
         },
     )

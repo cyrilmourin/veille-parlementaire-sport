@@ -1441,6 +1441,25 @@ def _load(rows: list[dict]) -> list[dict]:
             r["raw"] = json.loads(r.get("raw") or "{}")
         except Exception:
             r["raw"] = {}
+        # R40-T (2026-04-27) — Pour les items agenda AN avec plusieurs
+        # points à l'ODJ, réécrit le titre avec l'item qui contient le
+        # keyword matché. Avant : le pipeline prenait `odj_items[0]` ;
+        # cas confus où une commission examine 2 sujets dans la même
+        # réunion et que c'est le 2ᵉ qui est sport-relevant. Idempotent :
+        # si un keyword tombe dans `odj_items[0]`, le titre reste celui
+        # actuellement stocké.
+        if (r.get("category") == "agenda"
+                and r.get("chamber") == "AN"
+                and isinstance(r.get("raw"), dict)
+                and r.get("matched_keywords")):
+            _odj = r["raw"].get("odj_items") or []
+            if _odj:
+                _new_title = _resolve_agenda_odj_item(
+                    _odj, r["matched_keywords"],
+                )
+                if _new_title:
+                    r["title"] = _new_title
+
         # R40-Q (2026-04-27) — Pour les CR plénières AN syceron, enrichit
         # le titre avec le chapitre du paragraphe matché. Le titre stocké
         # en DB est neutre (« Séance AN du DD/MM/YYYY — séance plénière »)
@@ -1509,6 +1528,57 @@ def _load_disabled_source_ids(config_path: str = "config/sources.yml") -> set[st
                 if isinstance(sid, str) and sid.strip():
                     disabled.add(sid.strip())
     return disabled
+
+
+def _resolve_agenda_odj_item(
+    odj_items: list,
+    matched_keywords: list[str],
+) -> str:
+    """R40-T (2026-04-27) — Pour un item agenda AN avec plusieurs points
+    à l'ordre du jour, sélectionne celui qui contient effectivement le
+    keyword matché.
+
+    Args :
+        odj_items : `raw.odj_items` (liste de strings)
+        matched_keywords : `r["matched_keywords"]` (déjà filtrés)
+
+    Returns :
+        Texte du point ODJ qui matche, capitalisé sur la 1ère lettre
+        (préserve les sigles internes), tronqué à 220 chars. Renvoie ""
+        si aucun item ODJ ne contient un keyword (cas où le match vient
+        d'un autre champ comme `summary`, ou pas de keyword filtré
+        utilement) — l'export gardera alors le titre original.
+    """
+    if not odj_items or not matched_keywords:
+        return ""
+    # Filtre les pseudo-keywords R39-G qui commencent par "(" (ex.
+    # "(flux complet)") — ils ne sont pas dans le contenu ODJ.
+    real_kws = [k for k in matched_keywords if not str(k).startswith("(")]
+    if not real_kws:
+        return ""
+    for item in odj_items:
+        if not isinstance(item, str):
+            continue
+        item_low = item.lower()
+        for kw in real_kws:
+            kw_str = str(kw).lower()
+            if kw_str and kw_str in item_low:
+                # Trouvé — capitalise la 1ère lettre (préserve sigles
+                # comme "PSG", "JOP" en cours de texte). Strip leading
+                # punctuation/symboles puis upper-first.
+                # Strip leading punctuation/bullets : -, –, —, •, ·, +, *,
+                # éventuellement précédés d'espaces. Plus robuste que
+                # lstrip("-—•·") qui oubliait l'EN DASH (–).
+                cleaned = re.sub(
+                    r"^[\s\-–—•·+*]+", "", item
+                ).strip()
+                if not cleaned:
+                    return ""
+                # cleaned[:1].upper() + cleaned[1:] — ne touche QUE le 1er
+                # char, contrairement à .capitalize() qui met en minuscule
+                # le reste (casserait les sigles).
+                return (cleaned[:1].upper() + cleaned[1:])[:220]
+    return ""
 
 
 def _resolve_syceron_chapter_title(
