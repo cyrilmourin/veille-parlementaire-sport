@@ -28,11 +28,12 @@ def test_extract_eric_woerth_pmu():
     facts = extract_nomination_facts(
         "Eric Woerth a été nommé président du PMU."
     )
-    assert facts == {
-        "person": "Eric Woerth",
-        "function": "président",
-        "organization": "PMU",
-    }
+    assert facts is not None
+    assert facts["person"] == "Eric Woerth"
+    assert facts["function"] == "président"
+    assert facts["organization"] == "PMU"
+    # R41-F : préposition extraite avec la structure
+    assert facts.get("preposition") == "du "
 
 
 def test_extract_frederic_sanaur_eventeam():
@@ -193,14 +194,38 @@ def test_format_titre_sans_org():
     assert title == "Olivier Renaud devient directeur général"
 
 
-def test_format_titre_org_voyelle():
-    """Heuristique : sigle tout-maj → 'du', sinon 'de'."""
+def test_format_titre_org_voyelle_fallback_heuristique():
+    """Sans `preposition` explicite (compat héritée), heuristique :
+    - sigle voyelle → "de l'"
+    - sigle consonne → "du"
+    - texte voyelle → "d'"
+    - sinon → "de"."""
+    # Sans préposition + voyelle initiale → "d'"
     facts = {"person": "X Y", "function": "président",
              "organization": "Olympique de Marseille"}
-    title = format_normalized_title(facts)
-    # "Olympique" commence par O (voyelle) mais ce n'est pas un sigle,
-    # donc on prend la prep "de"
-    assert title == "X Y devient président de Olympique de Marseille"
+    assert format_normalized_title(facts) == \
+        "X Y devient président d'Olympique de Marseille"
+
+
+def test_format_titre_preposition_explicite_prioritaire():
+    """R41-F : si `preposition` est posée, elle prime sur l'heuristique."""
+    facts = {"person": "X Y", "function": "président",
+             "organization": "FFR", "preposition": "de la "}
+    assert format_normalized_title(facts) == \
+        "X Y devient président de la FFR"
+    # Sans preposition + sigle consonne → fallback "du"
+    facts2 = {"person": "X Y", "function": "président",
+              "organization": "FFR"}
+    assert format_normalized_title(facts2) == \
+        "X Y devient président du FFR"
+
+
+def test_format_titre_apostrophe_pas_de_double_espace():
+    """R41-F : « de l'OM » sans espace entre l' et OM."""
+    facts = {"person": "X Y", "function": "président",
+             "organization": "OM", "preposition": "de l'"}
+    assert format_normalized_title(facts) == \
+        "X Y devient président de l'OM"
 
 
 def test_format_titre_facts_invalides():

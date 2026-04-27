@@ -141,18 +141,49 @@ _PERSON_RE = re.compile(
 # Extraction de la structure (après fonction)
 # ---------------------------------------------------------------------------
 
-# Prépositions « de la suite » : « de », « du », « des », « d' », « à la
-# tête de », « au sein de », « au sein du », « auprès de », etc.
+# Prépositions « de la suite » : capture la PRÉPOSITION FINALE (de la,
+# du, de l', des, de, d') sous le nom `final_prep` pour la propager
+# au format du titre. Les compléments (à la tête de, au sein de…) sont
+# absorbés par le groupe non-capturant `prefix` et ne portent pas la
+# préposition finale visible — c'est `final_prep` qui détermine le
+# rendu (« devient président <final_prep><structure> »).
 _PREP_STRUCT_RE = re.compile(
     r"^\s*"
-    r"(?:"
-    r"à\s+la\s+(?:tête|présidence)\s+(?:de\s+|du\s+|des\s+|d['']\s*)|"
-    r"au\s+sein\s+(?:de\s+|du\s+|des\s+|d['']\s*)|"
-    r"auprès\s+(?:de\s+|du\s+|des\s+|d['']\s*)|"
-    r"de\s+la\s+|de\s+l['']\s*|de\s+|du\s+|des\s+|d['']\s*"
+    r"(?P<prefix>"
+    r"à\s+la\s+(?:tête|présidence)\s+|"
+    r"au\s+sein\s+|"
+    r"auprès\s+|"
+    r")"
+    r"(?P<final_prep>"
+    r"de\s+la\s+|"
+    r"de\s+l['']\s*|"
+    r"du\s+|"
+    r"des\s+|"
+    r"d['']\s*|"
+    r"de\s+"
     r")",
     re.IGNORECASE,
 )
+
+
+def _normalize_prep(raw_prep: str) -> str:
+    """Normalise un préfixe de préposition en sa forme canonique
+    pour le rendu : « de la », « du », « de l' », « des », « de »."""
+    if not raw_prep:
+        return "de "
+    p = raw_prep.strip().lower()
+    # Strip trailing whitespace; reconstruit avec espace final propre.
+    if p.startswith("de la"):
+        return "de la "
+    if p.startswith("de l"):  # de l' ou de l (avec apostrophe typographique)
+        return "de l'"
+    if p == "du" or p.startswith("du "):
+        return "du "
+    if p.startswith("des"):
+        return "des "
+    if p.startswith("d'") or p.startswith("d "):
+        return "d'"
+    return "de "
 
 # Structure = ce qui suit jusqu'à fin de phrase / virgule forte / parenthèse
 _STRUCT_RE = re.compile(
@@ -274,23 +305,30 @@ def extract_nomination_facts(text: str) -> dict | None:
         if not fm:
             continue
         function = _clean_function(fm.group(0))
-        # STRUCTURE — chez ce qui suit la fonction, après préposition
+        # STRUCTURE — ce qui suit la fonction, après préposition.
+        # On capture aussi la préposition FINALE (« de la », « du »,
+        # « de l' », « des », « de », « d' ») pour la propager au
+        # rendu de titre (Cyril : « extraire la structure avec son
+        # préfixe pour déduire la préposition »).
         post_func = after_window[fm.end():]
         prep_m = _PREP_STRUCT_RE.match(post_func)
+        org = ""
+        prep = "de "  # fallback si pas de préposition détectée
         if prep_m:
             post_prep = post_func[prep_m.end():]
             org_m = _STRUCT_RE.match(post_prep)
             if org_m:
                 org = _clean_organization(org_m.group("organization"))
-            else:
-                org = ""
-        else:
-            org = ""
+                prep = _normalize_prep(prep_m.group("final_prep"))
 
         return {
             "person": person,
             "function": function,
             "organization": org,
+            # R41-F (2026-04-27) — préposition canonique (« de la »,
+            # « du », « de l' », « des », « de », « d' »). Espace final
+            # inclus pour concaténation directe dans format_normalized_title.
+            "preposition": prep,
         }
     return None
 
@@ -323,7 +361,19 @@ def canonical_key(facts: dict) -> str:
 
 
 def format_normalized_title(facts: dict) -> str:
-    """« <Personne> devient <Fonction> de <Structure> » canonique."""
+    """« <Personne> devient <Fonction> <prep><Structure> » canonique.
+
+    R41-F (2026-04-27) : la préposition (« de la », « du », « de l' »,
+    « des », « de », « d' ») vient prioritairement de `facts['preposition']`
+    extraite avec la structure (par exemple « la FFF » → preposition
+    `de la`, « PMU » → preposition `du`, « OM » → preposition `de l'`).
+    Pour les facts hérités sans `preposition` explicite (compat
+    arrière), fallback heuristique :
+    - sigle 2-6 lettres tout-maj débutant par voyelle → « de l' »
+    - sigle 2-6 lettres tout-maj sinon → « du »
+    - début par voyelle → « d' »
+    - sinon → « de »
+    """
     person = (facts.get("person") or "").strip()
     function = (facts.get("function") or "").strip()
     org = (facts.get("organization") or "").strip()
@@ -331,15 +381,26 @@ def format_normalized_title(facts: dict) -> str:
         return ""
     if not org:
         return f"{person} devient {function}"[:220]
-    # Choix de la préposition. Heuristique simple :
-    # - sigle 2-6 lettres tout-maj → "du <SIGLE>"
-    # - début par voyelle → "de <Nom>"
-    # - sinon → "de <Nom>"
-    first_word = org.split()[0] if org else ""
-    if re.match(r"^[A-Z]{2,6}$", first_word):
-        prep = "du "
-    else:
-        prep = "de "
+
+    prep = facts.get("preposition") or ""
+    if not prep:
+        # Heuristique fallback (compat tests existants sans preposition).
+        first_word = org.split()[0] if org else ""
+        if re.match(r"^[A-Z]{2,6}$", first_word):
+            # Sigle. Voyelle initiale → de l'; sinon du.
+            if first_word[0] in "AEIOUYHaeiouyh":
+                prep = "de l'"
+            else:
+                prep = "du "
+        elif org and org[0].lower() in "aeiouyh":
+            prep = "d'"
+        else:
+            prep = "de "
+
+    # Si prep se termine par apostrophe ('), on colle directement à org
+    # (« de l'OM » sans espace). Sinon prep a déjà un espace final.
+    if prep.endswith("'"):
+        return f"{person} devient {function} {prep}{org}"[:220]
     return f"{person} devient {function} {prep}{org}"[:220]
 
 
