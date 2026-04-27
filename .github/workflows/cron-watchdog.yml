@@ -1,0 +1,70 @@
+name: Cron watchdog — daily.yml
+
+# R40-M (2026-04-27) — Filet de sécurité contre les skips silencieux du
+# cron principal.
+#
+# Contexte : le 27 avril 2026 le cron `0 6 * * *` du workflow daily.yml a
+# été silencieusement skippé par GHA (saturation des runners Free à 06:00
+# UTC, heure de pic mondial des crons). Cyril n'a pas reçu son mail du
+# matin et le site n'a pas été rebuild. R40-M a déjà décalé le cron à
+# `42 5 * * *` pour sortir de l'heure pile, mais GHA Free reste imprévisible.
+#
+# Ce watchdog tourne tous les jours à 09:00 UTC (3h18 après l'horaire
+# attendu du daily) et vérifie via l'API qu'au moins un run de daily.yml
+# a tourné depuis 04:00 UTC du jour courant (= les 5h précédant le watchdog).
+# Si aucun run n'est trouvé, déclenche manuellement daily.yml avec
+# since_days=1 (équivalent du cron matin manqué).
+#
+# Critère "run récent" :
+#   - workflow daily.yml
+#   - status terminé OU en cours
+#   - created_at >= today 04:00 UTC (couvre le cron `42 5` + tolérance)
+#
+# Faux positif possible : si un push manuel a tourné entre 04:00 et 09:00
+# UTC, le watchdog considère que le matin est OK et ne relance pas
+# daily.yml — comportement souhaité (pas de double mail).
+
+on:
+  schedule:
+    - cron: "0 9 * * *"  # 09:00 UTC = 11:00 Paris CEST
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "1 = déclencher daily.yml même si un run récent existe"
+        required: false
+        default: "0"
+
+permissions:
+  actions: write  # nécessaire pour POST /actions/workflows/.../dispatches
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vérifie qu'un run daily.yml a tourné dans les 5 dernières h
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE: ${{ github.event.inputs.force || '0' }}
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          # Cutoff : 5h avant maintenant. Couvre le cron `42 5 * * *` +
+          # un éventuel retard GHA jusqu'à ~3h. Si aucun run dans cette
+          # fenêtre, on considère que le cron a été skippé.
+          CUTOFF=$(date -u -d "5 hours ago" +%Y-%m-%dT%H:%M:%SZ)
+          echo "Cutoff watchdog : $CUTOFF (cherche un run daily.yml plus récent)"
+
+          RESP=$(gh api "/repos/$REPO/actions/workflows/daily.yml/runs?per_page=10")
+          RECENT_COUNT=$(echo "$RESP" | jq --arg c "$CUTOFF" '
+            [.workflow_runs[] | select(.created_at > $c)] | length')
+          echo "Runs daily.yml depuis $CUTOFF : $RECENT_COUNT"
+
+          if [ "$RECENT_COUNT" = "0" ] || [ "$FORCE" = "1" ]; then
+            echo "→ Déclenchement workflow_dispatch daily.yml (since_days=1)"
+            gh api -X POST "/repos/$REPO/actions/workflows/daily.yml/dispatches" \
+              -f ref=main \
+              -f "inputs[since_days]=1" \
+              && echo "OK, dispatch posté"
+          else
+            echo "→ Cron déjà tiré, watchdog no-op"
+          fi

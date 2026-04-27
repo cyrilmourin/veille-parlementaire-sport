@@ -1,0 +1,89 @@
+name: GC caches GHA — weekly
+
+# R40-M (2026-04-27) — Garbage collection des caches Actions du repo.
+#
+# Contexte : ce repo cumule des caches `actions/cache` à chaque run
+# (clé `veille-sqlite-v3-${run_id}` rolling, restore-key `veille-sqlite-v3-`).
+# 94 caches actifs / 2.5 Go observés au 2026-04-27. La limite GHA Free est
+# de 10 Go par repo ; au-delà GitHub évince automatiquement les plus anciens,
+# mais l'évincement asynchrone peut ralentir certains runs (lookup de
+# restore-key sur 90+ entrées). Un GC hebdomadaire qui supprime les caches
+# > 7 jours libère de l'espace en amont et garde un historique récent
+# pour les `restore-key` (les runs trouvent toujours un cache de la veille).
+#
+# Tourne le DIMANCHE à 03:00 UTC (heure très creuse), n'interfère pas avec
+# le cron daily à 05:42 UTC.
+
+on:
+  schedule:
+    - cron: "0 3 * * 0"  # dimanche 03:00 UTC = 05:00 Paris CEST
+  workflow_dispatch:
+    inputs:
+      keep_days:
+        description: "Garder les caches plus récents que N jours (défaut 7)"
+        required: false
+        default: "7"
+      dry_run:
+        description: "1 = lister les candidats sans supprimer"
+        required: false
+        default: "0"
+
+permissions:
+  actions: write  # nécessaire pour DELETE /actions/caches
+
+jobs:
+  gc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: GC caches > N jours
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEEP_DAYS: ${{ github.event.inputs.keep_days || '7' }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || '0' }}
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          CUTOFF_DATE=$(date -u -d "${KEEP_DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)
+          echo "Cutoff : $CUTOFF_DATE (caches plus anciens supprimés)"
+          echo "Dry-run : $DRY_RUN"
+
+          # Liste les caches via API REST. last_accessed_at = ordre LRU GHA.
+          PAGE=1
+          TOTAL_DELETED=0
+          TOTAL_KEPT=0
+          TOTAL_BYTES_FREED=0
+          while true; do
+            RESP=$(gh api "/repos/$REPO/actions/caches?per_page=100&page=$PAGE&sort=last_accessed_at&direction=asc")
+            COUNT=$(echo "$RESP" | jq '.actions_caches | length')
+            if [ "$COUNT" = "0" ]; then break; fi
+            echo "Page $PAGE : $COUNT caches"
+            for ROW in $(echo "$RESP" | jq -c '.actions_caches[] | {id, key, last_accessed_at, size_in_bytes}'); do
+              ID=$(echo "$ROW" | jq -r '.id')
+              KEY=$(echo "$ROW" | jq -r '.key')
+              LAST=$(echo "$ROW" | jq -r '.last_accessed_at')
+              SIZE=$(echo "$ROW" | jq -r '.size_in_bytes')
+              if [[ "$LAST" < "$CUTOFF_DATE" ]]; then
+                if [ "$DRY_RUN" = "1" ]; then
+                  echo "  [DRY] would delete : $KEY (last $LAST, $SIZE bytes)"
+                else
+                  gh api -X DELETE "/repos/$REPO/actions/caches/$ID" >/dev/null \
+                    && echo "  DELETED : $KEY (last $LAST, $SIZE bytes)" \
+                    || echo "  FAILED  : $KEY"
+                fi
+                TOTAL_DELETED=$((TOTAL_DELETED + 1))
+                TOTAL_BYTES_FREED=$((TOTAL_BYTES_FREED + SIZE))
+              else
+                TOTAL_KEPT=$((TOTAL_KEPT + 1))
+              fi
+            done
+            PAGE=$((PAGE + 1))
+            if [ "$COUNT" -lt "100" ]; then break; fi
+          done
+
+          MB_FREED=$((TOTAL_BYTES_FREED / 1024 / 1024))
+          echo
+          echo "==========================================="
+          echo "Supprimés : $TOTAL_DELETED caches ($MB_FREED Mo)"
+          echo "Conservés : $TOTAL_KEPT caches"
+          echo "Cutoff    : $CUTOFF_DATE"
+          echo "==========================================="
