@@ -1441,6 +1441,35 @@ def _load(rows: list[dict]) -> list[dict]:
             r["raw"] = json.loads(r.get("raw") or "{}")
         except Exception:
             r["raw"] = {}
+        # R40-Q (2026-04-27) — Pour les CR plénières AN syceron, enrichit
+        # le titre avec le chapitre du paragraphe matché. Le titre stocké
+        # en DB est neutre (« Séance AN du DD/MM/YYYY — séance plénière »)
+        # depuis R40-Q ; on remplace par « Séance AN du DD/MM/YYYY —
+        # <chapitre> » résolu dynamiquement via syceron_index +
+        # syceron_chapters. Si non résolvable, le titre neutre est
+        # conservé. Idempotent : si on retourne en arrière sur ce code,
+        # un nouveau build régénère le titre depuis la DB.
+        if (r.get("category") == "comptes_rendus"
+                and r.get("source_id") == "an_syceron"
+                and isinstance(r.get("raw"), dict)
+                and r.get("matched_keywords")):
+            _raw_cr = r["raw"]
+            _idx_q = _raw_cr.get("syceron_index") or []
+            _ch_q = _raw_cr.get("syceron_chapters") or {}
+            _hb_q = (_raw_cr.get("haystack_body") or "")
+            chapter_title = _resolve_syceron_chapter_title(
+                _hb_q, r["matched_keywords"], _idx_q, _ch_q,
+            )
+            if chapter_title:
+                # Reconstruit le titre avec le chapitre du paragraphe matché.
+                # Préserve la date depuis l'ancien titre (premier groupe
+                # « Séance AN du DD/MM/YYYY »).
+                cur_title = r.get("title") or ""
+                m_dt = re.match(
+                    r"^(Séance AN du \d{1,2}/\d{1,2}/\d{4})", cur_title
+                )
+                if m_dt:
+                    r["title"] = f"{m_dt.group(1)} — {chapter_title}"[:220]
         out.append(r)
     return out
 
@@ -1480,6 +1509,57 @@ def _load_disabled_source_ids(config_path: str = "config/sources.yml") -> set[st
                 if isinstance(sid, str) and sid.strip():
                     disabled.add(sid.strip())
     return disabled
+
+
+def _resolve_syceron_chapter_title(
+    haystack: str,
+    matched_keywords: list[str],
+    syceron_index: list,
+    syceron_chapters: dict,
+) -> str:
+    """R40-Q (2026-04-27) — Pour un CR AN syceron, résout le titre du
+    chapitre Syceron contenant le 1er match keyword dans `haystack`.
+
+    Args :
+        haystack : `raw.haystack_body` (texte du CR concaténé)
+        matched_keywords : `r["matched_keywords"]` (déjà filtrés)
+        syceron_index : `raw.syceron_index` = [[offset, id_syceron], ...]
+        syceron_chapters : `raw.syceron_chapters` = {id_syceron: titre}
+
+    Returns :
+        Titre du chapitre lisible (max 120 chars), ou "" si non
+        résolvable (pas de match dans haystack, pas de chapitre dans
+        l'index proche, ou structures vides).
+    """
+    if not haystack or not matched_keywords or not syceron_index or not syceron_chapters:
+        return ""
+    haystack_low = haystack.lower()
+    kw_pos = -1
+    for kw in matched_keywords:
+        p = haystack_low.find(str(kw).lower())
+        if p >= 0:
+            kw_pos = p
+            break
+    if kw_pos < 0:
+        return ""
+    # Bisect : on remonte de l'offset du keyword vers les chapitres
+    # précédents jusqu'à trouver le 1er id_syceron qui a un titre dans
+    # syceron_chapters. Les `<para>` sans `<intitule>` (= sans titre de
+    # chapitre) seront sautés. On préfère le titre le plus PROCHE en
+    # arrière, qui est le plus contextuel.
+    import bisect
+    offsets = [it[0] for it in syceron_index if isinstance(it, list)]
+    if not offsets:
+        return ""
+    # Index = position du plus grand offset <= kw_pos
+    i = bisect.bisect_right(offsets, kw_pos) - 1
+    while i >= 0:
+        anchor_id = syceron_index[i][1]
+        title = syceron_chapters.get(anchor_id) or syceron_chapters.get(str(anchor_id))
+        if title:
+            return title
+        i -= 1
+    return ""
 
 
 def _filter_disabled_sources(rows: list[dict]) -> list[dict]:

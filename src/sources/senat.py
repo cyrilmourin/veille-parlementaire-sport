@@ -240,11 +240,17 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
             except ValueError:
                 pass
 
-        # Titre humain : on veut évoquer le thème du débat quand possible
-        # (« Séance du 11 février 2026 — Discussion du projet de loi relatif
-        # au sport amateur »). À défaut, on garde la mention analytique/intégral.
-        # report_type expose la distinction aux templates dédiés sans avoir
-        # à parser le titre.
+        # R40-Q (2026-04-27) — Titre neutre par défaut (« Séance du
+        # DD MOIS YYYY — séance plénière »). Avant : on tentait
+        # `extract_cr_theme(text)` qui prenait le 1er thème détecté en
+        # début de fichier — souvent générique ou hors-sport, ne reflétait
+        # pas le passage qui avait déclenché le match keyword. Côté Sénat
+        # plénière on n'a pas l'équivalent du `syceron_chapters` AN
+        # (cf. R40-K, l'index XML est dans le zip, mais le mapping
+        # vers les pages HTML individuelles s20260225NNN.html est
+        # complexe). Donc on s'en tient au titre neutre conformément
+        # à la directive Cyril. `theme` reste exposé en `raw.theme`
+        # pour diagnostic / templates qui voudraient l'afficher.
         report_type = "analytique" if sid == "senat_debats" else "integral"
         label = (
             "Compte rendu analytique"
@@ -253,12 +259,10 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
         )
         theme = extract_cr_theme(text)
         date_label = _fmt_fr_date(seance_dt) if (m_name and seance_dt.year > 2000) else ""
-        if date_label and theme:
-            title = f"Séance du {date_label} — {theme}"[:220]
-        elif date_label:
-            title = f"Séance du {date_label} — {label}"[:220]
-        elif theme:
-            title = f"{label} — {theme}"[:220]
+        if date_label:
+            title = f"Séance du {date_label} — séance plénière"[:220]
+        elif cr_ref := re.search(r"d(\d{8})", base):
+            title = f"Compte rendu Sénat — {label}"[:220]
         else:
             # Fallback : ancien format (nom de fichier non reconnu)
             title = f"{label} — {base}"[:220]

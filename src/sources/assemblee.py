@@ -303,6 +303,48 @@ def _strip_xml(text: str) -> str:
 # tous les navigateurs (Firefox inclus).
 _SYCERON_ID_OPEN_RE = re.compile(r'<\w+\s+[^>]*id_syceron="(\d+)"[^>]*>')
 
+# R40-Q (2026-04-27) — extraction des titres de chapitres Syceron pour
+# enrichir le titre du CR avec le sujet du paragraphe matché plutôt que
+# le 1er sujet du CR. Pattern : `<titreStruct id_syceron="X" …>...
+# <intitule>TITRE</intitule>...`. Le `.*?` non-greedy + DOTALL borne la
+# capture au 1er <intitule> rencontré (qui appartient bien à ce
+# titreStruct, structure XML standard Syceron).
+_SYCERON_CHAPTER_RE = re.compile(
+    r'<titreStruct[^>]+id_syceron="(\d+)"[^>]*>'
+    r'.*?'
+    r'<intitule[^>]*>(.*?)</intitule>',
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _extract_syceron_chapters(xml_text: str) -> dict[str, str]:
+    """R40-Q — Map `{id_syceron: titre_chapitre}` extrait du XML Syceron.
+
+    Capture chaque `<titreStruct id_syceron="X"><intitule>TITRE</intitule>`
+    avec un strip des tags HTML internes (italique, br…) du titre.
+    Tronque à 120 chars par titre pour éviter d'absurdes longueurs en
+    UI (les titres Syceron peuvent contenir des sous-clauses sans
+    ponctuation).
+
+    Utilisé conjointement avec `_strip_xml_with_anchors` côté export :
+    1. Le keyword matché à l'offset X dans le haystack → bisect dans
+       `anchors` → id_syceron du paragraphe parent
+    2. Lookup dans le map des chapitres pour résoudre le titre lisible.
+    """
+    out: dict[str, str] = {}
+    for m in _SYCERON_CHAPTER_RE.finditer(xml_text):
+        id_syc = m.group(1)
+        # Strip les tags HTML du contenu de l'intitule (italique, br…)
+        raw_title = _TAG_RE.sub(" ", m.group(2))
+        title = _WS_RE.sub(" ", raw_title).strip()
+        # Decode entités basiques (Syceron a parfois &#39; / &amp;)
+        title = (title.replace("&#39;", "'")
+                       .replace("&amp;", "&")
+                       .replace("&quot;", '"'))
+        if title and id_syc not in out:
+            out[id_syc] = title[:120]
+    return out
+
 
 def _strip_xml_with_anchors(text: str) -> tuple[str, list[tuple[int, str]]]:
     """R40-J — strip XML Syceron en track les positions `id_syceron`.
@@ -424,6 +466,11 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
         # multi-navigateur, Firefox inclus). Si le XML ne contient
         # aucun id_syceron, retombe sur strip naïf (anchors vide).
         text, syceron_anchors = _strip_xml_with_anchors(raw)
+        # R40-Q (2026-04-27) — extraction des titres de chapitres
+        # Syceron pour enrichir le titre du CR à l'export avec le sujet
+        # du paragraphe matché (au lieu du 1er sujet du CR, qui est
+        # souvent générique type « Présidence de … »).
+        syceron_chapters = _extract_syceron_chapters(raw)
         if not text:
             continue
 
@@ -463,19 +510,21 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
         else:
             url = "https://www.assemblee-nationale.fr/dyn/17/comptes-rendus"
 
-        # Titre : on veut évoquer le thème du débat. Ordre de priorité :
-        #   1) thème Syceron (« Présidence de … <OBJET> 0 … ») — fiable
-        #   2) thème générique extract_cr_theme (motifs « projet de loi… »)
-        #   3) fallback date + mention CR intégral
+        # R40-Q (2026-04-27) — Titre par défaut neutre (« Séance AN du
+        # DD/MM/YYYY — séance plénière ») au lieu du 1er thème détecté
+        # par `_extract_syceron_meta` / `extract_cr_theme` qui était
+        # souvent générique (« Présidence de … ») et ne reflétait pas
+        # le passage qui a déclenché le match keyword. À l'export, le
+        # titre sera enrichi avec le chapitre du paragraphe matché via
+        # `raw.syceron_chapters` + `raw.syceron_index` :
+        # `Séance AN du DD/MM/YYYY — <chapitre du keyword matché>`.
+        # Si pas de chapitre résolvable (cas edge), le titre neutre est
+        # conservé. `theme` n'est plus utilisé pour le titre mais reste
+        # exposé en `raw.theme` (compat templates, diagnostic).
         theme = syceron_theme or extract_cr_theme(text)
-        # Indicateur : la date vient-elle bien du timestamp et pas du Zip ?
         date_is_from_seance = ts_dt is not None
-        if date_is_from_seance and theme:
-            title = f"Séance AN du {published_at:%d/%m/%Y} — {theme}"[:220]
-        elif date_is_from_seance:
-            title = f"Séance AN du {published_at:%d/%m/%Y} — Compte rendu intégral"[:220]
-        elif theme:
-            title = f"Séance AN — {theme}"[:220]
+        if date_is_from_seance:
+            title = f"Séance AN du {published_at:%d/%m/%Y} — séance plénière"[:220]
         elif cr_ref:
             title = f"Compte rendu AN — séance {cr_ref}"[:220]
         else:
@@ -526,6 +575,18 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
                     [off, aid] for off, aid in syceron_anchors
                     if off < 200000
                 ],
+                # R40-Q (2026-04-27) — map `{id_syceron: titre_chapitre}`
+                # extrait du sommaire XML Syceron. Consommé à l'export
+                # pour enrichir le titre du CR avec le sujet du paragraphe
+                # matché (au lieu du 1er sujet du CR, qui est souvent
+                # générique type « Présidence de … »). Bornage : seulement
+                # les chapitres dont l'id apparaît dans le syceron_index
+                # tronqué — les autres ne seront jamais résolus à l'export.
+                "syceron_chapters": {
+                    aid: syceron_chapters[aid]
+                    for off, aid in syceron_anchors
+                    if off < 200000 and aid in syceron_chapters
+                },
                 # Date officielle de séance (depuis timeStampDebut du XML).
                 # Consommée par _fix_cr_row : permet au rebuild du site
                 # d'écrire le titre correct même pour les items déjà en DB.

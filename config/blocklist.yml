@@ -104,3 +104,20 @@ blocklist:
   # « déontologie » / « CNOSF ».
   - url: https://cnosf.franceolympique.com/comite-de-deontologie-du-cnosf
     reason: "Page statique CNOSF (pas une actualité, structure permanente)"
+
+  # 2026-04-27 (R40-O) — CR séances plénières AN sans contenu sport-pertinent.
+  # Cyril a manuellement ciblé chaque séance via le text-fragment du
+  # paragraphe matché ; la blocklist masque la séance entière (pas le
+  # paragraphe seul — l'item DB est le CR complet).
+  - url: https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/seance/CRSANR5L17S2026O1N207
+    reason: "Séance AN 16/04/2026 #1 (sécurité, rétention administrative, prévention attentat — pas sport)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/seance/CRSANR5L17S2026O1N182
+    reason: "Séance AN (paragraphe id 4045125 — faux positif sport)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/seance/CRSANR5L17S2026O1N024
+    reason: "Séance AN 31/10/2025 PLF 2026 — erreur de transcription mentionnant un keyword sport hors contexte"
+
+  # 2026-04-27 (R40-O) — CR commission culture Sénat semaine 6 avril 2026.
+  # Mention « Football » hors contexte de la veille sport-institutionnel
+  # (quota global de discussion non sport-relevant).
+  - url: https://www.senat.fr/compte-rendu-commissions/20260406/cult.html
+    reason: "CR commission culture Sénat 06/04/2026 — match keyword football hors contexte"

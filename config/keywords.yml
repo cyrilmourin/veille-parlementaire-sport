@@ -60,7 +60,10 @@ acteur:
   - Groupe parlementaire sport
   - AMA sport                   # Agence mondiale antidopage
   - Agence mondiale antidopage
-  - CIO
+  # R40-P (2026-04-27) — `CIO` seul retiré du dictionnaire. Trop ambigu :
+  # matche aussi Cnil, Crio, ou des sigles d'organisations privées
+  # ("CIO Cap Investissement Open" et autres). On garde uniquement la
+  # forme étendue qui est sport-univoque.
   - Comité international olympique
   - Comite international olympique
   - IPC                         # Comité paralympique international
@@ -195,6 +198,22 @@ dispositif:
   - Plan equipements sportifs
   - 5000 équipements sportifs
   - 5000 equipements sportifs
+  # R40-N (2026-04-27) — termes génériques pour capter les PPL/PJL sur
+  # les équipements/infrastructures sportives qui n'utilisent pas le
+  # terme "Plan" en titre. Cas déclencheur : PPL 2667 du 14 avril 2026
+  # « Encourager les partenariats … équipements sportifs » non matchée.
+  - équipement sportif
+  - equipement sportif
+  - équipements sportifs
+  - equipements sportifs
+  - infrastructure sportive
+  - infrastructures sportives
+  - enceinte sportive
+  - enceintes sportives
+  - complexe sportif
+  - complexes sportifs
+  - installation sportive
+  - installations sportives
   - 1000 dojos
   - 500 terrains de padel
   - CQP sport
@@ -293,8 +312,16 @@ theme:
   - Equitation
   - Sport équestre
   - Sport equestre
-  - Escrime
-  - Gymnastique
+  # R40-P (2026-04-27) — `Escrime` seul retiré : ambiguë (escrime
+  # littéraire / verbale au sens figuré, et homonymes typographiques).
+  # Forme étendue conservée pour rester sport-univoque.
+  - Fédération française d'escrime
+  - Federation francaise d'escrime
+  # R40-P (2026-04-27) — `Gymnastique` seul retiré : Cyril a constaté
+  # un faux positif sur un CR AN (#4048713) où le mot est employé au
+  # sens figuré ("gymnastique intellectuelle" / "gymnastique budgétaire"
+  # / "gymnastique syntaxique"). La forme étendue reste captée par
+  # `Fédération française de gymnastique` (ligne ~104).
   - Judo
   - Karaté
   - Karate
