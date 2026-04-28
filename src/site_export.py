@@ -1561,11 +1561,23 @@ def _reroute_to_nominations(rows: list[dict]) -> list[dict]:
     (questions, amendements, dossiers) qui contiendraient des
     expressions performatives dans leur texte sans être des
     annonces de nomination.
+
+    Guard R41-H : les rapports parlementaires (senat_rapports, an_rapports)
+    ont category=communiques mais sont des documents de contrôle, pas des
+    annonces de nomination. Ex. faux positif : rapport APCE n°446 qui
+    mentionne « réélu président » en passant. On exclut toute la
+    family_source=parlement (couvre senat_rapports, an_rapports, senat_rss
+    et tout futur ajout parlementaire).
     """
     rerouted_count = 0
     for r in rows:
         cat = r.get("category") or ""
         if cat != "communiques":
+            continue
+        # R41-H : ne pas rerouter les documents parlementaires même s'ils
+        # mentionnent un verbe de nomination en passant.
+        fam = _source_family(r.get("source_id"), r.get("chamber"))
+        if fam == "parlement":
             continue
         families = r.get("keyword_families") or []
         if isinstance(families, str):
@@ -2050,6 +2062,60 @@ def _filter_parlement_publications(rows: list[dict]) -> list[dict]:
         import logging
         logging.getLogger(__name__).info(
             "R28 filtre publications parlement : %d item(s) non-rapport masqué(s)",
+            dropped,
+        )
+    return kept
+
+
+# R41-H (2026-04-28) — Sources dédiées aux nominations uniquement.
+# Ces sources (presse sport business + fédérations sportives hors CNOSF /
+# france_paralympique) sont ajoutées exclusivement pour enrichir la
+# catégorie nominations. Les items qui matchent d'autres familles de
+# keywords (ex. équipements sportifs, sport professionnel) mais PAS
+# nomination_event resteraient sinon en `communiques` et pollueraient la
+# page Publications avec des sources hors-scope éditorial (Olbia, Café du
+# Sport Biz, FFF.fr…).
+# Seuls CNOSF et france_paralympique restent dans communiques (Publications)
+# pour le mouvement sportif — ils couvrent l'activité institutionnelle
+# au-delà des nominations.
+_NOMINATIONS_ONLY_SOURCES: frozenset[str] = frozenset({
+    "olbia_conseil",
+    "cafe_sport_business",
+    "sport_buzz_business",
+    "sport_business_club",
+    "sport_strategies",
+    "fff_actualites",
+    "fft_actualites",
+    "ffa_actualites",
+})
+
+
+def _filter_nominations_only_sources(rows: list[dict]) -> list[dict]:
+    """R41-H (2026-04-28) — Retire de la catégorie `communiques` les items
+    issus de sources dédiées nominations qui n'ont PAS été re-routées.
+
+    Après `_reroute_to_nominations`, les items de _NOMINATIONS_ONLY_SOURCES
+    qui matchent nomination_event ont category=nominations (OK). Ceux qui
+    matchent d'autres keywords restent en communiques → apparaîtraient en
+    Publications avec des sources éditoriales hors-scope.
+
+    Ce filtre les supprime de l'export. Ils restent en DB (trace).
+    Idempotent. N'affecte pas les autres catégories.
+    """
+    kept: list[dict] = []
+    dropped = 0
+    for r in rows:
+        cat = (r.get("category") or "").strip()
+        sid = (r.get("source_id") or "").strip()
+        if cat == "communiques" and sid in _NOMINATIONS_ONLY_SOURCES:
+            dropped += 1
+            continue
+        kept.append(r)
+    if dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "R41-H : %d items communiques sources nominations-only"
+            " supprimés des publications",
             dropped,
         )
     return kept
@@ -2602,6 +2668,14 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # (90j) — un re-route après filter_window perdrait des items
     # nominations qui auraient été drop par la fenêtre 90j.
     rows = _reroute_to_nominations(rows)
+    # R41-H (2026-04-28) : après le reroute, retire de `communiques` les
+    # items des sources dédiées nominations (presse sport business +
+    # fédérations) qui n'ont PAS été re-routées (matches autres keywords
+    # sans nomination_event). Ces sources ne doivent apparaître que dans
+    # la page Nominations, pas dans Publications. CNOSF et
+    # france_paralympique ne sont pas dans ce set → restent dans
+    # communiques pour le mouvement sportif institutionnel.
+    rows = _filter_nominations_only_sources(rows)
     # R41-E (2026-04-27) : pour les items en catégorie `nominations`,
     # extraire (Personne, Fonction, Structure) et normaliser le titre
     # en « X devient Y de Z » sur les sources presse business (Olbia,
