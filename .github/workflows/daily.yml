@@ -8,10 +8,12 @@ on:
     # documente que les schedules peuvent être SKIP en cas de saturation).
     # Le 27 avril 2026 le cron 0 6 * * * a été silencieusement skippé,
     # mail du matin manquant (cron-watchdog ajouté en R40-M comme filet).
-    # 05:42 UTC = 07:42 Paris CEST (été) = 06:42 Paris CET (hiver).
-    # Toujours dans la tranche "matin" pour le digest, mais hors heure pile.
+    # R40-M-bis (2026-04-28) : avancé de 05:42 UTC → 03:42 UTC après
+    # observation : GHA Free retarde les schedules de 10-14h en journée.
+    # 03:42 UTC = 05:42 Paris CEST (été) = 04:42 Paris CET (hiver).
+    # Même avec 14h de délai GHA → exécution ~17:42 UTC = dans la journée.
     # Digest email complet + rebuild/deploy Hugo.
-    - cron: "42 5 * * *"
+    - cron: "42 3 * * *"
     # R24 (2026-04-23) → R24b (2026-04-23) : 17h30 Paris lun-ven (= 15h30 UTC).
     # Refetch + export + rebuild/deploy Hugo + ping (email court si nouveautés
     # depuis le matin, dedupe via data/ping_state.json). Pas de digest complet.
