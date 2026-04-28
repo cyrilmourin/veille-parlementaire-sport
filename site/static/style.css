@@ -1787,3 +1787,54 @@ a:hover { text-decoration: underline; }
   h1 { font-size: 24px; letter-spacing: -0.3px; }
   h2 { font-size: 19px; letter-spacing: -0.3px; }
 }
+
+/* ---------- Bannière consentement cookies (GA4) ---------------------------- */
+#consent-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: var(--sl-blue);
+  color: #fff;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 -2px 12px rgba(0,0,0,.18);
+}
+#consent-banner p {
+  margin: 0;
+  flex: 1 1 260px;
+  color: #fff;
+}
+#consent-banner a {
+  color: var(--sl-cream);
+  text-decoration: underline;
+}
+.consent-btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.consent-btn:hover { opacity: .85; }
+.consent-btn--accept {
+  background: var(--sl-red);
+  color: #fff;
+}
+.consent-btn--refuse {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.5);
+}
+@media (max-width: 640px) {
+  #consent-banner { flex-direction: column; align-items: flex-start; gap: 10px; }
+}

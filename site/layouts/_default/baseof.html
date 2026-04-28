@@ -6,6 +6,28 @@
   <title>{{ .Title }} — {{ .Site.Title }}</title>
   <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}"/>
   <meta name="robots" content="index,follow"/>
+  <!-- Google Analytics 4 — chargé uniquement après consentement explicite -->
+  <script>
+  (function(){
+    var GA_ID = 'G-GGX6LRV7F0';
+    function loadGA(){
+      if(window._gaLoaded) return;
+      window._gaLoaded = true;
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+      document.head.appendChild(s);
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      window.gtag = gtag;
+      gtag('js', new Date());
+      gtag('config', GA_ID);
+    }
+    var consent = localStorage.getItem('ga_consent');
+    if(consent === 'granted') loadGA();
+    window._loadGA = loadGA;
+  })();
+  </script>
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"/>
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png"/>
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
@@ -37,5 +59,29 @@
     {{ end }}
   </main>
   {{ partial "footer.html" . }}
+  <!-- Bannière consentement cookies -->
+  <div id="consent-banner" style="display:none" role="dialog" aria-live="polite"
+       aria-label="Consentement cookies">
+    <p>Ce site utilise Google Analytics pour mesurer son audience.
+       Vos données restent anonymisées et ne sont pas partagées à des tiers.</p>
+    <button class="consent-btn consent-btn--accept" id="consent-accept">Accepter</button>
+    <button class="consent-btn consent-btn--refuse" id="consent-refuse">Refuser</button>
+  </div>
+  <script>
+  (function(){
+    var banner = document.getElementById('consent-banner');
+    var consent = localStorage.getItem('ga_consent');
+    if(!consent) banner.style.display = 'flex';
+    document.getElementById('consent-accept').addEventListener('click', function(){
+      localStorage.setItem('ga_consent', 'granted');
+      banner.style.display = 'none';
+      if(window._loadGA) window._loadGA();
+    });
+    document.getElementById('consent-refuse').addEventListener('click', function(){
+      localStorage.setItem('ga_consent', 'denied');
+      banner.style.display = 'none';
+    });
+  })();
+  </script>
 </body>
 </html>
