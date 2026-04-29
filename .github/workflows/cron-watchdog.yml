@@ -9,24 +9,40 @@ name: Cron watchdog — daily.yml
 # matin et le site n'a pas été rebuild. R40-M a déjà décalé le cron à
 # `42 5 * * *` pour sortir de l'heure pile, mais GHA Free reste imprévisible.
 #
-# Ce watchdog tourne tous les jours à 09:00 UTC (3h18 après l'horaire
-# attendu du daily) et vérifie via l'API qu'au moins un run de daily.yml
-# a tourné depuis 04:00 UTC du jour courant (= les 5h précédant le watchdog).
-# Si aucun run n'est trouvé, déclenche manuellement daily.yml avec
-# since_days=1 (équivalent du cron matin manqué).
+# R40-M-ter (2026-04-29) — Le watchdog héritait du bug qu'il était censé
+# corriger : il tournait sur `0 9 * * *` (heure pile = pic de saturation),
+# et son cutoff `5 hours ago` calculé à 09:00 UTC (= 04:00 UTC) était
+# postérieur au cron principal R40-M-bis `42 3 * * *` → faux positifs et
+# faux négatifs. Le 29-04 au matin, premier jour avec le nouveau cron
+# `42 3`, daily.yml ET watchdog ont tous les deux été silencieusement
+# skippés → pas de digest matinal, site figé sur les données du 28-04.
+#
+# Trois changements R40-M-ter :
+#   1. Watchdog du matin déplacé `0 9 * * *` → `17 8 * * *`
+#      (10:17 Paris CEST, hors heure pile et hors minute ronde).
+#   2. Ajout d'un 2e watchdog l'après-midi `47 11 * * *`
+#      (13:47 Paris CEST), filet de récupération si le watchdog du
+#      matin saute aussi.
+#   3. Cutoff explicite calé sur 03:00 UTC du jour courant (= 30min
+#      avant le cron `42 3 * * *` pour absorber une éventuelle avance
+#      GHA, exceptionnelle). Plus robuste qu'une fenêtre relative qui
+#      doit être ajustée à chaque déplacement du cron principal.
 #
 # Critère "run récent" :
 #   - workflow daily.yml
 #   - status terminé OU en cours
-#   - created_at >= today 04:00 UTC (couvre le cron `42 5` + tolérance)
+#   - created_at >= today 03:00 UTC (couvre le cron `42 3 * * *` +
+#     tout run de récupération ou push qui aurait tourné après).
 #
-# Faux positif possible : si un push manuel a tourné entre 04:00 et 09:00
-# UTC, le watchdog considère que le matin est OK et ne relance pas
-# daily.yml — comportement souhaité (pas de double mail).
+# Faux positif possible : si un push manuel a tourné entre 03:00 UTC
+# et l'horaire du watchdog, le watchdog considère que le matin est OK
+# et ne relance pas daily.yml — comportement souhaité (pas de double
+# mail / double rebuild).
 
 on:
   schedule:
-    - cron: "0 9 * * *"  # 09:00 UTC = 11:00 Paris CEST
+    - cron: "17 8 * * *"   # 08:17 UTC = 10:17 Paris CEST (matin)
+    - cron: "47 11 * * *"  # 11:47 UTC = 13:47 Paris CEST (après-midi, filet n°2)
   workflow_dispatch:
     inputs:
       force:
@@ -41,17 +57,19 @@ jobs:
   watchdog:
     runs-on: ubuntu-latest
     steps:
-      - name: Vérifie qu'un run daily.yml a tourné dans les 5 dernières h
+      - name: Vérifie qu'un run daily.yml a tourné depuis 03:00 UTC du jour
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FORCE: ${{ github.event.inputs.force || '0' }}
         run: |
           set -euo pipefail
           REPO="${{ github.repository }}"
-          # Cutoff : 5h avant maintenant. Couvre le cron `42 5 * * *` +
-          # un éventuel retard GHA jusqu'à ~3h. Si aucun run dans cette
-          # fenêtre, on considère que le cron a été skippé.
-          CUTOFF=$(date -u -d "5 hours ago" +%Y-%m-%dT%H:%M:%SZ)
+          # Cutoff : aujourd'hui 03:00 UTC. Le cron principal `42 3 * * *`
+          # démarre à 03:42 UTC ; on prend 03:00 comme borne basse pour
+          # absorber une éventuelle avance GHA (très rare). Tout run de
+          # daily.yml dont `created_at` est postérieur est considéré
+          # comme couvrant le créneau matin du jour courant.
+          CUTOFF="$(date -u +%Y-%m-%dT03:00:00Z)"
           echo "Cutoff watchdog : $CUTOFF (cherche un run daily.yml plus récent)"
 
           RESP=$(gh api "/repos/$REPO/actions/workflows/daily.yml/runs?per_page=10")
