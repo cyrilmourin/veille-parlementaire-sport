@@ -249,6 +249,21 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-04-29 (matin, signalement Cyril « cron du matin pas tourné, site sur les données d'hier ») : **R40-M-ter — Cron-watchdog robuste (sortie de l'heure pile + filet n°2 + cutoff explicite)**. Premier jour avec le cron principal `42 3 * * *` introduit la veille en R40-M-bis : daily.yml ET cron-watchdog ont été tous les deux silencieusement skippés par GHA Free → digest manquant, site figé sur les données du 28-04. Diagnostic : le watchdog héritait du bug qu'il était censé corriger.
+  **3 causes structurelles identifiées** :
+  1. `cron-watchdog.yml` tournait sur `0 9 * * *` (heure pile = même pic de saturation Free qui avait fait sauter le cron originel `0 6` en R40-M).
+  2. Cutoff `5 hours ago` calculé à 09:00 UTC = `04:00 UTC`, donc *postérieur* au cron principal R40-M-bis à 03:42 UTC. Conséquence : un run nominal n'était jamais reconnu comme « récent » (`created_at 03:42 < cutoff 04:00`) → faux positifs RECENT_COUNT=0 → dispatches en double quand le cron tournait à temps, sans diagnostic clair quand il ratait.
+  3. Filet unique : si le watchdog du matin saute aussi, plus aucun rattrapage avant le cron du soir (lun-ven uniquement, et qui ne déclenche pas de digest complet).
+  **3 fixes dans `.github/workflows/cron-watchdog.yml`** :
+  1. Cron du matin déplacé `0 9 * * *` → `17 8 * * *` (10:17 Paris CEST). Hors heure pile, hors minute ronde — même logique que R40-M-bis pour le cron principal.
+  2. **Ajout d'un 2e watchdog** `47 11 * * *` (13:47 Paris CEST). Filet de récupération si le watchdog du matin saute aussi. Coût quasi nul, fiabilité doublée.
+  3. Cutoff explicite calé sur `aujourd'hui 03:00 UTC` via `date -u +%Y-%m-%dT03:00:00Z` (au lieu d'une fenêtre relative `5 hours ago` qui doit être ajustée à chaque déplacement du cron principal). Couvre le cron `42 3 * * *` avec 30min de marge en amont. Plus robuste et plus lisible.
+  `tests/test_r40m_ter_cron_watchdog.py` : +4 tests structurels (aucun cron watchdog sur l'heure pile, aucun cron daily sur l'heure pile, ≥ 2 schedules watchdog, cutoff antérieur au cron principal le plus matinal). Tests indépendants des sources Python — parsent directement les YAML workflows. Garde-fou : si quelqu'un re-déplace le cron principal sans recaler le cutoff watchdog, le test 4 alerte.
+  **Action prod** : déclencher manuellement `workflow_dispatch` sur daily.yml avec `since_days=1` pour rattraper le digest du 29-04 manqué.
+  **Note R40-M et R40-M-bis** (non documentés en HANDOFF jusqu'ici, ajoutés ici pour traçabilité) :
+  - **R40-M** (2026-04-27) : ajout du fichier `cron-watchdog.yml` après skip silencieux du cron `0 6 * * *` le 27-04 ; déplacement du cron principal `0 6` → `42 5` pour sortir de l'heure pile.
+  - **R40-M-bis** (2026-04-28) : avancement du cron `42 5` → `42 3` (UTC) après observation que GHA Free retarde régulièrement les schedules de 10-14h en journée — partir 2h plus tôt garantit que même avec un délai max, l'exécution termine dans la journée Paris.
+
 - 2026-04-27 (port côté Lidl signalé par Cyril) : **R40-L — Bascule Sénat `/dossier-legislatif/` → `/leg/` + élargissement scope text-fragment**. Bug constaté côté veille Lidl : les liens « Voir le dossier législatif » Sénat ne scrollaient pas au keyword surligné, alors que ça marchait pour l'AN. Cause : la page `/dossier-legislatif/<slug>.html` est un INDEX (titre + timeline + statut) qui ne contient pas le corps du texte. Le text-fragment `#:~:text=<keyword>` ne matche que si le keyword se trouve dans le titre — sinon le navigateur reste au top de la page. Côté AN c'est moins visible : la page `/dyn/17/dossiers/<uid>` répète titre + libellés des actes, le keyword s'y trouve souvent.
   **Fix** : la page `/leg/<slug>.html` contient l'exposé des motifs + articles + signatures = matériel riche en mots-clés thématiques. On bascule sur cette URL avant d'ajouter le text-fragment, uniquement pour les slugs modernes (sessions 2019-2029) — les anciens (08, 15...) répondent 404 sur `/leg/`.
   **3 changements** dans `src/site_export.py` :
