@@ -1,5 +1,5 @@
 {
-  "last_run_at": "2026-04-29T11:15:59",
+  "last_run_at": "2026-04-29T20:15:01",
   "schema_version": 2,
   "sources": {
     "afld": {
@@ -7,39 +7,39 @@
       "last_error": null,
       "last_fetched": 6,
       "last_max_published_at": "2026-04-23T12:50:31",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "an_agenda": {
       "consecutive_errors": 0,
       "last_error": null,
-      "last_fetched": 652,
+      "last_fetched": 662,
       "last_max_published_at": "2026-07-02T07:30:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "an_amendements": {
       "consecutive_errors": 0,
       "last_error": null,
-      "last_fetched": 2824,
-      "last_max_published_at": "2026-04-28T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_fetched": 4486,
+      "last_max_published_at": "2026-04-29T00:00:00",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "an_cr_commissions": {
       "consecutive_errors": 0,
       "last_error": null,
-      "last_fetched": 0,
-      "last_max_published_at": "2026-04-15T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_fetched": 1,
+      "last_max_published_at": "2026-04-28T00:00:00",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "an_dossiers_legislatifs": {
       "consecutive_errors": 0,
       "last_error": null,
-      "last_fetched": 1365,
+      "last_fetched": 1368,
       "last_max_published_at": "2026-05-26T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "an_questions_ecrites": {
@@ -47,7 +47,7 @@
       "last_error": null,
       "last_fetched": 950,
       "last_max_published_at": "2026-04-28T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "an_questions_gouvernement": {
@@ -55,7 +55,7 @@
       "last_error": null,
       "last_fetched": 0,
       "last_max_published_at": "2026-03-26T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "an_questions_orales_sans_debat": {
@@ -63,7 +63,7 @@
       "last_error": null,
       "last_fetched": 68,
       "last_max_published_at": "2026-04-21T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "an_rapports": {
@@ -71,7 +71,7 @@
       "last_error": null,
       "last_fetched": 0,
       "last_max_published_at": null,
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "an_syceron": {
@@ -79,7 +79,7 @@
       "last_error": null,
       "last_fetched": 493,
       "last_max_published_at": "2026-04-28T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "anj": {
@@ -87,7 +87,7 @@
       "last_error": null,
       "last_fetched": 133,
       "last_max_published_at": "2026-04-28T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "ans": {
@@ -95,7 +95,7 @@
       "last_error": null,
       "last_fetched": 0,
       "last_max_published_at": null,
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "arcom": {
@@ -103,7 +103,7 @@
       "last_error": null,
       "last_fetched": 25,
       "last_max_published_at": "2026-04-28T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "autorite_concurrence": {
@@ -111,7 +111,7 @@
       "last_error": null,
       "last_fetched": 31,
       "last_max_published_at": "2026-04-28T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "cafe_sport_business": {
@@ -119,7 +119,7 @@
       "last_error": null,
       "last_fetched": 0,
       "last_max_published_at": null,
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "ccomptes_publications": {
@@ -127,7 +127,7 @@
       "last_error": null,
       "last_fetched": 0,
       "last_max_published_at": null,
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "cnosf": {
@@ -135,7 +135,7 @@
       "last_error": null,
       "last_fetched": 132,
       "last_max_published_at": "2026-04-28T07:37:17",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "conseil_constit_actualites": {
@@ -143,7 +143,7 @@
       "last_error": null,
       "last_fetched": 1,
       "last_max_published_at": "2026-04-17T14:27:56",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "conseil_constit_decisions": {
@@ -151,7 +151,7 @@
       "last_error": null,
       "last_fetched": 10,
       "last_max_published_at": "2026-04-28T03:52:11",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "conseil_etat": {
@@ -159,7 +159,7 @@
       "last_error": null,
       "last_fetched": 20,
       "last_max_published_at": "2026-04-20T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "defenseur_droits": {
@@ -167,23 +167,23 @@
       "last_error": null,
       "last_fetched": 3,
       "last_max_published_at": "2026-04-23T10:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "dila_jorf": {
       "consecutive_errors": 0,
       "last_error": null,
-      "last_fetched": 1223,
+      "last_fetched": 1359,
       "last_max_published_at": "2999-01-01T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "elysee_agenda": {
       "consecutive_errors": 0,
       "last_error": null,
       "last_fetched": 8,
-      "last_max_published_at": "2026-04-27T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_max_published_at": "2026-04-29T00:00:00",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "elysee_feed": {
@@ -191,7 +191,7 @@
       "last_error": null,
       "last_fetched": 27,
       "last_max_published_at": "2026-04-27T18:15:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "fdsf": {
@@ -199,7 +199,7 @@
       "last_error": null,
       "last_fetched": 6,
       "last_max_published_at": "2026-04-09T08:27:36",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "ffa_actualites": {
@@ -207,7 +207,7 @@
       "last_error": null,
       "last_fetched": 19,
       "last_max_published_at": "2026-04-28T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "fff_actualites": {
@@ -215,7 +215,7 @@
       "last_error": null,
       "last_fetched": 25,
       "last_max_published_at": "2026-06-04T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "fft_actualites": {
@@ -223,31 +223,31 @@
       "last_error": null,
       "last_fetched": 15,
       "last_max_published_at": "2026-04-29T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "france_paralympique": {
       "consecutive_errors": 0,
       "last_error": null,
       "last_fetched": 42,
-      "last_max_published_at": "2026-04-05T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_max_published_at": "2026-04-22T00:00:00",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "igesr_rapports": {
       "consecutive_errors": 0,
       "last_error": null,
-      "last_fetched": 10,
+      "last_fetched": 0,
       "last_max_published_at": "2026-04-08T12:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "info_gouv_actualites": {
       "consecutive_errors": 0,
       "last_error": null,
-      "last_fetched": 0,
-      "last_max_published_at": "2026-04-27T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_fetched": 16,
+      "last_max_published_at": "2026-04-28T00:00:00",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "injep": {
@@ -255,7 +255,7 @@
       "last_error": null,
       "last_fetched": 0,
       "last_max_published_at": null,
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "insep": {
@@ -263,7 +263,7 @@
       "last_error": null,
       "last_fetched": 0,
       "last_max_published_at": null,
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "matignon_actualites": {
@@ -271,39 +271,39 @@
       "last_error": null,
       "last_fetched": 0,
       "last_max_published_at": "2026-04-27T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_affaires_etrangeres": {
       "consecutive_errors": 0,
       "last_error": null,
       "last_fetched": 22,
-      "last_max_published_at": "2026-04-28T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_max_published_at": "2026-04-29T00:00:00",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_armees": {
       "consecutive_errors": 0,
       "last_error": null,
       "last_fetched": 19,
-      "last_max_published_at": "2026-04-28T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_max_published_at": "2026-04-29T00:00:00",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_culture": {
       "consecutive_errors": 0,
       "last_error": null,
       "last_fetched": 13,
-      "last_max_published_at": "2026-04-27T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_max_published_at": "2026-04-29T00:00:00",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_economie": {
       "consecutive_errors": 0,
       "last_error": null,
-      "last_fetched": 51,
+      "last_fetched": 54,
       "last_max_published_at": "2026-05-19T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_educ_agenda": {
@@ -311,7 +311,7 @@
       "last_error": null,
       "last_fetched": 152,
       "last_max_published_at": "2026-04-29T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_education": {
@@ -319,7 +319,7 @@
       "last_error": null,
       "last_fetched": 0,
       "last_max_published_at": null,
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_enseignement_sup": {
@@ -327,7 +327,7 @@
       "last_error": null,
       "last_fetched": 21,
       "last_max_published_at": "2026-04-23T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_esr_agenda": {
@@ -335,15 +335,15 @@
       "last_error": null,
       "last_fetched": 0,
       "last_max_published_at": null,
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_interieur": {
       "consecutive_errors": 0,
       "last_error": null,
-      "last_fetched": 0,
+      "last_fetched": 18,
       "last_max_published_at": "2026-04-24T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_justice": {
@@ -351,7 +351,7 @@
       "last_error": null,
       "last_fetched": 21,
       "last_max_published_at": "2026-04-20T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_ruralite": {
@@ -359,7 +359,7 @@
       "last_error": null,
       "last_fetched": 17,
       "last_max_published_at": "2026-05-03T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_sports_actualites": {
@@ -367,7 +367,7 @@
       "last_error": null,
       "last_fetched": 17,
       "last_max_published_at": "2026-04-23T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_sports_agenda": {
@@ -375,7 +375,7 @@
       "last_error": null,
       "last_fetched": 19,
       "last_max_published_at": "2026-05-03T14:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_sports_presse": {
@@ -383,7 +383,7 @@
       "last_error": null,
       "last_fetched": 18,
       "last_max_published_at": "2026-04-23T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "min_transition_ecologique": {
@@ -391,7 +391,7 @@
       "last_error": null,
       "last_fetched": 17,
       "last_max_published_at": "2026-05-03T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "olbia_conseil": {
@@ -399,7 +399,7 @@
       "last_error": null,
       "last_fetched": 20,
       "last_max_published_at": "2026-04-24T15:42:24",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_agenda_affaires_sociales": {
@@ -407,7 +407,7 @@
       "last_error": null,
       "last_fetched": 3,
       "last_max_published_at": "2026-04-29T17:30:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_agenda_culture": {
@@ -415,7 +415,7 @@
       "last_error": null,
       "last_fetched": 0,
       "last_max_published_at": null,
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_agenda_etrangeres": {
@@ -423,7 +423,7 @@
       "last_error": null,
       "last_fetched": 2,
       "last_max_published_at": "2026-04-29T16:30:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_agenda_finances": {
@@ -431,7 +431,7 @@
       "last_error": null,
       "last_fetched": 2,
       "last_max_published_at": "2026-04-29T16:30:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_agenda_lois": {
@@ -439,31 +439,31 @@
       "last_error": null,
       "last_fetched": 8,
       "last_max_published_at": "2026-04-29T18:30:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_akn_adoptions": {
       "consecutive_errors": 0,
       "last_error": null,
-      "last_fetched": 53,
+      "last_fetched": 50,
       "last_max_published_at": "2026-04-28T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_akn_depots": {
       "consecutive_errors": 0,
       "last_error": null,
-      "last_fetched": 167,
+      "last_fetched": 168,
       "last_max_published_at": "2026-04-29T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_amendements": {
       "consecutive_errors": 0,
       "last_error": null,
-      "last_fetched": 2221,
-      "last_max_published_at": "2026-04-29T11:13:36",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_fetched": 2226,
+      "last_max_published_at": "2026-04-29T20:12:04",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_cr_affaires_sociales": {
@@ -471,7 +471,7 @@
       "last_error": null,
       "last_fetched": 8,
       "last_max_published_at": "2026-04-13T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_cr_culture": {
@@ -479,7 +479,7 @@
       "last_error": null,
       "last_fetched": 8,
       "last_max_published_at": "2026-04-13T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_cr_etrangeres": {
@@ -487,7 +487,7 @@
       "last_error": null,
       "last_fetched": 8,
       "last_max_published_at": "2026-04-13T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_cr_finances": {
@@ -495,7 +495,7 @@
       "last_error": null,
       "last_fetched": 8,
       "last_max_published_at": "2026-04-13T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_cr_lois": {
@@ -503,7 +503,7 @@
       "last_error": null,
       "last_fetched": 8,
       "last_max_published_at": "2026-04-13T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_cri": {
@@ -511,7 +511,7 @@
       "last_error": null,
       "last_fetched": 2802,
       "last_max_published_at": "2026-04-29T04:53:08",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_debats": {
@@ -519,7 +519,7 @@
       "last_error": null,
       "last_fetched": 1,
       "last_max_published_at": "2026-04-29T05:37:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_dosleg": {
@@ -527,7 +527,7 @@
       "last_error": null,
       "last_fetched": 4294,
       "last_max_published_at": "2026-04-23T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_ppl": {
@@ -535,7 +535,7 @@
       "last_error": null,
       "last_fetched": 6139,
       "last_max_published_at": "2026-04-27T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_promulguees": {
@@ -543,7 +543,7 @@
       "last_error": null,
       "last_fetched": 4294,
       "last_max_published_at": "2026-04-23T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_qg": {
@@ -551,7 +551,7 @@
       "last_error": null,
       "last_fetched": 9406,
       "last_max_published_at": "2026-04-16T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_questions_1an": {
@@ -559,7 +559,7 @@
       "last_error": null,
       "last_fetched": 5263,
       "last_max_published_at": "2026-04-23T00:00:00",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_rapports": {
@@ -567,7 +567,7 @@
       "last_error": null,
       "last_fetched": 3777,
       "last_max_published_at": null,
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "senat_rss": {
@@ -575,15 +575,15 @@
       "last_error": null,
       "last_fetched": 10,
       "last_max_published_at": null,
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "sport_business_club": {
       "consecutive_errors": 0,
       "last_error": null,
       "last_fetched": 10,
-      "last_max_published_at": "2026-04-29T06:15:28",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_max_published_at": "2026-04-29T17:33:37",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "sport_buzz_business": {
@@ -591,23 +591,19 @@
       "last_error": null,
       "last_fetched": 10,
       "last_max_published_at": "2026-04-29T07:59:03",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     },
     "sport_strategies": {
       "consecutive_errors": 0,
       "last_error": null,
       "last_fetched": 10,
-      "last_max_published_at": "2026-04-29T10:30:37",
-      "last_ok_at": "2026-04-29T11:15:59",
+      "last_max_published_at": "2026-04-29T15:30:10",
+      "last_ok_at": "2026-04-29T20:15:01",
       "stale_alerted": false
     }
   },
   "volumetry_history": [
-    {
-      "date": "2026-04-24T20:12:08",
-      "total_fetched": 44431
-    },
     {
       "date": "2026-04-24T21:47:22",
       "total_fetched": 44457
@@ -723,6 +719,10 @@
     {
       "date": "2026-04-29T11:15:59",
       "total_fetched": 47007
+    },
+    {
+      "date": "2026-04-29T20:15:01",
+      "total_fetched": 48849
     }
   ]
 }
