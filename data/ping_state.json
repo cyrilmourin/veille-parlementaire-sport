@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-04-29T20:22:21+00:00",
+  "last_run_at": "2026-04-30T06:34:09+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419865B2632P0D1N000492",
@@ -38,6 +38,7 @@
       "an_syceron::008b19da4a0cd6f2",
       "an_syceron::00c12618e8f1c31c",
       "an_syceron::0243de31b4488e5e",
+      "an_syceron::03a1f64c1e8e4088",
       "an_syceron::05dfa0ecb20e4e3a",
       "an_syceron::0a9618c5e0f26377",
       "an_syceron::0ad0e19e658d39b9",
@@ -187,6 +188,7 @@
       "an_syceron::cf17a1ede02b54fa",
       "an_syceron::cfe478b6fc46e1e3",
       "an_syceron::d1eb2cb22b3dd11b",
+      "an_syceron::d2c3eb258b9195e9",
       "an_syceron::d66b1587833c2e98",
       "an_syceron::d6e2557464fd6432",
       "an_syceron::d96c21cd10e0f6c6",
