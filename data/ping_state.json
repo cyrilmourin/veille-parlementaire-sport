@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-04-30T17:20:41+00:00",
+  "last_run_at": "2026-05-01T06:45:24+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419865B2632P0D1N000492",
@@ -189,6 +189,7 @@
       "an_syceron::cfe478b6fc46e1e3",
       "an_syceron::d1eb2cb22b3dd11b",
       "an_syceron::d2c3eb258b9195e9",
+      "an_syceron::d61b98812e8edb23",
       "an_syceron::d66b1587833c2e98",
       "an_syceron::d6e2557464fd6432",
       "an_syceron::d96c21cd10e0f6c6",
@@ -636,6 +637,7 @@
       "senat_cri::68ea26b7ec03b380",
       "senat_cri::6919ce25d86f541e",
       "senat_cri::6936eb86c600f70c",
+      "senat_cri::696270d88905105c",
       "senat_cri::69692d99b1bf9c11",
       "senat_cri::697567a5411b2104",
       "senat_cri::698188f52dadb6f6",
@@ -1263,6 +1265,7 @@
       "an_dossiers_legislatifs::DLR5L17N53078",
       "an_dossiers_legislatifs::DLR5L17N53186",
       "an_dossiers_legislatifs::DLR5L17N53191",
+      "an_dossiers_legislatifs::DLR5L17N54096",
       "an_dossiers_legislatifs::DLR5L17N54138",
       "senat_akn_adoptions::pjl24-630",
       "senat_akn_depots::pjl24-630",
@@ -1289,6 +1292,7 @@
       "senat_ppl::321",
       "senat_ppl::428",
       "senat_ppl::456",
+      "senat_ppl::533",
       "senat_promulguees::2004-1366",
       "senat_promulguees::2006-405",
       "senat_promulguees::2007-129",
