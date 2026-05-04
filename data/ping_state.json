@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-04T06:51:00+00:00",
+  "last_run_at": "2026-05-04T17:34:41+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419865B2632P0D1N000492",
@@ -19,12 +19,18 @@
       "an_amendements::AMANR5L17PO838901BTC2695P0D1N000486",
       "an_amendements::AMANR5L17PO838901BTC2695P0D1N000720",
       "senat_amendements::0f34d17c6e2ddc29",
+      "senat_amendements::1fb1daf262414907",
       "senat_amendements::3482514291dab7d8",
       "senat_amendements::3c8c2e47f55beeb6",
+      "senat_amendements::3d71aec0d8278e59",
+      "senat_amendements::47ad5d17f76efe0d",
       "senat_amendements::63541f8ed6f8c741",
       "senat_amendements::97e7bed55de11e7b",
+      "senat_amendements::dd2ff7a634a61fcd",
       "senat_amendements::e73c84410bfc5a92",
       "senat_amendements::ebbb31dc5631a32d",
+      "senat_amendements::ed00f42db8747755",
+      "senat_amendements::f82dbdf3be94f978",
       "senat_amendements::fdc4aeeb693f0384"
     ],
     "comptes_rendus": [
