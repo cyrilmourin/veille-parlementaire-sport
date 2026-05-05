@@ -78,7 +78,7 @@
       "scanned": []
     },
     "cion-dvp": {
-      "last_num": 40,
+      "last_num": 41,
       "scanned": [
         1,
         2,
@@ -118,7 +118,8 @@
         37,
         38,
         39,
-        40
+        40,
+        41
       ]
     },
     "cion-eco": {
