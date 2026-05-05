@@ -105,6 +105,26 @@ blocklist:
   - url: https://cnosf.franceolympique.com/comite-de-deontologie-du-cnosf
     reason: "Page statique CNOSF (pas une actualité, structure permanente)"
 
+  # 2026-05-05 (R41-I) — JORF faux positifs non-sport.
+  #
+  # JORFTEXT000053974650 : texte JORF matchant "complexe sportif" dans un
+  # contexte non sport-institutionnel (PPL suppression agences, mention
+  # incidente).
+  - url: https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000053974650
+    reason: "JORF faux positif — match 'complexe sportif' hors contexte sport-institutionnel"
+  #
+  # Nominations JORF non-sport : trois décrets de nomination de DG / présidents
+  # d'organismes non-sport, captés par la famille nomination_event (R41-A)
+  # introduite pour la presse sport business. Le filtre structurel R41-I
+  # (JORF nominations sans famille hors nomination_event) prévient les
+  # futurs faux positifs ; ces trois entrées couvrent les items déjà en DB.
+  - url: https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000053981885
+    reason: "JORF nomination non-sport — 'nommé directeur général' hors organisme sport"
+  - url: https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000053981761
+    reason: "JORF nomination non-sport — 'nommé président' hors organisme sport"
+  - url: https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000053981857
+    reason: "JORF nomination non-sport — 'nommé directeur général' hors organisme sport"
+
   # 2026-04-27 (R40-O) — CR séances plénières AN sans contenu sport-pertinent.
   # Cyril a manuellement ciblé chaque séance via le text-fragment du
   # paragraphe matché ; la blocklist masque la séance entière (pas le

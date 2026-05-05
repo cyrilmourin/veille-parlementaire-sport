@@ -66,7 +66,7 @@ concurrency:
 jobs:
   collect-and-publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45  # R41-I : porté 25→45 min après ajout des sources sport business (R41-C)
     # R24b (2026-04-23) : tourne sur les DEUX crons (04h00 et 17h30) +
     # push main + workflow_dispatch. Le cron matin envoie le digest email
     # complet ; le cron 17h30 ne fait PAS de digest complet (--no-email)

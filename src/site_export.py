@@ -2121,6 +2121,60 @@ def _filter_nominations_only_sources(rows: list[dict]) -> list[dict]:
     return kept
 
 
+def _filter_jorf_nominations_hors_sport(rows: list[dict]) -> list[dict]:
+    """R41-I (2026-05-05) — Retire les nominations JORF dont le seul signal
+    sport est la famille `nomination_event` (verbes génériques : nommé,
+    désigné, élu président, etc.).
+
+    Problème : la famille `nomination_event` ajoutée en R41-A pour enrichir
+    les nominations presse sport business s'applique aussi aux textes JORF
+    (dila_jorf). Or le JORF publie des nominations pour TOUS les organismes
+    publics français, pas seulement sportifs. Un décret "M. X nommé directeur
+    général de [organisme non-sport]" passe le filtre parce que "nommé
+    directeur général" est un keyword nomination_event.
+
+    Critère d'exclusion :
+      - source_id == "dila_jorf"
+      - category == "nominations"
+      - keyword_families ne contient QUE "nomination_event" (aucune autre
+        famille sport : acteur, federation, dispositif, evenement, theme)
+
+    Les nominations JORF légitimes (ANS, INSEP, CREPS, ministères sport…)
+    matchent aussi la famille `acteur` (Agence nationale du sport, INSEP,
+    Direction des sports…) → elles passent.
+
+    Idempotent. N'affecte pas les sources non-JORF.
+    """
+    kept: list[dict] = []
+    dropped = 0
+    for r in rows:
+        sid = (r.get("source_id") or "").strip()
+        cat = (r.get("category") or "").strip()
+        if sid != "dila_jorf" or cat != "nominations":
+            kept.append(r)
+            continue
+        families = r.get("keyword_families") or []
+        if isinstance(families, str):
+            try:
+                families = json.loads(families)
+            except Exception:
+                families = []
+        families_set = set(families)
+        # Si la seule famille matchée est nomination_event → hors-sport
+        if families_set and families_set <= {"nomination_event"}:
+            dropped += 1
+            continue
+        kept.append(r)
+    if dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "R41-I : %d nominations JORF hors-sport supprimées"
+            " (famille nomination_event seule, aucun keyword sport spécifique)",
+            dropped,
+        )
+    return kept
+
+
 def _filter_window(rows: list[dict]) -> list[dict]:
     """Garde uniquement les items dont la date de PUBLICATION est dans la
     fenêtre applicable à leur catégorie (WINDOW_DAYS_BY_CATEGORY sinon
@@ -2676,6 +2730,11 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # france_paralympique ne sont pas dans ce set → restent dans
     # communiques pour le mouvement sportif institutionnel.
     rows = _filter_nominations_only_sources(rows)
+    # R41-I (2026-05-05) : nominations JORF dont le seul signal sport est
+    # nomination_event (verbes génériques) → exclues. Le JORF contient des
+    # nominations pour tous les organismes publics ; seules celles qui matchent
+    # aussi une famille sport spécifique (acteur, federation…) sont pertinentes.
+    rows = _filter_jorf_nominations_hors_sport(rows)
     # R41-E (2026-04-27) : pour les items en catégorie `nominations`,
     # extraire (Personne, Fonction, Structure) et normaliser le titre
     # en « X devient Y de Z » sur les sources presse business (Olbia,
