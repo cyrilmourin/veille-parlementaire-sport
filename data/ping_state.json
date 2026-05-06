@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-05T17:40:59+00:00",
+  "last_run_at": "2026-05-06T06:40:35+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419865B2632P0D1N000492",
@@ -19,7 +19,6 @@
       "an_amendements::AMANR5L17PO838901BTC2695P0D1N000486",
       "an_amendements::AMANR5L17PO838901BTC2695P0D1N000720",
       "senat_amendements::0f34d17c6e2ddc29",
-      "senat_amendements::1fb1daf262414907",
       "senat_amendements::3482514291dab7d8",
       "senat_amendements::3c8c2e47f55beeb6",
       "senat_amendements::3d71aec0d8278e59",
@@ -200,6 +199,7 @@
       "an_syceron::d66b1587833c2e98",
       "an_syceron::d6e2557464fd6432",
       "an_syceron::d96c21cd10e0f6c6",
+      "an_syceron::da3bba9c611e9190",
       "an_syceron::da4b316ae7c0b708",
       "an_syceron::dd36c724e262f3cb",
       "an_syceron::dd9b81f05faac6d3",
@@ -216,6 +216,7 @@
       "an_syceron::ed8e123228a8cdba",
       "an_syceron::f3178b20f08498c3",
       "an_syceron::f3af11c27f196c4a",
+      "an_syceron::f465e96639a9d4a9",
       "an_syceron::f4769824e7026750",
       "an_syceron::f4ddb78f80a08d88",
       "an_syceron::f4e8cfaae2504884",
@@ -1339,6 +1340,7 @@
       "an_questions_ecrites::QANR5L17QE14905",
       "an_questions_ecrites::QANR5L17QE14918",
       "an_questions_ecrites::QANR5L17QE14951",
+      "an_questions_gouvernement::QANR5L17QG1429",
       "an_questions_orales_sans_debat::QANR5L17QOSD696",
       "senat_qg::0701G",
       "senat_qg::0835G",
