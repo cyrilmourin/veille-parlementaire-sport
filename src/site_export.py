@@ -2956,7 +2956,10 @@ def _recent(rows: list[dict], hours: int = 24) -> list[dict]:
 # ---------- écritures Markdown ---------------------------------------------
 
 def _fmt_item_line(it: dict, with_tags: bool = True,
-                    with_snippet: bool = True) -> str:
+                    with_snippet: bool = True,
+                    chamber_first: bool = False,
+                    with_date: bool = True,
+                    target_blank: bool = False) -> str:
     """Ligne Markdown d'un item (home / catégorie). Layout :
 
     - **[Titre](url)** <span class="chamber" data-chamber="AN">AN</span> · Date · tags inline
@@ -2973,6 +2976,12 @@ def _fmt_item_line(it: dict, with_tags: bool = True,
     `with_snippet=False` (R13-D) : masque l'extrait. Utilisé par le home
     pour les catégories publications/agenda/jorf/dossiers_legislatifs
     où un extrait n'apporte rien au-delà du titre.
+
+    R41-J (2026-05-07) — options pour la section « Actualité 24h » home :
+    `chamber_first=True` : badge AN/Sénat AVANT le titre (au lieu de après
+    en méta). `with_date=False` : retire la date de la ligne. `target_blank
+    =True` : les liens s'ouvrent dans un nouvel onglet (raw HTML, nécessite
+    goldmark unsafe=true — déjà actif).
     """
     date = (it.get("published_at") or "")[:10]
     title = (it.get("title") or "").replace("\n", " ").strip()
@@ -3020,13 +3029,17 @@ def _fmt_item_line(it: dict, with_tags: bool = True,
                 f'<span class="status{promulgated}">{_escape(clean)}</span>'
             )
 
-    date_html = f'<time class="date">{date}</time>' if date else ""
+    date_html = f'<time class="date">{date}</time>' if (date and with_date) else ""
 
     # Meta principale (chambre · statut · date) sur une ligne, puis tags sur
     # une 2e ligne dédiée (.meta-tags) — évite que la liste de mots-clés
     # déborde du cadre sur les écrans étroits.
     # Coloration des tags via CSS .kw-tag[data-family=...].
-    main_parts = [p for p in [chamber_html, status_html, date_html] if p]
+    # R41-J : si `chamber_first`, le badge chambre est rendu AVANT le titre
+    # (en préfixe) plutôt que dans la méta — il ne doit donc pas réapparaître
+    # ici.
+    main_chamber = "" if chamber_first else chamber_html
+    main_parts = [p for p in [main_chamber, status_html, date_html] if p]
     main_inline = " · ".join(main_parts) if main_parts else ""
 
     tags_html = ""
@@ -3046,13 +3059,25 @@ def _fmt_item_line(it: dict, with_tags: bool = True,
             meta_html += f'<span class="meta-tags">{tags_html}</span>'
         meta_html += "</span>"
 
+    # Préfixe chambre (R41-J) — affiché en INLINE devant le titre quand
+    # chamber_first=True, sinon vide.
+    chamber_prefix = (chamber_html + " ") if (chamber_first and chamber_html) else ""
+
     # Titre : hypertexte uniquement si on a une URL exploitable.
     # Sinon (ex. réunions AN : pas d'URL publique stable), on affiche
     # le titre en texte gras simple — cf. Follaw.
-    if url:
-        line = f"- **[{title}]({url})**{meta_html}"
+    # R41-J : `target_blank=True` → raw HTML pour pouvoir poser
+    # target="_blank" rel="noopener" (Markdown ne le supporte pas).
+    if url and target_blank:
+        title_html = (
+            f'<strong><a href="{_escape(url)}" target="_blank" '
+            f'rel="noopener">{_escape(title)}</a></strong>'
+        )
+        line = f"- {chamber_prefix}{title_html}{meta_html}"
+    elif url:
+        line = f"- {chamber_prefix}**[{title}]({url})**{meta_html}"
     else:
-        line = f"- **{title}**{meta_html}"
+        line = f"- {chamber_prefix}**{title}**{meta_html}"
 
     if snippet and with_snippet:
         line += f"  \n  <div class=\"snippet-inline\">« {_escape(snippet)} »</div>"
@@ -3085,13 +3110,37 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
     # Bloc compact (padding réduit, pas de tags) — cf. demande utilisateur
     # pour densifier le haut de page. Les tags restent dans les sections
     # par thématique en dessous, qui servent à la lecture exploratoire.
-    lines.append(f"## Dernières 24 h ({len(recent)})")
+    # R41-J (2026-05-07) : titre « Actualité des dernières 24 h », badge
+    # chambre AVANT le titre, pas de date, liens en nouvel onglet, et
+    # repli au-delà des 5 premières occurrences.
+    lines.append(f"## Actualité des dernières 24 h ({len(recent)})")
     lines.append("")
     lines.append('<div class="recent-24">')
     lines.append("")
     if recent:
-        for it in recent[:30]:
-            lines.append(_fmt_item_line(it, with_tags=False))
+        VISIBLE = 5
+        head = recent[:VISIBLE]
+        tail = recent[VISIBLE:30]
+        for it in head:
+            lines.append(_fmt_item_line(
+                it, with_tags=False, chamber_first=True,
+                with_date=False, target_blank=True,
+            ))
+        if tail:
+            lines.append("")
+            lines.append(
+                f'<details class="recent-24-fold">'
+                f'<summary>Voir les {len(tail)} suivante'
+                f'{"s" if len(tail) > 1 else ""}</summary>'
+            )
+            lines.append("")
+            for it in tail:
+                lines.append(_fmt_item_line(
+                    it, with_tags=False, chamber_first=True,
+                    with_date=False, target_blank=True,
+                ))
+            lines.append("")
+            lines.append("</details>")
     else:
         lines.append("_Aucune nouveauté depuis 24h._")
     lines.append("")

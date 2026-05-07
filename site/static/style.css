@@ -1427,15 +1427,39 @@ a:hover { text-decoration: underline; }
   margin: 0;
   padding-left: 20px;
 }
+/* R41-J (2026-05-07) — interligne réduit, padding minimal pour densifier
+   l'affichage. Le badge chambre est désormais inline DEVANT le titre. */
 .recent-24 ul li {
-  padding: 5px 0;
+  padding: 2px 0;
   margin: 0;
   border-bottom: 1px dashed var(--line);
-  line-height: 1.4;
+  line-height: 1.25;
 }
 .recent-24 ul li:last-child { border-bottom: 0; }
 .recent-24 .kw-tag { display: none; }
 .recent-24 .snippet-inline { display: none; }
+/* Badge chambre inline devant le titre : marge à droite pour respirer */
+.recent-24 .chamber {
+  margin-right: 6px;
+  vertical-align: baseline;
+}
+/* Repli des occurrences au-delà de 5 : <details> sobre, pas de chevron
+   custom (laisse le navigateur gérer). Marge top pour séparer la zone
+   visible du contenu plié. */
+.recent-24 .recent-24-fold {
+  margin-top: 6px;
+}
+.recent-24 .recent-24-fold > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--accent-2);
+  font-weight: 600;
+}
+.recent-24 .recent-24-fold > summary::-webkit-details-marker { display: none; }
+.recent-24 .recent-24-fold > summary:hover { text-decoration: underline; }
+.recent-24 .recent-24-fold[open] > summary { margin-bottom: 4px; }
 
 /* ---------- Dossier législatif : timeline procédurale --------------------- */
 .dosleg-timeline {
