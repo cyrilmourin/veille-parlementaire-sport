@@ -1,0 +1,46 @@
+{{/* R41-M (2026-05-07) — Bloc sidebar « PPL Sport Pro » :
+  5 derniers amendements (commission + séance fusionnés, tri date desc),
+  lien vers la page dédiée /ppl-sport-professionnel/.
+
+  Affiché sur :
+    - accueil
+    - /items/dossiers_legislatifs/
+    - /items/amendements/
+  Le partial est inclus inconditionnellement par sidebar.html ; un guard
+  `with site.Data.special_ppl` masque le bloc tant que le payload n'est
+  pas généré (ex. premier build avant le 1er match).
+
+  Le routing est géré côté CSS / template selon le type de page (cf. la
+  classe side-card--ppl du conteneur).
+*/}}
+{{ with site.Data.special_ppl }}
+{{ $amdt := slice }}
+{{ with .amdt_commission }}{{ $amdt = $amdt | append . }}{{ end }}
+{{ with .amdt_seance }}{{ $amdt = $amdt | append . }}{{ end }}
+{{ if $amdt }}
+{{ $sorted := sort $amdt "date" "desc" }}
+<div class="side-card side-card--ppl">
+  <div class="side-card--ppl__head">
+    <span class="side-card--ppl__kicker">SPÉCIAL</span>
+    <h3 class="side-title">PPL Sport Pro</h3>
+  </div>
+  <p class="side-caption">5 derniers amendements (n° 1560)</p>
+  <ul class="side-list">
+    {{ range first 5 $sorted }}
+    <li class="side-item">
+      <div class="side-date">
+        {{ if .date }}<time datetime="{{ .date }}">{{ dateFormat "02/01" (time.AsTime .date) }}</time>{{ end }}
+      </div>
+      <div class="side-body">
+        {{ with .auteur }}<span class="side-auteur">{{ . }}</span>{{ end }}
+        <a href="/ppl-sport-professionnel/" class="side-title-link" title="{{ .title }}">{{ .title }}</a>
+      </div>
+    </li>
+    {{ end }}
+  </ul>
+  <p class="side-more">
+    <a href="/ppl-sport-professionnel/">Voir le suivi détaillé &rarr;</a>
+  </p>
+</div>
+{{ end }}
+{{ end }}

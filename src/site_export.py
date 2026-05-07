@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
-from . import amo_loader
+from . import amo_loader, special_ppl
 from .digest import CATEGORY_LABELS, CATEGORY_ORDER
 
 # R13-G (2026-04-21) : label de version système, affiché dans le header
@@ -2998,6 +2998,14 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
         encoding="utf-8",
     )
 
+    # R41-M (2026-05-07) — Module dédié « Spécial PPL Sport professionnel ».
+    # Collecte les rows liés (texte_ref AN n°1560 / Sénat S459 + match titre)
+    # et expose un payload sur `site/data/special_ppl.json` consommé par :
+    #   - la carte accueil à droite du module 24h (layout home)
+    #   - la page dédiée /ppl-sport-professionnel/ (layout ppl-sport-pro)
+    #   - le bloc sidebar « 5 derniers amendements » sur accueil + dosleg + amdt
+    special_ppl.export(rows, root)
+
     # R13-G : méta sidebar — date de mise à jour + version système (label
     # cumulé + hash commit court). Consommé par layouts/partials/sidebar.html.
     # Le format de date_str colle à la demande Cyril : "XX/XX/XX à XXhXX"
@@ -3029,7 +3037,10 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
 
     # Page d'accueil
     recent = _recent(rows, hours=RECENT_HOURS)
-    _write_home(content, rows, by_cat, recent)
+    # R41-M : payload Spécial PPL pour la carte accueil (à droite du 24h)
+    special_ppl_buckets = special_ppl.collect_special_ppl(rows)
+    special_ppl_payload = special_ppl.build_payload(special_ppl_buckets)
+    _write_home(content, rows, by_cat, recent, special_ppl_payload)
 
     # Page de listing par catégorie (_index.md) — nécessaire pour que
     # /items/amendements/ etc. ne donne pas un 404.
@@ -3220,8 +3231,73 @@ def _escape(s: str) -> str:
             .replace(">", "&gt;"))
 
 
+def _render_special_ppl_card(payload: dict) -> list[str]:
+    """R41-M (2026-05-07) — Carte HTML « Spécial PPL Sport professionnel »
+    affichée à droite du module 24 h sur la page d'accueil.
+
+    Fond bleu (palette Sideline), occurrences sur fond blanc, lien vers la
+    page dédiée /ppl-sport-professionnel/. Inclut un mini-aperçu : prochaine
+    inscription agenda, nb d'amendements en commission/séance, lien direct
+    vers le texte AN.
+    """
+    if not payload:
+        return []
+    meta = payload.get("meta") or {}
+    counts = payload.get("counts") or {}
+    agenda = (payload.get("agenda") or [])
+    # Prochaine échéance = 1er agenda > today
+    today_iso = datetime.now().date().isoformat()
+    upcoming = [a for a in agenda if a.get("date", "") >= today_iso]
+    # Tri agenda asc pour avoir la prochaine d'abord
+    upcoming.sort(key=lambda a: a.get("date", ""))
+    next_event = upcoming[0] if upcoming else None
+    nb_commission = counts.get("amdt_commission", 0)
+    nb_seance = counts.get("amdt_seance", 0)
+
+    lines: list[str] = ['<aside class="special-ppl-card" aria-label="Spécial PPL Sport professionnel">']
+    lines.append('<div class="special-ppl-card__head">')
+    lines.append('<span class="special-ppl-card__kicker">SPÉCIAL</span>')
+    lines.append('<h3 class="special-ppl-card__title">PPL Sport professionnel</h3>')
+    lines.append(
+        '<div class="special-ppl-card__sub">Proposition de loi n° 1560 — '
+        'organisation, gestion et financement</div>'
+    )
+    lines.append('</div>')
+    lines.append('<ul class="special-ppl-card__items">')
+    if next_event:
+        lines.append(
+            f'<li class="special-ppl-card__item special-ppl-card__item--next">'
+            f'<span class="lbl">Prochaine échéance</span>'
+            f'<span class="val">{_escape(next_event.get("date",""))} — '
+            f'{_escape((next_event.get("title","") or "")[:120])}</span></li>'
+        )
+    lines.append(
+        f'<li class="special-ppl-card__item">'
+        f'<span class="lbl">Amendements (commission)</span>'
+        f'<span class="val">{nb_commission}</span></li>'
+    )
+    lines.append(
+        f'<li class="special-ppl-card__item">'
+        f'<span class="lbl">Amendements (séance)</span>'
+        f'<span class="val">{nb_seance}</span></li>'
+    )
+    lines.append('</ul>')
+    lines.append('<div class="special-ppl-card__cta">')
+    lines.append(
+        f'<a class="special-ppl-card__btn" href="{meta.get("slug_path","/ppl-sport-professionnel/")}">'
+        f'Voir le suivi détaillé →</a>'
+    )
+    lines.append(
+        f'<a class="special-ppl-card__link" href="{_escape(meta.get("url_an_texte",""))}" '
+        f'target="_blank" rel="noopener">Texte AN</a>'
+    )
+    lines.append('</div>')
+    lines.append('</aside>')
+    return lines
+
+
 def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict]],
-                recent: list[dict]):
+                recent: list[dict], special_ppl_payload: dict | None = None):
     now = datetime.now()
     # NB : on ne met pas l'heure dans `date:` pour éviter les pages cachées
     # par Hugo si `date > now()` au moment du build (fuseau navigateur vs UTC).
@@ -3234,13 +3310,18 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         "",
     ]
 
-    # -------- Section top : mises à jour des dernières 24 h ----------
+    # -------- Section top : 24 h + carte « Spécial PPL » côte à côte ----
     # Bloc compact (padding réduit, pas de tags) — cf. demande utilisateur
     # pour densifier le haut de page. Les tags restent dans les sections
     # par thématique en dessous, qui servent à la lecture exploratoire.
     # R41-J (2026-05-07) : titre « Actualité des dernières 24 h », badge
     # chambre AVANT le titre, pas de date, liens en nouvel onglet, et
     # repli au-delà des 5 premières occurrences.
+    # R41-M (2026-05-07) : layout 2 colonnes en flexbox dans le main —
+    # 24h à gauche (~62%), carte « Spécial PPL Sport professionnel » à
+    # droite (~38%). En dessous de 720px les colonnes empilent (CSS).
+    lines.append('<div class="home-row-top">')
+    lines.append('<section class="home-col-recent">')
     lines.append(f"## Actualité des dernières 24 h ({len(recent)})")
     lines.append("")
     lines.append('<div class="recent-24">')
@@ -3272,7 +3353,12 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
     else:
         lines.append("_Aucune nouveauté depuis 24h._")
     lines.append("")
-    lines.append("</div>")
+    lines.append("</div>")  # /.recent-24
+    lines.append("</section>")  # /.home-col-recent
+    # Carte Spécial PPL à droite
+    if special_ppl_payload:
+        lines.extend(_render_special_ppl_card(special_ppl_payload))
+    lines.append("</div>")  # /.home-row-top
     lines.append("")
 
     # -------- Sections par catégorie (fenêtre par catégorie) ----------

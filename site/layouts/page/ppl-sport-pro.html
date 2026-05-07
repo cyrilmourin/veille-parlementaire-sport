@@ -1,0 +1,145 @@
+{{/* R41-M (2026-05-07) — Page dédiée /ppl-sport-professionnel/.
+
+  Lit `site.Data.special_ppl` pour rendre :
+    - Lien vers le texte AN à date
+    - Étapes de la procédure (timeline)
+    - Amendements en commission (2 colonnes)
+    - Amendements en séance (2 colonnes)
+
+  Layout fullwidth (pas de sidebar). Cyril : « pas dans le menu pour
+  l'instant », accessible via la carte accueil + sidebar amendements PPL.
+*/}}
+{{ define "main" }}
+{{ $d := .Site.Data.special_ppl }}
+<article class="ppl-page">
+  <header class="ppl-page__header">
+    <div class="ppl-page__kicker">SPÉCIAL</div>
+    <h1>PPL Sport professionnel</h1>
+    <p class="ppl-page__lead">
+      Proposition de loi relative à <strong>l'organisation, à la gestion
+      et au financement du sport professionnel</strong>.
+      AN n° 1560 — déposée au Sénat le 18 mars 2025, transmise à
+      l'Assemblée nationale après adoption.
+    </p>
+    {{ with $d.meta }}
+    <div class="ppl-page__links">
+      <a class="ppl-page__btn ppl-page__btn--primary"
+         href="{{ .url_an_texte }}" target="_blank" rel="noopener">
+         Texte AN (n° 1560)
+      </a>
+      <a class="ppl-page__btn"
+         href="{{ .url_an_dossier }}" target="_blank" rel="noopener">
+         Dossier législatif (AN)
+      </a>
+      <a class="ppl-page__btn"
+         href="{{ .url_senat_dossier }}" target="_blank" rel="noopener">
+         Dossier législatif (Sénat)
+      </a>
+    </div>
+    {{ end }}
+  </header>
+
+  {{/* ---------- Étapes de la procédure (timeline) ---------- */}}
+  {{ with (or $d.agenda $d.dosleg) }}
+  <section class="ppl-page__section">
+    <h2>Étapes de la discussion</h2>
+    {{ $items := slice }}
+    {{ with $d.dosleg }}
+      {{ range . }}
+        {{ $items = $items | append (dict "date" .date "label" .title "url" .url "kind" "dossier") }}
+      {{ end }}
+    {{ end }}
+    {{ with $d.agenda }}
+      {{ range . }}
+        {{ $items = $items | append (dict "date" .date "label" .title "url" .url "kind" "agenda" "chamber" .chamber) }}
+      {{ end }}
+    {{ end }}
+    {{ if $items }}
+    <ol class="ppl-timeline">
+      {{ range (sort $items "date" "desc") }}
+      <li class="ppl-timeline__item">
+        <span class="ppl-timeline__date">{{ .date }}</span>
+        {{ with .chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
+        {{ if .url }}
+          <a href="{{ .url }}" target="_blank" rel="noopener">{{ .label }}</a>
+        {{ else }}
+          <span>{{ .label }}</span>
+        {{ end }}
+      </li>
+      {{ end }}
+    </ol>
+    {{ else }}
+    <p><em>Aucune étape disponible pour l'instant.</em></p>
+    {{ end }}
+  </section>
+  {{ end }}
+
+  {{/* ---------- Amendements en commission (2 colonnes) ---------- */}}
+  <section class="ppl-page__section">
+    <h2>Amendements en commission ({{ index $d.counts "amdt_commission" }})</h2>
+    {{ with $d.amdt_commission }}
+    <div class="ppl-amdt-grid">
+      {{ range . }}
+      <div class="ppl-amdt-card">
+        <div class="ppl-amdt-card__head">
+          {{ with .auteur }}<span class="ppl-amdt-card__auteur">{{ . }}</span>{{ end }}
+          {{ with .groupe }}<span class="ppl-amdt-card__groupe">({{ . }})</span>{{ end }}
+          <span class="ppl-amdt-card__date">{{ .date }}</span>
+        </div>
+        <a class="ppl-amdt-card__title" href="{{ .url }}" target="_blank" rel="noopener">
+          {{ .title }}
+        </a>
+        {{ with .status_label }}
+        <div class="ppl-amdt-card__status">{{ . }}</div>
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
+    {{ else }}
+    <p><em>Aucun amendement en commission pour l'instant.</em></p>
+    {{ end }}
+  </section>
+
+  {{/* ---------- Amendements en séance (2 colonnes) ---------- */}}
+  <section class="ppl-page__section">
+    <h2>Amendements en séance ({{ index $d.counts "amdt_seance" }})</h2>
+    {{ with $d.amdt_seance }}
+    <div class="ppl-amdt-grid">
+      {{ range . }}
+      <div class="ppl-amdt-card">
+        <div class="ppl-amdt-card__head">
+          {{ with .auteur }}<span class="ppl-amdt-card__auteur">{{ . }}</span>{{ end }}
+          {{ with .groupe }}<span class="ppl-amdt-card__groupe">({{ . }})</span>{{ end }}
+          <span class="ppl-amdt-card__date">{{ .date }}</span>
+        </div>
+        <a class="ppl-amdt-card__title" href="{{ .url }}" target="_blank" rel="noopener">
+          {{ .title }}
+        </a>
+        {{ with .status_label }}
+        <div class="ppl-amdt-card__status">{{ . }}</div>
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
+    {{ else }}
+    <p><em>Aucun amendement en séance pour l'instant.</em></p>
+    {{ end }}
+  </section>
+
+  {{/* ---------- Comptes rendus liés ---------- */}}
+  {{ with $d.comptes_rendus }}
+  <section class="ppl-page__section">
+    <h2>Comptes rendus liés</h2>
+    <ul class="ppl-list">
+      {{ range . }}
+      <li>
+        <span class="chamber" data-chamber="{{ .chamber }}">{{ .chamber }}</span>
+        <span class="ppl-list__date">{{ .date }}</span>
+        <a href="{{ .url }}" target="_blank" rel="noopener">{{ .title }}</a>
+      </li>
+      {{ end }}
+    </ul>
+  </section>
+  {{ end }}
+</article>
+{{ end }}
