@@ -2667,6 +2667,82 @@ def _sort_by_date_desc(rows: list[dict]) -> list[dict]:
     )
 
 
+def _boost_dosleg_with_agenda(rows: list[dict]) -> None:
+    """R41-K (2026-05-07) — Booste le `published_at` d'un dossier législatif
+    avec la date la plus récente d'un item agenda qui mentionne le même texte.
+
+    Cas concret : la PPL « organisation, gestion et financement du sport
+    professionnel » a été déposée au Sénat le 18/03/2025, adoptée, transmise
+    à l'AN avec un examen en commission le 12/05/2026 et une plénière le
+    18/05/2026. Sans ce boost le dossier reste daté du 18/03/2025 et tombe
+    en bas de la liste alors qu'il est en cours d'examen actif. Cyril :
+    « c'est toujours la dernière actualisation qui prime entre une version
+    AN ou Sénat d'un dossier ».
+
+    Match : intersection des mots significatifs (`_dosleg_word_set`) avec
+    seuils (≥ 4 mots partagés ET ≥ 50% des mots du dosleg). Modifie
+    `published_at` in-place. La date originale reste exposée en
+    `raw.effective_at_origin` (titre agenda) et `raw.published_at_original`.
+
+    Idempotent — un 2e passage trouvera le même `latest_date` et n'augmentera
+    pas davantage. N'affecte pas les autres catégories.
+    """
+    dosleg = [r for r in rows if r.get("category") == "dossiers_legislatifs"]
+    agenda = [r for r in rows if r.get("category") == "agenda"]
+    if not dosleg or not agenda:
+        return
+
+    # Pré-calcul des word sets + dates des items agenda
+    agenda_data: list[tuple[set[str], str, str]] = []
+    for a in agenda:
+        words = _dosleg_word_set(a.get("title", "") or "")
+        if len(words) < 4:
+            continue
+        date = (a.get("published_at") or "")[:10]
+        if not date:
+            continue
+        agenda_data.append((words, date, a.get("title", "") or ""))
+
+    boosted = 0
+    for d in dosleg:
+        d_words = _dosleg_word_set(d.get("title", "") or "")
+        if len(d_words) < 4:
+            continue
+        threshold = max(4, int(len(d_words) * 0.5 + 0.5))
+        latest_date = ""
+        latest_title = ""
+        for a_words, a_date, a_title in agenda_data:
+            shared = d_words & a_words
+            if len(shared) < threshold:
+                continue
+            if a_date > latest_date:
+                latest_date = a_date
+                latest_title = a_title
+        if not latest_date:
+            continue
+        cur_date_iso = (d.get("published_at") or "")[:10]
+        if latest_date <= cur_date_iso:
+            continue
+        # On garde l'heure 12:00 pour cohérence avec la convention
+        # _fix_cr_row qui recale published_at sur "<jour>T12:00:00".
+        original = d.get("published_at") or ""
+        d["published_at"] = f"{latest_date}T12:00:00"
+        raw = d.get("raw")
+        if not isinstance(raw, dict):
+            raw = {}
+            d["raw"] = raw
+        raw["effective_at_source"] = "agenda"
+        raw["effective_at_origin"] = latest_title[:140]
+        raw["published_at_original"] = original
+        boosted += 1
+    if boosted:
+        import logging
+        logging.getLogger(__name__).info(
+            "R41-K : %d dossiers législatifs boostés via inscriptions agenda",
+            boosted,
+        )
+
+
 def export(rows: list[dict], site_root: str | Path) -> dict:
     """Écrit les fichiers JSON + Markdown dans le site/ Hugo.
 
@@ -2757,6 +2833,13 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
         _fix_chamber_row(r)
         _enrich_senat_question_photo(r, senat_photo_cache)
     rows = _filter_window(rows)
+    # R41-K (2026-05-07) : pour les dossiers législatifs, recalcule
+    # `published_at` = max(published_at, dernière inscription agenda
+    # liée au même dossier). Surface en haut de liste les dossiers en
+    # cours d'examen actif même si leur date de dépôt est ancienne.
+    # AVANT le tri et le dedup pour que la version boostée ait sa
+    # date à jour quand `_prefer` compare AN vs Sénat.
+    _boost_dosleg_with_agenda(rows)
     rows = _sort_by_date_desc(rows)
     # Dédup APRÈS tri par date : on garde la version la plus récente en cas
     # de doublons (title+url identique, UID différent).
