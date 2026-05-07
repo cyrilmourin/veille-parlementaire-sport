@@ -28,10 +28,6 @@
          Texte AN (n° 1560)
       </a>
       <a class="ppl-page__btn"
-         href="{{ .url_an_dossier }}" target="_blank" rel="noopener">
-         Dossier législatif (AN)
-      </a>
-      <a class="ppl-page__btn"
          href="{{ .url_senat_dossier }}" target="_blank" rel="noopener">
          Dossier législatif (Sénat)
       </a>
@@ -74,9 +70,11 @@
   </section>
   {{ end }}
 
-  {{/* ---------- Amendements en commission (2 colonnes) ---------- */}}
-  <section class="ppl-page__section">
-    <h2>Amendements en commission ({{ index $d.counts "amdt_commission" }})</h2>
+  {{/* ---------- Amendements en commission (dépliable) ---------- */}}
+  {{/* R41-N : <details> dépliable pour ne pas saturer la page quand
+       il y a 100+ amendements en commission. Replié par défaut. */}}
+  <details class="ppl-page__section ppl-fold">
+    <summary><h2>Amendements en commission ({{ index $d.counts "amdt_commission" }})</h2></summary>
     {{ with $d.amdt_commission }}
     <div class="ppl-amdt-grid">
       {{ range . }}
@@ -98,11 +96,11 @@
     {{ else }}
     <p><em>Aucun amendement en commission pour l'instant.</em></p>
     {{ end }}
-  </section>
+  </details>
 
-  {{/* ---------- Amendements en séance (2 colonnes) ---------- */}}
-  <section class="ppl-page__section">
-    <h2>Amendements en séance ({{ index $d.counts "amdt_seance" }})</h2>
+  {{/* ---------- Amendements en séance (dépliable) ---------- */}}
+  <details class="ppl-page__section ppl-fold">
+    <summary><h2>Amendements en séance ({{ index $d.counts "amdt_seance" }})</h2></summary>
     {{ with $d.amdt_seance }}
     <div class="ppl-amdt-grid">
       {{ range . }}
@@ -124,7 +122,7 @@
     {{ else }}
     <p><em>Aucun amendement en séance pour l'instant.</em></p>
     {{ end }}
-  </section>
+  </details>
 
   {{/* ---------- Comptes rendus liés ---------- */}}
   {{ with $d.comptes_rendus }}

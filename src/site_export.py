@@ -3239,11 +3239,18 @@ def _render_special_ppl_card(payload: dict) -> list[str]:
     page dédiée /ppl-sport-professionnel/. Inclut un mini-aperçu : prochaine
     inscription agenda, nb d'amendements en commission/séance, lien direct
     vers le texte AN.
+
+    R41-N (2026-05-07) — N'émet rien si aucun item lié n'a été trouvé
+    (pas de dosleg / agenda / amendement). Permet à la zone 24 h de
+    reprendre 100% de la colonne main au lieu de garder un slot vide.
     """
     if not payload:
         return []
-    meta = payload.get("meta") or {}
     counts = payload.get("counts") or {}
+    total_items = sum(counts.values()) if counts else 0
+    if total_items == 0:
+        return []
+    meta = payload.get("meta") or {}
     agenda = (payload.get("agenda") or [])
     # Prochaine échéance = 1er agenda > today
     today_iso = datetime.now().date().isoformat()
@@ -3318,11 +3325,25 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
     # chambre AVANT le titre, pas de date, liens en nouvel onglet, et
     # repli au-delà des 5 premières occurrences.
     # R41-M (2026-05-07) : layout 2 colonnes en flexbox dans le main —
-    # 24h à gauche (~62%), carte « Spécial PPL Sport professionnel » à
-    # droite (~38%). En dessous de 720px les colonnes empilent (CSS).
-    lines.append('<div class="home-row-top">')
-    lines.append('<section class="home-col-recent">')
-    lines.append(f"## Actualité des dernières 24 h ({len(recent)})")
+    # 24h à gauche (~66%), carte « Spécial PPL Sport professionnel » à
+    # droite (~33%). En dessous de 720px les colonnes empilent (CSS).
+    # R41-N : si aucune carte spéciale (payload vide), 24 h prend 100%.
+    special_card_lines = (
+        _render_special_ppl_card(special_ppl_payload)
+        if special_ppl_payload else []
+    )
+    has_special_card = bool(special_card_lines)
+    if has_special_card:
+        lines.append('<div class="home-row-top home-row-top--with-special">')
+        lines.append('<section class="home-col-recent">')
+        # En contexte HTML brut, Markdown ne réinterprète pas `## ...` sans
+        # ligne vide → on rend le titre directement en HTML pour préserver
+        # le style `.home .content h2` (border-left rouge, marge top etc.).
+        lines.append(
+            f'<h2>Actualité des dernières 24 h ({len(recent)})</h2>'
+        )
+    else:
+        lines.append(f"## Actualité des dernières 24 h ({len(recent)})")
     lines.append("")
     lines.append('<div class="recent-24">')
     lines.append("")
@@ -3354,11 +3375,10 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         lines.append("_Aucune nouveauté depuis 24h._")
     lines.append("")
     lines.append("</div>")  # /.recent-24
-    lines.append("</section>")  # /.home-col-recent
-    # Carte Spécial PPL à droite
-    if special_ppl_payload:
-        lines.extend(_render_special_ppl_card(special_ppl_payload))
-    lines.append("</div>")  # /.home-row-top
+    if has_special_card:
+        lines.append("</section>")  # /.home-col-recent
+        lines.extend(special_card_lines)  # Carte Spécial PPL à droite
+        lines.append("</div>")  # /.home-row-top
     lines.append("")
 
     # -------- Sections par catégorie (fenêtre par catégorie) ----------

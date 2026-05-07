@@ -1867,25 +1867,29 @@ a:hover { text-decoration: underline; }
    R41-M (2026-05-07) — Module Spécial PPL Sport professionnel
    ============================================================================ */
 
-/* ---------- Accueil : ligne du haut (24h + carte PPL côte à côte) ---------- */
-.home .content > .home-row-top {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+/* ---------- Accueil : ligne du haut (24h + carte PPL côte à côte) ----------
+   R41-N : grid 2/1 (66/33) quand la carte spéciale est présente, 100% sinon.
+   Grid plutôt que flex pour gérer proprement les colonnes étroites (la
+   colonne main du layout--split peut tomber à ~600px sur écran moyen).
+   Les enfants ont min-width: 0 pour autoriser le shrink des contenus longs.
+*/
+.home .content > .home-row-top--with-special {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 18px;
   align-items: stretch;
   margin: 0 0 24px;
 }
-.home-row-top .home-col-recent {
-  flex: 1 1 60%;
-  min-width: 0;     /* permet aux titres longs de wrap dans le flex */
+.home-row-top--with-special > .home-col-recent {
+  min-width: 0;
 }
-.home-row-top .home-col-recent > h2 {
+.home-row-top--with-special > .home-col-recent > h2 {
   margin-top: 0;
 }
-@media (max-width: 760px) {
-  .home-row-top { flex-direction: column; }
-  .home-row-top .home-col-recent,
-  .home-row-top .special-ppl-card { flex: 1 1 100%; }
+@media (max-width: 720px) {
+  .home .content > .home-row-top--with-special {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ---------- Carte « Spécial PPL » (accueil) -------------------------------- */
@@ -1913,19 +1917,27 @@ a:hover { text-decoration: underline; }
   border-radius: 3px;
   margin-bottom: 6px;
 }
+/* h3 dans .home .content reçoit color: var(--sl-blue) — on override en blanc
+   pour la carte spéciale (la spécificité .special-ppl-card .special-ppl-card__title
+   bat le sélecteur global .home .content h3). */
+.home .content .special-ppl-card .special-ppl-card__title,
 .special-ppl-card__title {
   font-size: 18px;
   font-weight: 800;
-  color: #fff;
+  color: #fff !important;
   margin: 0;
   font-family: var(--font-title);
   letter-spacing: -0.3px;
+  border: 0;          /* annule border-bottom hérité de .home .content h3 */
+  padding: 0;
+  background: transparent;
 }
 .special-ppl-card__sub {
   font-size: 12px;
   color: var(--sl-cream);
-  opacity: .9;
-  margin-top: 2px;
+  opacity: 1;
+  font-weight: 700;   /* R41-N : sous-titre en bold (demande Cyril) */
+  margin-top: 4px;
 }
 .special-ppl-card__items {
   list-style: none;
@@ -1939,7 +1951,11 @@ a:hover { text-decoration: underline; }
   background: #fff;
   color: var(--fg);
   border-radius: 6px;
-  padding: 8px 10px;
+  /* R41-N : padding gauche 14px + margin-left 5px pour que le texte ne
+     colle pas au bord blanc gauche (demande Cyril). */
+  padding: 8px 12px 8px 14px;
+  margin-left: 5px;
+  margin-right: 5px;
   font-size: 13px;
   display: flex;
   flex-direction: column;
@@ -2081,6 +2097,35 @@ a:hover { text-decoration: underline; }
   margin: 0 0 12px;
   border-left: 4px solid var(--sl-red);
   padding-left: 10px;
+}
+
+/* R41-N : sections amendements en <details> dépliables (page dédiée). */
+details.ppl-fold { padding: 0; }
+details.ppl-fold > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  user-select: none;
+}
+details.ppl-fold > summary::-webkit-details-marker { display: none; }
+details.ppl-fold > summary::before {
+  content: "▶";
+  font-size: 11px;
+  color: var(--sl-red);
+  transition: transform 0.2s;
+  flex: 0 0 auto;
+}
+details.ppl-fold[open] > summary::before { transform: rotate(90deg); }
+details.ppl-fold > summary > h2 {
+  display: inline-block;
+  margin: 0;
+}
+details.ppl-fold > summary:hover > h2 { color: var(--sl-red); }
+details.ppl-fold[open] > .ppl-amdt-grid,
+details.ppl-fold[open] > p {
+  margin-top: 14px;
 }
 
 /* Timeline étapes */

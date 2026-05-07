@@ -55,10 +55,10 @@ URL_AN_TEXTE = (
     "https://www.assemblee-nationale.fr/dyn/17/textes/"
     "l17b1560_proposition-loi"
 )
-URL_AN_DOSSIER = (
-    "https://www.assemblee-nationale.fr/dyn/17/dossiers/"
-    "sport-professionnel-organisation-gestion-financement"
-)
+# Note R41-N : pas d'URL canonique du « dossier législatif AN » — le slug
+# n'est pas connu de manière stable depuis l'open data, on utilisait un
+# slug deviné qui renvoyait vers une autre page. On expose seulement le
+# texte AN (URL stable) et le dossier Sénat (URL stable ppl24-456).
 URL_SENAT_DOSSIER = (
     "https://www.senat.fr/dossier-legislatif/ppl24-456.html"
 )
@@ -214,7 +214,6 @@ def build_payload(buckets: dict) -> dict:
             "title": PPL_TITLE,
             "slug_path": PPL_SLUG_PATH,
             "url_an_texte": URL_AN_TEXTE,
-            "url_an_dossier": URL_AN_DOSSIER,
             "url_senat_dossier": URL_SENAT_DOSSIER,
             "an_num": AN_TEXTE_NUM,
             "generated_at": datetime.utcnow().isoformat(timespec="seconds"),
@@ -256,7 +255,8 @@ def write_page_stub(content_dir: Path) -> None:
         'description: "Suivi de la proposition de loi relative à '
         "l'organisation, à la gestion et au financement du sport "
         'professionnel (n° 1560)."',
-        "fullwidth: true",
+        # R41-N : pas de fullwidth → la sidebar (Sideline / Recherche /
+        # Agenda + bloc PPL) s'affiche sur la page dédiée comme partout.
         "type: page",
         "layout: ppl-sport-pro",
         f'url: "{PPL_SLUG_PATH}"',
