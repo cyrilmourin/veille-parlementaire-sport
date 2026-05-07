@@ -2263,8 +2263,19 @@ def _dosleg_word_set(title: str) -> set[str]:
         s = _uni(title).lower()
     except Exception:
         s = title.lower()
-    # Coupe au 1er caractère de ponctuation forte (suffixes "(PJL)" etc.)
-    for sep in ("(", " - ", " — ", " – ", " : "):
+    # R41-L (2026-05-07) : strip des suffixes courts type « (PJL) »
+    # uniquement EN FIN de chaîne, pas au premier `(` rencontré. Avant ce
+    # patch, un titre comme « ... pour le centre de ressources, d'expertise
+    # et de performance sportive (CREPS) de Vichy » se faisait couper à
+    # « (CREPS) » et perdait `creps` + `vichy` du word_set → faux positif
+    # de non-dédup avec « Gouvernance ... pour le CREPS de Vichy (PPL) ».
+    # Strip itératif pour absorber les suffixes empilés type « ... (PPL) (urgence) ».
+    while True:
+        new_s = re.sub(r"\s*\([A-Za-z0-9\s\.\-]{1,15}\)\s*$", "", s)
+        if new_s == s:
+            break
+        s = new_s
+    for sep in (" - ", " — ", " – ", " : "):
         if sep in s:
             s = s.split(sep, 1)[0]
     # Retire préfixes type de texte + connecteurs grammaticaux
@@ -2692,8 +2703,8 @@ def _boost_dosleg_with_agenda(rows: list[dict]) -> None:
     if not dosleg or not agenda:
         return
 
-    # Pré-calcul des word sets + dates des items agenda
-    agenda_data: list[tuple[set[str], str, str]] = []
+    # Pré-calcul des word sets + dates + chambre + titre agenda
+    agenda_data: list[tuple[set[str], str, str, str]] = []
     for a in agenda:
         words = _dosleg_word_set(a.get("title", "") or "")
         if len(words) < 4:
@@ -2701,9 +2712,17 @@ def _boost_dosleg_with_agenda(rows: list[dict]) -> None:
         date = (a.get("published_at") or "")[:10]
         if not date:
             continue
-        agenda_data.append((words, date, a.get("title", "") or ""))
+        agenda_data.append((
+            words, date, a.get("title", "") or "",
+            (a.get("chamber") or "").strip(),
+        ))
+
+    # R41-L (2026-05-07) : extraction du n° texte AN depuis le titre
+    # agenda (formats « (n° 1560) », « (no 1560) », « n° 1560 »).
+    _AN_TEXTE_NUM_RE = re.compile(r"\(?\bn[°o]\s*(\d{2,5})\b\)?", re.IGNORECASE)
 
     boosted = 0
+    rerouted_an = 0
     for d in dosleg:
         d_words = _dosleg_word_set(d.get("title", "") or "")
         if len(d_words) < 4:
@@ -2711,13 +2730,15 @@ def _boost_dosleg_with_agenda(rows: list[dict]) -> None:
         threshold = max(4, int(len(d_words) * 0.5 + 0.5))
         latest_date = ""
         latest_title = ""
-        for a_words, a_date, a_title in agenda_data:
+        latest_chamber = ""
+        for a_words, a_date, a_title, a_chamber in agenda_data:
             shared = d_words & a_words
             if len(shared) < threshold:
                 continue
             if a_date > latest_date:
                 latest_date = a_date
                 latest_title = a_title
+                latest_chamber = a_chamber
         if not latest_date:
             continue
         cur_date_iso = (d.get("published_at") or "")[:10]
@@ -2735,11 +2756,35 @@ def _boost_dosleg_with_agenda(rows: list[dict]) -> None:
         raw["effective_at_origin"] = latest_title[:140]
         raw["published_at_original"] = original
         boosted += 1
+
+        # R41-L : si la dernière inscription est à l'AN, bascule l'URL
+        # et le badge chambre vers l'AN — c'est là que se déroule la
+        # prochaine lecture (demande Cyril). Évite aussi les liens Sénat
+        # cassés (CSV `dossiers-legislatifs.csv` parfois URL malformée).
+        if latest_chamber.upper() == "AN":
+            num_m = _AN_TEXTE_NUM_RE.search(latest_title or "")
+            if num_m:
+                num = num_m.group(1)
+                title_low = (d.get("title") or "").lower()
+                doc_type = (
+                    "projet-loi" if title_low.startswith("projet")
+                    else "proposition-loi"
+                )
+                new_url = (
+                    f"https://www.assemblee-nationale.fr/dyn/17/textes/"
+                    f"l17b{num}_{doc_type}"
+                )
+                raw["url_original"] = d.get("url") or ""
+                raw["chamber_original"] = d.get("chamber") or ""
+                d["url"] = new_url
+                d["chamber"] = "AN"
+                rerouted_an += 1
     if boosted:
         import logging
         logging.getLogger(__name__).info(
-            "R41-K : %d dossiers législatifs boostés via inscriptions agenda",
-            boosted,
+            "R41-K : %d dossiers législatifs boostés via inscriptions agenda"
+            " (dont %d reroutés vers l'AN)",
+            boosted, rerouted_an,
         )
 
 
@@ -3277,7 +3322,13 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         # R13-D : snippet uniquement pour catégories pertinentes sur la home.
         show_snip = cat in HOMEPAGE_SNIPPET_CATEGORIES
         for it in bucket[:10]:
-            lines.append(_fmt_item_line(it, with_snippet=show_snip))
+            # R41-L (2026-05-07) : target_blank=True sur TOUTES les
+            # occurrences de l'accueil (Cyril : « y compris dans les
+            # catégories dépliables, pas uniquement pour les dernières
+            # occurrences »).
+            lines.append(_fmt_item_line(
+                it, with_snippet=show_snip, target_blank=True,
+            ))
         if count > 10:
             lines.append("")
             lines.append(f"→ [Voir les {count} {label.lower()}](/items/{cat}/)")
