@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-07T14:13:39+00:00",
+  "last_run_at": "2026-05-07T15:51:12+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419865B2632P0D1N000492",
@@ -235,6 +235,7 @@
       "senat_cr_culture::28f13fd222c33436",
       "senat_cr_culture::973981f78730c9c1",
       "senat_cr_culture::a05f830a6f0d7493",
+      "senat_cr_culture::dbd3ceb8a2f9cdaf",
       "senat_cr_etrangeres::89c009a3a77ac689",
       "senat_cr_etrangeres::9fa3519a304a169e",
       "senat_cr_etrangeres::cff8c33e053aa8ba",
