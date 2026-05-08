@@ -96,26 +96,43 @@ def test_no_match_autre_dossier():
 # ---------------------------------------------------------------------------
 
 
-def test_collect_amdt_commission_via_url():
-    """URL contenant 'cion-' → bucket amdt_commission."""
+def test_collect_amdt_commission_via_prefixe_lettre_titre():
+    """R41-P : titre « Amdt n°AC118 » → bucket amdt_commission
+    (le préfixe alphabétique signale toujours une commission AN)."""
     rows = [
-        _row(category="amendements", raw={"texte_ref": AN_TEXTE_REF},
-             url="https://www.assemblee-nationale.fr/dyn/17/amendements/cion-cedu/AMANR5L17PO419604..."),
+        _row(category="amendements",
+             raw={"texte_ref": AN_TEXTE_REF},
+             title="Amdt n°AC118 · art. ARTICLE 5 · sur PPL sport pro",
+             url="https://www.assemblee-nationale.fr/dyn/17/amendements/AMANR5L17PO419604B1560P0D1N000118"),
     ]
     out = collect_special_ppl(rows)
     assert len(out["amdt_commission"]) == 1
     assert len(out["amdt_seance"]) == 0
 
 
-def test_collect_amdt_seance_par_defaut():
-    """Pas d'indice commission → bucket séance."""
+def test_collect_amdt_seance_si_numero_pur():
+    """R41-P : titre « Amdt n°118 » (numéro pur) → bucket séance."""
     rows = [
-        _row(category="amendements", raw={"texte_ref": AN_TEXTE_REF},
-             url="https://www.assemblee-nationale.fr/dyn/17/amendements/AMANR5L17B1560XYZ"),
+        _row(category="amendements",
+             raw={"texte_ref": AN_TEXTE_REF},
+             title="Amdt n°118 · art. ARTICLE 5 · sur PPL sport pro",
+             url="https://www.assemblee-nationale.fr/dyn/17/amendements/AMANR5L17PO710764B1560P0D1N000118"),
     ]
     out = collect_special_ppl(rows)
     assert len(out["amdt_seance"]) == 1
     assert len(out["amdt_commission"]) == 0
+
+
+def test_collect_amdt_commission_via_stage_si_pas_de_titre():
+    """Fallback : raw.stage='commission' → bucket commission."""
+    rows = [
+        _row(category="amendements",
+             raw={"texte_ref": AN_TEXTE_REF, "stage": "commission"},
+             title="",
+             url="http://example/x"),
+    ]
+    out = collect_special_ppl(rows)
+    assert len(out["amdt_commission"]) == 1
 
 
 def test_collect_dosleg_et_agenda():
@@ -219,6 +236,48 @@ def test_write_page_stub(tmp_path):
     assert "type: page" in text
     assert "layout: ppl-sport-pro" in text
     assert PPL_TITLE in text
+
+
+def test_payload_extract_400_chars_strip_titre():
+    """R41-P : extract = haystack_body sans le titre, ≤ 400 chars."""
+    title = "Amdt n°AC118 · art. ARTICLE 5"
+    body = title + " : Le présent amendement vise à clarifier le rôle des fédérations sportives dans la régulation du sport professionnel. " * 10
+    rows = [_row(category="amendements", title=title,
+                 raw={"texte_ref": AN_TEXTE_REF, "haystack_body": body})]
+    payload = build_payload(collect_special_ppl(rows))
+    item = payload["amdt_commission"][0]
+    assert item["extract"]
+    assert len(item["extract"]) <= 401  # 400 + ellipsis
+    # Le titre n'est PAS dans l'extract (strippé)
+    assert not item["extract"].startswith(title)
+    # Le contenu réel commence par "Le présent amendement"
+    assert item["extract"].startswith("Le présent amendement")
+
+
+def test_payload_sort_expose():
+    """R41-P : raw.sort exposé dans le payload pour le filtre UI."""
+    rows = [_row(category="amendements", title="Amdt n°AC1",
+                 raw={"texte_ref": AN_TEXTE_REF, "sort": "Adopté"})]
+    payload = build_payload(collect_special_ppl(rows))
+    assert payload["amdt_commission"][0]["sort"] == "Adopté"
+
+
+def test_payload_url_agenda_organe_remplacee_par_interne():
+    """R41-P : URLs agenda /dyn/17/organes/PO… → /items/agenda/."""
+    rows = [_row(category="agenda",
+                 title="Examen de la PPL (n° 1560)",
+                 url="https://www.assemblee-nationale.fr/dyn/17/organes/PO419604")]
+    payload = build_payload(collect_special_ppl(rows))
+    assert payload["agenda"][0]["url"] == "/items/agenda/"
+
+
+def test_payload_url_amdt_preservee():
+    """Les URLs amendements ne sont PAS réécrites (seulement agenda)."""
+    url = "https://www.assemblee-nationale.fr/dyn/17/amendements/AMANR5L17B1560X"
+    rows = [_row(category="amendements", title="Amdt n°AC1",
+                 raw={"texte_ref": AN_TEXTE_REF}, url=url)]
+    payload = build_payload(collect_special_ppl(rows))
+    assert payload["amdt_commission"][0]["url"] == url
 
 
 def test_export_end_to_end(tmp_path):

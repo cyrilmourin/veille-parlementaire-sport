@@ -1,0 +1,35 @@
+{{/* R41-P (2026-05-08) — Widget de filtre par sort sur les amendements
+    de la page dédiée PPL.
+
+  Construit dynamiquement la liste des sorts présents (« adopté »,
+  « rejeté », « irrecevable », « retiré », « tombé », « inconnu »…),
+  affiche un bouton par valeur + « Tous ». Le filtrage est géré par le
+  script JS dans la même page (data-amdt-grid + data-sort).
+
+  Args :
+    .items  list (les amdt commission ou séance)
+    .scope  string ("commission" ou "seance")
+*/}}
+{{ $sorts := slice }}
+{{ range .items }}
+  {{ $s := default "inconnu" .sort | lower }}
+  {{ if not (in $sorts $s) }}{{ $sorts = $sorts | append $s }}{{ end }}
+{{ end }}
+{{ $sorts = sort $sorts }}
+{{ if gt (len $sorts) 1 }}
+<div class="ppl-amdt-filter" data-amdt-filter="{{ .scope }}">
+  <span class="ppl-amdt-filter__label">Filtrer&nbsp;:</span>
+  <button type="button" class="ppl-amdt-filter__btn is-active" data-sort="*">
+    Tous ({{ len .items }})
+  </button>
+  {{ range $sorts }}
+    {{ $val := . }}
+    {{ $count := 0 }}
+    {{ range $.items }}
+      {{ if eq (default "inconnu" .sort | lower) $val }}{{ $count = add $count 1 }}{{ end }}
+    {{ end }}
+    <button type="button" class="ppl-amdt-filter__btn"
+            data-sort="{{ $val }}">{{ humanize $val }} ({{ $count }})</button>
+  {{ end }}
+</div>
+{{ end }}

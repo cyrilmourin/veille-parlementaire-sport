@@ -76,17 +76,23 @@
   <details class="ppl-page__section ppl-fold">
     <summary><h2>Amendements en commission ({{ index $d.counts "amdt_commission" }})</h2></summary>
     {{ with $d.amdt_commission }}
-    <div class="ppl-amdt-grid">
+    {{ partial "ppl_amdt_filter.html" (dict "items" . "scope" "commission") }}
+    <div class="ppl-amdt-grid" data-amdt-grid="commission">
       {{ range . }}
-      <div class="ppl-amdt-card">
+      {{/* R41-P : data-sort permet le filtrage JS par sort de l'amdt. */}}
+      <div class="ppl-amdt-card" data-sort="{{ default "inconnu" .sort | lower }}">
         <div class="ppl-amdt-card__head">
           {{ with .auteur }}<span class="ppl-amdt-card__auteur">{{ . }}</span>{{ end }}
           {{ with .groupe }}<span class="ppl-amdt-card__groupe">({{ . }})</span>{{ end }}
           <span class="ppl-amdt-card__date">{{ .date }}</span>
+          {{ with .sort }}<span class="ppl-amdt-card__sort ppl-amdt-card__sort--{{ . | lower | urlize }}">{{ . }}</span>{{ end }}
         </div>
         <a class="ppl-amdt-card__title" href="{{ .url }}" target="_blank" rel="noopener">
           {{ .title }}
         </a>
+        {{ with .extract }}
+        <p class="ppl-amdt-card__extract">{{ . }}</p>
+        {{ end }}
         {{ with .status_label }}
         <div class="ppl-amdt-card__status">{{ . }}</div>
         {{ end }}
@@ -102,17 +108,23 @@
   <details class="ppl-page__section ppl-fold">
     <summary><h2>Amendements en séance ({{ index $d.counts "amdt_seance" }})</h2></summary>
     {{ with $d.amdt_seance }}
-    <div class="ppl-amdt-grid">
+    {{ partial "ppl_amdt_filter.html" (dict "items" . "scope" "seance") }}
+    <div class="ppl-amdt-grid" data-amdt-grid="seance">
       {{ range . }}
-      <div class="ppl-amdt-card">
+      {{/* R41-P : data-sort permet le filtrage JS par sort de l'amdt. */}}
+      <div class="ppl-amdt-card" data-sort="{{ default "inconnu" .sort | lower }}">
         <div class="ppl-amdt-card__head">
           {{ with .auteur }}<span class="ppl-amdt-card__auteur">{{ . }}</span>{{ end }}
           {{ with .groupe }}<span class="ppl-amdt-card__groupe">({{ . }})</span>{{ end }}
           <span class="ppl-amdt-card__date">{{ .date }}</span>
+          {{ with .sort }}<span class="ppl-amdt-card__sort ppl-amdt-card__sort--{{ . | lower | urlize }}">{{ . }}</span>{{ end }}
         </div>
         <a class="ppl-amdt-card__title" href="{{ .url }}" target="_blank" rel="noopener">
           {{ .title }}
         </a>
+        {{ with .extract }}
+        <p class="ppl-amdt-card__extract">{{ . }}</p>
+        {{ end }}
         {{ with .status_label }}
         <div class="ppl-amdt-card__status">{{ . }}</div>
         {{ end }}
@@ -123,6 +135,33 @@
     <p><em>Aucun amendement en séance pour l'instant.</em></p>
     {{ end }}
   </details>
+
+  {{/* ---------- JS : filtrage des amendements par sort ---------- */}}
+  {{/* R41-P : pour chaque .ppl-amdt-filter, on toggle .is-hidden sur les
+       cards de la grille jumelle (data-amdt-grid match data-amdt-filter)
+       en fonction du data-sort cliqué. « * » réaffiche tout. */}}
+  <script>
+  (function(){
+    document.querySelectorAll('.ppl-amdt-filter').forEach(function(filt){
+      var scope = filt.getAttribute('data-amdt-filter');
+      var grid = document.querySelector('.ppl-amdt-grid[data-amdt-grid="'+scope+'"]');
+      if(!grid) return;
+      filt.querySelectorAll('.ppl-amdt-filter__btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var sort = btn.getAttribute('data-sort');
+          filt.querySelectorAll('.ppl-amdt-filter__btn').forEach(function(b){
+            b.classList.toggle('is-active', b === btn);
+          });
+          grid.querySelectorAll('.ppl-amdt-card').forEach(function(card){
+            var cardSort = card.getAttribute('data-sort') || 'inconnu';
+            var match = (sort === '*' || cardSort === sort);
+            card.style.display = match ? '' : 'none';
+          });
+        });
+      });
+    });
+  })();
+  </script>
 
   {{/* ---------- Comptes rendus liés ---------- */}}
   {{ with $d.comptes_rendus }}

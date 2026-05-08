@@ -21,8 +21,18 @@ Hugo s'occupe du rendu via les layouts/partials.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
+
+# R41-P (2026-05-08) : préfixe alphabétique du n° d'amendement = signe
+# fiable d'un amdt de commission. Exemples observés :
+#   - « Amdt n°AC118 ... » → AC = commission affaires culturelles
+#   - « Amdt n°CL77 ... »   → CL = commission lois
+#   - « Amdt n°118 ... »    → numéro pur = séance plénière
+_AMDT_NUM_PREFIX_RE = re.compile(
+    r"Amdt\s+n[°o]\s*([A-Z]{1,3})?(\d+)", re.IGNORECASE
+)
 
 # ---------------------------------------------------------------------------
 # Constantes — identifiants stables de la PPL sport pro
@@ -147,13 +157,20 @@ def collect_special_ppl(rows: list[dict]) -> dict:
         elif cat == "agenda":
             out["agenda"].append(r)
         elif cat == "amendements":
+            # R41-P (2026-05-08) : distinction commission / séance fiable
+            # via le préfixe alphabétique du n° d'amendement dans le titre
+            # (« AC118 » → commission, « 118 » → séance). L'URL AN ne
+            # contient pas « cion-* » dans le format actuel — l'organe est
+            # codé en PO<id> ce qui n'est pas portable. Le titre reste le
+            # signal le plus stable et lisible.
+            title = r.get("title") or ""
+            m = _AMDT_NUM_PREFIX_RE.search(title)
+            has_letter_prefix = bool(m and m.group(1))
             raw = r.get("raw") or {}
             stage_hint = ""
-            url_hint = (r.get("url") or "").lower()
             if isinstance(raw, dict):
                 stage_hint = (raw.get("stage") or "").lower()
-            # AMANR... = AN amendements ; CION-CEDU dans URL = commission
-            if "cion-" in url_hint or "commission" in stage_hint:
+            if has_letter_prefix or "commission" in stage_hint:
                 out["amdt_commission"].append(r)
             else:
                 out["amdt_seance"].append(r)
@@ -176,6 +193,49 @@ def collect_special_ppl(rows: list[dict]) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def _build_extract(row: dict, raw: dict, max_chars: int = 400) -> str:
+    """R41-P (2026-05-08) — Extrait du corps de l'amendement (≤ 400 chars).
+
+    Source : `raw.haystack_body` (corps complet déposé par le parser AN
+    en R26) si présent, sinon `summary`. Le titre est strippé du début
+    pour ne pas dupliquer (le titre est déjà affiché dans la card).
+    """
+    extract = ""
+    if isinstance(raw, dict):
+        extract = (raw.get("haystack_body") or "").strip()
+    if not extract:
+        extract = (row.get("summary") or "").strip()
+    title = (row.get("title") or "").strip()
+    if title and extract:
+        # Strip le titre quand il préfixe le body (cas typique AN)
+        if extract.startswith(title):
+            extract = extract[len(title):]
+        # Strip aussi quelques séparateurs résiduels
+        extract = extract.lstrip(" :—-·\n\t")
+    extract = re.sub(r"\s+", " ", extract).strip()
+    if len(extract) > max_chars:
+        extract = extract[:max_chars].rstrip() + "…"
+    return extract
+
+
+def _safe_url(row: dict, raw: dict) -> str:
+    """R41-P (2026-05-08) — Retourne l'URL du row, en remplaçant les URLs
+    AN d'organe `/dyn/17/organes/POXXXX` (qui mènent vers la fiche
+    générique de la commission, pas vers la réunion datée) par un lien
+    interne `/items/agenda/`.
+
+    S'applique uniquement aux items de catégorie `agenda` — pour les
+    amendements / dosleg / CR, l'URL d'origine est préservée.
+    """
+    url = (row.get("url") or "").strip()
+    cat = (row.get("category") or "").strip()
+    if cat != "agenda":
+        return url
+    if "/dyn/17/organes/PO" in url or "/organes/PO" in url:
+        return "/items/agenda/"
+    return url
+
+
 def _row_to_payload(r: dict, max_title: int = 220) -> dict:
     """Réduit un row à ses champs utiles pour le rendu Hugo."""
     raw = r.get("raw") or {}
@@ -183,15 +243,20 @@ def _row_to_payload(r: dict, max_title: int = 220) -> dict:
         raw = {}
     return {
         "title": (r.get("title") or "")[:max_title],
-        "url": r.get("url") or "",
+        "url": _safe_url(r, raw),
         "chamber": r.get("chamber") or "",
         "date": (r.get("published_at") or "")[:10],
         "source_id": r.get("source_id") or "",
         "auteur": raw.get("auteur") or "",
         "groupe": raw.get("groupe") or "",
         "status_label": raw.get("status_label") or raw.get("status") or "",
+        # R41-P : sort (« adopté », « rejeté », « irrecevable », « retiré »,
+        # « tombé »…) exposé pour le filtre UI sur la page dédiée.
+        "sort": raw.get("sort") or "",
         "stage": raw.get("stage") or "",
         "step": raw.get("step") or "",
+        # R41-P : extrait du corps (max 400 chars), sans le titre.
+        "extract": _build_extract(r, raw),
     }
 
 

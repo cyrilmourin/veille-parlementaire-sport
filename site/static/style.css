@@ -1980,6 +1980,24 @@ a:hover { text-decoration: underline; }
   font-size: 13px;
   /* margin-left déjà appliqué via .special-ppl-card__item .val */
 }
+/* R41-P : items cliquables (Amendements commission/séance → page dédiée). */
+.special-ppl-card__item--link { padding: 0; }
+.special-ppl-card__item--link > a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 6px;
+  transition: background .15s;
+}
+.special-ppl-card__item--link > a:hover {
+  background: var(--sl-cream);
+}
+.special-ppl-card__item--link > a:hover .val {
+  color: var(--sl-red);
+}
 .special-ppl-card__cta {
   display: flex;
   flex-wrap: wrap;
@@ -2202,6 +2220,81 @@ details.ppl-fold[open] > p {
   color: #fff;
   border-radius: 3px;
   align-self: flex-start;
+}
+
+/* R41-P : extrait du corps de l'amendement (≤ 400 chars). */
+.ppl-amdt-card__extract {
+  margin: 4px 0 2px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--fg);
+  font-style: italic;
+  background: rgba(255,255,255,.6);
+  border-left: 2px solid var(--line);
+  padding: 4px 8px;
+  border-radius: 0 4px 4px 0;
+}
+
+/* R41-P : badge de sort (« adopté », « rejeté », etc.). Couleur
+   dépendante de la valeur via classes modificateurs. */
+.ppl-amdt-card__sort {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: var(--muted);
+  color: #fff;
+}
+.ppl-amdt-card__sort--adopte,
+.ppl-amdt-card__sort--adopté { background: var(--sl-green); }
+.ppl-amdt-card__sort--rejete,
+.ppl-amdt-card__sort--rejeté { background: var(--sl-red); }
+.ppl-amdt-card__sort--retire,
+.ppl-amdt-card__sort--retiré { background: var(--muted); }
+.ppl-amdt-card__sort--irrecevable { background: #8e3a2e; }
+.ppl-amdt-card__sort--tombe,
+.ppl-amdt-card__sort--tombé { background: #6c757d; }
+
+/* R41-P : widget de filtre par sort. */
+.ppl-amdt-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 12px 0 14px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+.ppl-amdt-filter__label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-right: 4px;
+}
+.ppl-amdt-filter__btn {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--fg);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.ppl-amdt-filter__btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.ppl-amdt-filter__btn.is-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 /* Liste comptes rendus liés */
