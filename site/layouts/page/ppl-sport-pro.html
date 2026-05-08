@@ -70,92 +70,117 @@
   </section>
   {{ end }}
 
-  {{/* ---------- Amendements en commission (dépliable) ---------- */}}
-  {{/* R41-N : <details> dépliable pour ne pas saturer la page quand
-       il y a 100+ amendements en commission. Replié par défaut. */}}
+  {{/* ---------- Amendements en commission (dépliable, classés par article) ---------- */}}
+  {{/* R41-N : <details> dépliable pour ne pas saturer la page quand il y a
+       100+ amendements. R41-Q : amdt classés par article (Article 1ER → 2 →
+       2 BIS → 3...), avec un sous-titre par article et une grille par bloc. */}}
   <details class="ppl-page__section ppl-fold">
     <summary><h2>Amendements en commission ({{ index $d.counts "amdt_commission" }})</h2></summary>
     {{ with $d.amdt_commission }}
     {{ partial "ppl_amdt_filter.html" (dict "items" . "scope" "commission") }}
-    <div class="ppl-amdt-grid" data-amdt-grid="commission">
+    {{ with $d.amdt_commission_by_article }}
       {{ range . }}
-      {{/* R41-P : data-sort permet le filtrage JS par sort de l'amdt. */}}
-      <div class="ppl-amdt-card" data-sort="{{ default "inconnu" .sort | lower }}">
-        <div class="ppl-amdt-card__head">
-          {{ with .auteur }}<span class="ppl-amdt-card__auteur">{{ . }}</span>{{ end }}
-          {{ with .groupe }}<span class="ppl-amdt-card__groupe">({{ . }})</span>{{ end }}
-          <span class="ppl-amdt-card__date">{{ .date }}</span>
-          {{ with .sort }}<span class="ppl-amdt-card__sort ppl-amdt-card__sort--{{ . | lower | urlize }}">{{ . }}</span>{{ end }}
+      <div class="ppl-article-group" data-scope="commission">
+        <h3 class="ppl-article-heading">{{ .article }} <span class="ppl-article-heading__count">({{ len .items }})</span></h3>
+        <div class="ppl-amdt-grid" data-amdt-grid="commission">
+          {{ range .items }}
+          <div class="ppl-amdt-card" data-sort="{{ default "inconnu" .sort | lower }}" data-article="{{ .article | urlize }}">
+            <div class="ppl-amdt-card__head">
+              {{ with .auteur }}<span class="ppl-amdt-card__auteur">{{ . }}</span>{{ end }}
+              {{ with .groupe }}<span class="ppl-amdt-card__groupe">({{ . }})</span>{{ end }}
+              <span class="ppl-amdt-card__date">{{ .date }}</span>
+              {{ with .sort }}<span class="ppl-amdt-card__sort ppl-amdt-card__sort--{{ . | lower | urlize }}">{{ . }}</span>{{ end }}
+            </div>
+            <a class="ppl-amdt-card__title" href="{{ .url }}" target="_blank" rel="noopener">
+              {{ .title }}
+            </a>
+            {{ with .extract }}
+            <p class="ppl-amdt-card__extract">{{ . }}</p>
+            {{ end }}
+            {{ with .status_label }}
+            <div class="ppl-amdt-card__status">{{ . }}</div>
+            {{ end }}
+          </div>
+          {{ end }}
         </div>
-        <a class="ppl-amdt-card__title" href="{{ .url }}" target="_blank" rel="noopener">
-          {{ .title }}
-        </a>
-        {{ with .extract }}
-        <p class="ppl-amdt-card__extract">{{ . }}</p>
-        {{ end }}
-        {{ with .status_label }}
-        <div class="ppl-amdt-card__status">{{ . }}</div>
-        {{ end }}
       </div>
       {{ end }}
-    </div>
+    {{ end }}
     {{ else }}
     <p><em>Aucun amendement en commission pour l'instant.</em></p>
     {{ end }}
   </details>
 
-  {{/* ---------- Amendements en séance (dépliable) ---------- */}}
+  {{/* ---------- Amendements en séance (dépliable, classés par article) ---------- */}}
   <details class="ppl-page__section ppl-fold">
     <summary><h2>Amendements en séance ({{ index $d.counts "amdt_seance" }})</h2></summary>
     {{ with $d.amdt_seance }}
     {{ partial "ppl_amdt_filter.html" (dict "items" . "scope" "seance") }}
-    <div class="ppl-amdt-grid" data-amdt-grid="seance">
+    {{ with $d.amdt_seance_by_article }}
       {{ range . }}
-      {{/* R41-P : data-sort permet le filtrage JS par sort de l'amdt. */}}
-      <div class="ppl-amdt-card" data-sort="{{ default "inconnu" .sort | lower }}">
-        <div class="ppl-amdt-card__head">
-          {{ with .auteur }}<span class="ppl-amdt-card__auteur">{{ . }}</span>{{ end }}
-          {{ with .groupe }}<span class="ppl-amdt-card__groupe">({{ . }})</span>{{ end }}
-          <span class="ppl-amdt-card__date">{{ .date }}</span>
-          {{ with .sort }}<span class="ppl-amdt-card__sort ppl-amdt-card__sort--{{ . | lower | urlize }}">{{ . }}</span>{{ end }}
+      <div class="ppl-article-group" data-scope="seance">
+        <h3 class="ppl-article-heading">{{ .article }} <span class="ppl-article-heading__count">({{ len .items }})</span></h3>
+        <div class="ppl-amdt-grid" data-amdt-grid="seance">
+          {{ range .items }}
+          <div class="ppl-amdt-card" data-sort="{{ default "inconnu" .sort | lower }}" data-article="{{ .article | urlize }}">
+            <div class="ppl-amdt-card__head">
+              {{ with .auteur }}<span class="ppl-amdt-card__auteur">{{ . }}</span>{{ end }}
+              {{ with .groupe }}<span class="ppl-amdt-card__groupe">({{ . }})</span>{{ end }}
+              <span class="ppl-amdt-card__date">{{ .date }}</span>
+              {{ with .sort }}<span class="ppl-amdt-card__sort ppl-amdt-card__sort--{{ . | lower | urlize }}">{{ . }}</span>{{ end }}
+            </div>
+            <a class="ppl-amdt-card__title" href="{{ .url }}" target="_blank" rel="noopener">
+              {{ .title }}
+            </a>
+            {{ with .extract }}
+            <p class="ppl-amdt-card__extract">{{ . }}</p>
+            {{ end }}
+            {{ with .status_label }}
+            <div class="ppl-amdt-card__status">{{ . }}</div>
+            {{ end }}
+          </div>
+          {{ end }}
         </div>
-        <a class="ppl-amdt-card__title" href="{{ .url }}" target="_blank" rel="noopener">
-          {{ .title }}
-        </a>
-        {{ with .extract }}
-        <p class="ppl-amdt-card__extract">{{ . }}</p>
-        {{ end }}
-        {{ with .status_label }}
-        <div class="ppl-amdt-card__status">{{ . }}</div>
-        {{ end }}
       </div>
       {{ end }}
-    </div>
+    {{ end }}
     {{ else }}
     <p><em>Aucun amendement en séance pour l'instant.</em></p>
     {{ end }}
   </details>
 
   {{/* ---------- JS : filtrage des amendements par sort ---------- */}}
-  {{/* R41-P : pour chaque .ppl-amdt-filter, on toggle .is-hidden sur les
-       cards de la grille jumelle (data-amdt-grid match data-amdt-filter)
-       en fonction du data-sort cliqué. « * » réaffiche tout. */}}
+  {{/* R41-P : filtre par sort. R41-Q : adapté pour parcourir TOUTES les
+       grilles d'un scope (une grille par article) et masquer les groupes
+       d'article qui se retrouvent vides après filtrage. */}}
   <script>
   (function(){
     document.querySelectorAll('.ppl-amdt-filter').forEach(function(filt){
       var scope = filt.getAttribute('data-amdt-filter');
-      var grid = document.querySelector('.ppl-amdt-grid[data-amdt-grid="'+scope+'"]');
-      if(!grid) return;
+      var grids = document.querySelectorAll('.ppl-amdt-grid[data-amdt-grid="'+scope+'"]');
+      if(!grids.length) return;
+      var groups = document.querySelectorAll('.ppl-article-group[data-scope="'+scope+'"]');
       filt.querySelectorAll('.ppl-amdt-filter__btn').forEach(function(btn){
         btn.addEventListener('click', function(){
           var sort = btn.getAttribute('data-sort');
           filt.querySelectorAll('.ppl-amdt-filter__btn').forEach(function(b){
             b.classList.toggle('is-active', b === btn);
           });
-          grid.querySelectorAll('.ppl-amdt-card').forEach(function(card){
-            var cardSort = card.getAttribute('data-sort') || 'inconnu';
-            var match = (sort === '*' || cardSort === sort);
-            card.style.display = match ? '' : 'none';
+          // Toggle cards
+          grids.forEach(function(grid){
+            grid.querySelectorAll('.ppl-amdt-card').forEach(function(card){
+              var cardSort = card.getAttribute('data-sort') || 'inconnu';
+              var match = (sort === '*' || cardSort === sort);
+              card.style.display = match ? '' : 'none';
+            });
+          });
+          // Masque les groupes d'article qui n'ont plus aucune card visible
+          groups.forEach(function(grp){
+            var anyVisible = Array.prototype.some.call(
+              grp.querySelectorAll('.ppl-amdt-card'),
+              function(c){ return c.style.display !== 'none'; }
+            );
+            grp.style.display = anyVisible ? '' : 'none';
           });
         });
       });

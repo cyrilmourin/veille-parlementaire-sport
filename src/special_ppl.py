@@ -20,6 +20,7 @@ Hugo s'occupe du rendu via les layouts/partials.
 """
 from __future__ import annotations
 
+import html as _html
 import json
 import re
 from datetime import datetime
@@ -33,6 +34,26 @@ from pathlib import Path
 _AMDT_NUM_PREFIX_RE = re.compile(
     r"Amdt\s+n[°o]\s*([A-Z]{1,3})?(\d+)", re.IGNORECASE
 )
+
+# R41-Q (2026-05-08) : extraction de l'article depuis le titre
+# (« Amdt n°AC118 · art. ARTICLE 5 · sur... » → « ARTICLE 5 »).
+_AMDT_ARTICLE_RE = re.compile(
+    r"art\.\s+([^·]+?)\s*(?:·|$)", re.IGNORECASE
+)
+# R41-Q : nettoyage du `summary` qui contient un préfixe « Dossier : ... »
+# (le titre du dossier parent répété, redondant car identique sur tous les
+# amdt PPL) puis les blocs « — Auteur : ... — Statut : ... — Article : ... »
+# en fin (déjà affichés via les champs structurés du payload).
+_DOSSIER_PREFIX_RE = re.compile(r"^Dossier\s*:\s*[^—]+—\s*", re.IGNORECASE)
+_METADATA_TAIL_RE = re.compile(
+    r"\s*—\s*(?:Auteur|Statut|Article|Sort|État)\s*:.*$",
+    re.IGNORECASE | re.DOTALL,
+)
+# Strip des balises HTML — `corps.contenuAuteur.dispositif/exposeSommaire`
+# AN sont typés XHTML donc remontent avec <p>, <i>, &nbsp;…
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+# Compactage des espaces multiples (incluant \n, \t, &nbsp; déjà décodé).
+_WS_RE = re.compile(r"\s+")
 
 # ---------------------------------------------------------------------------
 # Constantes — identifiants stables de la PPL sport pro
@@ -197,25 +218,97 @@ def _build_extract(row: dict, raw: dict, max_chars: int = 400) -> str:
     """R41-P (2026-05-08) — Extrait du corps de l'amendement (≤ 400 chars).
 
     Source : `raw.haystack_body` (corps complet déposé par le parser AN
-    en R26) si présent, sinon `summary`. Le titre est strippé du début
-    pour ne pas dupliquer (le titre est déjà affiché dans la card).
+    en R26) si présent, sinon `summary`.
+
+    R41-Q (2026-05-08) — Nettoyages successifs :
+      1. Strip du préfixe « Dossier : <titre dossier> — » (titre du
+         dossier parent, identique sur tous les amdt PPL → redondant)
+      2. Strip de la queue méta « — Auteur : ... — Statut : ... —
+         Article : ... » (déjà affichée via les champs structurés)
+      3. Décodage des entités HTML (&nbsp;, &amp;…) puis suppression
+         des balises XHTML (<p>, <i>…) issues du dispositif/exposé AN
+      4. Strip du titre s'il préfixe le body (cas legacy)
+      5. Compactage des espaces et troncature à 400 chars
     """
     extract = ""
     if isinstance(raw, dict):
         extract = (raw.get("haystack_body") or "").strip()
     if not extract:
         extract = (row.get("summary") or "").strip()
+
+    # 1. Strip "Dossier : ... — " en tête (titre dosleg parent répétitif)
+    extract = _DOSSIER_PREFIX_RE.sub("", extract)
+    # 2. Strip queue métadonnées (Auteur / Statut / Article / Sort / État)
+    extract = _METADATA_TAIL_RE.sub("", extract)
+    # 3. Décodage entités + suppression balises XHTML
+    extract = _html.unescape(extract)
+    extract = _HTML_TAG_RE.sub(" ", extract)
+    # 4. Strip titre en préfixe (cas legacy — la R41-Q masque déjà via 1)
     title = (row.get("title") or "").strip()
-    if title and extract:
-        # Strip le titre quand il préfixe le body (cas typique AN)
-        if extract.startswith(title):
-            extract = extract[len(title):]
-        # Strip aussi quelques séparateurs résiduels
-        extract = extract.lstrip(" :—-·\n\t")
-    extract = re.sub(r"\s+", " ", extract).strip()
+    if title and extract.startswith(title):
+        extract = extract[len(title):]
+    extract = extract.lstrip(" :—-·\n\t")
+    # 5. Compactage espaces + troncature
+    extract = _WS_RE.sub(" ", extract).strip()
     if len(extract) > max_chars:
         extract = extract[:max_chars].rstrip() + "…"
     return extract
+
+
+def _extract_article_label(title: str) -> str:
+    """R41-Q (2026-05-08) — Extrait le libellé d'article depuis le titre
+    de l'amdt (« Amdt n°AC118 · art. ARTICLE 5 · sur... » → « ARTICLE 5 »).
+    Retourne "" si pas trouvé (cas non-amdt ou titre incomplet)."""
+    if not title:
+        return ""
+    m = _AMDT_ARTICLE_RE.search(title)
+    if not m:
+        return ""
+    return m.group(1).strip()
+
+
+def _article_sort_key(label: str) -> tuple:
+    """Clé de tri pour ordonner les groupes d'articles : Article 1ER → 2 →
+    2 BIS → 3 ... Articles « additionnels après ... » en queue.
+
+    Stratégie : extraire le 1er nombre, mettre les "ADDITIONNEL" en haute
+    valeur, "SANS ARTICLE" en toute fin.
+    """
+    if not label:
+        return (99999, 9, "")
+    up = label.upper()
+    if "SANS ARTICLE" in up or label == "Sans article":
+        return (99999, 9, label)
+    is_additional = "ADDITIONNEL" in up
+    m = re.search(r"(\d+)", label)
+    num = int(m.group(1)) if m else 9999
+    # Bis/Ter/Quater pondèrent le tri secondaire
+    suffix = 0
+    if "BIS" in up: suffix = 1
+    elif "TER" in up: suffix = 2
+    elif "QUATER" in up: suffix = 3
+    elif "QUINQUIES" in up: suffix = 4
+    additional_weight = 1 if is_additional else 0
+    return (num, suffix + 5 * additional_weight, label)
+
+
+def _group_amdt_by_article(amdt_payload: list[dict]) -> list[dict]:
+    """R41-Q (2026-05-08) — Groupe une liste d'amdt (déjà rendus par
+    `_row_to_payload`) par article, triés.
+
+    Retourne `[{"article": "ARTICLE 1ER", "items": [...]}, ...]`. Items
+    de chaque groupe triés par date desc.
+    """
+    groups: dict[str, list[dict]] = {}
+    for it in amdt_payload:
+        art = it.get("article") or "Sans article"
+        groups.setdefault(art, []).append(it)
+    result = []
+    for art, items in groups.items():
+        items.sort(key=lambda x: x.get("date") or "", reverse=True)
+        result.append({"article": art, "items": items})
+    result.sort(key=lambda g: _article_sort_key(g["article"]))
+    return result
 
 
 def _safe_url(row: dict, raw: dict) -> str:
@@ -257,6 +350,9 @@ def _row_to_payload(r: dict, max_title: int = 220) -> dict:
         "step": raw.get("step") or "",
         # R41-P : extrait du corps (max 400 chars), sans le titre.
         "extract": _build_extract(r, raw),
+        # R41-Q : article ciblé par l'amdt (« ARTICLE 5 », « ARTICLE 1ER A »,
+        # « ARTICLE 2 BIS »...). Vide pour les autres types d'items.
+        "article": _extract_article_label(r.get("title") or ""),
     }
 
 
@@ -289,6 +385,15 @@ def build_payload(buckets: dict) -> dict:
         payload[bucket] = [_row_to_payload(r) for r in items[:limit]]
     # Compteurs absolus (avant slice) pour les totaux UI
     payload["counts"] = {k: len(v) for k, v in buckets.items()}
+    # R41-Q (2026-05-08) : versions groupées par article pour la page
+    # dédiée. Hugo itère sur ces structures pour rendre un sub-heading
+    # « Article X (n) » au-dessus de chaque grille de cards.
+    payload["amdt_commission_by_article"] = _group_amdt_by_article(
+        payload["amdt_commission"]
+    )
+    payload["amdt_seance_by_article"] = _group_amdt_by_article(
+        payload["amdt_seance"]
+    )
     return payload
 
 

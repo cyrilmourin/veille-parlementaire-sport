@@ -280,6 +280,126 @@ def test_payload_url_amdt_preservee():
     assert payload["amdt_commission"][0]["url"] == url
 
 
+# ---------------------------------------------------------------------------
+# R41-Q : extract nettoyé + tri par article
+# ---------------------------------------------------------------------------
+
+
+def test_extract_strip_dossier_prefix():
+    """R41-Q : préfixe 'Dossier : ... — ' retiré (titre dosleg parent
+    redondant sur tous les amdt PPL)."""
+    rows = [_row(
+        category="amendements",
+        title="Amdt n°AC1",
+        raw={
+            "texte_ref": AN_TEXTE_REF,
+            "haystack_body": (
+                "Dossier : Proposition de loi relative à l'organisation "
+                "et au financement du sport professionnel — Le présent "
+                "amendement vise à clarifier le rôle des fédérations."
+            ),
+        },
+    )]
+    payload = build_payload(collect_special_ppl(rows))
+    extract = payload["amdt_commission"][0]["extract"]
+    assert "Dossier" not in extract
+    assert extract.startswith("Le présent amendement")
+
+
+def test_extract_strip_metadata_tail():
+    """R41-Q : queue '— Auteur : ... — Statut : ...' retirée."""
+    rows = [_row(
+        category="amendements",
+        title="Amdt n°AC1",
+        raw={
+            "texte_ref": AN_TEXTE_REF,
+            "haystack_body": (
+                "Le présent amendement vise à clarifier. — Auteur : M. X "
+                "— Statut : déposé — Article : ARTICLE 5"
+            ),
+        },
+    )]
+    payload = build_payload(collect_special_ppl(rows))
+    extract = payload["amdt_commission"][0]["extract"]
+    assert "Auteur" not in extract
+    assert "Statut" not in extract
+    assert "Article :" not in extract
+    assert extract.startswith("Le présent amendement")
+
+
+def test_extract_strip_html_tags():
+    """R41-Q : balises XHTML du dispositif AN strippées."""
+    rows = [_row(
+        category="amendements",
+        title="Amdt n°AC1",
+        raw={
+            "texte_ref": AN_TEXTE_REF,
+            "haystack_body": (
+                "<p>Le présent amendement vise à <i>clarifier</i> "
+                "le rôle&nbsp;des fédérations.</p>"
+            ),
+        },
+    )]
+    payload = build_payload(collect_special_ppl(rows))
+    extract = payload["amdt_commission"][0]["extract"]
+    assert "<" not in extract
+    assert ">" not in extract
+    assert "&nbsp;" not in extract
+    assert "clarifier" in extract
+
+
+def test_payload_article_extrait_du_titre():
+    """R41-Q : le champ 'article' est extrait du titre amdt."""
+    rows = [_row(
+        category="amendements",
+        title="Amdt n°AC118 · art. ARTICLE 5 · sur PPL",
+        raw={"texte_ref": AN_TEXTE_REF},
+    )]
+    payload = build_payload(collect_special_ppl(rows))
+    assert payload["amdt_commission"][0]["article"] == "ARTICLE 5"
+
+
+def test_payload_article_vide_si_pas_dans_titre():
+    rows = [_row(
+        category="amendements",
+        title="Amdt n°AC118",
+        raw={"texte_ref": AN_TEXTE_REF},
+    )]
+    payload = build_payload(collect_special_ppl(rows))
+    assert payload["amdt_commission"][0]["article"] == ""
+
+
+def test_payload_amdt_commission_by_article_groupe_et_trie():
+    """R41-Q : groupage par article + tri (Article 1ER → 2 → 2 BIS → 3)."""
+    rows = [
+        _row(category="amendements", title="Amdt n°AC10 · art. ARTICLE 3 · x",
+             raw={"texte_ref": AN_TEXTE_REF}),
+        _row(category="amendements", title="Amdt n°AC11 · art. ARTICLE 1ER · x",
+             raw={"texte_ref": AN_TEXTE_REF}),
+        _row(category="amendements", title="Amdt n°AC12 · art. ARTICLE 2 BIS · x",
+             raw={"texte_ref": AN_TEXTE_REF}),
+        _row(category="amendements", title="Amdt n°AC13 · art. ARTICLE 2 · x",
+             raw={"texte_ref": AN_TEXTE_REF}),
+        _row(category="amendements", title="Amdt n°AC14 · art. ARTICLE 1ER · y",
+             raw={"texte_ref": AN_TEXTE_REF}),
+    ]
+    payload = build_payload(collect_special_ppl(rows))
+    groups = payload["amdt_commission_by_article"]
+    article_order = [g["article"] for g in groups]
+    assert article_order == ["ARTICLE 1ER", "ARTICLE 2", "ARTICLE 2 BIS", "ARTICLE 3"]
+    # Article 1ER doit avoir 2 amdt
+    assert len(groups[0]["items"]) == 2
+
+
+def test_payload_amdt_seance_by_article_existe():
+    """Le payload séance a aussi sa version groupée."""
+    rows = [_row(category="amendements", title="Amdt n°5 · art. ARTICLE 1ER · x",
+                 raw={"texte_ref": AN_TEXTE_REF})]
+    payload = build_payload(collect_special_ppl(rows))
+    assert "amdt_seance_by_article" in payload
+    assert len(payload["amdt_seance_by_article"]) == 1
+
+
 def test_export_end_to_end(tmp_path):
     rows = [
         _row(category="amendements", raw={"texte_ref": AN_TEXTE_REF}),
