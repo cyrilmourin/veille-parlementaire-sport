@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-07T17:39:41+00:00",
+  "last_run_at": "2026-05-08T06:03:39+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419604B1560P0D1N000001",
@@ -370,6 +370,7 @@
       "an_syceron::cfe478b6fc46e1e3",
       "an_syceron::d1eb2cb22b3dd11b",
       "an_syceron::d2c3eb258b9195e9",
+      "an_syceron::d5e76fe2466b4e2d",
       "an_syceron::d61b98812e8edb23",
       "an_syceron::d66b1587833c2e98",
       "an_syceron::d6e2557464fd6432",
@@ -418,6 +419,7 @@
       "senat_cr_finances::3569ad2585217432",
       "senat_cr_finances::3b8b16f7efa68536",
       "senat_cr_lois::49b4292382fff2ce",
+      "senat_cr_lois::72457dca48bebb2d",
       "senat_cr_lois::764d6d1093f8d50b",
       "senat_cr_lois::b6548f99eb3041b7",
       "senat_cr_lois::f9260ad30848a802",
@@ -1521,7 +1523,6 @@
       "an_questions_gouvernement::QANR5L17QG1429",
       "an_questions_orales_sans_debat::QANR5L17QOSD696",
       "senat_qg::0701G",
-      "senat_qg::0835G",
       "senat_qg::0890G",
       "senat_qg::0933G",
       "senat_qg::1185G",
