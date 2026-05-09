@@ -66,7 +66,15 @@ def _client(timeout: httpx.Timeout = _TIMEOUT_LIGHT) -> httpx.Client:
                 "image/avif,image/webp,*/*;q=0.8"
             ),
             "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate, br",
+            # R41-AJ (2026-05-09) : `br` (Brotli) RETIRÉ de l'Accept-Encoding.
+            # httpx ne sait pas décompresser Brotli sans la lib `brotli`
+            # installée — résultat : le serveur AN (et d'autres) répondait
+            # en `br`, on recevait des bytes compressés non-décodables, le
+            # parser HTML voyait du binaire et trouvait 0 contenu (cas
+            # confirmé sur an_rapports : `aucun rapport extrait` alors que
+            # la page expose 103 OMC_RAPP). Avec `gzip, deflate` seul, le
+            # serveur retombe sur gzip que httpx gère nativement.
+            "Accept-Encoding": "gzip, deflate",
             "From": CONTACT_EMAIL,
             "DNT": "1",
         },
