@@ -302,4 +302,9 @@ def _patch_dila(monkeypatch, xml_list: list[bytes]) -> None:
 # -----------------------------------------------------------------
 
 def test_keep_natures_stable():
-    assert KEEP_NATURES == {"ARRETE", "DECRET", "DECISION", "LOI", "ORDONNANCE"}
+    # R41-AC (2026-05-09) : ajout COMMUNICATION pour capter les CR
+    # Conseil des ministres mentionnant le sport.
+    assert KEEP_NATURES == {
+        "ARRETE", "DECRET", "DECISION", "LOI", "ORDONNANCE",
+        "COMMUNICATION",
+    }

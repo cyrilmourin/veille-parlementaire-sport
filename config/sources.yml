@@ -685,8 +685,14 @@ autorites:
       # runs → le host répond par intermittence. Réactivée : le soft-fail
       # du loader (`_common.fetch`) lâche proprement en cas de timeout, les
       # items déjà captés restent visibles jusqu'au prochain run réussi.
+      # R41-AC (2026-05-09) — `impersonate: true` ajouté : le pipeline
+      # passe désormais via curl_cffi avec signature TLS Chrome, ce qui
+      # contourne les WAF / Cloudflare-like qui bloquent httpx standard.
+      # Cyril : pas de RSS exploitable côté ANS, scraping HTML est la
+      # seule option (Drupal moderne, pas de feed natif).
       url: https://www.agencedusport.fr/actualites
       format: html
+      impersonate: true
       poids: 3
       fetch_meta: true
       fetch_meta_limit: 60

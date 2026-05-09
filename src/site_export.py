@@ -103,8 +103,18 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
 # `_window_for` accepte désormais un `source_id` optionnel pour prioriser
 # cet override sur la fenêtre catégorie.
 WINDOW_DAYS_BY_SOURCE_ID: dict[str, int] = {
-    "an_rapports": 730,     # 2 ans — rapports AN (R28)
-    "senat_rapports": 730,  # 2 ans — rapports Sénat
+    # R41-AC (2026-05-09) : 2 ans → 3 ans (1095j) pour absorber les
+    # rapports d'information de longue durée (rapport SAVIN/LAFFONT
+    # sport pro Sénat, rapports commission culture sur PJL Alpes 2030,
+    # rapports annuels d'activité). Cyril : « quitte à élargir la
+    # fenêtre d'éligibilité dans le temps ».
+    "an_rapports": 1095,     # 3 ans — rapports AN
+    "senat_rapports": 1095,  # 3 ans — rapports Sénat
+    # R41-AC : Cour des comptes publie des rapports thématiques
+    # (ex. bilan JO Paris 2024 — 29/09/2025) qui restent référents
+    # plusieurs années. La fenêtre `communiques: 90j` les faisait
+    # sortir trop tôt. 2 ans permet de garder le rapport JO visible.
+    "ccomptes_publications": 730,
 }
 
 # Catégories pour lesquelles on exige une vraie `published_at` ≤ now (pas de

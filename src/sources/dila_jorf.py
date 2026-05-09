@@ -37,8 +37,15 @@ _FILE_PAT = re.compile(
     r"^JORF_(?P<date>\d{8})-(?P<time>\d{6})\.tar\.gz$", re.IGNORECASE
 )
 
-# Natures que l'on garde (les plus fréquentes dans la veille sport)
-KEEP_NATURES = {"ARRETE", "DECRET", "DECISION", "LOI", "ORDONNANCE"}
+# Natures que l'on garde (les plus fréquentes dans la veille sport).
+# R41-AC (2026-05-09) : ajout de COMMUNICATION pour capter les comptes
+# rendus du Conseil des ministres (rubrique « Communication du
+# Gouvernement » au JORF) qui mentionnent régulièrement le sport mais
+# étaient filtrés en amont du KeywordMatcher.
+KEEP_NATURES = {
+    "ARRETE", "DECRET", "DECISION", "LOI", "ORDONNANCE",
+    "COMMUNICATION",
+}
 
 
 def _list_recent_dumps(n: int = 8) -> list[tuple[str, datetime]]:
