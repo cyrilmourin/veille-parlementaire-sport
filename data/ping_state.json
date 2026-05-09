@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-08T20:55:41+00:00",
+  "last_run_at": "2026-05-09T06:21:32+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419604B1560P0D1N000001",
@@ -268,6 +268,7 @@
       "an_syceron::44673b7c47a78e52",
       "an_syceron::44bee2e320bfbec9",
       "an_syceron::465a34dc3758cb28",
+      "an_syceron::478e59a7277c070b",
       "an_syceron::4991ab631c00fcd6",
       "an_syceron::4a452d4f35330afd",
       "an_syceron::4a899b2f95cdb8d5",
