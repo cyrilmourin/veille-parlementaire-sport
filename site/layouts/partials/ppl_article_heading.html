@@ -42,6 +42,22 @@
     <span class="ppl-article-label">{{ $key }}</span>
   {{ end }}
   <span class="ppl-article-heading__count">({{ $count }})</span>
+  {{/* R41-AH (2026-05-09) — mention secondaire « Consulter le texte de
+       l'article » à côté du compteur, partage le même `data-article-key`
+       que le bouton principal et déclenche le même toggle (le JS itère
+       sur TOUS les .ppl-article-toggle d'une même clé pour garder l'état
+       aria-expanded / is-open synchronisé). N'apparaît que si $has_text
+       est vrai (pas d'affichage pour les articles additionnels qui n'ont
+       pas encore de texte de loi). */}}
+  {{ if $has_text }}
+    <button type="button" class="ppl-article-toggle ppl-article-toggle--secondary"
+            data-article-key="{{ $slug }}"
+            aria-expanded="false"
+            aria-controls="ppl-article-text-{{ $slug }}"
+            title="Cliquez pour afficher / masquer le texte de l'article">
+      <em>Consulter le texte de l'article</em>
+    </button>
+  {{ end }}
 </h3>
 {{ if $has_text }}
 <div class="ppl-article-text"

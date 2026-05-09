@@ -2631,6 +2631,32 @@ details.ppl-fold[open] > p {
 }
 .ppl-article-label { display: inline-block; }
 
+/* R41-AH (2026-05-09) — Lien secondaire « Consulter le texte de
+   l'article » à côté du compteur. Italique + casse normale + couleur
+   discrète, pour qu'il soit identifiable comme un lien sans concurrencer
+   visuellement le label principal de l'article. Hover rouge comme le
+   bouton principal. */
+.ppl-article-toggle--secondary {
+  font-style: italic;
+  font-size: 12px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.ppl-article-toggle--secondary em {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  font-style: italic;
+}
+.ppl-article-toggle--secondary:hover {
+  color: var(--sl-red);
+}
+.ppl-article-toggle--secondary.is-open em {
+  text-decoration: none;
+}
+
 /* R41-X : bloc texte de l'article déplié sous le H3. */
 .ppl-article-text {
   margin: -4px 0 14px;

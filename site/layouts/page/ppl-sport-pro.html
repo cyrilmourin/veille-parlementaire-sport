@@ -226,8 +226,15 @@
         if(!target) return;
         var open = !target.hidden;
         target.hidden = open;
-        btn.setAttribute('aria-expanded', String(!open));
-        btn.classList.toggle('is-open', !open);
+        // R41-AH : un même article peut être déclenché par plusieurs
+        // boutons (label principal + lien « Consulter le texte de
+        // l'article »). On synchronise leur état visuel.
+        document.querySelectorAll(
+          '.ppl-article-toggle[data-article-key="'+key+'"]'
+        ).forEach(function(b){
+          b.setAttribute('aria-expanded', String(!open));
+          b.classList.toggle('is-open', !open);
+        });
       });
     });
   })();
