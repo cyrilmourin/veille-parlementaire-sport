@@ -22,12 +22,9 @@
   <img src="/sideline-banner.png" alt="Sideline Conseil" loading="lazy"/>
 </a>
 
-{{/* R41-M (2026-05-07) — Bloc « Spécial PPL Sport pro » : 5 derniers
-     amendements + lien vers la page dédiée. Visible sur accueil + dosleg
-     + amendements (toutes les pages non-fullwidth). Le partial gère son
-     propre guard sur site.Data.special_ppl. */}}
-{{ partial "special_ppl_sidebar.html" . }}
-
+{{/* R41-AJ (2026-05-09) : Recherche AVANT Spécial PPL Sport pro
+     (demande Cyril). Ordre final sidebar : Sideline → Recherche →
+     Spécial PPL → Agenda. */}}
 <div class="side-card side-card--search">
   <h3 class="side-title">Recherche</h3>
   <p class="side-caption">Tous les contenus de la veille (30 jours)</p>
@@ -37,6 +34,12 @@
     <button type="submit" aria-label="Lancer la recherche">&rsaquo;</button>
   </form>
 </div>
+
+{{/* R41-M (2026-05-07) — Bloc « Spécial PPL Sport pro » : 5 derniers
+     amendements + lien vers la page dédiée. Visible sur accueil + dosleg
+     + amendements (toutes les pages non-fullwidth). Le partial gère son
+     propre guard sur site.Data.special_ppl. */}}
+{{ partial "special_ppl_sidebar.html" . }}
 
 <div class="side-card side-card--agenda">
   <h3 class="side-title">Agenda</h3>
