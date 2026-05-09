@@ -4,8 +4,32 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>{{ .Title }} — {{ .Site.Title }}</title>
-  <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}"/>
+  {{ $desc := cond (gt (len (.Description | default "")) 0) .Description .Site.Params.description }}
+  <meta name="description" content="{{ $desc }}"/>
   <meta name="robots" content="index,follow"/>
+
+  {{/* R41-Y (2026-05-09) — Open Graph + Twitter Cards pour le partage
+       LinkedIn / Facebook / Twitter / Slack / WhatsApp. Sans ces meta
+       le partage produit un lien nu sans cartouche visuel. L'image
+       sideline-banner.png est utilisée par défaut (1200×630 conseillé). */}}
+  {{ $img := "sideline-banner.png" | absURL }}
+  {{ $url := .Permalink }}
+  {{ $ogTitle := printf "%s — %s" .Title .Site.Title }}
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="{{ .Site.Title }}"/>
+  <meta property="og:title" content="{{ $ogTitle }}"/>
+  <meta property="og:description" content="{{ $desc }}"/>
+  <meta property="og:url" content="{{ $url }}"/>
+  <meta property="og:image" content="{{ $img }}"/>
+  <meta property="og:image:secure_url" content="{{ $img }}"/>
+  <meta property="og:image:type" content="image/png"/>
+  <meta property="og:image:alt" content="{{ .Site.Title }} — Sideline Conseil"/>
+  <meta property="og:locale" content="fr_FR"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="{{ $ogTitle }}"/>
+  <meta name="twitter:description" content="{{ $desc }}"/>
+  <meta name="twitter:image" content="{{ $img }}"/>
+  <link rel="canonical" href="{{ $url }}"/>
   <!-- Google Analytics 4 — chargé uniquement après consentement explicite -->
   <script>
   (function(){
