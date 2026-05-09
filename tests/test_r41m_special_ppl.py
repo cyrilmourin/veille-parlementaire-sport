@@ -436,6 +436,69 @@ def test_url_senat_canonique_preservee():
     assert payload["dosleg"][0]["url"].endswith("ppl24-456.html")
 
 
+def test_meeting_kind_seance_via_organe_PO838901():
+    """R41-T : URL /organes/PO838901 → Séance Plénière."""
+    from src.special_ppl import _detect_meeting_kind
+    r = {"category": "agenda",
+         "url": "https://www.assemblee-nationale.fr/dyn/17/organes/PO838901",
+         "title": "Discussion (n° 1560)"}
+    assert _detect_meeting_kind(r) == "Séance Plénière"
+
+
+def test_meeting_kind_commission_via_organe_PO419604():
+    """R41-T : URL /organes/PO419604 (commission CCE) → Commission."""
+    from src.special_ppl import _detect_meeting_kind
+    r = {"category": "agenda",
+         "url": "https://www.assemblee-nationale.fr/dyn/17/organes/PO419604",
+         "title": "Examen de la PPL (n° 1560)"}
+    assert _detect_meeting_kind(r) == "Commission"
+
+
+def test_meeting_kind_via_titre_sans_url_organe():
+    """R41-T : fallback heuristique titre quand URL pas /organes/."""
+    from src.special_ppl import _detect_meeting_kind
+    r1 = {"category": "agenda", "url": "/items/agenda/",
+          "title": "Discussion de la proposition de loi"}
+    assert _detect_meeting_kind(r1) == "Séance Plénière"
+    r2 = {"category": "agenda", "url": "/items/agenda/",
+          "title": "Examen de la proposition de loi"}
+    assert _detect_meeting_kind(r2) == "Commission"
+    r3 = {"category": "agenda", "url": "/items/agenda/",
+          "title": "Désignation du rapporteur"}
+    assert _detect_meeting_kind(r3) == "Commission"
+
+
+def test_meeting_kind_vide_pour_non_agenda():
+    from src.special_ppl import _detect_meeting_kind
+    r = {"category": "amendements", "url": "x", "title": "y"}
+    assert _detect_meeting_kind(r) == ""
+
+
+def test_payload_meeting_kind_dans_agenda():
+    """L'agenda dans le payload contient le meeting_kind calculé."""
+    rows = [_row(
+        category="agenda",
+        title="Examen de la proposition de loi (n° 1560)",
+        url="https://www.assemblee-nationale.fr/dyn/17/organes/PO419604",
+    )]
+    payload = build_payload(collect_special_ppl(rows))
+    assert payload["agenda"][0]["meeting_kind"] == "Commission"
+
+
+def test_meta_rapporteurs_4_par_ordre_alphabetique_nom():
+    """R41-T : 4 rapporteurs dans le payload meta, triés par NOM."""
+    payload = build_payload(collect_special_ppl([]))
+    rapps = payload["meta"]["rapporteurs"]
+    assert len(rapps) == 4
+    noms = [r["nom"] for r in rapps]
+    assert noms == sorted(noms, key=lambda x: x.upper())
+    # Champs requis
+    for r in rapps:
+        assert r["prenom"] and r["nom"] and r["groupe"]
+        assert r["fiche_url"].startswith("https://www.assemblee-nationale.fr")
+        assert r["photo_url"].startswith("https://www2.assemblee-nationale.fr")
+
+
 def test_url_an_dosleg_preservee():
     """L'URL AN dosleg (rerouté par R41-K) est préservée telle quelle."""
     rows = [_row(

@@ -97,13 +97,57 @@ URL_AN_TEXTE = (
     "https://www.assemblee-nationale.fr/dyn/17/textes/"
     "l17b1560_proposition-loi"
 )
-# Note R41-N : pas d'URL canonique du « dossier législatif AN » — le slug
-# n'est pas connu de manière stable depuis l'open data, on utilisait un
-# slug deviné qui renvoyait vers une autre page. On expose seulement le
-# texte AN (URL stable) et le dossier Sénat (URL stable ppl24-456).
+# R41-T (2026-05-09) : URL dossier législatif AN. Format slug stable
+# `<sujet-mots-cles>` derrière `/dyn/17/dossiers/`. Vérifié 200 OK le
+# 2026-05-09. C'est la page index officielle du dossier sur le site AN.
+URL_AN_DOSSIER = (
+    "https://www.assemblee-nationale.fr/dyn/17/dossiers/"
+    "sport-professionnel-organisation-gestion-financement"
+)
 URL_SENAT_DOSSIER = (
     "https://www.senat.fr/dossier-legislatif/ppl24-456.html"
 )
+
+# R41-T (2026-05-09) : 4 rapporteurs nommés sur la PPL n° 1560
+# (commission affaires culturelles AN, examen 12-13 mai 2026).
+# Triés par ORDRE ALPHABÉTIQUE sur le NOM (demande Cyril). Photos
+# AN format `/static/tribun/17/photos/carre/<digits>.jpg`.
+RAPPORTEURS = [
+    {
+        "prenom": "Belkhir",
+        "nom": "Belhaddad",
+        "groupe": "SOC",
+        "fiche_url": "https://www.assemblee-nationale.fr/dyn/deputes/PA720362",
+        "photo_url": "https://www2.assemblee-nationale.fr/static/tribun/17/photos/carre/720362.jpg",
+        "pa_id": "PA720362",
+    },
+    {
+        "prenom": "Lionel",
+        "nom": "Royer-Perreault",
+        "groupe": "DR",
+        "fiche_url": "https://www.assemblee-nationale.fr/dyn/deputes/PA870009",
+        "photo_url": "https://www2.assemblee-nationale.fr/static/tribun/17/photos/carre/870009.jpg",
+        "pa_id": "PA870009",
+    },
+    {
+        "prenom": "Sophie",
+        "nom": "Mette",
+        "groupe": "DEM",
+        "fiche_url": "https://www.assemblee-nationale.fr/dyn/deputes/PA719640",
+        "photo_url": "https://www2.assemblee-nationale.fr/static/tribun/17/photos/carre/719640.jpg",
+        "pa_id": "PA719640",
+    },
+    {
+        "prenom": "Véronique",
+        "nom": "Riotton",
+        "groupe": "RE",
+        "fiche_url": "https://www.assemblee-nationale.fr/dyn/deputes/PA721426",
+        "photo_url": "https://www2.assemblee-nationale.fr/static/tribun/17/photos/carre/721426.jpg",
+        "pa_id": "PA721426",
+    },
+]
+# Re-tri sécurité (au cas où l'ordre source serait modifié)
+RAPPORTEURS = sorted(RAPPORTEURS, key=lambda x: x["nom"].upper())
 
 
 # ---------------------------------------------------------------------------
@@ -322,6 +366,48 @@ def _group_amdt_by_article(amdt_payload: list[dict]) -> list[dict]:
     return result
 
 
+def _detect_meeting_kind(row: dict) -> str:
+    """R41-T (2026-05-09) — Pour un item agenda, détermine si la réunion
+    est une « Séance Plénière » ou une « Commission ».
+
+    Stratégie en 3 niveaux :
+      1. URL d'organe d'origine : `PO838901` = AN séance plénière,
+         `PO4xxxxx` ou `PO7xxxxx` = commission AN. Sénat équivalent
+         (organe 100 = séance, autres = commissions).
+      2. Heuristique titre (« Discussion »/« Suite de la discussion »
+         → plénière ; « Examen »/« Désignation »/« Audition »/« Table
+         ronde » → commission).
+      3. Fallback : "" (pas de préfixe).
+
+    Doit être appelé AVANT `_safe_url` (qui réécrit l'URL d'organe en
+    `/items/agenda/`) sinon on perd l'info.
+    """
+    if (row.get("category") or "") != "agenda":
+        return ""
+    url = (row.get("url") or "").lower()
+    title_low = (row.get("title") or "").lower()
+    # 1. Codes d'organe
+    if "/organes/po838901" in url:
+        return "Séance Plénière"
+    if re.search(r"/organes/po[47]\d{5}", url):
+        return "Commission"
+    # 2. Heuristique titre
+    if any(w in title_low for w in (
+        "suite de la discussion",
+        "discussion de la proposition",
+        "discussion en séance",
+        "séance publique",
+    )):
+        return "Séance Plénière"
+    if any(w in title_low for w in (
+        "examen de la proposition", "examen du projet",
+        "désignation du rapporteur", "audition", "table ronde",
+        "examen du texte", "examen pour avis",
+    )):
+        return "Commission"
+    return ""
+
+
 def _safe_url(row: dict, raw: dict) -> str:
     """R41-P (2026-05-08) — Retourne l'URL du row, en remplaçant les URLs
     AN d'organe `/dyn/17/organes/POXXXX` (qui mènent vers la fiche
@@ -362,6 +448,10 @@ def _row_to_payload(r: dict, max_title: int = 220) -> dict:
         raw = {}
     return {
         "title": (r.get("title") or "")[:max_title],
+        # R41-T : meeting_kind calculé AVANT _safe_url qui réécrit l'URL
+        # d'organe en /items/agenda/ — on a besoin de l'URL d'origine pour
+        # la détection.
+        "meeting_kind": _detect_meeting_kind(r),
         "url": _safe_url(r, raw),
         "chamber": r.get("chamber") or "",
         "date": (r.get("published_at") or "")[:10],
@@ -401,7 +491,11 @@ def build_payload(buckets: dict) -> dict:
             "title": PPL_TITLE,
             "slug_path": PPL_SLUG_PATH,
             "url_an_texte": URL_AN_TEXTE,
+            "url_an_dossier": URL_AN_DOSSIER,
             "url_senat_dossier": URL_SENAT_DOSSIER,
+            # R41-T : 4 rapporteurs nommés sur la PPL — exposés au layout
+            # Hugo pour le module « Rapporteurs » à droite des étapes.
+            "rapporteurs": list(RAPPORTEURS),
             "an_num": AN_TEXTE_NUM,
             "generated_at": datetime.utcnow().isoformat(timespec="seconds"),
         },

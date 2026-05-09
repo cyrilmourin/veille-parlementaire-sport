@@ -3288,16 +3288,19 @@ def _render_special_ppl_card(payload: dict) -> list[str]:
     lines.append('</div>')
     lines.append('<ul class="special-ppl-card__items">')
     if next_event:
+        # R41-T (2026-05-09) : titre tronqué via CSS line-clamp (4 lignes
+        # max) plutôt qu'au caractère, pour respecter la coupure mots.
+        # La couleur passe au sl-blue (cohérence avec le reste de la
+        # carte) — l'accent rouge restait incongru sur fond bleu marine.
         lines.append(
             f'<li class="special-ppl-card__item special-ppl-card__item--next">'
             f'<span class="lbl">Prochaine échéance</span>'
-            f'<span class="val">{_escape(next_event.get("date",""))} — '
-            f'{_escape((next_event.get("title","") or "")[:120])}</span></li>'
+            f'<span class="val lc-4">{_escape(next_event.get("date",""))} — '
+            f'{_escape(next_event.get("title","") or "")}</span></li>'
         )
     # R41-P : items « Amendements (commission/séance) » cliquables vers
-    # la page dédiée (#amdt-commission / #amdt-seance via fragment, le
-    # layout n'a pas d'ID sur ces sections — on tombe en haut, ce qui
-    # reste acceptable pour la V1).
+    # la page dédiée. R41-T : un lien explicite supplémentaire en queue
+    # « → Voir tous les amendements » au-delà du seul nombre cliquable.
     page_path = meta.get("slug_path", "/ppl-sport-professionnel/")
     lines.append(
         f'<li class="special-ppl-card__item special-ppl-card__item--link">'
@@ -3310,6 +3313,10 @@ def _render_special_ppl_card(payload: dict) -> list[str]:
         f'<a href="{page_path}" aria-label="Voir les amendements en séance">'
         f'<span class="lbl">Amendements (séance)</span>'
         f'<span class="val">{nb_seance}</span></a></li>'
+    )
+    lines.append(
+        f'<li class="special-ppl-card__item special-ppl-card__item--cta">'
+        f'<a href="{page_path}">→ Voir tous les amendements</a></li>'
     )
     lines.append('</ul>')
     lines.append('<div class="special-ppl-card__cta">')

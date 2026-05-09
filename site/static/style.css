@@ -1974,11 +1974,42 @@ a:hover { text-decoration: underline; }
   line-height: 1.3;
   margin-left: 5px;
 }
+/* R41-T (2026-05-09) : prochaine échéance en bleu marine (sl-blue) plutôt
+   qu'en rouge — le rouge tranchait avec le fond bleu de la carte et créait
+   un point d'attention dissonant. */
 .special-ppl-card__item--next .val {
-  color: var(--sl-red);
+  color: var(--sl-blue);
   font-weight: 600;
   font-size: 13px;
   /* margin-left déjà appliqué via .special-ppl-card__item .val */
+}
+/* R41-T : line-clamp 4 lignes max pour le titre de l'échéance, avec
+   ellipsis. Évite de tronquer dur au caractère. */
+.special-ppl-card__item .lc-4 {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
+}
+/* R41-T : lien explicite « Voir tous les amendements » sous les compteurs. */
+.special-ppl-card__item--cta {
+  background: transparent;
+  padding: 4px 10px 0;
+}
+.special-ppl-card__item--cta > a {
+  color: var(--sl-cream);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-block;
+  padding: 4px 0;
+  margin-left: 5px;
+}
+.special-ppl-card__item--cta > a:hover {
+  color: #fff;
+  text-decoration: underline;
 }
 /* R41-P : items cliquables (Amendements commission/séance → page dédiée). */
 .special-ppl-card__item--link { padding: 0; }
@@ -2165,6 +2196,7 @@ details.ppl-fold[open] > p {
   padding: 8px 0;
   border-bottom: 1px dashed var(--line);
   font-size: 14px;
+  flex-wrap: wrap;
 }
 .ppl-timeline__item:last-child { border-bottom: 0; }
 .ppl-timeline__date {
@@ -2175,6 +2207,78 @@ details.ppl-fold[open] > p {
 }
 .ppl-timeline__item a { color: var(--accent); text-decoration: none; }
 .ppl-timeline__item a:hover { text-decoration: underline; }
+/* R41-T : préfixe « Séance Plénière » / « Commission » devant le label */
+.ppl-timeline__kind {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.ppl-timeline__label {
+  flex: 1 1 200px;
+  color: var(--fg);
+}
+.ppl-timeline__more {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* R41-T : ligne overview 50/50 (Étapes / Rapporteurs) */
+.ppl-row-overview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 24px;
+}
+.ppl-overview-col { margin-top: 0; }
+.ppl-overview-col h2 { margin-top: 0; }
+@media (max-width: 720px) {
+  .ppl-row-overview { grid-template-columns: 1fr; }
+}
+
+/* R41-T : module Rapporteurs */
+.ppl-rapporteurs__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ppl-rapporteur {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.ppl-rapporteur:last-child { border-bottom: 0; }
+.ppl-rapporteur__photo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--line);
+  flex-shrink: 0;
+  background: var(--bg);
+}
+.ppl-rapporteur__name {
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.ppl-rapporteur__name:hover { color: var(--sl-red); }
+.ppl-rapporteur__groupe {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 12px;
+  margin-left: 4px;
+}
 
 /* Amendements 2 colonnes */
 .ppl-amdt-grid {
