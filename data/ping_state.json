@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-09T18:25:23+00:00",
+  "last_run_at": "2026-05-09T18:46:13+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419604B1560P0D1N000001",
@@ -554,7 +554,6 @@
       "senat_cri::26ddf980df5d0cbf",
       "senat_cri::272307356cd03a7d",
       "senat_cri::279d850cd6256482",
-      "senat_cri::283e0de12a3c93f5",
       "senat_cri::28458b7b6b2baf67",
       "senat_cri::2899ca1435439ae5",
       "senat_cri::295939665ac20b48",
@@ -1519,7 +1518,6 @@
       "an_questions_ecrites::QANR5L17QE14854",
       "an_questions_ecrites::QANR5L17QE14866",
       "an_questions_ecrites::QANR5L17QE14905",
-      "an_questions_ecrites::QANR5L17QE14918",
       "an_questions_ecrites::QANR5L17QE14951",
       "an_questions_gouvernement::QANR5L17QG1429",
       "an_questions_orales_sans_debat::QANR5L17QOSD696",
