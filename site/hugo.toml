@@ -18,7 +18,7 @@ paginate = 50
   pagerSize = 50
 
 [params]
-  description = "Veille institutionnelle du sport — Parlement, Gouvernement, JORF, autorités."
+  description = "Veille institutionnelle quotidienne du sport en France : Parlement (AN, Sénat), Gouvernement, JORF, autorités indépendantes, opérateurs publics et mouvement sportif. Sources officielles agrégées et filtrées par Sideline Conseil — actualisée chaque matin."
   author = "Sideline Conseil"
   tagline = "Voir clair. Jouer juste."
   accent = "#122549"

@@ -3362,7 +3362,13 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         "---",
         f'title: "Veille Institutionnelle Sport — {now:%Y-%m-%d}"',
         f'date: {now:%Y-%m-%d}',
-        'description: "Veille institutionnelle du sport — actualisée quotidiennement par Sideline Conseil."',
+        # R41-Z (2026-05-09) : description ≥ 100 chars (exigence LinkedIn
+        # post-inspector) + verbatim agrégateur du périmètre (Parlement,
+        # Gouvernement, JORF, fédérations) pour le SEO et les previews
+        # de partage.
+        'description: "Veille institutionnelle quotidienne du sport en France : '
+        'dossiers législatifs, amendements, questions parlementaires, comptes rendus, '
+        'JORF, agendas et nominations. Sources officielles agrégées par Sideline Conseil."',
         "---",
         "",
     ]

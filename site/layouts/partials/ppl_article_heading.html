@@ -13,12 +13,19 @@
 {{ $count := .count }}
 {{ $up := upper $key }}
 {{ $is_additional := or (in $up "APRÈS") (or (in $up "APRES") (in $up "AVANT")) }}
+{{/* R41-Z (2026-05-09) : robustesse — `len nil` plante Hugo
+     ('reflect.Value.Type on zero Value'). On défaut "" pour les clés
+     absentes (articles additionnels, articles non extraits, ou data
+     file pas encore généré). */}}
 {{ $articles := dict }}
 {{ with .articles_data }}
   {{ $articles = .articles | default dict }}
 {{ end }}
-{{ $text := index $articles $key }}
-{{ $has_text := and (not $is_additional) (gt (len $text) 0) }}
+{{ $text := "" }}
+{{ if $articles }}
+  {{ with index $articles $key }}{{ $text = . }}{{ end }}
+{{ end }}
+{{ $has_text := and (not $is_additional) (ne $text "") }}
 {{ $slug := $key | urlize }}
 
 <h3 class="ppl-article-heading">
