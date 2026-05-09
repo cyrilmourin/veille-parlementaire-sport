@@ -3,16 +3,17 @@
   lien vers la page dédiée /ppl-sport-professionnel/.
 
   Affiché sur :
-    - accueil
     - /items/dossiers_legislatifs/
     - /items/amendements/
-  Le partial est inclus inconditionnellement par sidebar.html ; un guard
-  `with site.Data.special_ppl` masque le bloc tant que le payload n'est
-  pas généré (ex. premier build avant le 1er match).
+    - et toutes les pages non-fullwidth EXCEPTÉ l'accueil.
 
-  Le routing est géré côté CSS / template selon le type de page (cf. la
-  classe side-card--ppl du conteneur).
+  R41-V (2026-05-09) : exclusion explicite de la home — la carte
+  Spécial PPL est déjà présente en grand format dans le main de
+  l'accueil ; un doublon dans la sidebar fait redondance. Sur les
+  autres pages (dossiers, amendements), la carte main n'existe pas
+  donc la sidebar reste utile.
 */}}
+{{ if .IsHome }}{{/* skip sur l'accueil */}}{{ else }}
 {{ with site.Data.special_ppl }}
 {{ $amdt := slice }}
 {{ with .amdt_commission }}{{ $amdt = $amdt | append . }}{{ end }}
@@ -44,3 +45,4 @@
 </div>
 {{ end }}
 {{ end }}
+{{ end }}{{/* /not .IsHome */}}

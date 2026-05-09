@@ -342,7 +342,7 @@ a:hover { text-decoration: underline; }
   list-style: none; padding: 0; margin: 8px 0;
 }
 .home .content ul li {
-  padding: 12px 0 14px;
+  padding: 6px 0 7px;
   border-bottom: 1px solid var(--line);
 }
 .home .content ul li:last-child { border-bottom: none; }
@@ -1949,30 +1949,31 @@ a:hover { text-decoration: underline; }
   flex-direction: column;
   gap: 6px;
 }
+/* R41-V (2026-05-09) : padding-left UNIFORME 14px sur tous les items
+   blancs (next + link + cta) pour aligner « Prochaine échéance » avec
+   « Amendements (Commission) » et « Amendements (Séance) ». Suppression
+   du margin-left sur .lbl/.val (intégré au padding du conteneur). */
 .special-ppl-card__item {
   background: #fff;
   color: var(--fg);
   border-radius: 6px;
-  padding: 8px 10px;
+  padding: 8px 12px 8px 14px;
   font-size: 13px;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-/* R41-O (2026-05-07) : labels en doré, casse normale (Première lettre
-   en majuscule, pas tout en capitales), bold + margin-left sur le TEXTE
-   pour aérer (demande Cyril : marge sur le texte, pas sur le conteneur
-   blanc). */
+/* R41-V : labels font 12px, weight 900 (demande Cyril). */
 .special-ppl-card__item .lbl {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0;
   color: #c9a14a;       /* doré chaud, contraste OK sur fond blanc */
-  font-weight: 700;
-  margin-left: 5px;
+  font-weight: 900;
+  margin-left: 0;
 }
 .special-ppl-card__item .val {
   line-height: 1.3;
-  margin-left: 5px;
+  margin-left: 0;
 }
 /* R41-T (2026-05-09) : prochaine échéance en bleu marine (sl-blue) plutôt
    qu'en rouge — le rouge tranchait avec le fond bleu de la carte et créait
@@ -1981,7 +1982,30 @@ a:hover { text-decoration: underline; }
   color: var(--sl-blue);
   font-weight: 600;
   font-size: 13px;
-  /* margin-left déjà appliqué via .special-ppl-card__item .val */
+}
+/* R41-V (2026-05-09) : cartouche date « JJ/MM » rouge/blanc (style
+   sidebar agenda) + préfixe « Commission » / « Séance Plénière » en bold. */
+.special-ppl-card__item--next .val .date-pill {
+  display: inline-block;
+  background: var(--sl-red);
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-right: 6px;
+  vertical-align: 1px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .3px;
+}
+.special-ppl-card__item--next .val .kind-prefix {
+  display: inline-block;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: .4px;
+  color: var(--sl-blue);
+  margin-right: 6px;
 }
 /* R41-T : line-clamp 4 lignes max pour le titre de l'échéance, avec
    ellipsis. Évite de tronquer dur au caractère. */
@@ -1993,31 +2017,35 @@ a:hover { text-decoration: underline; }
   overflow: hidden;
   line-height: 1.35;
 }
-/* R41-T : lien explicite « Voir tous les amendements » sous les compteurs. */
+/* R41-T : lien explicite « Voir tous les amendements » sous les compteurs.
+   R41-V : passage en BLANC (#fff) pour visibilité optimale sur fond bleu
+   (le sl-cream précédent était trop discret). Padding-left aligné à 14px
+   pour cohérence avec les autres items blancs au-dessus. */
 .special-ppl-card__item--cta {
   background: transparent;
-  padding: 4px 10px 0;
+  padding: 4px 14px 0;
 }
 .special-ppl-card__item--cta > a {
-  color: var(--sl-cream);
+  color: #fff;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
   display: inline-block;
   padding: 4px 0;
-  margin-left: 5px;
+  margin-left: 0;
 }
 .special-ppl-card__item--cta > a:hover {
   color: #fff;
   text-decoration: underline;
 }
-/* R41-P : items cliquables (Amendements commission/séance → page dédiée). */
+/* R41-P : items cliquables (Amendements commission/séance → page dédiée).
+   R41-V : padding aligné sur 14px gauche pour alignement vertical des labels. */
 .special-ppl-card__item--link { padding: 0; }
 .special-ppl-card__item--link > a {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 10px;
+  padding: 8px 12px 8px 14px;
   text-decoration: none;
   color: inherit;
   border-radius: 6px;

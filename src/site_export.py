@@ -3290,12 +3290,32 @@ def _render_special_ppl_card(payload: dict) -> list[str]:
     if next_event:
         # R41-T (2026-05-09) : titre tronqué via CSS line-clamp (4 lignes
         # max) plutôt qu'au caractère, pour respecter la coupure mots.
-        # La couleur passe au sl-blue (cohérence avec le reste de la
-        # carte) — l'accent rouge restait incongru sur fond bleu marine.
+        # La couleur passe au sl-blue (cohérence avec le reste de la carte).
+        # R41-V (2026-05-09) : préfixe « Commission » / « Séance Plénière »
+        # depuis meeting_kind (homogène avec la page dédiée), date en
+        # cartouche rouge/blanc (style sidebar agenda), titre derrière.
+        kind = (next_event.get("meeting_kind") or "").strip()
+        date_iso = (next_event.get("date") or "")
+        date_short = ""
+        if date_iso and len(date_iso) >= 10:
+            try:
+                date_short = datetime.strptime(
+                    date_iso[:10], "%Y-%m-%d"
+                ).strftime("%d/%m")
+            except ValueError:
+                date_short = date_iso[:10]
+        date_pill = (
+            f'<span class="date-pill">{_escape(date_short)}</span>'
+            if date_short else ''
+        )
+        kind_html = (
+            f'<span class="kind-prefix">{_escape(kind)}</span>'
+            if kind else ''
+        )
         lines.append(
             f'<li class="special-ppl-card__item special-ppl-card__item--next">'
             f'<span class="lbl">Prochaine échéance</span>'
-            f'<span class="val lc-4">{_escape(next_event.get("date",""))} — '
+            f'<span class="val lc-4">{date_pill}{kind_html} '
             f'{_escape(next_event.get("title","") or "")}</span></li>'
         )
     # R41-P : items « Amendements (commission/séance) » cliquables vers
