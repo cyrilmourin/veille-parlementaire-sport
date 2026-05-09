@@ -12,12 +12,28 @@
     .items  list (les amdt commission ou séance)
     .scope  string ("commission" ou "seance")
 */}}
-{{ $standard_sorts := slice "adopté" "rejeté" "irrecevable" "retiré" "non soutenu" "tombé" "inconnu" }}
+{{/* R41-W (2026-05-09) : liste exhaustive des sorts officiels AN
+     (cycleDeVie.sort + statuts procéduraux). « En traitement » remplace
+     « Inconnu » comme valeur par défaut quand le vote n'a pas encore
+     eu lieu. Tous les boutons restent affichés même à 0 (R41-S). */}}
+{{ $standard_sorts := slice
+  "adopté"
+  "rejeté"
+  "irrecevable"
+  "retiré"
+  "retiré avant publication"
+  "retiré avant séance"
+  "non soutenu"
+  "tombé"
+  "non examiné"
+  "article 40"
+  "en traitement"
+}}
 
 {{/* Sorts effectivement présents (lower-cased) */}}
 {{ $present := slice }}
 {{ range .items }}
-  {{ $s := default "inconnu" .sort | lower }}
+  {{ $s := default "en traitement" .sort | lower }}
   {{ if not (in $present $s) }}{{ $present = $present | append $s }}{{ end }}
 {{ end }}
 
@@ -36,7 +52,7 @@
     {{ $val := . }}
     {{ $count := 0 }}
     {{ range $.items }}
-      {{ if eq (default "inconnu" .sort | lower) $val }}{{ $count = add $count 1 }}{{ end }}
+      {{ if eq (default "en traitement" .sort | lower) $val }}{{ $count = add $count 1 }}{{ end }}
     {{ end }}
     {{/* R41-S : tous les boutons rendus, classe is-empty si compteur 0 */}}
     <button type="button"

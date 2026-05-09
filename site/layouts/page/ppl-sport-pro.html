@@ -118,13 +118,29 @@
     <summary><h2>Amendements en commission ({{ index $d.counts "amdt_commission" }})</h2></summary>
     {{ with $d.amdt_commission }}
     {{ partial "ppl_amdt_filter.html" (dict "items" . "scope" "commission") }}
+    {{/* R41-W : lien de téléchargement de la liasse PDF de commission.
+         Pointe vers la page AN du listing des amendements (avec tri
+         ordre_passage,asc) où l'utilisateur peut générer une liasse PDF
+         à la demande. Plus stable que le PDF direct dont l'URL
+         (hash + date) est temporaire. */}}
+    {{ with $d.meta.url_amdt_liste_an }}
+    <p class="ppl-amdt-liasse">
+      <a class="ppl-page__btn ppl-page__btn--liasse" href="{{ . }}"
+         target="_blank" rel="noopener">
+        ⬇ Télécharger l'ensemble des amendements (liasse PDF)
+      </a>
+      <span class="ppl-amdt-liasse__hint">
+        (page AN — bouton « Créer une liasse »)
+      </span>
+    </p>
+    {{ end }}
     {{ with $d.amdt_commission_by_article }}
       {{ range . }}
       <div class="ppl-article-group" data-scope="commission">
         <h3 class="ppl-article-heading">{{ .article }} <span class="ppl-article-heading__count">({{ len .items }})</span></h3>
         <div class="ppl-amdt-grid" data-amdt-grid="commission">
           {{ range .items }}
-          <div class="ppl-amdt-card" data-sort="{{ default "inconnu" .sort | lower }}" data-article="{{ .article | urlize }}">
+          <div class="ppl-amdt-card" data-sort="{{ default "en traitement" .sort | lower }}" data-article="{{ .article | urlize }}">
             <div class="ppl-amdt-card__head">
               {{ with .auteur }}<span class="ppl-amdt-card__auteur">{{ . }}</span>{{ end }}
               {{ with .groupe }}<span class="ppl-amdt-card__groupe">({{ . }})</span>{{ end }}
@@ -162,7 +178,7 @@
         <h3 class="ppl-article-heading">{{ .article }} <span class="ppl-article-heading__count">({{ len .items }})</span></h3>
         <div class="ppl-amdt-grid" data-amdt-grid="seance">
           {{ range .items }}
-          <div class="ppl-amdt-card" data-sort="{{ default "inconnu" .sort | lower }}" data-article="{{ .article | urlize }}">
+          <div class="ppl-amdt-card" data-sort="{{ default "en traitement" .sort | lower }}" data-article="{{ .article | urlize }}">
             <div class="ppl-amdt-card__head">
               {{ with .auteur }}<span class="ppl-amdt-card__auteur">{{ . }}</span>{{ end }}
               {{ with .groupe }}<span class="ppl-amdt-card__groupe">({{ . }})</span>{{ end }}
@@ -209,7 +225,7 @@
           // Toggle cards
           grids.forEach(function(grid){
             grid.querySelectorAll('.ppl-amdt-card').forEach(function(card){
-              var cardSort = card.getAttribute('data-sort') || 'inconnu';
+              var cardSort = card.getAttribute('data-sort') || 'en traitement';
               var match = (sort === '*' || cardSort === sort);
               card.style.display = match ? '' : 'none';
             });

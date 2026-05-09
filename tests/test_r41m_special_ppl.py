@@ -512,6 +512,104 @@ def test_url_an_dosleg_preservee():
     assert "l17b1560" in payload["dosleg"][0]["url"]
 
 
+# ---------------------------------------------------------------------------
+# R41-W : tri articles (APRÈS après ARTICLE), sort fallback statut
+# ---------------------------------------------------------------------------
+
+
+def test_article_apres_passe_apres_article_principal():
+    """R41-W : ARTICLE 1ER C doit passer AVANT « APRÈS L'ARTICLE 1ER C »."""
+    rows = [
+        _row(category="amendements",
+             title="Amdt n°AC5 · art. APRÈS L'ARTICLE 1ER C, insérer l'article suivant: · sur PPL",
+             raw={"texte_ref": AN_TEXTE_REF}),
+        _row(category="amendements",
+             title="Amdt n°AC10 · art. ARTICLE 1ER C · sur PPL",
+             raw={"texte_ref": AN_TEXTE_REF}),
+    ]
+    payload = build_payload(collect_special_ppl(rows))
+    groups = payload["amdt_commission_by_article"]
+    article_order = [g["article"] for g in groups]
+    # ARTICLE 1ER C en 1er, APRÈS L'ARTICLE 1ER C ensuite
+    assert article_order[0] == "ARTICLE 1ER C"
+    assert article_order[1].startswith("APRÈS L'ARTICLE 1ER C")
+
+
+def test_article_sub_letter_ordering():
+    """R41-W : ARTICLE 1ER → 1ER A → 1ER AA → 1ER B → 1ER C → 2."""
+    rows = [
+        _row(category="amendements", title="Amdt n°AC1 · art. ARTICLE 1ER C · x",
+             raw={"texte_ref": AN_TEXTE_REF}),
+        _row(category="amendements", title="Amdt n°AC2 · art. ARTICLE 1ER A · x",
+             raw={"texte_ref": AN_TEXTE_REF}),
+        _row(category="amendements", title="Amdt n°AC3 · art. ARTICLE 2 · x",
+             raw={"texte_ref": AN_TEXTE_REF}),
+        _row(category="amendements", title="Amdt n°AC4 · art. ARTICLE 1ER · x",
+             raw={"texte_ref": AN_TEXTE_REF}),
+        _row(category="amendements", title="Amdt n°AC5 · art. ARTICLE 1ER B · x",
+             raw={"texte_ref": AN_TEXTE_REF}),
+    ]
+    payload = build_payload(collect_special_ppl(rows))
+    order = [g["article"] for g in payload["amdt_commission_by_article"]]
+    assert order == [
+        "ARTICLE 1ER", "ARTICLE 1ER A", "ARTICLE 1ER B", "ARTICLE 1ER C",
+        "ARTICLE 2",
+    ]
+
+
+def test_article_bis_apres_article_principal():
+    """ARTICLE 2 doit passer avant ARTICLE 2 BIS."""
+    rows = [
+        _row(category="amendements", title="Amdt n°AC1 · art. ARTICLE 2 BIS · x",
+             raw={"texte_ref": AN_TEXTE_REF}),
+        _row(category="amendements", title="Amdt n°AC2 · art. ARTICLE 2 · x",
+             raw={"texte_ref": AN_TEXTE_REF}),
+    ]
+    payload = build_payload(collect_special_ppl(rows))
+    order = [g["article"] for g in payload["amdt_commission_by_article"]]
+    assert order == ["ARTICLE 2", "ARTICLE 2 BIS"]
+
+
+def test_sort_fallback_statut_en_traitement():
+    """R41-W : amdt sans sort → 'En traitement' (depuis statut ou par défaut)."""
+    rows = [
+        _row(category="amendements", title="Amdt n°AC1",
+             raw={"texte_ref": AN_TEXTE_REF, "sort": "", "statut": ""}),
+    ]
+    payload = build_payload(collect_special_ppl(rows))
+    assert payload["amdt_commission"][0]["sort"] == "En traitement"
+
+
+def test_sort_fallback_via_statut_explicite():
+    """R41-W : si raw.sort vide et raw.statut='En traitement' → sort='En traitement'."""
+    rows = [
+        _row(category="amendements", title="Amdt n°AC1",
+             raw={"texte_ref": AN_TEXTE_REF, "sort": "",
+                  "statut": "En traitement"}),
+    ]
+    payload = build_payload(collect_special_ppl(rows))
+    assert payload["amdt_commission"][0]["sort"] == "En traitement"
+
+
+def test_sort_prend_priorite_sur_statut():
+    """R41-W : si raw.sort posé, c'est lui qui sort (pas le statut)."""
+    rows = [
+        _row(category="amendements", title="Amdt n°AC1",
+             raw={"texte_ref": AN_TEXTE_REF, "sort": "Adopté",
+                  "statut": "En traitement"}),
+    ]
+    payload = build_payload(collect_special_ppl(rows))
+    assert payload["amdt_commission"][0]["sort"] == "Adopté"
+
+
+def test_meta_url_amdt_liste_an_expose():
+    """R41-W : URL liste amdt AN exposée pour le bouton liasse."""
+    payload = build_payload(collect_special_ppl([]))
+    url = payload["meta"]["url_amdt_liste_an"]
+    assert "DLR5L17N51732" in url
+    assert "examen=EXANR5L17PO419604B1560P0D1" in url
+
+
 def test_export_end_to_end(tmp_path):
     rows = [
         _row(category="amendements", raw={"texte_ref": AN_TEXTE_REF}),

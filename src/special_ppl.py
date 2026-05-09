@@ -108,6 +108,22 @@ URL_SENAT_DOSSIER = (
     "https://www.senat.fr/dossier-legislatif/ppl24-456.html"
 )
 
+# R41-W (2026-05-09) — Lien vers la page AN de listing des amendements
+# pour la PPL n° 1560 (commission CCE = PO419604, examen EXANR5L17PO419604B1560P0D1).
+# Permet à l'utilisateur de cliquer « Créer une liasse » sur l'AN et
+# télécharger le PDF complet à la demande. Plus stable que le lien PDF
+# direct (qui contient un hash + une date et expire — vérifié 2026-05-09 :
+# le PDF généré pointe vers `/dyn/17/amendements/liasse/<date>/<hash>.pdf`,
+# cache temporaire AN). Trier par ordre_passage,asc côté AN pour matcher
+# notre tri par article.
+URL_AMDT_LISTE_AN = (
+    "https://www.assemblee-nationale.fr/dyn/17/amendements?"
+    "dossier_legislatif=DLR5L17N51732&"
+    "examen=EXANR5L17PO419604B1560P0D1&"
+    "order=ordre_passage,asc&"
+    "page=1"
+)
+
 # R41-T (2026-05-09) : 4 rapporteurs nommés sur la PPL n° 1560
 # (commission affaires culturelles AN, examen 12-13 mai 2026).
 # Triés par ORDRE ALPHABÉTIQUE sur le NOM (demande Cyril). Photos
@@ -323,28 +339,66 @@ def _extract_article_label(title: str) -> str:
 
 
 def _article_sort_key(label: str) -> tuple:
-    """Clé de tri pour ordonner les groupes d'articles : Article 1ER → 2 →
-    2 BIS → 3 ... Articles « additionnels après ... » en queue.
+    """Clé de tri pour ordonner les groupes d'articles dans l'ordre de
+    passage AN.
 
-    Stratégie : extraire le 1er nombre, mettre les "ADDITIONNEL" en haute
-    valeur, "SANS ARTICLE" en toute fin.
+    R41-W (2026-05-09) — Refonte multi-critères pour respecter l'ordre
+    réel d'examen :
+      ARTICLE 1ER  →  APRÈS ART. 1ER  →  ARTICLE 1ER A  →
+      APRÈS 1ER A  →  ARTICLE 1ER AA  →  ARTICLE 1ER B  →
+      APRÈS 1ER B  →  ARTICLE 1ER C  →  APRÈS 1ER C  →
+      ARTICLE 2  →  APRÈS ART. 2  →  ARTICLE 2 BIS  →
+      APRÈS ART. 2 BIS  →  ARTICLE 3 ...
+
+    Stratégie : tuple (num, sub_letter, suffix_bis, position).
+      - num         : numéro d'article (1, 2, 3…)
+      - sub_letter  : lettre de sous-article (A, AA, B, C…) ou "" pour
+                      l'article principal (qui passe avant les sous-arts)
+      - suffix_bis  : 0 = base, 1 = bis, 2 = ter, 3 = quater, 4 = quinquies
+      - position    : 0 = avant, 1 = sur l'article, 2 = après
     """
     if not label:
-        return (99999, 9, "")
+        return (99999, "", 0, 9, "")
     up = label.upper()
     if "SANS ARTICLE" in up or label == "Sans article":
-        return (99999, 9, label)
-    is_additional = "ADDITIONNEL" in up
+        return (99999, "", 0, 9, label)
+
+    # Numéro principal (1, 2, 3…)
     m = re.search(r"(\d+)", label)
     num = int(m.group(1)) if m else 9999
-    # Bis/Ter/Quater pondèrent le tri secondaire
-    suffix = 0
-    if "BIS" in up: suffix = 1
-    elif "TER" in up: suffix = 2
-    elif "QUATER" in up: suffix = 3
-    elif "QUINQUIES" in up: suffix = 4
-    additional_weight = 1 if is_additional else 0
-    return (num, suffix + 5 * additional_weight, label)
+
+    # Suffixe latin (BIS/TER/QUATER/QUINQUIES) — détecté avant la
+    # sub-letter pour ne pas le confondre.
+    suffix_weight = 0
+    if "QUINQUIES" in up:
+        suffix_weight = 4
+    elif "QUATER" in up:
+        suffix_weight = 3
+    elif "TER" in up:
+        suffix_weight = 2
+    elif "BIS" in up:
+        suffix_weight = 1
+
+    # Sub-letter après le numéro (ex. « 1ER A » → A, « 1ER AA » → AA,
+    # « 2 C » → C). Filtrer si c'est en réalité un suffixe latin.
+    sub_letter = ""
+    sub_m = re.search(
+        r"\d+\s*(?:ER|ÈRE)?\s+([A-Z]{1,3})\b", label, re.IGNORECASE
+    )
+    if sub_m:
+        candidate = sub_m.group(1).upper()
+        if candidate not in ("BIS", "TER", "QUATER", "QUINQUIES"):
+            sub_letter = candidate
+
+    # Position avant / sur / après l'article
+    if "AVANT" in up:
+        position = 0
+    elif "APRÈS" in up or "APRES" in up:
+        position = 2
+    else:
+        position = 1
+
+    return (num, sub_letter, suffix_weight, position, label)
 
 
 def _group_amdt_by_article(amdt_payload: list[dict]) -> list[dict]:
@@ -446,6 +500,19 @@ def _row_to_payload(r: dict, max_title: int = 220) -> dict:
     raw = r.get("raw") or {}
     if not isinstance(raw, dict):
         raw = {}
+    # R41-W (2026-05-09) : cascade sort > sous_etat > etat > statut.
+    # Le `sort` officiel AN n'est posé qu'après le vote (Adopté, Rejeté,
+    # Irrecevable, Retiré, Retiré avant publication, Tombé, Non soutenu,
+    # Non examiné, Article 40…). Avant le vote, l'item AN expose un
+    # « statut » procédural (« En traitement », « À discuter »…). On
+    # remonte ce statut comme sort visible — par défaut « En traitement »
+    # qui se substitue à l'ancien « Inconnu ».
+    sort_value = (
+        raw.get("sort") or raw.get("sous_etat")
+        or raw.get("etat") or raw.get("statut") or ""
+    ).strip()
+    if not sort_value and (r.get("category") or "") == "amendements":
+        sort_value = "En traitement"
     return {
         "title": (r.get("title") or "")[:max_title],
         # R41-T : meeting_kind calculé AVANT _safe_url qui réécrit l'URL
@@ -459,9 +526,9 @@ def _row_to_payload(r: dict, max_title: int = 220) -> dict:
         "auteur": raw.get("auteur") or "",
         "groupe": raw.get("groupe") or "",
         "status_label": raw.get("status_label") or raw.get("status") or "",
-        # R41-P : sort (« adopté », « rejeté », « irrecevable », « retiré »,
-        # « tombé »…) exposé pour le filtre UI sur la page dédiée.
-        "sort": raw.get("sort") or "",
+        # R41-P/W : sort résultat-vote ou statut procédural (cf. cascade
+        # ci-dessus). Exposé pour le filtre UI sur la page dédiée.
+        "sort": sort_value,
         "stage": raw.get("stage") or "",
         "step": raw.get("step") or "",
         # R41-P : extrait du corps (max 400 chars), sans le titre.
@@ -493,6 +560,7 @@ def build_payload(buckets: dict) -> dict:
             "url_an_texte": URL_AN_TEXTE,
             "url_an_dossier": URL_AN_DOSSIER,
             "url_senat_dossier": URL_SENAT_DOSSIER,
+            "url_amdt_liste_an": URL_AMDT_LISTE_AN,
             # R41-T : 4 rapporteurs nommés sur la PPL — exposés au layout
             # Hugo pour le module « Rapporteurs » à droite des étapes.
             "rapporteurs": list(RAPPORTEURS),

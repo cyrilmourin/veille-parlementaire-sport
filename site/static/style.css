@@ -1700,6 +1700,23 @@ a:hover { text-decoration: underline; }
   border-bottom: 0;
 }
 
+/* R41-W (2026-05-09) — Lien « Spécial PPL Sport pro » dans le menu :
+   accent vert (sl-green) pour signaler une page temporaire dédiée à un
+   suivi spécifique. Hover rouge (sl-red) comme les autres liens. */
+.nav a.nav-special {
+  background: var(--sl-green);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 1;
+  font-weight: 700;
+}
+.nav a.nav-special:hover {
+  background: var(--sl-red);
+  color: #fff;
+  border-bottom: 0;
+}
+
 /* R13-J (2026-04-21) : agenda — chambre + titre inline sur la même ligne
    (demande Cyril patch 5).
    R19-E (2026-04-23) : on abandonne flex pour un flux inline. Avec flex +
@@ -2173,6 +2190,31 @@ a:hover { text-decoration: underline; }
   color: #fff;
 }
 .ppl-page__btn--primary:hover { background: var(--sl-red); border-color: var(--sl-red); }
+
+/* R41-W (2026-05-09) : bouton « Télécharger la liasse PDF » */
+.ppl-amdt-liasse {
+  margin: 14px 0 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.ppl-page__btn--liasse {
+  background: var(--sl-green);
+  color: #fff;
+  border-color: var(--sl-green);
+  font-weight: 700;
+}
+.ppl-page__btn--liasse:hover {
+  background: var(--sl-red);
+  color: #fff;
+  border-color: var(--sl-red);
+}
+.ppl-amdt-liasse__hint {
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
 
 .ppl-page__section { margin-top: 28px; }
 .ppl-page__section h2 {
