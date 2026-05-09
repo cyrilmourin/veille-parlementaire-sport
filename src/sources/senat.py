@@ -484,8 +484,17 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
                 title=f"Rapport n°{uid} — {titre}"[:220],
                 url=(_pick(r, "URL", "url", "lien")
                      or f"https://www.senat.fr/rap/{uid}.html"),
-                published_at=parse_iso(_pick(r, "Date de dépôt", "date",
-                                              "datePublication", "date_publication")),
+                # R41-AK (2026-05-09) : `_parse_date_any` au lieu de
+                # `parse_iso` — le CSV Sénat expose la « Date de dépôt » au
+                # format DD/MM/YYYY (ex. « 24/07/1959 ») que parse_iso
+                # rejette → toutes les dates étaient None → 100% des
+                # rapports éliminés par filter_window. Bug latent depuis
+                # R28, masqué par l'absence de Brotli (Brotli fix R41-AJ a
+                # rendu les fetch fonctionnels et révélé ce bug aval).
+                published_at=_parse_date_any(_pick(
+                    r, "Date de dépôt", "date",
+                    "datePublication", "date_publication",
+                )),
                 summary=extras[:2000], raw=r,
             )
 
