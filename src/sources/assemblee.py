@@ -946,8 +946,15 @@ def _normalize_amendement(obj, src, cat):
     if article:
         title_bits.append(f"· art. {article}")
     if dossier_titre:
-        # Tronqué pour ne pas exploser title[:220]
-        title_bits.append(f"· sur « {dossier_titre[:80]} »")
+        # Tronqué pour ne pas exploser title[:220]. R41-AI (2026-05-09) :
+        # ellipsis « … » ajoutée quand le titre dossier est coupé (au lieu
+        # de simple `[:80]` qui produisait une fin abrupte type
+        # « organisation, à la gestion et au financement du » sans
+        # signal de coupe — demande Cyril).
+        dossier_disp = dossier_titre[:80]
+        if len(dossier_titre) > 80:
+            dossier_disp = dossier_disp.rstrip() + "…"
+        title_bits.append(f"· sur « {dossier_disp} »")
     title = " ".join(title_bits)[:220]
 
     # URL : on préfère le UID technique (unique) au numéro court (unique
