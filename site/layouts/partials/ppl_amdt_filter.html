@@ -1,35 +1,50 @@
 {{/* R41-P (2026-05-08) — Widget de filtre par sort sur les amendements
     de la page dédiée PPL.
 
-  Construit dynamiquement la liste des sorts présents (« adopté »,
-  « rejeté », « irrecevable », « retiré », « tombé », « inconnu »…),
-  affiche un bouton par valeur + « Tous ». Le filtrage est géré par le
-  script JS dans la même page (data-amdt-grid + data-sort).
+  R41-S (2026-05-09) — Affiche TOUJOURS la liste standard des sorts
+  attendus (adopté / rejeté / irrecevable / retiré / non soutenu /
+  tombé / inconnu) même si compteur = 0 (demande Cyril : permet à
+  l'utilisateur de voir l'éventail des filtres possibles avant que les
+  votes commission/séance ne soient remontés). Les sorts atypiques
+  effectivement présents en plus sont ajoutés en queue.
 
   Args :
     .items  list (les amdt commission ou séance)
     .scope  string ("commission" ou "seance")
 */}}
-{{ $sorts := slice }}
+{{ $standard_sorts := slice "adopté" "rejeté" "irrecevable" "retiré" "non soutenu" "tombé" "inconnu" }}
+
+{{/* Sorts effectivement présents (lower-cased) */}}
+{{ $present := slice }}
 {{ range .items }}
   {{ $s := default "inconnu" .sort | lower }}
-  {{ if not (in $sorts $s) }}{{ $sorts = $sorts | append $s }}{{ end }}
+  {{ if not (in $present $s) }}{{ $present = $present | append $s }}{{ end }}
 {{ end }}
-{{ $sorts = sort $sorts }}
-{{ if gt (len $sorts) 1 }}
+
+{{/* Union : standards puis sorts atypiques en queue */}}
+{{ $all := $standard_sorts }}
+{{ range $present }}
+  {{ if not (in $all .) }}{{ $all = $all | append . }}{{ end }}
+{{ end }}
+
 <div class="ppl-amdt-filter" data-amdt-filter="{{ .scope }}">
   <span class="ppl-amdt-filter__label">Filtrer&nbsp;:</span>
   <button type="button" class="ppl-amdt-filter__btn is-active" data-sort="*">
     Tous ({{ len .items }})
   </button>
-  {{ range $sorts }}
+  {{ range $all }}
     {{ $val := . }}
     {{ $count := 0 }}
     {{ range $.items }}
       {{ if eq (default "inconnu" .sort | lower) $val }}{{ $count = add $count 1 }}{{ end }}
     {{ end }}
-    <button type="button" class="ppl-amdt-filter__btn"
-            data-sort="{{ $val }}">{{ humanize $val }} ({{ $count }})</button>
+    {{/* R41-S : tous les boutons rendus, classe is-empty si compteur 0 */}}
+    <button type="button"
+            class="ppl-amdt-filter__btn{{ if eq $count 0 }} is-empty{{ end }}"
+            data-sort="{{ $val }}"
+            {{ if eq $count 0 }}aria-disabled="true"{{ end }}>
+      {{ title $val }} ({{ $count }})
+    </button>
   {{ end }}
 </div>
-{{ end }}
+

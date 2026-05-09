@@ -2296,6 +2296,16 @@ details.ppl-fold[open] > p {
   color: #fff;
   border-color: var(--accent);
 }
+/* R41-S : boutons « vides » (compteur 0) — affichés grisés mais
+   toujours présents pour montrer l'éventail de filtres possibles. */
+.ppl-amdt-filter__btn.is-empty {
+  opacity: .5;
+  cursor: default;
+}
+.ppl-amdt-filter__btn.is-empty:hover {
+  border-color: var(--line);
+  color: var(--fg);
+}
 
 /* R41-Q : sub-heading par article (page dédiée). */
 .ppl-article-group { margin: 18px 0 10px; }
