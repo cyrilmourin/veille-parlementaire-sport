@@ -610,7 +610,69 @@ def test_meta_url_amdt_liste_an_expose():
     assert "examen=EXANR5L17PO419604B1560P0D1" in url
 
 
-def test_export_end_to_end(tmp_path):
+# ---------------------------------------------------------------------------
+# R41-X : extraction articles texte AN
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_an_text_articles_offline(monkeypatch):
+    """R41-X : fetch articles AN — test offline avec HTML stub."""
+    from src.special_ppl import fetch_an_text_articles
+
+    stub_html = (
+        '<html><body>'
+        '<p class="assnat9ArticleNum">Article 1<span>er</span> A (nouveau)</p>'
+        '<p class="assnatLoiTexte">Le code du sport est ainsi modifié.</p>'
+        '<p class="assnatLoiTexte">Un alinéa est inséré.</p>'
+        '<p class="assnat9ArticleNum">Article 2 bis</p>'
+        '<p class="assnatLoiTexte">Le présent article concerne les ligues.</p>'
+        '</body></html>'
+    )
+
+    class _StubResp:
+        text = stub_html
+        def raise_for_status(self): pass
+
+    class _StubClient:
+        def __init__(self, *a, **kw): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def get(self, url): return _StubResp()
+
+    import httpx
+    monkeypatch.setattr(httpx, "Client", _StubClient)
+    arts = fetch_an_text_articles()
+    # Normalisation labels : « 1 er A » → « 1ER A », parenthèses strippées
+    assert "ARTICLE 1ER A" in arts
+    assert "ARTICLE 2 BIS" in arts
+    # Les paragraphes de l'article 1ER A sont concaténés (2 <p>)
+    assert "Le code du sport" in arts["ARTICLE 1ER A"]
+    assert "Un alinéa" in arts["ARTICLE 1ER A"]
+    # Le 2 bis ne contient pas le texte de l'article 1ER A
+    assert "Le code du sport" not in arts["ARTICLE 2 BIS"]
+    assert "ligues" in arts["ARTICLE 2 BIS"]
+
+
+def test_fetch_an_text_articles_resilient_au_reseau(monkeypatch):
+    """R41-X : si fetch échoue, retourne {} (pas d'exception)."""
+    from src.special_ppl import fetch_an_text_articles
+
+    class _ErrClient:
+        def __init__(self, *a, **kw): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def get(self, url): raise RuntimeError("network down")
+
+    import httpx
+    monkeypatch.setattr(httpx, "Client", _ErrClient)
+    assert fetch_an_text_articles() == {}
+
+
+def test_export_end_to_end(tmp_path, monkeypatch):
+    # R41-X : on neutralise l'appel réseau fetch_an_text_articles dans
+    # le test e2e (offline) pour ne pas dépendre du site AN.
+    from src import special_ppl as mod
+    monkeypatch.setattr(mod, "fetch_an_text_articles", lambda: {})
     rows = [
         _row(category="amendements", raw={"texte_ref": AN_TEXTE_REF}),
         _row(category="agenda", title="Examen PPL (n° 1560)"),

@@ -97,6 +97,14 @@ URL_AN_TEXTE = (
     "https://www.assemblee-nationale.fr/dyn/17/textes/"
     "l17b1560_proposition-loi"
 )
+# R41-X (2026-05-09) : URL « raw » de la PPL pour extraction des
+# articles. C'est l'iframe HTML server-rendered contenant le texte
+# complet (cf. assnat9ArticleNum / assnatLoiTexte). Plus stable et
+# plus rapide à parser que la page wrapper qui charge l'iframe via JS.
+URL_AN_TEXTE_RAW = (
+    "https://www.assemblee-nationale.fr/dyn/docs/PIONANR5L17B1560.raw"
+)
+
 # R41-T (2026-05-09) : URL dossier législatif AN. Format slug stable
 # `<sujet-mots-cles>` derrière `/dyn/17/dossiers/`. Vérifié 200 OK le
 # 2026-05-09. C'est la page index officielle du dossier sur le site AN.
@@ -626,6 +634,84 @@ def write_page_stub(content_dir: Path) -> None:
     )
 
 
+def fetch_an_text_articles(timeout: float = 20.0) -> dict[str, str]:
+    """R41-X (2026-05-09) — Fetch le texte de la PPL n° 1560 et le
+    découpe par article. Retourne `{label_normalisé: html_du_corps}`.
+
+    Découpage : `<p class="assnat9ArticleNum">` = en-tête d'article ;
+    paragraphes `<p class="assnatLoiTexte">` qui suivent jusqu'au prochain
+    en-tête = corps de l'article.
+
+    Le label est normalisé en majuscules sans parenthèses (« Article 1er
+    AA (nouveau) » → « ARTICLE 1ER AA ») pour matcher `_extract_article_label`
+    appliqué aux titres d'amendements.
+
+    Retourne un dict vide en cas d'erreur réseau / parsing.
+    """
+    try:
+        import httpx
+        from bs4 import BeautifulSoup
+        with httpx.Client(timeout=timeout, follow_redirects=True) as cli:
+            resp = cli.get(URL_AN_TEXTE_RAW)
+            resp.raise_for_status()
+            html = resp.text
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            "R41-X : fetch articles AN échoué (%s)", e
+        )
+        return {}
+
+    soup = BeautifulSoup(html, "lxml")
+    out: dict[str, str] = {}
+    headers = soup.find_all("p", class_="assnat9ArticleNum")
+    for hdr in headers:
+        label_raw = hdr.get_text(" ", strip=True)
+        # « Article 1er AA (nouveau) » → « ARTICLE 1ER AA »
+        label_clean = re.sub(r"\([^)]*\)", "", label_raw).strip()
+        # « Article 1 er AA » → « Article 1er AA » (le « er » est dans
+        # un <span>/<sup> séparé, get_text le détache avec un espace).
+        label_clean = re.sub(
+            r"(\d+)\s+(ER|ERE|ÈRE)\b", r"\1\2",
+            label_clean, flags=re.IGNORECASE,
+        )
+        label_clean = re.sub(r"\s+", " ", label_clean).strip()
+        label_norm = label_clean.upper()
+        if not label_norm.startswith("ARTICLE"):
+            continue
+        # Collecte des paragraphes assnatLoiTexte qui suivent jusqu'au
+        # prochain assnat9ArticleNum.
+        body_parts: list[str] = []
+        for sib in hdr.find_next_siblings():
+            cls = sib.get("class") or []
+            if "assnat9ArticleNum" in cls:
+                break
+            if "assnatLoiTexte" in cls:
+                # Texte propre, balises retirées sauf <em> et <i> pour
+                # l'italique du « bis » et autres mises en forme légères.
+                txt = sib.get_text(" ", strip=True)
+                if txt:
+                    body_parts.append(f"<p>{txt}</p>")
+        if body_parts:
+            out[label_norm] = "\n".join(body_parts)
+    return out
+
+
+def write_articles_data_file(site_data_dir: Path,
+                              articles: dict[str, str]) -> None:
+    """Écrit `site/data/special_ppl_articles.json` consommé par le layout
+    Hugo via `site.Data.special_ppl_articles`."""
+    site_data_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "fetched_at": datetime.utcnow().isoformat(timespec="seconds"),
+        "articles": articles,
+    }
+    (site_data_dir / "special_ppl_articles.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
 def export(rows: list[dict], site_root: Path) -> dict:
     """Point d'entrée appelé depuis `site_export.export()`. Génère le
     fichier de données + la page stub. Retourne le payload pour debug."""
@@ -634,4 +720,10 @@ def export(rows: list[dict], site_root: Path) -> dict:
     site_root = Path(site_root)
     write_data_file(site_root / "data", payload)
     write_page_stub(site_root / "content")
+    # R41-X : fetch + découpage du texte de la PPL en articles. Best-effort
+    # (réseau, timeout 20s). Si échec, le fichier articles n'est pas écrit
+    # et le layout retombe sur l'absence d'articles → boutons inactifs.
+    articles = fetch_an_text_articles()
+    if articles:
+        write_articles_data_file(site_root / "data", articles)
     return payload

@@ -137,7 +137,7 @@
     {{ with $d.amdt_commission_by_article }}
       {{ range . }}
       <div class="ppl-article-group" data-scope="commission">
-        <h3 class="ppl-article-heading">{{ .article }} <span class="ppl-article-heading__count">({{ len .items }})</span></h3>
+        {{ partial "ppl_article_heading.html" (dict "article" .article "count" (len .items) "articles_data" site.Data.special_ppl_articles) }}
         <div class="ppl-amdt-grid" data-amdt-grid="commission">
           {{ range .items }}
           <div class="ppl-amdt-card" data-sort="{{ default "en traitement" .sort | lower }}" data-article="{{ .article | urlize }}">
@@ -175,7 +175,7 @@
     {{ with $d.amdt_seance_by_article }}
       {{ range . }}
       <div class="ppl-article-group" data-scope="seance">
-        <h3 class="ppl-article-heading">{{ .article }} <span class="ppl-article-heading__count">({{ len .items }})</span></h3>
+        {{ partial "ppl_article_heading.html" (dict "article" .article "count" (len .items) "articles_data" site.Data.special_ppl_articles) }}
         <div class="ppl-amdt-grid" data-amdt-grid="seance">
           {{ range .items }}
           <div class="ppl-amdt-card" data-sort="{{ default "en traitement" .sort | lower }}" data-article="{{ .article | urlize }}">
@@ -204,6 +204,29 @@
     <p><em>Aucun amendement en séance pour l'instant.</em></p>
     {{ end }}
   </details>
+
+  {{/* ---------- JS : toggle texte d'article au clic du label ---------- */}}
+  {{/* R41-X : un clic sur le numéro d'article (« ARTICLE 1ER A ») toggle
+       l'affichage du texte de l'article correspondant juste en dessous.
+       Pas de sélection d'un seul article ouvert à la fois (libre) — chaque
+       toggle agit indépendamment. */}}
+  <script>
+  (function(){
+    document.querySelectorAll('.ppl-article-toggle').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var key = btn.getAttribute('data-article-key');
+        var target = document.querySelector(
+          '.ppl-article-text[data-article-text="'+key+'"]'
+        );
+        if(!target) return;
+        var open = !target.hidden;
+        target.hidden = open;
+        btn.setAttribute('aria-expanded', String(!open));
+        btn.classList.toggle('is-open', !open);
+      });
+    });
+  })();
+  </script>
 
   {{/* ---------- JS : filtrage des amendements par sort ---------- */}}
   {{/* R41-P : filtre par sort. R41-Q : adapté pour parcourir TOUTES les

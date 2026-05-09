@@ -1,0 +1,54 @@
+{{/* R41-X (2026-05-09) — En-tête d'article amendable sur la page
+     Spécial PPL. Si le texte de l'article a été récupéré côté pipeline
+     (site.Data.special_ppl_articles.articles[<label>]) ET que ce n'est
+     PAS un article additionnel (« APRÈS L'ARTICLE… » / « AVANT… »), le
+     label est rendu en bouton cliquable qui déroule le texte en dessous.
+
+  Args :
+    .article        string — label normalisé (ex. « ARTICLE 1ER A »)
+    .count          int    — nombre d'amendements sur cet article
+    .articles_data  obj    — site.Data.special_ppl_articles (peut être nil)
+*/}}
+{{ $key := .article }}
+{{ $count := .count }}
+{{ $up := upper $key }}
+{{ $is_additional := or (in $up "APRÈS") (or (in $up "APRES") (in $up "AVANT")) }}
+{{ $articles := dict }}
+{{ with .articles_data }}
+  {{ $articles = .articles | default dict }}
+{{ end }}
+{{ $text := index $articles $key }}
+{{ $has_text := and (not $is_additional) (gt (len $text) 0) }}
+{{ $slug := $key | urlize }}
+
+<h3 class="ppl-article-heading">
+  {{ if $has_text }}
+    <button type="button" class="ppl-article-toggle"
+            data-article-key="{{ $slug }}"
+            aria-expanded="false"
+            aria-controls="ppl-article-text-{{ $slug }}"
+            title="Cliquez pour afficher / masquer le texte de l'article">
+      <span class="ppl-article-toggle__label">{{ $key }}</span>
+      <span class="ppl-article-toggle__icon" aria-hidden="true">▾</span>
+    </button>
+  {{ else }}
+    <span class="ppl-article-label">{{ $key }}</span>
+  {{ end }}
+  <span class="ppl-article-heading__count">({{ $count }})</span>
+</h3>
+{{ if $has_text }}
+<div class="ppl-article-text"
+     id="ppl-article-text-{{ $slug }}"
+     data-article-text="{{ $slug }}"
+     hidden>
+  <div class="ppl-article-text__inner">
+    <div class="ppl-article-text__src">
+      Texte issu de la
+      <a href="{{ $.articles_data.url_an_texte | default "https://www.assemblee-nationale.fr/dyn/17/textes/l17b1560_proposition-loi" }}"
+         target="_blank" rel="noopener">PPL n° 1560</a>
+      (version examen commission).
+    </div>
+    {{ $text | safeHTML }}
+  </div>
+</div>
+{{ end }}
