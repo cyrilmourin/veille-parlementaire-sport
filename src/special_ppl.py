@@ -108,9 +108,11 @@ URL_AN_TEXTE_RAW = (
 # R41-T (2026-05-09) : URL dossier législatif AN. Format slug stable
 # `<sujet-mots-cles>` derrière `/dyn/17/dossiers/`. Vérifié 200 OK le
 # 2026-05-09. C'est la page index officielle du dossier sur le site AN.
+# R41-AB (2026-05-09) : URL canonique par dossier_id `DLR5L17N51732`
+# (vérifiée 200 OK le 2026-05-09). L'ancien slug deviné
+# `sport-professionnel-organisation-gestion-financement` rendait 404.
 URL_AN_DOSSIER = (
-    "https://www.assemblee-nationale.fr/dyn/17/dossiers/"
-    "sport-professionnel-organisation-gestion-financement"
+    "https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51732"
 )
 URL_SENAT_DOSSIER = (
     "https://www.senat.fr/dossier-legislatif/ppl24-456.html"
@@ -146,8 +148,12 @@ RAPPORTEURS = [
         "pa_id": "PA720362",
     },
     {
+        # R41-AB : PA870009 = Lionel Duparay (DR), pas Royer-Perreault
+        # (l'agent d'identification avait extrapolé un nom). Vérifié
+        # 2026-05-09 via cache AMO refresh : civ=M. prenom=Lionel
+        # nom=Duparay (groupe DR — Droite Républicaine).
         "prenom": "Lionel",
-        "nom": "Royer-Perreault",
+        "nom": "Duparay",
         "groupe": "DR",
         "fiche_url": "https://www.assemblee-nationale.fr/dyn/deputes/PA870009",
         "photo_url": "https://www2.assemblee-nationale.fr/static/tribun/17/photos/carre/870009.jpg",

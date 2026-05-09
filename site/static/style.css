@@ -1966,16 +1966,21 @@ a:hover { text-decoration: underline; }
   flex-direction: column;
   gap: 6px;
 }
-/* R41-V/AA (2026-05-09) : padding UNIFORME sur tous les items blancs
-   (next + link + cta). Le padding est porté par l'élément qui contient
-   le contenu textuel directement — `<li>` pour --next, `<a>` pour --link
-   et --cta. Tous les .lbl démarrent au même offset depuis le bord gauche
-   du <ul> conteneur. Pas de margin-left sur les .lbl/.val. */
-.special-ppl-card__item {
+/* R41-V/AA/AB (2026-05-09) : padding UNIFORME sur tous les items blancs
+   (next + link + cta).
+   IMPORTANT — sélecteur préfixé `.home .content .special-ppl-card …`
+   (spécificité 0,4,1) pour BATTRE la règle globale
+   `.home .content ul li { padding: 6px 0 7px }` (0,3,0) qui écrasait
+   nos paddings dans le contexte de l'accueil et faisait coller le texte
+   du `--next` au bord gauche (alors que `--link` avait son padding
+   réel sur le `<a>` enfant, ce qui donnait l'effet de désalignement). */
+.home .content .special-ppl-card .special-ppl-card__item,
+.special-ppl-card .special-ppl-card__item {
   background: #fff;
   color: var(--fg);
   border-radius: 6px;
   padding: 8px 12px;
+  border-bottom: 0;       /* annule la bordure héritée de .home .content ul li */
   font-size: 13px;
   display: flex;
   flex-direction: column;
@@ -2046,7 +2051,12 @@ a:hover { text-decoration: underline; }
   background: transparent;
   padding: 4px 12px 0;
 }
-.special-ppl-card__item--cta > a {
+/* R41-AB (2026-05-09) : sélecteur remonté en spécificité (0,4,1) pour
+   battre `.home .content ul li a { color: sl-blue }` (0,3,0) qui passait
+   le lien en bleu sur fond bleu (invisible). Cyril : blanc en normal,
+   rouge au survol. */
+.home .content .special-ppl-card .special-ppl-card__item--cta > a,
+.special-ppl-card .special-ppl-card__item--cta > a {
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -2054,8 +2064,9 @@ a:hover { text-decoration: underline; }
   display: inline-block;
   padding: 4px 0;
 }
-.special-ppl-card__item--cta > a:hover {
-  color: #fff;
+.home .content .special-ppl-card .special-ppl-card__item--cta > a:hover,
+.special-ppl-card .special-ppl-card__item--cta > a:hover {
+  color: var(--sl-red);
   text-decoration: underline;
 }
 /* R41-P : items cliquables (Amendements commission/séance → page dédiée).

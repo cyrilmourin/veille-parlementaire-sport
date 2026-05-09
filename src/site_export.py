@@ -2794,6 +2794,15 @@ def _boost_dosleg_with_agenda(rows: list[dict]) -> None:
                 raw["chamber_original"] = d.get("chamber") or ""
                 d["url"] = new_url
                 d["chamber"] = "AN"
+                # R41-AB (2026-05-09) : un dossier issu du CSV Sénat
+                # rerouté vers l'AN n'avait pas de status_label exploitable
+                # (le CSV expose `État du dossier` côté Sénat seulement,
+                # ex. « Première lecture (Sénat) » qui ne reflète plus
+                # l'état réel). On pose un statut générique « Première
+                # lecture AN » dès qu'on bascule — la commission AN du
+                # 12-13/05 puis la plénière du 18/05 confirment ce stade.
+                if not raw.get("status_label"):
+                    raw["status_label"] = "Première lecture AN"
                 rerouted_an += 1
     if boosted:
         import logging

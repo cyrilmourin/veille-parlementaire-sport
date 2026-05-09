@@ -67,7 +67,10 @@ acteur:
   # forme étendue qui est sport-univoque.
   - Comité international olympique
   - Comite international olympique
-  - IPC                         # Comité paralympique international
+  # IPC retiré (R41-AB, 2026-05-09) — trop générique, déclenchait des faux
+  # positifs sur des questions parlementaires hors-sport (sigles
+  # économiques, médicaux, comptables). On garde « Comité paralympique
+  # international » en forme longue (acteur, ligne 8 plus bas).
   - ARJEL                       # ancien ANJ — pour archives
   - Opérateurs sport
   - Operateurs sport
