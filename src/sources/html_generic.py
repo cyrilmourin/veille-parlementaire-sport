@@ -500,9 +500,17 @@ def fetch_source(src: dict) -> list[Item]:
     seen: set[str] = set()
 
     # On cible les liens d'articles : <article> <a>, <h2> <a>, liens de type /presse/..., /actualites/...
+    # R41-AD (2026-05-09) : ajout des sélecteurs Drupal Views (cas ANS
+    # agencedusport.fr — les actualités sont dans `div.views-row` avec
+    # le titre dans `div.views-field-title > a`). Couvre aussi les autres
+    # sites Drupal de notre veille qui exposent des Views.
     selectors = [
         "article a", "h2 a", "h3 a",
         "a.fr-card__link", "a.news-item__link",
+        # Drupal Views (R41-AD)
+        "div.views-field-title a", "div.views-field-view-node a",
+        "div.views-row > a", "div.views-row h2 a", "div.views-row h3 a",
+        # Patterns d'URL génériques
         "a[href*='presse']", "a[href*='actualite']", "a[href*='communique']",
         "a[href*='discours']", "a[href*='agenda']",
     ]
