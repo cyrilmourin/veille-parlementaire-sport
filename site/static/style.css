@@ -2044,10 +2044,13 @@ a:hover { text-decoration: underline; }
   line-height: 1.35;
 }
 /* R41-T : lien explicite « Voir tous les amendements » sous les compteurs.
-   R41-V/AA : padding ALIGNÉ sur le même 12px gauche que --next et --link,
-   pour que le texte « → Voir tous les amendements » démarre exactement
-   au même x que « Prochaine échéance » et « Amendements (Commission) ». */
-.special-ppl-card__item--cta {
+   R41-AE (2026-05-09) : sélecteur préfixé `.home .content .special-ppl-card`
+   (spécif 0,4,1) — sinon la règle de base `.special-ppl-card__item`
+   (préfixée elle aussi pour la même raison) écrase `background: transparent`
+   et impose `#fff`. Cyril : le CTA doit être sur fond bleu (carte) pas
+   blanc. Idem pour le padding qui doit annuler le 8/12 du --item. */
+.home .content .special-ppl-card .special-ppl-card__item--cta,
+.special-ppl-card .special-ppl-card__item--cta {
   background: transparent;
   padding: 4px 12px 0;
 }
@@ -2070,11 +2073,17 @@ a:hover { text-decoration: underline; }
   text-decoration: underline;
 }
 /* R41-P : items cliquables (Amendements commission/séance → page dédiée).
-   R41-V/AA : padding 12px sur le <a> (le <li> a padding 0 dans ce cas
-   car la zone cliquable est le <a> entier). 12px = même x que --next
-   et --cta → labels alignés. */
-.special-ppl-card__item--link { padding: 0; }
-.special-ppl-card__item--link > a {
+   R41-AE (2026-05-09) : sélecteur préfixé pour battre la règle de base
+   `.special-ppl-card__item { padding: 8px 12px }` qui ajoutait 12px de
+   padding sur le `<li>`, doublant avec le 12px du `<a>` → décalage +12px
+   par rapport à --next. La règle est `padding: 0` sur le `<li>` et le
+   padding visuel uniquement sur le `<a>` enfant. */
+.home .content .special-ppl-card .special-ppl-card__item--link,
+.special-ppl-card .special-ppl-card__item--link {
+  padding: 0;
+}
+.home .content .special-ppl-card .special-ppl-card__item--link > a,
+.special-ppl-card .special-ppl-card__item--link > a {
   display: flex;
   flex-direction: column;
   gap: 2px;
