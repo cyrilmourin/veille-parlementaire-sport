@@ -400,6 +400,55 @@ def test_payload_amdt_seance_by_article_existe():
     assert len(payload["amdt_seance_by_article"]) == 1
 
 
+# ---------------------------------------------------------------------------
+# R41-R : URL Sénat malformée → bascule vers URL canonique
+# ---------------------------------------------------------------------------
+
+
+def test_url_senat_malformee_remplacee_par_canonique():
+    """R41-R : URL Sénat dosleg non-canonique (ex. 's92930456' qui
+    renvoie vers texte épargne) bascule vers URL_SENAT_DOSSIER."""
+    from src.special_ppl import URL_SENAT_DOSSIER
+    rows = [_row(
+        category="dossiers_legislatifs",
+        title=("Proposition de loi relative à l'organisation, à la "
+               "gestion et au financement du sport professionnel"),
+        chamber="Senat",
+        url="http://www.senat.fr/dossier-legislatif/s92930456.html",
+    )]
+    payload = build_payload(collect_special_ppl(rows))
+    assert payload["dosleg"][0]["url"] == URL_SENAT_DOSSIER
+
+
+def test_url_senat_canonique_preservee():
+    """L'URL Sénat dosleg au format canonique (pplXX-YYY.html) est
+    préservée."""
+    rows = [_row(
+        category="dossiers_legislatifs",
+        title=("Proposition de loi relative à l'organisation, à la "
+               "gestion et au financement du sport professionnel"),
+        chamber="Senat",
+        url="https://www.senat.fr/dossier-legislatif/ppl24-456.html",
+    )]
+    payload = build_payload(collect_special_ppl(rows))
+    assert "ppl24-456" in payload["dosleg"][0]["url"]
+    # Pas de bascule erronée
+    assert payload["dosleg"][0]["url"].endswith("ppl24-456.html")
+
+
+def test_url_an_dosleg_preservee():
+    """L'URL AN dosleg (rerouté par R41-K) est préservée telle quelle."""
+    rows = [_row(
+        category="dossiers_legislatifs",
+        title=("Proposition de loi relative à l'organisation, à la "
+               "gestion et au financement du sport professionnel"),
+        chamber="AN",
+        url="https://www.assemblee-nationale.fr/dyn/17/textes/l17b1560_proposition-loi",
+    )]
+    payload = build_payload(collect_special_ppl(rows))
+    assert "l17b1560" in payload["dosleg"][0]["url"]
+
+
 def test_export_end_to_end(tmp_path):
     rows = [
         _row(category="amendements", raw={"texte_ref": AN_TEXTE_REF}),

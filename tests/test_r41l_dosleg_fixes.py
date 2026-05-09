@@ -176,3 +176,37 @@ def test_pas_de_reroute_si_pas_de_numero_dans_agenda():
     # Mais URL non rerouted (pas de numéro)
     assert "senat.fr" in rows[0]["url"]
     assert "url_original" not in rows[0]["raw"]
+
+
+def test_reroute_extrait_numero_depuis_un_agenda_an_meme_si_pas_le_dernier():
+    """R41-R : le numéro est extrait depuis N'IMPORTE QUEL agenda AN
+    matché — pas seulement le plus récent. Cas concret PPL sport pro :
+    la séance plénière du 18/05 a un titre sans « (n° 1560) » mais la
+    commission du 12/05 a bien le n° dans son titre."""
+    rows = [
+        _dosleg(
+            "Proposition de loi relative à l'organisation, à la gestion "
+            "et au financement du sport professionnel"
+        ),
+        # Plus récent : pas de numéro
+        _agenda(
+            "Discussion de la proposition de loi, adoptée par le Sénat, "
+            "relative à l'organisation, à la gestion et au financement "
+            "du sport professionnel",
+            "2026-05-18T15:00:00",
+        ),
+        # Plus ancien mais avec numéro
+        _agenda(
+            "Examen de la proposition de loi relative à l'organisation, "
+            "à la gestion et au financement du sport professionnel "
+            "(n° 1560)",
+            "2026-05-12T09:00:00",
+        ),
+    ]
+    _boost_dosleg_with_agenda(rows)
+    d = rows[0]
+    # Date = la plus récente
+    assert d["published_at"].startswith("2026-05-18")
+    # URL rerouted via le numéro extrait du 2e agenda
+    assert "l17b1560_proposition-loi" in d["url"]
+    assert d["chamber"] == "AN"

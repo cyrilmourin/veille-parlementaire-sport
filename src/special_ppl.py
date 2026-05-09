@@ -55,6 +55,17 @@ _HTML_TAG_RE = re.compile(r"<[^>]+>")
 # Compactage des espaces multiples (incluant \n, \t, &nbsp; déjà décodé).
 _WS_RE = re.compile(r"\s+")
 
+# R41-R (2026-05-09) : URL Sénat « dossier législatif » canonique au
+# format `(ppl|pjl)<session>-<numéro>.html`. Tout autre format est jugé
+# malformé (ex. CSV historique `dossiers-legislatifs.csv` qui expose
+# parfois des identifiants internes type `s92930456` qui renvoient vers
+# un texte sans rapport — vérifié 2026-05-09 sur la PPL sport pro :
+# `s92930456` → page « Épargne »).
+_SENAT_URL_CANONIQUE_RE = re.compile(
+    r"/dossier-legislatif/(?:ppl|pjl)\d{2}-\d{2,4}",
+    re.IGNORECASE,
+)
+
 # ---------------------------------------------------------------------------
 # Constantes — identifiants stables de la PPL sport pro
 # ---------------------------------------------------------------------------
@@ -317,15 +328,30 @@ def _safe_url(row: dict, raw: dict) -> str:
     générique de la commission, pas vers la réunion datée) par un lien
     interne `/items/agenda/`.
 
-    S'applique uniquement aux items de catégorie `agenda` — pour les
-    amendements / dosleg / CR, l'URL d'origine est préservée.
+    R41-R (2026-05-09) — Pour les dossiers législatifs Sénat dont l'URL
+    sort du format canonique `(ppl|pjl)SS-NNN.html` (ex. CSV historique
+    qui expose `s92930456` renvoyant vers un texte sans rapport), on
+    bascule vers `URL_SENAT_DOSSIER` — l'URL canonique connue du module.
+    Le module est dédié à UNE PPL ; tous les rows liés sont garantis
+    pointer vers le même dossier, donc la substitution est sûre.
     """
     url = (row.get("url") or "").strip()
     cat = (row.get("category") or "").strip()
-    if cat != "agenda":
+    if cat == "agenda":
+        if "/dyn/17/organes/PO" in url or "/organes/PO" in url:
+            return "/items/agenda/"
         return url
-    if "/dyn/17/organes/PO" in url or "/organes/PO" in url:
-        return "/items/agenda/"
+    if cat == "dossiers_legislatifs":
+        chamber = (row.get("chamber") or "").strip().lower()
+        if chamber in ("senat", "sénat"):
+            # URL Sénat doit matcher le pattern canonique ; sinon on
+            # bascule sur l'URL connue de la PPL.
+            if not _SENAT_URL_CANONIQUE_RE.search(url):
+                return URL_SENAT_DOSSIER
+        elif chamber == "an":
+            # Pour AN, le boost R41-K reroute déjà vers /dyn/17/textes/
+            # l17bNNNN_<type>, qu'on garde tel quel.
+            pass
     return url
 
 

@@ -2731,6 +2731,13 @@ def _boost_dosleg_with_agenda(rows: list[dict]) -> None:
         latest_date = ""
         latest_title = ""
         latest_chamber = ""
+        # R41-R : on collecte AUSSI tous les titres AN matchés pour
+        # extraire le n° texte de n'importe lequel (l'inscription la plus
+        # récente n'a pas toujours le « (n° XXX) » dans son titre — ex.
+        # PPL sport pro où la séance plénière du 18/05 dit juste
+        # « Discussion ... » sans le n°, alors que la commission du
+        # 12/05 a bien « ... (n° 1560) »).
+        an_titles_matched: list[str] = []
         for a_words, a_date, a_title, a_chamber in agenda_data:
             shared = d_words & a_words
             if len(shared) < threshold:
@@ -2739,6 +2746,8 @@ def _boost_dosleg_with_agenda(rows: list[dict]) -> None:
                 latest_date = a_date
                 latest_title = a_title
                 latest_chamber = a_chamber
+            if a_chamber.upper() == "AN":
+                an_titles_matched.append(a_title)
         if not latest_date:
             continue
         cur_date_iso = (d.get("published_at") or "")[:10]
@@ -2761,10 +2770,17 @@ def _boost_dosleg_with_agenda(rows: list[dict]) -> None:
         # et le badge chambre vers l'AN — c'est là que se déroule la
         # prochaine lecture (demande Cyril). Évite aussi les liens Sénat
         # cassés (CSV `dossiers-legislatifs.csv` parfois URL malformée).
+        # R41-R : on cherche le numéro dans TOUS les agendas AN matchés
+        # (pas seulement le plus récent) pour absorber le cas où le titre
+        # de la dernière inscription ne mentionne pas explicitement le n°.
         if latest_chamber.upper() == "AN":
-            num_m = _AN_TEXTE_NUM_RE.search(latest_title or "")
-            if num_m:
-                num = num_m.group(1)
+            num = ""
+            for at in an_titles_matched:
+                m = _AN_TEXTE_NUM_RE.search(at or "")
+                if m:
+                    num = m.group(1)
+                    break
+            if num:
                 title_low = (d.get("title") or "").lower()
                 doc_type = (
                     "projet-loi" if title_low.startswith("projet")
