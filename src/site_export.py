@@ -3512,7 +3512,17 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
             ))
         if count > 10:
             lines.append("")
-            lines.append(f"→ [Voir les {count} {label.lower()}](/items/{cat}/)")
+            # R41-AF (2026-05-09) : libellé enrichi « Voir les XX items
+            # dans <catégorie> » + flèche en icône SVG, le tout dans une
+            # `<p class="cat-fold__see-all">` stylée bold weight 900.
+            # Demande Cyril : flèche dédiée vs simple « → » markdown.
+            lines.append(
+                f'<p class="cat-fold__see-all">'
+                f'<a href="/items/{cat}/">'
+                f'<span class="cat-fold__see-all-icon" aria-hidden="true">➜</span> '
+                f'Voir les {count} items dans {label.lower()}'
+                f'</a></p>'
+            )
         lines.append("")
         lines.append("</details>")
         lines.append("")

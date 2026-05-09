@@ -1403,6 +1403,44 @@ a:hover { text-decoration: underline; }
   padding: 0 18px 14px 18px;
   margin: 0;
 }
+
+/* R41-AF (2026-05-09) — Lien « Voir les XX items dans <catégorie> » en
+   pied de chaque section thématique : bold weight 900 (demande Cyril).
+   Spécificité préfixée pour battre `.home .content ul li a { color:
+   sl-blue }` qui mettait sinon le lien en bleu standard. */
+.home .content .cat-fold > p.cat-fold__see-all,
+.cat-fold > p.cat-fold__see-all {
+  margin: 0;
+  padding: 8px 18px 18px;
+  border-top: 1px dashed var(--line);
+}
+.home .content .cat-fold > p.cat-fold__see-all > a,
+.cat-fold > p.cat-fold__see-all > a {
+  font-family: var(--font-title);
+  font-weight: 900;
+  font-size: 14px;
+  color: var(--sl-blue);
+  letter-spacing: -0.2px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.home .content .cat-fold > p.cat-fold__see-all > a:hover,
+.cat-fold > p.cat-fold__see-all > a:hover {
+  color: var(--sl-red);
+  text-decoration: none;
+}
+.cat-fold__see-all-icon {
+  display: inline-block;
+  font-size: 16px;
+  color: var(--sl-red);
+  transform: translateY(0);
+  transition: transform .15s ease;
+}
+.cat-fold > p.cat-fold__see-all > a:hover .cat-fold__see-all-icon {
+  transform: translateX(3px);
+}
 /* Items dépliés dans une thématique : padding interne L/R 18px pour
    éviter que les titres/tags touchent le bord de la carte. Spécificité
    renforcée (.home .content .cat-fold …) pour battre `.home .content ul li`
