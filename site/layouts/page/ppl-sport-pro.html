@@ -74,7 +74,12 @@
         <li class="ppl-timeline__item">
           <span class="ppl-timeline__date">{{ .date }}</span>
           {{ with .chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
-          {{ with .kind }}<span class="ppl-timeline__kind">{{ . }}</span>{{ end }}
+          {{ with .kind }}
+            {{ $slug := "" }}
+            {{ if eq . "Séance publique" }}{{ $slug = "seance" }}{{ end }}
+            {{ if eq . "Commission" }}{{ $slug = "commission" }}{{ end }}
+            <span class="ppl-timeline__kind ppl-timeline__kind--{{ $slug }}" data-kind="{{ $slug }}">{{ . }}</span>
+          {{ end }}
           <span class="ppl-timeline__label">{{ .label }}</span>
         </li>
         {{ end }}

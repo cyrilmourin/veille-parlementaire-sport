@@ -3327,8 +3327,14 @@ def _render_special_ppl_card(payload: dict) -> list[str]:
             f'<span class="date-pill">{_escape(date_short)}</span>'
             if date_short else ''
         )
+        kind_slug = ""
+        if kind == "Séance publique":
+            kind_slug = "seance"
+        elif kind == "Commission":
+            kind_slug = "commission"
         kind_html = (
-            f'<span class="kind-prefix">{_escape(kind)}</span>'
+            f'<span class="kind-prefix kind-prefix--{kind_slug}" '
+            f'data-kind="{kind_slug}">{_escape(kind)}</span>'
             if kind else ''
         )
         lines.append(

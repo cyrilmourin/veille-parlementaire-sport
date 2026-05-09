@@ -456,7 +456,7 @@ def _detect_meeting_kind(row: dict) -> str:
     title_low = (row.get("title") or "").lower()
     # 1. Codes d'organe
     if "/organes/po838901" in url:
-        return "Séance Plénière"
+        return "Séance publique"
     if re.search(r"/organes/po[47]\d{5}", url):
         return "Commission"
     # 2. Heuristique titre
@@ -466,7 +466,7 @@ def _detect_meeting_kind(row: dict) -> str:
         "discussion en séance",
         "séance publique",
     )):
-        return "Séance Plénière"
+        return "Séance publique"
     if any(w in title_low for w in (
         "examen de la proposition", "examen du projet",
         "désignation du rapporteur", "audition", "table ronde",

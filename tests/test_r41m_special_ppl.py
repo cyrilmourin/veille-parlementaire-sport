@@ -442,7 +442,7 @@ def test_meeting_kind_seance_via_organe_PO838901():
     r = {"category": "agenda",
          "url": "https://www.assemblee-nationale.fr/dyn/17/organes/PO838901",
          "title": "Discussion (n° 1560)"}
-    assert _detect_meeting_kind(r) == "Séance Plénière"
+    assert _detect_meeting_kind(r) == "Séance publique"
 
 
 def test_meeting_kind_commission_via_organe_PO419604():
@@ -459,7 +459,7 @@ def test_meeting_kind_via_titre_sans_url_organe():
     from src.special_ppl import _detect_meeting_kind
     r1 = {"category": "agenda", "url": "/items/agenda/",
           "title": "Discussion de la proposition de loi"}
-    assert _detect_meeting_kind(r1) == "Séance Plénière"
+    assert _detect_meeting_kind(r1) == "Séance publique"
     r2 = {"category": "agenda", "url": "/items/agenda/",
           "title": "Examen de la proposition de loi"}
     assert _detect_meeting_kind(r2) == "Commission"

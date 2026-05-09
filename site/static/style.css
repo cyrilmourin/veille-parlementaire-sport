@@ -2064,12 +2064,23 @@ a:hover { text-decoration: underline; }
 }
 .special-ppl-card__item--next .val .kind-prefix {
   display: inline-block;
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: .4px;
-  color: var(--sl-blue);
+  font-size: 10px;
+  letter-spacing: .5px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--sl-blue);
+  color: #fff;
   margin-right: 6px;
+  vertical-align: 1px;
+}
+/* R41-AG : Séance publique (bleu) vs Commission (vert) */
+.special-ppl-card__item--next .val .kind-prefix--seance {
+  background: var(--sl-blue);
+}
+.special-ppl-card__item--next .val .kind-prefix--commission {
+  background: var(--sl-green);
 }
 /* R41-T : line-clamp 4 lignes max pour le titre de l'échéance, avec
    ellipsis. Évite de tronquer dur au caractère. */
@@ -2340,17 +2351,36 @@ details.ppl-fold[open] > p {
 }
 .ppl-timeline__item a { color: var(--accent); text-decoration: none; }
 .ppl-timeline__item a:hover { text-decoration: underline; }
-/* R41-T : préfixe « Séance Plénière » / « Commission » devant le label */
+/* R41-T/AG : préfixe « Séance publique » / « Commission » devant le label,
+   rendu en cartouche coloré inline avec le titre. R41-AG (2026-05-09) :
+   chaque kind a sa propre couleur de fond (sl-blue pour Séance publique,
+   sl-green pour Commission) — visuellement distinct comme les chambres. */
 .ppl-timeline__kind {
   font-weight: 700;
-  color: var(--accent);
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: .4px;
+  letter-spacing: .5px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  flex: 0 0 auto;
 }
+/* Couleur dédiée pour Séance publique (bleu marine) vs Commission (vert) */
+.ppl-timeline__kind--seance,
+.ppl-timeline__kind[data-kind="seance"] { background: var(--sl-blue); }
+.ppl-timeline__kind--commission,
+.ppl-timeline__kind[data-kind="commission"] { background: var(--sl-green); }
+
+/* R41-AG : label inline avec les cartouches, peut shrinker à 0 et wrap
+   son contenu en interne (au lieu de pousser à la ligne suivante).
+   `flex: 1 1 0` + `min-width: 0` autorisent le shrink, le contenu
+   wrap en multi-lignes si nécessaire. */
 .ppl-timeline__label {
-  flex: 1 1 200px;
+  flex: 1 1 0;
+  min-width: 0;
   color: var(--fg);
+  word-wrap: break-word;
 }
 .ppl-timeline__more {
   margin: 6px 0 0;
