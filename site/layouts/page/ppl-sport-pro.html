@@ -44,41 +44,46 @@
        lignes (les 3 plus récentes). Rapporteurs à droite avec photos. */}}
   <div class="ppl-row-overview">
 
-    {{/* ---------- Étapes de la procédure (timeline, 3 dernières) ---------- */}}
+    {{/* ---------- Prochaines étapes de la discussion (timeline futur) ---------- */}}
+    {{/* R41-U (2026-05-09) : on n'affiche QUE les étapes ≥ aujourd'hui,
+         triées par ordre chronologique (la plus proche d'abord vers le
+         plus lointain dans le futur). Limite 3, mention « + N à venir »
+         si plus. Demande Cyril. */}}
     <section class="ppl-page__section ppl-overview-col">
-      <h2>Étapes de la discussion</h2>
+      <h2>Prochaines étapes de la discussion</h2>
+      {{ $today := now.Format "2006-01-02" }}
       {{ $items := slice }}
       {{ with $d.dosleg }}
         {{ range . }}
-          {{ $items = $items | append (dict "date" .date "label" .title "kind" "" "chamber" .chamber) }}
+          {{ if ge .date $today }}
+            {{ $items = $items | append (dict "date" .date "label" .title "kind" "" "chamber" .chamber) }}
+          {{ end }}
         {{ end }}
       {{ end }}
       {{ with $d.agenda }}
         {{ range . }}
-          {{ $items = $items | append (dict "date" .date "label" .title "kind" .meeting_kind "chamber" .chamber) }}
+          {{ if ge .date $today }}
+            {{ $items = $items | append (dict "date" .date "label" .title "kind" .meeting_kind "chamber" .chamber) }}
+          {{ end }}
         {{ end }}
       {{ end }}
       {{ if $items }}
-      {{ $sorted := sort $items "date" "desc" }}
-      {{/* R41-T : 3 dernières étapes seulement */}}
+      {{ $sorted := sort $items "date" "asc" }}
       <ol class="ppl-timeline">
         {{ range first 3 $sorted }}
         <li class="ppl-timeline__item">
           <span class="ppl-timeline__date">{{ .date }}</span>
           {{ with .chamber }}<span class="chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }}
-          {{/* R41-T : préfixe « Séance Plénière » / « Commission » sans
-               afficher l'intitulé long de la commission (demande Cyril).
-               Plus de lien — texte simple. */}}
           {{ with .kind }}<span class="ppl-timeline__kind">{{ . }}</span>{{ end }}
           <span class="ppl-timeline__label">{{ .label }}</span>
         </li>
         {{ end }}
       </ol>
       {{ if gt (len $sorted) 3 }}
-      <p class="ppl-timeline__more">+ {{ sub (len $sorted) 3 }} étape{{ if gt (sub (len $sorted) 3) 1 }}s{{ end }} antérieure{{ if gt (sub (len $sorted) 3) 1 }}s{{ end }}</p>
+      <p class="ppl-timeline__more">+ {{ sub (len $sorted) 3 }} étape{{ if gt (sub (len $sorted) 3) 1 }}s{{ end }} à venir</p>
       {{ end }}
       {{ else }}
-      <p><em>Aucune étape disponible pour l'instant.</em></p>
+      <p><em>Aucune étape à venir programmée pour l'instant.</em></p>
       {{ end }}
     </section>
 
