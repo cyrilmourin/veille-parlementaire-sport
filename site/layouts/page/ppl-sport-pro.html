@@ -125,38 +125,29 @@
     {{ partial "ppl_amdt_filter.html" (dict "items" . "scope" "commission") }}
     {{/* R42-I (2026-05-10) : on sert directement le PDF de la liasse
          depuis `site/static/ppl-1560-amendements-commission.pdf` (déposé
-         manuellement par Cyril, refresh ~1×/jour jusqu'au 20 mai). Le
-         lien dynamique AN `/dyn/17/amendements/liasse/<date>/<hash>.pdf`
-         expirait toutes les heures (vérifié R41-W) — ici lien stable.
+         manuellement par Cyril, refresh ~1×/jour jusqu'au 13 mai = fin
+         examen commission). Le lien dynamique AN
+         `/dyn/17/amendements/liasse/<date>/<hash>.pdf` expirait toutes
+         les heures (vérifié R41-W) — ici lien stable.
          Le PDF est cherché via `fileExists` côté Hugo : si absent, on
-         retombe sur le lien externe AN (R41-W). Préparé pour la séance
-         publique : `ppl-1560-amendements-seance-publique.pdf` apparaîtra
-         comme un 2e bouton dès qu'il sera déposé. */}}
+         retombe sur le lien externe AN (R41-W). Le PDF de séance publique
+         n'est PAS encore préparé dans ce template — on l'ajoutera comme
+         2e bouton après la fin de l'examen en commission, quand l'AN
+         publiera la nouvelle liasse. Demande Cyril 2026-05-10. */}}
     {{ $pdfCommission := "/ppl-1560-amendements-commission.pdf" }}
-    {{ $pdfSeance := "/ppl-1560-amendements-seance-publique.pdf" }}
     {{ $hasCommissionPDF := fileExists (printf "static%s" $pdfCommission) }}
-    {{ $hasSeancePDF := fileExists (printf "static%s" $pdfSeance) }}
 
-    {{ if or $hasCommissionPDF $hasSeancePDF }}
+    {{ if $hasCommissionPDF }}
     <p class="ppl-amdt-liasse">
-      {{ if $hasCommissionPDF }}
       <a class="ppl-page__btn ppl-page__btn--liasse" href="{{ $pdfCommission }}"
          target="_blank" rel="noopener">
         ⬇ Liasse PDF — Amendements de commission
       </a>
-      {{ end }}
-      {{ if $hasSeancePDF }}
-      <a class="ppl-page__btn ppl-page__btn--liasse" href="{{ $pdfSeance }}"
-         target="_blank" rel="noopener">
-        ⬇ Liasse PDF — Amendements de séance publique
-      </a>
-      {{ end }}
     </p>
     {{ else }}
-    {{/* Fallback R41-W : si aucun PDF statique disponible (cas test ou
-         période sans dépôt), on pointe vers la page AN du listing
-         d'amendements où l'utilisateur peut générer une liasse à la
-         demande. Permanent : ne casse jamais le bloc. */}}
+    {{/* Fallback R41-W : si le PDF statique n'a pas (encore) été déposé,
+         on pointe vers la page AN du listing d'amendements où
+         l'utilisateur peut générer une liasse à la demande. */}}
     {{ with $d.meta.url_amdt_liste_an }}
     <p class="ppl-amdt-liasse">
       <a class="ppl-page__btn ppl-page__btn--liasse" href="{{ . }}"
