@@ -105,6 +105,14 @@ blocklist:
   - url: https://cnosf.franceolympique.com/comite-de-deontologie-du-cnosf
     reason: "Page statique CNOSF (pas une actualité, structure permanente)"
 
+  # 2026-05-10 (R41-AS) — Page d'accueil CNOSF (slug `/accueil`) qui
+  # remontait avec un titre « Accueil » dans la page Publications.
+  # Le filtre structurel `_SITEMAP_STOP_SLUGS` (R41-AS) empêche la
+  # ré-ingestion future ; cette entrée fait disparaître l'item déjà
+  # en DB au prochain build sans nécessiter de reset_category.
+  - url: https://cnosf.franceolympique.com/accueil
+    reason: "Page d'accueil CNOSF (titre « Accueil » trompeur)"
+
   # 2026-05-09 (R41-AB) — Retrait du keyword "IPC" (trop générique,
   # cf. config/keywords.yml). Les items déjà en DB qui ne matchaient
   # QUE sur "IPC" sont blocklistés ici.
