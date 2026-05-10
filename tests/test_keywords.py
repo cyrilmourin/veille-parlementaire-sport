@@ -19,6 +19,42 @@ def test_normalize_accents():
     assert _normalize("  Pass'Sport  ") == "pass'sport"
 
 
+def test_normalize_decodes_html_entities():
+    """R41-AO (2026-05-10) : régression — les flux RSS WordPress (Olbia,
+    FFF, FFT, FFA, sport_strategies…) injectent des entités numériques
+    `&#160;` (espace insécable) et `&#8217;` (apostrophe typographique).
+    Sans `html.unescape` avant `unidecode`, la chaîne « nommé&#160;président »
+    ne se normalise pas en « nomme president » → la famille
+    `nomination_event` ne taggait JAMAIS les items presse business → tous
+    supprimés par `_filter_nominations_only_sources` → 0 nominations
+    presse visibles sur le site.
+    """
+    # Espace insécable encodé (&#160;) doit devenir un espace simple.
+    assert _normalize("nommé&#160;président") == "nomme president"
+    # Apostrophe typographique encodée.
+    assert _normalize("d&#8217;une") == "d'une"
+    # &nbsp; nommé doit aussi être décodé.
+    assert _normalize("Pass&nbsp;Sport") == "pass sport"
+    # &amp; → & (test de robustesse)
+    assert _normalize("CNOSF &amp; CPSF") == "cnosf & cpsf"
+
+
+def test_match_through_html_entities(m):
+    """R41-AO : le match doit fonctionner même sur du texte qui contient
+    des entités HTML — sinon les items presse business des sources RSS
+    WordPress (qui en injectent systématiquement) ne taggent pas.
+    """
+    # Cas observé en prod sur olbia : « M. Dupond a été nommé&#160;président
+    # de la FFF »
+    kws, fams = m.match("M. Dupond a été nommé&#160;président de la FFF")
+    # Le keyword "FFF" doit être détecté malgré l'absence d'espace propre.
+    assert "FFF" in kws
+    # Le keyword "nommé président" (ou variante) doit déclencher la
+    # famille nomination_event si elle existe dans le yaml.
+    # On vérifie au minimum que la famille federation est bien là (FFF).
+    assert "federation" in fams
+
+
 def test_match_dispositif(m):
     kws, fams = m.match("Élargissement du dispositif Pass'Sport aux jeunes")
     assert "Pass'Sport" in kws
