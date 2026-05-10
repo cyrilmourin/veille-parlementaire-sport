@@ -725,14 +725,18 @@ autorites:
     # R41-AN (2026-05-10) — Agence Française de Développement.
     # L'AFD a un volet « Sport et développement » actif (Coupe d'Afrique
     # des Nations, Sport pour tous, héritage JO 2024 international…).
-    # RSS officiel `/fr/rss.xml` → Drupal RSS 2.0 standard, ~10 items
-    # récents pubDate RFC 822 (vérifié 2026-05-10 : 200 OK, items du 07/05).
-    # Le flux mélange tous les sujets AFD (climat, énergie, santé, sport,
-    # culture…) ; le KeywordMatcher filtre sur les mots sport — bruit
-    # non-sport naturellement écarté.
+    # R41-AP (2026-05-10) : bascule sur le flux Drupal taxonomique dédié
+    # « Sport et développement » (terme 686). Le flux générique
+    # `/fr/rss.xml` agrège tous les sujets AFD (climat, IA, traite,
+    # voisinage Est…) et 0 items matchaient les keywords sport (vérifié
+    # run 25622653048 : 10 fetched / 0 matchés). Le flux taxonomique
+    # `/fr/taxonomy/term/686/feed` ressort des items réellement sport
+    # (« Mouvement sportif sénégalais », « Pass'sport », « Infrastructures
+    # sportives - Guide technique », « Africa Forward : sport comme
+    # levier »…) — Drupal RSS 2.0 standard, 10 items, pubDate RFC 822.
     - id: afd
       category: communiques
-      url: https://www.afd.fr/fr/rss.xml
+      url: https://www.afd.fr/fr/taxonomy/term/686/feed
       format: rss
 
     # R19+ (2026-04-23) — INJEP (Institut national de la jeunesse et de
