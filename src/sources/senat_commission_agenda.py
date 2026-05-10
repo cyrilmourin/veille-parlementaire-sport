@@ -74,6 +74,22 @@ _BLOCK_RE = re.compile(
     re.DOTALL | re.IGNORECASE,
 )
 
+# R41-AX : bloc historique sur la même page. Selon les templates Sénat
+# le titre varie ("Dernières réunions", "Réunions précédentes",
+# "Réunions passées"). On capte les trois pour rattraper les auditions
+# qui n'auraient pas été ingérées côté "Prochaines" (timing scraper,
+# annonce tardive, ou source AGLAE jamais reflétée dans le carrousel).
+_BLOCK_PAST_RE = re.compile(
+    r'<h3[^>]*>\s*'
+    r'(?:Derni[èe]res\s+r[ée]unions'
+    r'|R[ée]unions\s+(?:pr[ée]c[ée]dentes|pass[ée]es))'
+    r'\s*</h3>.*?'
+    r'<ul[^>]+class="[^"]*list-group[^"]*"[^>]*>'
+    r'(?P<body>.*?)'
+    r'</ul>',
+    re.DOTALL | re.IGNORECASE,
+)
+
 # Un item réunion. Le HTML Sénat est très verbeux (plein de <div>
 # vides), donc on découpe par bornes `<li class="list-group-item">`
 # plutôt que par regex récursive sur des balises équilibrées.
@@ -144,6 +160,8 @@ def _resolve_date(
     month: int,
     time_str: str | None,
     now: datetime,
+    *,
+    prefer_past: bool = False,
 ) -> datetime | None:
     """Combine (day, month, time_str) + `now` pour inférer l'année.
 
@@ -156,6 +174,12 @@ def _resolve_date(
     courante si la date est dans les 30 jours passés (évite qu'une
     réunion du 31 déc vue le 2 janv bascule sur l'année d'après).
 
+    R41-AX : si `prefer_past=True` (item issu du bloc historique de
+    la page commission), on inverse l'heuristique. Une date qui semble
+    future de plus de 30 j est en fait sur l'année précédente — utile
+    en début janvier quand le bloc passé montre encore des réunions
+    de novembre/décembre de l'année écoulée.
+
     Retourne un datetime naïf (convention R11f).
     """
     try:
@@ -165,8 +189,16 @@ def _resolve_date(
         candidate = datetime(now.year, month, day, h, mm)
     except ValueError:
         return None
-    # Heuristique bascule année
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if prefer_past:
+        if candidate.date() > today.date():
+            if (candidate.date() - today.date()).days <= 30:
+                return candidate
+            try:
+                return candidate.replace(year=now.year - 1)
+            except ValueError:
+                return candidate
+        return candidate
     if candidate.date() < today.date():
         # Date dans le passé sur l'année courante :
         # si très proche (< 30j) on accepte, sinon on bascule year+1.
@@ -180,7 +212,7 @@ def _resolve_date(
 
 
 def _parse_event_block(
-    body: str, *, now: datetime,
+    body: str, *, now: datetime, prefer_past: bool = False,
 ) -> dict | None:
     """Parse un `<li class="list-group-item">` et renvoie le dict d'event.
 
@@ -218,7 +250,7 @@ def _parse_event_block(
     time_attr_m = _TIME_ATTR_RE.search(body)
     time_str = time_attr_m.group("dt") if time_attr_m else None
 
-    event_dt = _resolve_date(day, month, time_str, now)
+    event_dt = _resolve_date(day, month, time_str, now, prefer_past=prefer_past)
     if event_dt is None:
         return None
 
@@ -233,17 +265,35 @@ def _parse_event_block(
 def _parse_page(html: str, *, now: datetime) -> list[dict]:
     """Extrait les events d'une page agenda-de-la-commission.html.
 
+    Lit deux blocs si présents : « Prochaines réunions » (futur) et,
+    depuis R41-AX, le bloc historique (« Dernières réunions » /
+    « Réunions précédentes » / « Réunions passées »). Dédup par
+    (date ISO, titre) au cas où la page surfacerait un event dans
+    les deux blocs en bordure de fenêtre.
+
     Retourne une liste (potentiellement vide — page "Aucun événement
     n'est actuellement inscrit à l'agenda" pendant les inter-sessions).
     """
-    block_m = _BLOCK_RE.search(html)
-    if not block_m:
-        return []
-    body = block_m.group("body")
     events: list[dict] = []
-    for li in _LI_RE.finditer(body):
-        parsed = _parse_event_block(li.group("body"), now=now)
-        if parsed:
+    seen: set[tuple[str, str]] = set()
+    for block_re, prefer_past in (
+        (_BLOCK_RE, False),
+        (_BLOCK_PAST_RE, True),
+    ):
+        block_m = block_re.search(html)
+        if not block_m:
+            continue
+        body = block_m.group("body")
+        for li in _LI_RE.finditer(body):
+            parsed = _parse_event_block(
+                li.group("body"), now=now, prefer_past=prefer_past,
+            )
+            if not parsed:
+                continue
+            key = (parsed["event_dt"].isoformat(), parsed["title"])
+            if key in seen:
+                continue
+            seen.add(key)
             events.append(parsed)
     return events
 
@@ -287,16 +337,20 @@ def fetch_source(src: dict) -> list[Item]:
         log.warning("Sénat commission agenda %s : fetch KO %s : %s", sid, url, e)
         return []
 
-    if "Aucun événement" in body or "aucun événement" in body:
-        log.info("Sénat commission agenda %s : aucun événement publié", sid)
-        return []
-
     now = datetime.now().replace(microsecond=0)
     events = _parse_page(body, now=now)
     if not events:
-        log.info(
-            "Sénat commission agenda %s : 0 event parsé (page sans bloc)", sid,
-        )
+        # R41-AX : on ne fait plus d'early-return sur "Aucun événement"
+        # avant le parse, car la page peut afficher ce libellé sur le
+        # bloc "Prochaines" (creux d'agenda) tout en exposant un bloc
+        # historique peuplé. _parse_page renvoie [] dans les deux cas
+        # (aucun bloc, ou blocs présents mais sans event valide).
+        if "Aucun événement" in body or "aucun événement" in body:
+            log.info("Sénat commission agenda %s : aucun événement publié", sid)
+        else:
+            log.info(
+                "Sénat commission agenda %s : 0 event parsé (page sans bloc)", sid,
+            )
         return []
 
     items: list[Item] = []
