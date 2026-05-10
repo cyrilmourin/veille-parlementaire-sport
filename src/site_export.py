@@ -2660,9 +2660,19 @@ def _dedup(rows: list[dict]) -> list[dict]:
     # l'un des deux a ≥ 4 mots ET que la plus longue des deux clés fait
     # ≥ 25 chars (protège les dossiers courts contre les faux positifs).
     # Complexité O(n²) sur les dosleg — acceptable (quelques dizaines).
+    #
+    # R41-AT (2026-05-10) : seuil INTERSECTION_MIN ajusté dynamiquement
+    # quand les 2 word_sets sont petits. Sans ça, les titres normalisés
+    # à 4 mots significatifs (cas PPL Sport pro après stop-words R13-L
+    # qui retire « organisation ») ne dédupent jamais : intersection
+    # max = 4 < INTERSECTION_MIN = 5 → 2 items doublons restent.
+    # Règle : si min(len_a, len_b) ≥ 3, on accepte intersection =
+    # min(INTERSECTION_MIN, smaller). C'est conservateur : tous les
+    # mots du plus petit set doivent être dans le plus grand.
     INTERSECTION_MIN = 5
     WORDS_MIN = 4
     KEY_LEN_MIN = 25
+    SMALL_WS_FLOOR = 3  # plancher pour autoriser le seuil dynamique
 
     groups: list[list[dict]] = []
     word_sets: list[set[str]] = []
@@ -2679,7 +2689,15 @@ def _dedup(rows: list[dict]) -> list[dict]:
                 if max(len(keys[i]), len(key)) < KEY_LEN_MIN:
                     continue
                 inter = ws & gws
-                if len(inter) >= INTERSECTION_MIN:
+                smaller = min(len(ws), len(gws))
+                # Seuil dynamique : si les 2 sets sont petits (≥ floor),
+                # accepter une intersection couvrant le plus petit set.
+                required = (
+                    min(INTERSECTION_MIN, smaller)
+                    if smaller >= SMALL_WS_FLOOR
+                    else INTERSECTION_MIN
+                )
+                if len(inter) >= required:
                     matched_idx = i
                     break
         if matched_idx == -1:
