@@ -11,6 +11,7 @@ Structure produite :
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -1618,9 +1619,19 @@ def _normalize_and_dedup_nominations(rows: list[dict]) -> list[dict]:
     - Sinon (presse business : Olbia, Café, Sport Stratégies…) → on
       tente d'extraire `(person, function, organization)` depuis le
       titre OU le summary, et on remplace `r["title"]` par la version
-      canonique « <Personne> devient <Fonction> de <Structure> ». On
-      met aussi `r["url"] = ""` pour ne PAS afficher de lien presse
-      (le titre normalisé suffit).
+      canonique « <Personne> devient <Fonction> de <Structure> ».
+
+    R41-AU (2026-05-10) — pour les sources presse, on extrait DÉSORMAIS
+    TOUTES les nominations détectées dans title+summary (pas juste la
+    1ère). Les newsletters Olbia / Café du Sport Business / Sport
+    Stratégies mentionnent souvent N nominations dans une seule édition
+    → on duplique le row en N occurrences distinctes (1 par fact),
+    avec un titre canonique propre par occurrence et l'URL préservée
+    (lien vers la newsletter complète, demande Cyril).
+
+    Décision Cyril R41-AU : URL CONSERVÉE (revient sur R41-E qui la
+    masquait pour les sources presse). L'utilisateur peut cliquer pour
+    lire la newsletter d'origine et vérifier la nomination.
 
     DÉDUP : groupage par clé canonique (nom + fonction + organisation
     normalisés, ordre-insensible). Pour chaque groupe :
@@ -1633,6 +1644,7 @@ def _normalize_and_dedup_nominations(rows: list[dict]) -> list[dict]:
     """
     from src.nominations import (
         canonical_key,
+        extract_all_nominations,
         extract_nomination_facts,
         format_normalized_title,
         is_official_source,
@@ -1651,6 +1663,21 @@ def _normalize_and_dedup_nominations(rows: list[dict]) -> list[dict]:
                 return facts
         return None
 
+    def _try_extract_all(r: dict) -> list[dict]:
+        """R41-AU : extraction multi-match sur title puis summary. On
+        concat avec `. ` pour que les segments restent distincts dans le
+        split phrase mais que les nominations du title et du summary
+        soient toutes captées en un appel."""
+        title = (r.get("title") or "").strip()
+        summary = (r.get("summary") or "").strip()
+        # Concat sécurisée : un séparateur fort pour éviter que le titre
+        # se mélange avec le 1er segment du summary.
+        combined_parts = [t for t in (title, summary) if t]
+        if not combined_parts:
+            return []
+        combined = ". ".join(combined_parts)
+        return extract_all_nominations(combined)
+
     # --- Phase 1 : extraction + normalisation des items presse ---
     enriched: list[dict] = []
     for r in rows:
@@ -1658,24 +1685,51 @@ def _normalize_and_dedup_nominations(rows: list[dict]) -> list[dict]:
             enriched.append(r)
             continue
         sid = (r.get("source_id") or "").strip()
-        facts = _try_extract(r)
-        r["_nomination_facts"] = facts
         if is_official_source(sid):
             # Source officielle : on conserve titre + URL ; les facts
             # servent uniquement à la dédup en phase 2 (si une source
             # presse relaie la même nomination).
+            r["_nomination_facts"] = _try_extract(r)
             r["_nomination_official"] = True
-        else:
+            enriched.append(r)
+            continue
+        # Source presse / non-officielle : R41-AU multi-extraction.
+        all_facts = _try_extract_all(r)
+        if not all_facts:
+            # Aucun fact extrait — on garde l'item tel quel (l'algorithme
+            # historique produisait au moins un titre normalisé sur 1
+            # match ; ici on a 0 match donc on laisse le titre source).
+            r["_nomination_facts"] = None
             r["_nomination_official"] = False
-            if facts:
-                # Source presse + extraction OK → titre canonique +
-                # URL masquée (Cyril : « pas besoin de la source /
-                # lien dans ce cas »).
-                norm_title = format_normalized_title(facts)
-                if norm_title:
-                    r["title"] = norm_title
-                r["url"] = ""
-        enriched.append(r)
+            enriched.append(r)
+            continue
+        # 1+ facts. On crée 1 row par fact.
+        # Un row "principal" pour le 1er fact (préserve l'identité DB) ;
+        # des rows "split" pour les suivants (uid suffixé pour unicité).
+        for idx, facts in enumerate(all_facts):
+            if idx == 0:
+                target = r
+            else:
+                # Shallow copy suffit ; raw n'est pas modifié, et les
+                # autres champs sont des strings/ints immutables ou des
+                # listes que le pipeline ne ré-écrit pas en aval.
+                target = dict(r)
+                # UID unique pour éviter collision Hugo (même slug =
+                # écrase). On suffixe par un hash court de la clé
+                # canonique.
+                base_uid = (r.get("uid") or "").strip()
+                k = canonical_key(facts)
+                short = hashlib.sha1(k.encode("utf-8")).hexdigest()[:6]
+                target["uid"] = f"{base_uid}__{short}"
+            norm_title = format_normalized_title(facts)
+            if norm_title:
+                target["title"] = norm_title
+            # URL : préservée (Cyril R41-AU : « renvoie ensuite vers la
+            # newsletter d'Olbia »). NB : R41-E avait masqué l'URL ; on
+            # revient sur cette décision.
+            target["_nomination_facts"] = facts
+            target["_nomination_official"] = False
+            enriched.append(target)
 
     # --- Phase 2 : dédup par clé canonique ---
     # On groupe les items qui ont une clé non vide. Les items sans
