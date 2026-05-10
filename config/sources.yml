@@ -485,6 +485,10 @@ executif:
     - id: min_educ_agenda
       category: agenda
       url: https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-agenda-ministre-education-nationale/exports/json
+      # R42-T (2026-05-11) : `display_url` = page « humaine » exposée
+      # comme lien cliquable sur le site (au lieu de l'URL API JSON
+      # brute). L'explorateur OpenDataSoft rend l'agenda en tableau.
+      display_url: https://data.education.gouv.fr/explore/assets/fr-en-agenda-ministre-education-nationale/
       format: data_gouv_agenda
       chamber: MinEduc
       since_days: 90
@@ -507,6 +511,8 @@ executif:
     - id: min_esr_agenda
       category: agenda
       url: https://data.enseignementsup-recherche.gouv.fr/api/explore/v2.1/catalog/datasets/fr-esr-agenda-ministre/exports/json
+      # R42-T (2026-05-11) : page humaine OpenDataSoft pour les liens.
+      display_url: https://data.enseignementsup-recherche.gouv.fr/explore/dataset/fr-esr-agenda-ministre/table/?sort=dtstart
       format: data_gouv_agenda
       chamber: MinESR
       since_days: 90

@@ -61,6 +61,14 @@ def _fetch_agenda_json(src: dict) -> list[Item]:
                         avant J-since_days pour éviter de recharger des
                         milliers d'events historiques à chaque run
         title_prefix : optionnel, ex. `MinESR —` ajouté au début du titre
+        display_url  : R42-T (2026-05-11) — URL « humaine » à exposer
+                        comme `Item.url` (cliquable par l'utilisateur sur
+                        le site). Sans ce paramètre, on retombe sur `url`
+                        qui est l'endpoint API JSON brut — pas
+                        utilisable côté navigateur (Cyril 2026-05-11 :
+                        « le lien renvoit vers JSON »). Pointe sur
+                        l'explorateur OpenDataSoft du dataset qui rend
+                        l'agenda dans un tableau lisible.
     """
     sid = src["id"]
     url = src["url"]
@@ -68,6 +76,7 @@ def _fetch_agenda_json(src: dict) -> list[Item]:
     chamber = src.get("chamber")
     since_days = int(src.get("since_days", 90))
     title_prefix = src.get("title_prefix", "")
+    display_url = src.get("display_url", "").strip() or url
 
     try:
         payload = fetch_text(url)
@@ -132,7 +141,10 @@ def _fetch_agenda_json(src: dict) -> list[Item]:
 
         # URL item : pas d'URL canonique par event dans l'API → on
         # pointe vers la ressource source (utile pour audit / preuve).
-        item_url = url
+        # R42-T (2026-05-11) : si `display_url` est défini dans le
+        # YAML, on l'utilise — sert à exposer une page « humaine »
+        # (explorateur OpenDataSoft) plutôt que l'endpoint JSON brut.
+        item_url = display_url
         # Hash court pour garder uid stable même si la source change de
         # format de uid (défense contre un upstream qui passerait de
         # "52206" à "uid://foo/52206").

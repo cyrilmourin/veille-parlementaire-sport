@@ -266,6 +266,23 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-11 (matin tardif, suite audit Cyril) : **R42-R + R42-T + R42-V — Étendre fenêtre dosleg AN 365j→1095j (PPL manquantes) + lien agenda data.gouv humain au lieu de JSON brut + bouton Suivre LinkedIn border-radius 5px**.
+  Lot 3 R-tags atomiques, suite de la session R42-N/O/P/Q.
+
+  **R42-R** — Étendre `_DOSLEG_MAX_AGE_ACTIVE_DAYS` de 365j à **1095j** (3 ans) dans `assemblee.py::_normalize_dossier`. Origine : Cyril a remonté plusieurs PPL sport invisibles malgré titre 100% sport (1068 « Protéger éducateurs sportifs », 1803 « Responsabiliser clubs homophobie », 332 « Héritage JOP », 269 « Pratique sportive jeunes », 56 « Pneus terrains sport », 699 « Plus sport moins sucre »). Diagnostic : ces PPL sont déposées depuis 12-18 mois mais SANS activité parlementaire récente (status « En attente d'examen ») → `last_date < today - 365j` → filtrées par `_DOSLEG_MAX_AGE_ACTIVE_DAYS`. La fenêtre side_export pour dossiers_legislatifs est déjà à 1095j → on s'aligne. Le filtre keyword en aval garantit qu'on ne ramène que les dosleg sport-relevants. Au prochain reset_dossiers_legislatifs, ces PPL apparaîtront avec leur vrai status « 1ère lecture · commission » + date de dépôt originale (R42-N).
+
+  **R42-T** — Paramètre YAML `display_url` ajouté à `data_gouv_agenda` (handler dans `src/sources/data_gouv.py`). Avant : `Item.url = src["url"]` = endpoint API JSON brut (ex. `https://data.education.gouv.fr/api/explore/v2.1/.../exports/json`) — cliquer sur un item agenda MinEduc affichait du JSON. Après : si `display_url` est défini dans le YAML, on l'utilise comme URL cliquable. Configuration appliquée pour `min_educ_agenda` et `min_esr_agenda` (pages explorateur OpenDataSoft qui rendent l'agenda en tableau humain).
+
+  **R42-V** — Border-radius `var(--radius)` (= 10px) → **5px** pour le bouton « Suivre Sideline Conseil sur LinkedIn » dans la sidebar (demande Cyril). Arrondi discret, visuellement plus compact que le pill button initial (R42-D 999px) et que la valeur token sidebar (R42-K 10px).
+
+  **R42-S — no-op** (propositions de résolution → dosleg). Cyril : « je suggère de traiter les propositions de résolution dans les dossiers législatifs (elles en ont toutes un, et de faire pareil le cas échéant au Sénat) ». Vérification : le pipeline `an_dossiers_legislatifs` ingère DÉJÀ tous les types de dossiers (PPL, PJL, PNRE résolutions, PNRR motions…) via le ZIP open data AN. 16 PNRE listées dans `/documents/liste?type=depots&legis=17` au moment du test, **aucune sport-relevante** (sujets : retraites, IA, fiscalité, condamnation Cuba, etc.). Côté Sénat, le CSV `ppl.csv` ne contient pas les résolutions mais `dossiers-legislatifs.csv` (grand CSV) les couvre. Pas de fix structurel nécessaire actuellement — si une résolution sport apparaît, elle sera ingérée.
+
+  **R42-U — investigation Tavernost** (audition commission culture Sénat 06/05/2026 sur la crise des droits TV du foot pro). Constat : l'audition EST captée dans le CR Sénat « Semaine du 4 mai 2026 » (catégorie comptes_rendus, visible via Ctrl+F « Tavernost » sur `/items/comptes_rendus/`). MAIS PAS dans l'agenda Sénat (qui aurait dû la lister avant le 6 mai). Cause : le bypass organe R27 (qui matchait automatiquement tous les items d'un organe sport-relevant comme PO211490 culture/éducation/communication/sport Sénat) a été **désactivé en R39-K** sur décision Cyril : « Je ne veux PAS d'item qui remonte sans qu'un keyword thématique matche ». Les 6 events fetchés actuellement depuis la page agenda commission culture Sénat ont des titres génériques (« Désignation d'un rapporteur », « Examen du rapport ») sans keyword sport spécifique → tous filtrés. Pas de fix structurel : pour réactiver le bypass organe, il faut revenir sur R39-K (décision arbitrale Cyril). En attendant, l'info reste accessible via le CR semaine du 4 mai.
+
+  1030 → 1030 tests verts (pas de nouveaux tests sur R42-R/T/V — modifs trop minimes pour mériter une régression dédiée).
+
+  Action prod recommandée : `gh workflow run daily.yml -f reset_category=dossiers_legislatifs -f since_days=14` pour rattraper les PPL manquantes via R42-R.
+
 - 2026-05-11 (matin, audit Cyril sur multiples problèmes structurels) : **R42-N + R42-O + R42-P + R42-Q — Date dépôt structurelle dosleg AN + blocklist faux positifs + retrait sigles polysémiques + body_max_chars 200k**.
   Lot 4 R-tags atomiques, suite à un audit Cyril qui a remonté 9 sujets — voici les 4 quick-wins traités d'abord, les 5 plus gros chantiers (R42-R à U) suivent.
 

@@ -872,10 +872,10 @@ a:hover { text-decoration: underline; }
    le texte d'accroche. Couleurs LinkedIn officielles (#0A66C2 / #004182
    au hover) pour la reconnaissance visuelle, Montserrat 900. Inline-flex
    pour l'alignement icône+label.
-   R42-K (2026-05-10) : border-radius aligné sur `var(--radius)` (= 10px,
-   identique aux side-card et autres modules sidebar) — demande Cyril.
-   Avant : `999px` (pill button convention LinkedIn) qui détonnait avec
-   l'arrondi modéré du reste de la sidebar. */
+   R42-V (2026-05-11) : border-radius fixé à 5px sur demande explicite
+   de Cyril — entre l'arrondi pill button d'origine (999px R42-D) et la
+   valeur token sidebar (var(--radius) = 10px de R42-K). 5px = arrondi
+   discret, visuellement plus compact. */
 .side-follow-btn {
   display: inline-flex;
   align-items: center;
@@ -885,7 +885,7 @@ a:hover { text-decoration: underline; }
   background: #0A66C2;
   color: #ffffff;
   padding: 5px 12px;
-  border-radius: var(--radius);
+  border-radius: 5px;
   font-family: var(--font-title), "Montserrat", sans-serif;
   font-weight: 900;
   font-size: 13px;

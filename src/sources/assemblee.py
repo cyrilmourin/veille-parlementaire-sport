@@ -1180,8 +1180,18 @@ def _format_status(mapping: dict) -> str:
 # Fenêtres d'inclusion — alignées sur la mémoire projet
 # (veille_parl_procedure_context.md) : on affiche seulement les dossiers
 # "actifs" ou "promulgués récemment".
-_DOSLEG_MAX_AGE_ACTIVE_DAYS = 365      # non-promulgués : < 12 mois
-_DOSLEG_MAX_AGE_PROMULGATED_DAYS = 548  # promulgués : < 18 mois
+# R42-R (2026-05-11) — passage 365j → 1095j pour les NON promulgués.
+# Origine : Cyril a remonté l'absence de PPL sport déposées il y a 12-18
+# mois qui restent juridiquement actives mais sans activité parlementaire
+# récente (ex. PPL n°1068 « Protéger les éducateurs sportifs » déposée
+# 11/03/2025, PPL n°1803 « Responsabiliser les clubs pour mettre fin à
+# l'homophobie dans le sport », PPL n°332, n°269, n°699). Avant : filtre
+# `age_days > 365` les éliminait → invisibles malgré titre 100% sport.
+# Après : aligné sur la fenêtre `site_export.WINDOW_DAYS_BY_CATEGORY`
+# qui est déjà à 1095j pour les dossiers législatifs. Le filtre keyword
+# en aval garantit qu'on ne ramène que les dosleg sport-relevants.
+_DOSLEG_MAX_AGE_ACTIVE_DAYS = 1095      # 3 ans (R42-R, étendu depuis 365j)
+_DOSLEG_MAX_AGE_PROMULGATED_DAYS = 548  # promulgués : < 18 mois (inchangé)
 
 # Accumulateur du cache `texteLegislatifRef → dossier_title`, rempli par
 # `_normalize_dosleg` au fil de l'itération sur le dump `Dossiers_Legislatifs.json.zip`,
