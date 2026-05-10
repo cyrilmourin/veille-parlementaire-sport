@@ -30,8 +30,40 @@ Robustesse :
 """
 from __future__ import annotations
 
+import html as _html_lib
 import re
 import unicodedata
+
+
+# ---------------------------------------------------------------------------
+# R41-AW (2026-05-10) — Pré-traitement texte avant extraction.
+# Symétrique au fix R41-AO côté KeywordMatcher : les flux RSS WordPress
+# (Olbia, Café du Sport Business, Sport Stratégies, FFF, FFT, FFA…) émettent
+# une `<description>` qui contient :
+#   - des entités HTML (`&nbsp;`, `&#8217;`, `&amp;`, `&laquo;`…)
+#   - des balises HTML (`<p>`, `<br>`, `<a href="...">…</a>`, `[&hellip;]`…)
+# Sans ce pré-traitement, les regex de verbe performatif (« \ba\s+été\s+
+# nommé\b ») ne matchaient jamais quand la phrase incluait `a&nbsp;été` —
+# parce que `&nbsp;` n'est pas une whitespace au sens regex.
+# Bug observé en prod 2026-05-10 : items Olbia visibles avec leur titre
+# source intact (« Cette semaine, Olbia a appris que… ») au lieu du titre
+# normalisé R41-E/AU. Aucun fact extrait → pas de split, pas de normalisation.
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_MULTI_SPACE_RE = re.compile(r"\s+")
+
+
+def _preclean_text(text: str) -> str:
+    """Décode les entités HTML, strip les tags HTML, normalise les espaces.
+
+    Idempotent : un 2e passage ne change rien sur du texte déjà nettoyé.
+    Robuste aux entrées non-string (renvoie "").
+    """
+    if not text or not isinstance(text, str):
+        return ""
+    s = _html_lib.unescape(text)
+    s = _HTML_TAG_RE.sub(" ", s)
+    s = _MULTI_SPACE_RE.sub(" ", s).strip()
+    return s
 
 
 # ---------------------------------------------------------------------------
@@ -257,6 +289,12 @@ def extract_nomination_facts(text: str) -> dict | None:
     """
     if not text or not isinstance(text, str):
         return None
+    # R41-AW : strip HTML + decode entités AVANT toute regex de verbe
+    # performatif. Sinon, les flux RSS WordPress (Olbia, Café…) qui
+    # encodent `a&nbsp;été` au lieu de `a été` ratent toute extraction.
+    text = _preclean_text(text)
+    if not text:
+        return None
     # Normalise les apostrophes typographiques + espaces
     txt = (
         text.replace("’", "'")
@@ -357,6 +395,12 @@ def extract_all_nominations(text: str) -> list[dict]:
     Renvoie [] si aucune nomination détectable. Idempotent.
     """
     if not text or not isinstance(text, str):
+        return []
+    # R41-AW : strip HTML + decode entités AVANT le split phrase. Sinon
+    # `<p>X a été nommé...</p>` n'est pas découpé proprement et les
+    # entités `&nbsp;` faussent le matching.
+    text = _preclean_text(text)
+    if not text:
         return []
     # Normalise les apostrophes / espaces non-breakables avant de splitter,
     # pour rester aligné avec le pré-traitement de extract_nomination_facts.
