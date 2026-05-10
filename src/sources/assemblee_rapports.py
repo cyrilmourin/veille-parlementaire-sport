@@ -213,19 +213,21 @@ def fetch_source(src: dict) -> list[Item]:
           category: communiques
           url: https://www2.assemblee-nationale.fr/documents/liste?type=rapports&legis=17
           format: an_rapports_html
-          # R42-B : profondeur extraction PDF (défaut 50000 chars = ~50 pages
-          # PDF stripées — couvre sommaire + intro + 1ères pages corps).
-          body_max_chars: 50000
+          # R42-Q (2026-05-11) : 50k → 200k pour rattraper les rapports
+          # AN volumineux dont le keyword sport tombe au-delà du seuil
+          # initial. Symétrie avec senat_rapports + senat_cr_commissions.
+          body_max_chars: 200000
 
-    R42-B (2026-05-10) : pour chaque rapport ayant `url_pdf`, fetch + extract
-    PDF avec pypdf, tronque à `body_max_chars` (défaut 50000), pose dans
-    `raw.haystack_body`. Le matcher (`KeywordMatcher.apply`) consomme
-    automatiquement cette clé (cf. R26 / R40-G/H pour CR).
+    R42-B (2026-05-10) + R42-Q (2026-05-11) : pour chaque rapport ayant
+    `url_pdf`, fetch + extract PDF avec pypdf, tronque à `body_max_chars`
+    (défaut 200000), pose dans `raw.haystack_body`. Le matcher
+    (`KeywordMatcher.apply`) consomme automatiquement cette clé (cf. R26
+    et R40-G/H pour les CR).
     """
     sid = src["id"]
     url = src["url"]
     cat = src.get("category", "communiques")
-    body_max = int(src.get("body_max_chars", 50000))  # R42-B
+    body_max = int(src.get("body_max_chars", 200000))  # R42-B + R42-Q
 
     try:
         payload = fetch_bytes(url)

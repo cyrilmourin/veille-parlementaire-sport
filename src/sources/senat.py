@@ -272,10 +272,17 @@ def _first_sentence(text: str, max_len: int = 140) -> str:
 # partir de la page mono.html. URL CSV → notice → mono :
 #   /notice-rapport/2024/r24-006-notice.html  →  /rap/r24-006/r24-006_mono.html
 # La page _mono.html agrège tous les chapitres (~150-300k chars de
-# texte). On l'extrait via BeautifulSoup.get_text et on tronque à 50k
-# pour le matcher (compromis Cyril : couvre sommaire + 1ères pages corps).
+# texte). On l'extrait via BeautifulSoup.get_text et on tronque à
+# `body_max_chars` (default 200000 depuis R42-Q ; 50k laissait passer
+# des rapports volumineux où le keyword sport tombe au-delà du seuil —
+# cas vérifié r24-710 « Bilan annuel application des lois » dont
+# « Jeux olympiques » est à la position 62449).
+# R42-Q (2026-05-11) : regex étendue pour capturer les rapports en
+# plusieurs tomes (`r24-807-1-notice.html`, `r24-807-2-notice.html`)
+# qui auparavant retournaient un slug `r24-807` sans suffixe → 404 sur
+# le mono.html. Le suffixe `-\d+` est optionnel et capturé en entier.
 _RAP_NOTICE_RE = re.compile(
-    r"/notice-rapport/\d{4}/(r\d{2}-\d+)(?:-notice)?\.html?",
+    r"/notice-rapport/\d{4}/(r\d{2}-\d+(?:-\d+)?)(?:-notice)?\.html?",
     re.IGNORECASE,
 )
 
@@ -735,7 +742,11 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
         # qui propose la dissolution de l'ANS — le titre et les thèmes ne
         # contiennent aucun keyword sport, mais le texte intégral mentionne
         # 9× « Agence nationale du sport ». Sans haystack_body, dossier rate.
-        body_max = int(src.get("body_max_chars", 50000))
+        # R42-Q (2026-05-11) : passage 50k → 200k (symétrie avec
+        # senat_cr_commissions et les CR plénières). 50k ratait les
+        # rapports volumineux où le keyword sport tombe après cette
+        # position (cf. r24-710 où « Jeux olympiques » est à pos 62449).
+        body_max = int(src.get("body_max_chars", 200000))
         body_window_days = int(src.get("body_window_days", 800))
         body_cutoff = datetime.utcnow() - timedelta(days=body_window_days)
         for r in rows:
@@ -803,7 +814,11 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
         # CSV ramène l'historique entier (~12 000 rapports depuis 1959).
         # On limite le fetch mono.html aux rapports < 800 jours pour
         # borner le temps de fetch (~50 rapports/jour récents max).
-        body_max = int(src.get("body_max_chars", 50000))
+        # R42-Q (2026-05-11) : passage 50k → 200k (symétrie avec
+        # senat_cr_commissions et les CR plénières). 50k ratait les
+        # rapports volumineux où le keyword sport tombe après cette
+        # position (cf. r24-710 où « Jeux olympiques » est à pos 62449).
+        body_max = int(src.get("body_max_chars", 200000))
         rap_window_days = int(src.get("rap_haystack_window_days", 800))
         cutoff = datetime.utcnow() - timedelta(days=rap_window_days)
         for r in rows:

@@ -171,3 +171,13 @@ blocklist:
   # (quota global de discussion non sport-relevant).
   - url: https://www.senat.fr/compte-rendu-commissions/20260406/cult.html
     reason: "CR commission culture Sénat 06/04/2026 — match keyword football hors contexte"
+
+  # 2026-05-11 (R42-O) — Faux positifs détectés par Cyril après le passage
+  # R42-B (rapports parlementaires haystack body) et R42-L (dosleg Sénat
+  # texte intégral). 3 items à exclure :
+  - url: http://www.senat.fr/notice-rapport/2002/r02-380-notice.html
+    reason: "Rapport Sénat 2002 — mention FFT hors contexte sport (faux positif R42-B)"
+  - url: http://www.senat.fr/notice-rapport/1982/i1982_1983_0322-notice.html
+    reason: "Rapport Sénat 1982/1983 — mention LNR hors contexte (faux positif R42-B)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/statut_personnel_sante_services_incendie_secours
+    reason: "PPL 2525 personnels santé incendie/secours — mention JO Paris 2024 marginale (article modificatif), faux positif R42-B AN"

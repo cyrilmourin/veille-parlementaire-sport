@@ -1376,6 +1376,21 @@ def _normalize_dosleg(obj, src, cat):
     if libelles_haystack:
         _harvest_texte_refs(root, libelles_haystack, _TEXTE_TO_LIBELLES_ACCUM)
 
+    # R42-N (2026-05-11) — VRAIE date de dépôt initial pour les cards
+    # `/items/dossiers_legislatifs/` qui affichent « Dépôt à l'AN le ».
+    # Avant : `published_at = last_date = max(dateActe)` incluait les actes
+    # FUTURS (séances prévues, inscriptions agenda) → la card affichait
+    # une date dans le futur étiquetée « Dépôt » (faux). On extrait
+    # désormais la 1re date d'acte de la timeline (qui est triée ASC,
+    # cf. ligne `actes_timeline.sort` plus haut) — c'est le dépôt initial
+    # AN ou la transmission entrante depuis le Sénat. R42-M consomme ce
+    # `raw.published_at_original` côté frontmatter et l'affiche en lieu
+    # et place de la date `last_date`. Demande Cyril 2026-05-11.
+    first_act_date_iso = ""
+    if actes_timeline:
+        first_iso = (actes_timeline[0].get("date") or "")[:10]
+        if first_iso and first_iso != last_date.date().isoformat():
+            first_act_date_iso = f"{first_iso}T00:00:00"
     yield Item(
         source_id=src["id"],
         uid=uid,
@@ -1405,6 +1420,10 @@ def _normalize_dosleg(obj, src, cat):
             "is_promulgated": has_promulgation,
             # R13-N : flag retrait détecté par scan des codes/libellés actes.
             "is_retire": has_retire,
+            # R42-N : vraie date de dépôt initial (1re date timeline).
+            # Consommée par R42-M côté frontmatter → affichée comme
+            # « Dépôt à l'AN le {date_depot} » sur les cards dosleg.
+            "published_at_original": first_act_date_iso,
             # Timeline pour la maquette AN-like — borner à 40 étapes pour
             # garder le JSON raisonnable (certains dossiers ont 70+ actes).
             "actes_timeline": actes_timeline[-40:],

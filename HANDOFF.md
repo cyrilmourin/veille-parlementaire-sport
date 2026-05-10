@@ -266,6 +266,28 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-11 (matin, audit Cyril sur multiples problèmes structurels) : **R42-N + R42-O + R42-P + R42-Q — Date dépôt structurelle dosleg AN + blocklist faux positifs + retrait sigles polysémiques + body_max_chars 200k**.
+  Lot 4 R-tags atomiques, suite à un audit Cyril qui a remonté 9 sujets — voici les 4 quick-wins traités d'abord, les 5 plus gros chantiers (R42-R à U) suivent.
+
+  **R42-N** — Date de dépôt structurelle pour les dossiers AN. R42-M (hier soir) ne résolvait que les dossiers boostés par R41-K. Mais le parser `_normalize_dossier` posait `published_at = max(dateActe)` qui inclut les actes FUTURS (séances prévues, inscriptions agenda). Cas observés sur le live :
+  - PPL n°2667 « Encourager les partenariats » (DLR5L17N54138) : carte affichait « Dépôt à l'AN le **28/05/2026** » → date FUTURE, alors que la vraie date de dépôt est antérieure.
+  - PPL sport pro n°1560 (DLR5L17N51732) : carte affichait « Dépôt à l'AN le **18/05/2026** » → idem.
+
+  Fix : `assemblee.py::_normalize_dossier` pose désormais `raw["published_at_original"]` = 1re date de la timeline d'actes utiles (= dépôt initial AN ou transmission entrante Sénat), si différente de `last_date`. R42-M consomme ce champ et émet `date_depot:` au frontmatter Hugo ; le template `list.html` lit `.Params.date_depot` en priorité.
+
+  Tests `tests/test_r42n_dosleg_an_date_depot.py` : 2 tests (présence du marqueur R42-N dans le code source + utilisation `.Params.date_depot` côté template).
+
+  **R42-O** — Blocklist de 3 faux positifs détectés par Cyril après le passage R42-B/L :
+  - `http://www.senat.fr/notice-rapport/2002/r02-380-notice.html` — rapport Sénat 2002 mentionnant FFT hors contexte sport
+  - `http://www.senat.fr/notice-rapport/1982/i1982_1983_0322-notice.html` — rapport 1982/1983 mentionnant LNR hors contexte
+  - `https://www.assemblee-nationale.fr/dyn/17/dossiers/statut_personnel_sante_services_incendie_secours` — PPL 2525 « personnels santé incendie/secours » dont l'article 7 modifie une référence à la loi JO Paris 2024 (faux positif marginal côté AN)
+
+  **R42-P** — Retrait des sigles courts polysémiques `FFT` et `LNR` dans `nomination_event` / `acteur`. R42-O ne traite que 2 faux positifs spécifiques, mais le problème structurel est que `FFT` matche dans tous les textes qui contiennent l'acronyme (fiscalité, technique…). Les formes longues « Fédération française de tennis » et « Ligue nationale de rugby » restent listées et suffisent : un article réellement sport-relevant les utilise quasi-systématiquement (couplé à d'autres keywords comme tennis, fédération, Roland-Garros). Trade-off accepté : on perd les rares articles presse qui ne citent QUE « FFT » sans contexte tennis explicite. Cyril : « je souhaite que soit mieux contextualisés les mots FFT et LNR ». Tests `tests/test_keywords.py` : +4 régressions (FFT/LNR sigles retirés + formes longues toujours fonctionnelles).
+
+  **R42-Q** — `body_max_chars` 50000 → **200000** pour `an_rapports`, `senat_rapports`, `senat_dosleg`. Symétrie avec `senat_cr_commissions` (R40-G/H). Cas qui motive : rapports Sénat n°710 « Bilan annuel application des lois 31/03/2025 » et autres rapports volumineux où le keyword sport tombe au-delà du seuil 50k (vérifié : « Jeux olympiques » à pos 62449 dans r24-710 → loupé avec 50k, capté avec 200k). Aussi : extension du regex `_RAP_NOTICE_RE` pour capturer les rapports en plusieurs tomes (`r24-807-1`, `r24-807-2` pour le rapport Agencification). Auparavant le regex ne captait que `r24-807` sans suffixe → URL mono construite 404. Coût mémoire : ~27 Mo de haystack (35 rapports Sénat + 100 AN × 200k) — négligeable.
+
+  1024 → 1030 tests verts. Action prod recommandée : `gh workflow run daily.yml -f reset_category=communiques -f since_days=14` (pour appliquer R42-Q sur les rapports déjà ingérés ; un autre reset `dossiers_legislatifs` pour appliquer R42-N).
+
 - 2026-05-10 (nuit, demandes Cyril sur PPL ANS absente + label « Dépôt au » incorrect) : **R42-L + R42-M — Extension du matching aux dossiers Sénat via `/leg/<slug>.html` + vraie date de dépôt sur les cards dossiers législatifs**.
   Lot 2 R-tags atomiques.
   **R42-L** — Cyril a remonté que la PPL Sénat n°25-566 « Repenser l'agencification pour renforcer l'action publique » (déposée 27/04/2026 par P. MARTIN et M. DARNAUD), qui propose la **dissolution de l'Agence nationale du sport**, n'apparaissait pas dans la veille. Diagnostic :

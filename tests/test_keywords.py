@@ -181,3 +181,41 @@ def test_r42j_devient_avec_fonction_couvre_olbia_typique(m):
     for sent in cases:
         kws, fams = m.match(sent)
         assert "nomination_event" in fams, f"Manqué : {sent!r}"
+
+
+# ============================================================
+# R42-P (2026-05-11) — Sigles courts polysémiques retirés.
+# ============================================================
+
+def test_r42p_fft_sigle_court_retire(m):
+    """« FFT » seul (sans contexte tennis) ne doit pas matcher la
+    famille `federation` — sigle polysémique (cf. faux positif rapport
+    Sénat 2002 sur la fiscalité)."""
+    kws, fams = m.match("La FFT a une croissance de 3% sur l'année")
+    assert "FFT" not in kws, (
+        "R42-P : le sigle FFT ne doit plus être un keyword direct "
+        "(retiré pour éviter les faux positifs sur acronymes fiscaux/techniques)"
+    )
+
+
+def test_r42p_lnr_sigle_court_retire(m):
+    """« LNR » seul (sans contexte rugby) ne doit pas matcher."""
+    kws, fams = m.match("Le rapport LNR de 1982 sur la fiscalité")
+    assert "LNR" not in kws
+
+
+def test_r42p_forme_longue_tennis_match_toujours(m):
+    """La forme longue « Fédération française de tennis » continue de
+    matcher la famille `federation` — c'est uniquement le sigle court
+    qui est retiré."""
+    kws, fams = m.match("La Fédération française de tennis organise Roland-Garros")
+    assert "Fédération française de tennis" in kws
+    assert "federation" in fams
+
+
+def test_r42p_forme_longue_rugby_match_toujours(m):
+    """Idem pour rugby : la forme longue « Ligue nationale de rugby »
+    continue de matcher."""
+    kws, fams = m.match("La Ligue nationale de rugby organise le Top 14")
+    assert "Ligue nationale de rugby" in kws
+    assert "federation" in fams

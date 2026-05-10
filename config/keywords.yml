@@ -89,7 +89,16 @@ federation:
   - Competition federation
   - FFF                         # football
   - FFR                         # rugby
-  - FFT                         # tennis
+  # R42-P (2026-05-11) — FFT et LNR retirés (sigles courts polysémiques) :
+  # « FFT » apparaît dans des textes non-sport (acronymes financiers,
+  # techniques) — cf. faux positif rapport Sénat 2002 r02-380 sur la
+  # fiscalité (FFT = autre acronyme). Idem « LNR » détecté en faux positif
+  # dans un rapport 1982 i1982_1983_0322. Les formes longues (« Fédération
+  # française de tennis », « Ligue nationale de rugby ») restent listées
+  # plus bas et suffisent : un article qui parle vraiment de la FFT
+  # mentionne presque toujours d'autres keywords sport (tennis, joueur,
+  # fédération). Trade-off : on perd les rares articles presse qui ne
+  # citent QUE « FFT » sans contexte tennis explicite. Idem LNR.
   - FFBB                        # basket
   - FFHB                        # handball
   - FFA                         # athlétisme
@@ -103,7 +112,6 @@ federation:
   - FFSU                        # sport universitaire
   - Ligue de football professionnel
   - LFP
-  - LNR
   - LNH
   - FFTri                       # triathlon
   - FFGym
