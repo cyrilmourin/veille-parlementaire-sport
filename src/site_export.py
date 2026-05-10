@@ -1934,40 +1934,58 @@ def _canon_block_url(u: str) -> str:
     return s
 
 
-def _load_blocklist() -> tuple[set[str], set[str]]:
-    """Lit config/blocklist.yml et retourne `(blocked_urls, blocked_uids)`.
+def _load_blocklist() -> tuple[set[str], set[str], dict[str, tuple[str, str]], dict[str, tuple[str, str]]]:
+    """Lit config/blocklist.yml et retourne :
+    `(blocked_urls, blocked_uids, recat_urls, recat_uids)`.
 
-    `blocked_urls` est canonicalisé via `_canon_block_url` ; `blocked_uids`
-    est de la forme `{source_id}::{uid}`. Format YAML attendu :
+    - `blocked_urls` / `blocked_uids` : items à DROP (filtre dur).
+    - `recat_urls` / `recat_uids` : items à RECATÉGORISER au lieu de drop.
+      Format `{key: (from_category, to_category)}`. Si `from_category` est
+      vide, le reroute s'applique quelle que soit la catégorie courante.
+
+    Format YAML attendu :
 
         blocklist:
           - url: https://...
             reason: "..."
           - uid: source_id::uid
             reason: "..."
+          # R41-AR (2026-05-10) : variante non-destructive — au lieu de
+          # drop l'item, on le déplace vers une autre catégorie. Utile
+          # quand l'item est légitime dans sa catégorie source (ex. JORF)
+          # mais pollue la catégorie d'arrivée (ex. nominations).
+          - url: https://www.legifrance.gouv.fr/jorf/id/JORFTEXTxxx
+            recategorize_to: jorf
+            from_category: nominations  # facultatif (filtre par cat. courante)
+            reason: "..."
 
-    Safe : si le fichier est absent ou mal formé, retourne deux sets vides
-    (aucun filtre appliqué).
+    Safe : si le fichier est absent ou mal formé, retourne quatre containers
+    vides (aucun filtre appliqué).
     """
     blocked_urls: set[str] = set()
     blocked_uids: set[str] = set()
+    recat_urls: dict[str, tuple[str, str]] = {}
+    recat_uids: dict[str, tuple[str, str]] = {}
     try:
         import yaml as _yaml  # type: ignore
     except Exception:
-        return blocked_urls, blocked_uids
+        return blocked_urls, blocked_uids, recat_urls, recat_uids
     if not _BLOCKLIST_PATH.exists():
-        return blocked_urls, blocked_uids
+        return blocked_urls, blocked_uids, recat_urls, recat_uids
     try:
         with _BLOCKLIST_PATH.open("r", encoding="utf-8") as f:
             data = _yaml.safe_load(f) or {}
     except Exception:
-        return blocked_urls, blocked_uids
+        return blocked_urls, blocked_uids, recat_urls, recat_uids
     entries = data.get("blocklist") if isinstance(data, dict) else None
     if not isinstance(entries, list):
-        return blocked_urls, blocked_uids
+        return blocked_urls, blocked_uids, recat_urls, recat_uids
     for e in entries:
         if not isinstance(e, dict):
             continue
+        recat_to = e.get("recategorize_to")
+        recat_from = e.get("from_category") or ""
+        is_recat = isinstance(recat_to, str) and recat_to.strip()
         u = e.get("url")
         if isinstance(u, str) and u.strip():
             # R40-D : refuser silencieusement la forme NAVIGABLE des URLs
@@ -1985,11 +2003,17 @@ def _load_blocklist() -> tuple[set[str], set[str]]:
             else:
                 c = _canon_block_url(u)
                 if c:
-                    blocked_urls.add(c)
+                    if is_recat:
+                        recat_urls[c] = (recat_from.strip(), recat_to.strip())
+                    else:
+                        blocked_urls.add(c)
         uid = e.get("uid")
         if isinstance(uid, str) and uid.strip():
-            blocked_uids.add(uid.strip())
-    return blocked_urls, blocked_uids
+            if is_recat:
+                recat_uids[uid.strip()] = (recat_from.strip(), recat_to.strip())
+            else:
+                blocked_uids.add(uid.strip())
+    return blocked_urls, blocked_uids, recat_urls, recat_uids
 
 
 def _filter_blocklist(rows: list[dict]) -> list[dict]:
@@ -2000,8 +2024,12 @@ def _filter_blocklist(rows: list[dict]) -> list[dict]:
 
     Match par URL canonicalisée OU par `source_id::uid` exact.
     Idempotent, safe : YAML manquant ou mal formé → retourne `rows`.
+
+    R41-AR : ne traite QUE les entrées de drop dur. Les entrées avec
+    `recategorize_to` sont gérées séparément par
+    `_apply_blocklist_recategorize` (qui tourne après _reroute_to_nominations).
     """
-    blocked_urls, blocked_uids = _load_blocklist()
+    blocked_urls, blocked_uids, _recat_urls, _recat_uids = _load_blocklist()
     if not blocked_urls and not blocked_uids:
         return rows
     kept: list[dict] = []
@@ -2024,6 +2052,61 @@ def _filter_blocklist(rows: list[dict]) -> list[dict]:
             dropped,
         )
     return kept
+
+
+def _apply_blocklist_recategorize(rows: list[dict]) -> list[dict]:
+    """R41-AR (2026-05-10) — applique les recategorizations déclarées en
+    `config/blocklist.yml` (champ `recategorize_to` + `from_category`).
+
+    Au lieu de drop l'item, change sa `category` vers une autre catégorie.
+    Utile quand l'item est légitime dans sa catégorie source (ex. JORF) mais
+    pollue la catégorie d'arrivée après un reroute (ex. nominations).
+
+    Doit tourner APRÈS `_reroute_to_nominations` (sinon on rate les items
+    qui basculent dans `nominations` via le reroute communiques→nominations).
+
+    Critères de match :
+    - URL canonicalisée OU `source_id::uid` exact
+    - Si `from_category` est non-vide, ne matche que si la catégorie
+      courante du row == `from_category`. Sinon, recategorize quel que
+      soit l'état courant.
+
+    Idempotent : un 2e passage ne change rien (la catégorie est déjà
+    celle visée).
+    """
+    _bu, _bk, recat_urls, recat_uids = _load_blocklist()
+    if not recat_urls and not recat_uids:
+        return rows
+    rerouted = 0
+    for r in rows:
+        cur_cat = (r.get("category") or "").strip()
+        url_c = _canon_block_url(r.get("url") or "")
+        target = None
+        if url_c and url_c in recat_urls:
+            target = recat_urls[url_c]
+        else:
+            sid = (r.get("source_id") or "").strip()
+            uid = (r.get("uid") or "").strip()
+            if sid and uid:
+                key = f"{sid}::{uid}"
+                if key in recat_uids:
+                    target = recat_uids[key]
+        if not target:
+            continue
+        from_cat, to_cat = target
+        if from_cat and cur_cat != from_cat:
+            continue
+        if cur_cat == to_cat:
+            continue
+        r["category"] = to_cat
+        rerouted += 1
+    if rerouted:
+        import logging
+        logging.getLogger(__name__).info(
+            "R41-AR : %d items recatégorisés via blocklist.yml (recategorize_to)",
+            rerouted,
+        )
+    return rows
 
 
 # R28 (2026-04-23) — Filtre « publications parlementaires ».
@@ -2887,6 +2970,11 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # (90j) — un re-route après filter_window perdrait des items
     # nominations qui auraient été drop par la fenêtre 90j.
     rows = _reroute_to_nominations(rows)
+    # R41-AR (2026-05-10) : recategorize ciblé via blocklist.yml
+    # (champ `recategorize_to`). Tourne APRÈS le reroute pour pouvoir
+    # contre-balancer un reroute spécifique (ex. décret JORF basculé en
+    # nominations qu'on souhaite conserver dans la catégorie `jorf`).
+    rows = _apply_blocklist_recategorize(rows)
     # R41-H (2026-04-28) : après le reroute, retire de `communiques` les
     # items des sources dédiées nominations (presse sport business +
     # fédérations) qui n'ont PAS été re-routées (matches autres keywords
