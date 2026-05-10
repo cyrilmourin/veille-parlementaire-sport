@@ -3487,9 +3487,11 @@ def _render_special_ppl_card(payload: dict) -> list[str]:
         # R41-T (2026-05-09) : titre tronqué via CSS line-clamp (4 lignes
         # max) plutôt qu'au caractère, pour respecter la coupure mots.
         # La couleur passe au sl-blue (cohérence avec le reste de la carte).
-        # R41-V (2026-05-09) : préfixe « Commission » / « Séance Plénière »
+        # R41-V (2026-05-09) : préfixe « Commission » / « Séance publique »
         # depuis meeting_kind (homogène avec la page dédiée), date en
         # cartouche rouge/blanc (style sidebar agenda), titre derrière.
+        # R42-H (2026-05-10) : alignement terminologique — « publique »
+        # (officiel AN/Sénat) et non « plénière ».
         kind = (next_event.get("meeting_kind") or "").strip()
         date_iso = (next_event.get("date") or "")
         date_short = ""

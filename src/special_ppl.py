@@ -436,10 +436,13 @@ def _group_amdt_by_article(amdt_payload: list[dict]) -> list[dict]:
 
 def _detect_meeting_kind(row: dict) -> str:
     """R41-T (2026-05-09) — Pour un item agenda, détermine si la réunion
-    est une « Séance Plénière » ou une « Commission ».
+    est une « Séance publique » ou une « Commission ».
+
+    R42-H (2026-05-10) : terminologie alignée — on dit « séance publique »
+    (terme officiel AN/Sénat) et non « plénière ».
 
     Stratégie en 3 niveaux :
-      1. URL d'organe d'origine : `PO838901` = AN séance plénière,
+      1. URL d'organe d'origine : `PO838901` = AN séance publique,
          `PO4xxxxx` ou `PO7xxxxx` = commission AN. Sénat équivalent
          (organe 100 = séance, autres = commissions).
       2. Heuristique titre (« Discussion »/« Suite de la discussion »

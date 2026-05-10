@@ -5,10 +5,12 @@ import csv
 import hashlib
 import html
 import io
+import json
 import logging
 import os
 import re
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Iterable
 
 import feedparser
@@ -25,6 +27,96 @@ from ._common import (
 )
 
 log = logging.getLogger(__name__)
+
+
+# ============================================================================
+# R42-B-bis (2026-05-10) — Cache des slugs `_mono.html` Sénat qui répondent
+# en HTTP 404. Évite de retenter ~200 fetches par run sur des rapports
+# historiques sans page mono.html (rapports d'urgence, rapports flash, ou
+# plus simplement rapports anciens dont le format Sénat n'a pas généré la
+# page mono).
+#
+# Avant ce cache : un reset_communiques (ou un run après expiration de la
+# DB) prenait ~50 min au lieu de 10 min — ~400 rapports < 800j × ~5s
+# timeout sur 50% de 404. Avec le cache : le 1er run paie le coût (~50 min)
+# puis tous les suivants skippent les slugs déjà connus 404 (~10 min).
+#
+# Stockage : `data/senat_rap_mono_404.json` (committé par le workflow
+# daily.yml — voir le step `Commit last digest + AMO + texte→dossier
+# caches`). Format compact :
+#     {"slugs_404": ["r23-510", "r24-707", ...]}
+#
+# Pas de TTL : un rapport Sénat sans `_mono.html` aujourd'hui restera sans
+# `_mono.html` demain (structure figée par publication). Si le Sénat change
+# d'architecture URL un jour, on supprime le fichier et on relance — coût
+# = 1 run lent, négligeable.
+# ============================================================================
+
+_RAP_404_CACHE_PATH = Path("data/senat_rap_mono_404.json")
+_RAP_404_CACHE: set[str] | None = None  # lazy-loaded
+_RAP_404_DIRTY = False
+
+
+def _load_rap_404_cache() -> set[str]:
+    """Charge le cache 404 depuis le state file (lazy, idempotent).
+
+    Soft-fail : tout problème de lecture / parse JSON → set vide
+    (pas de planter, juste perte de l'optimisation pour ce run).
+    """
+    global _RAP_404_CACHE
+    if _RAP_404_CACHE is not None:
+        return _RAP_404_CACHE
+    try:
+        if _RAP_404_CACHE_PATH.exists():
+            data = json.loads(_RAP_404_CACHE_PATH.read_text(encoding="utf-8"))
+            slugs = data.get("slugs_404", [])
+            _RAP_404_CACHE = set(slugs) if isinstance(slugs, list) else set()
+        else:
+            _RAP_404_CACHE = set()
+    except Exception as e:
+        log.debug("senat_rapports : load 404 cache KO (%s) — repart à vide", e)
+        _RAP_404_CACHE = set()
+    return _RAP_404_CACHE
+
+
+def _mark_rap_404(slug: str) -> None:
+    """Mémorise un slug en 404. Marque le cache `dirty` pour persistance."""
+    global _RAP_404_DIRTY
+    if not slug:
+        return
+    cache = _load_rap_404_cache()
+    if slug not in cache:
+        cache.add(slug)
+        _RAP_404_DIRTY = True
+
+
+def _is_rap_404(slug: str) -> bool:
+    """Vrai si le slug est connu pour répondre 404. Skip immédiat conseillé."""
+    if not slug:
+        return False
+    return slug in _load_rap_404_cache()
+
+
+def _persist_rap_404_cache() -> None:
+    """Écrit le cache sur disque si modifié pendant le run.
+
+    Appelé à la fin de la boucle `senat_rapports` dans `fetch_source`.
+    Soft-fail : si le filesystem est read-only (cas test), on ignore.
+    """
+    global _RAP_404_DIRTY
+    if not _RAP_404_DIRTY:
+        return
+    try:
+        _RAP_404_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        slugs = sorted(_load_rap_404_cache())
+        _RAP_404_CACHE_PATH.write_text(
+            json.dumps({"slugs_404": slugs}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        _RAP_404_DIRTY = False
+        log.info("senat_rapports : cache 404 mono persisté (%d slugs)", len(slugs))
+    except Exception as e:
+        log.warning("senat_rapports : persistance cache 404 KO (%s)", e)
 
 
 def _first_sentence(text: str, max_len: int = 140) -> str:
@@ -73,14 +165,29 @@ def _fetch_senat_rap_haystack(notice_url: str, max_chars: int = 50000) -> str:
     - fetch KO (404, timeout, WAF) → ""
     - parse BS4 KO → ""
     Aucun crash possible — le matcher retombe sur title + summary.
+
+    R42-B-bis (2026-05-10) : cache des slugs en 404 — skip immédiat des
+    rapports historiques sans page mono.html (économise ~5s/skip × ~200
+    rapports = ~17 min sur un reset_communiques nominal).
     """
     mono_url = _build_rap_mono_url(notice_url)
     if not mono_url:
+        return ""
+    # R42-B-bis : extrait le slug pour interroger le cache 404
+    slug_match = re.search(r"/rap/(r\d{2}-\d+)/", mono_url)
+    slug = slug_match.group(1) if slug_match else ""
+    if slug and _is_rap_404(slug):
+        # Connu pour répondre 404 — skip sans fetch.
         return ""
     try:
         # fetch_text gère retry + encoding tolerant.
         html_body = fetch_text(mono_url)
     except Exception as e:
+        # Détection 404 → cache pour les runs futurs. Toute autre exception
+        # (timeout, DNS, WAF transitoire) n'est pas cachée — on retentera.
+        msg = str(e).lower()
+        if slug and ("404" in msg or "not found" in msg):
+            _mark_rap_404(slug)
         log.debug("senat_rapports : fetch mono KO %s (%s)", mono_url, e)
         return ""
     if not html_body:
@@ -302,16 +409,18 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
                 pass
 
         # R40-Q (2026-04-27) — Titre neutre par défaut (« Séance du
-        # DD MOIS YYYY — séance plénière »). Avant : on tentait
+        # DD MOIS YYYY — séance publique »). Avant : on tentait
         # `extract_cr_theme(text)` qui prenait le 1er thème détecté en
         # début de fichier — souvent générique ou hors-sport, ne reflétait
         # pas le passage qui avait déclenché le match keyword. Côté Sénat
-        # plénière on n'a pas l'équivalent du `syceron_chapters` AN
+        # publique on n'a pas l'équivalent du `syceron_chapters` AN
         # (cf. R40-K, l'index XML est dans le zip, mais le mapping
         # vers les pages HTML individuelles s20260225NNN.html est
         # complexe). Donc on s'en tient au titre neutre conformément
         # à la directive Cyril. `theme` reste exposé en `raw.theme`
         # pour diagnostic / templates qui voudraient l'afficher.
+        # R42-H (2026-05-10) : « séance plénière » → « séance publique »
+        # (rectification terminologique — terme officiel AN/Sénat).
         report_type = "analytique" if sid == "senat_debats" else "integral"
         label = (
             "Compte rendu analytique"
@@ -321,7 +430,7 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
         theme = extract_cr_theme(text)
         date_label = _fmt_fr_date(seance_dt) if (m_name and seance_dt.year > 2000) else ""
         if date_label:
-            title = f"Séance du {date_label} — séance plénière"[:220]
+            title = f"Séance du {date_label} — séance publique"[:220]
         elif cr_ref := re.search(r"d(\d{8})", base):
             title = f"Compte rendu Sénat — {label}"[:220]
         else:
@@ -584,6 +693,11 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
                 published_at=published,
                 summary=extras[:2000], raw=raw_with_body,
             )
+        # R42-B-bis (2026-05-10) : persistance du cache 404 après tous les
+        # fetches du run. S'écrit dans data/senat_rap_mono_404.json (committé
+        # par le workflow daily.yml). Le 1er run paie le coût (~50 min de
+        # 404), les runs suivants skippent les slugs connus → ~10 min.
+        _persist_rap_404_cache()
 
     elif sid in ("senat_ameli",):
         for r in rows:

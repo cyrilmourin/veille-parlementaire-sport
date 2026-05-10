@@ -2182,7 +2182,8 @@ a:hover { text-decoration: underline; }
   font-size: 13px;
 }
 /* R41-V (2026-05-09) : cartouche date « JJ/MM » rouge/blanc (style
-   sidebar agenda) + préfixe « Commission » / « Séance Plénière » en bold. */
+   sidebar agenda) + préfixe « Commission » / « Séance publique » en bold.
+   R42-H (2026-05-10) : terminologie alignée — « publique » (officiel AN/Sénat). */
 .special-ppl-card__item--next .val .date-pill {
   display: inline-block;
   background: var(--sl-red);
@@ -2506,12 +2507,17 @@ details.ppl-fold[open] > p {
 .ppl-timeline__kind--commission,
 .ppl-timeline__kind[data-kind="commission"] { background: var(--sl-green); }
 
-/* R41-AG : label inline avec les cartouches, peut shrinker à 0 et wrap
-   son contenu en interne (au lieu de pousser à la ligne suivante).
-   `flex: 1 1 0` + `min-width: 0` autorisent le shrink, le contenu
-   wrap en multi-lignes si nécessaire. */
+/* R42-G (2026-05-10) : extension du fix mobile R41-AP au desktop —
+   demande Cyril « passer en inline des cartouches l'occurrence,
+   plutôt qu'à côté, pour que le titre aille à la ligne sous les
+   cartouches AN ou Commission ». Le label prend toute la largeur
+   restante (flex-basis 100%) et passe en wrap → systématiquement
+   sur la 2e ligne, sous les cartouches (date + chambre + kind).
+   Avant : `flex: 1 1 0` posait le titre dans une colonne étroite à
+   droite des cartouches, lisibilité dégradée. La media query mobile
+   R41-AP est supprimée (devenue obsolète, comportement unifié). */
 .ppl-timeline__label {
-  flex: 1 1 0;
+  flex: 1 1 100%;
   min-width: 0;
   color: var(--fg);
   word-wrap: break-word;
@@ -2521,18 +2527,6 @@ details.ppl-fold[open] > p {
   font-size: 12px;
   color: var(--muted);
   font-style: italic;
-}
-
-/* R41-AP (2026-05-10) : sur mobile, le label passe en flex-basis 100%
-   pour s'afficher SOUS les cartouches AN/Sénat + COMMISSION/SÉANCE.
-   Sur desktop il reste inline (cf. R41-AG). Sans ce fix, le label se
-   retrouvait coincé dans une colonne ultra-étroite à droite des
-   cartouches sur écran < 720px (chaque mot finissait sur sa propre
-   ligne — illisible). */
-@media (max-width: 720px) {
-  .ppl-timeline__label {
-    flex: 1 1 100%;
-  }
 }
 
 /* R41-T : ligne overview 50/50 (Étapes / Rapporteurs) */

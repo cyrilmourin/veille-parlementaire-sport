@@ -40,7 +40,11 @@
     </fieldset>
     <fieldset class="cr-filter-group">
       <legend>Type</legend>
-      <label><input type="checkbox" class="cr-f-kind" value="pleniere" checked> Séances plénières</label>
+      {{/* R42-H (2026-05-10) : libellé visible « Séances publiques » au lieu de
+           « Séances plénières » — terme officiel AN/Sénat. La valeur interne
+           du checkbox reste `pleniere` pour ne pas casser le data-cr-kind
+           déjà posé sur tous les <li> par le JS de filtrage et la DB. */}}
+      <label><input type="checkbox" class="cr-f-kind" value="pleniere" checked> Séances publiques</label>
       <label><input type="checkbox" class="cr-f-kind" value="commission" checked> Commissions &amp; Groupes d’études</label>
     </fieldset>
   </nav>

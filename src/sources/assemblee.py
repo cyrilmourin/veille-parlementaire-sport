@@ -511,7 +511,7 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
             url = "https://www.assemblee-nationale.fr/dyn/17/comptes-rendus"
 
         # R40-Q (2026-04-27) — Titre par défaut neutre (« Séance AN du
-        # DD/MM/YYYY — séance plénière ») au lieu du 1er thème détecté
+        # DD/MM/YYYY — séance publique ») au lieu du 1er thème détecté
         # par `_extract_syceron_meta` / `extract_cr_theme` qui était
         # souvent générique (« Présidence de … ») et ne reflétait pas
         # le passage qui a déclenché le match keyword. À l'export, le
@@ -521,10 +521,13 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
         # Si pas de chapitre résolvable (cas edge), le titre neutre est
         # conservé. `theme` n'est plus utilisé pour le titre mais reste
         # exposé en `raw.theme` (compat templates, diagnostic).
+        # R42-H (2026-05-10) : « séance plénière » → « séance publique »
+        # (rectification terminologique demandée par Cyril — c'est le
+        # terme officiel utilisé par l'AN et le Sénat).
         theme = syceron_theme or extract_cr_theme(text)
         date_is_from_seance = ts_dt is not None
         if date_is_from_seance:
-            title = f"Séance AN du {published_at:%d/%m/%Y} — séance plénière"[:220]
+            title = f"Séance AN du {published_at:%d/%m/%Y} — séance publique"[:220]
         elif cr_ref:
             title = f"Compte rendu AN — séance {cr_ref}"[:220]
         else:

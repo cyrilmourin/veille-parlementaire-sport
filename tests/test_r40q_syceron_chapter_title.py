@@ -201,21 +201,23 @@ def test_normalize_syceron_pose_syceron_chapters():
 
 def test_titre_neutre_par_defaut_an_syceron():
     """Le titre par défaut (avant résolution dynamique à l'export) doit
-    être neutre : « Séance AN du DD/MM/YYYY — séance plénière »."""
+    être neutre : « Séance AN du DD/MM/YYYY — séance publique »
+    (R40-Q + R42-H : « plénière » → « publique » terme officiel AN/Sénat)."""
     from src.sources import assemblee as an_mod
     src_path = an_mod.__file__
     with open(src_path, encoding="utf-8") as f:
         src_code = f.read()
-    assert '"Séance AN du {published_at:%d/%m/%Y} — séance plénière"' in src_code, (
-        "_normalize_syceron doit poser un titre neutre par défaut (R40-Q)"
+    assert '"Séance AN du {published_at:%d/%m/%Y} — séance publique"' in src_code, (
+        "_normalize_syceron doit poser un titre neutre par défaut (R40-Q + R42-H)"
     )
 
 
 def test_titre_neutre_par_defaut_senat_plenary():
+    """R40-Q + R42-H : « Séance du DD MOIS YYYY — séance publique »."""
     from src.sources import senat as sen_mod
     src_path = sen_mod.__file__
     with open(src_path, encoding="utf-8") as f:
         src_code = f.read()
-    assert '"Séance du {date_label} — séance plénière"' in src_code, (
-        "senat._fetch_debats_zip doit poser un titre neutre par défaut (R40-Q)"
+    assert '"Séance du {date_label} — séance publique"' in src_code, (
+        "senat._fetch_debats_zip doit poser un titre neutre par défaut (R40-Q + R42-H)"
     )
