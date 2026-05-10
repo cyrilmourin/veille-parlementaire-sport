@@ -700,6 +700,12 @@ def fetch_source(src: dict) -> list[Item]:
             log.warning("Flush cache texte→libelles KO : %s", e)
         _TEXTE_TO_LIBELLES_ACCUM.clear()
 
+    # R42-X (2026-05-11) — persistance du cache 404 des texte_refs sans
+    # page /dyn/opendata/ (anciens textes, types atypiques). Symétrique
+    # à R42-B-bis côté Sénat.
+    if src["id"] == "an_dossiers_legislatifs":
+        _persist_an_dossier_text_404_cache()
+
     return items
 
 
@@ -1177,6 +1183,164 @@ def _format_status(mapping: dict) -> str:
     return " · ".join(parts)
 
 
+# ============================================================================
+# R42-X (2026-05-11) — Cache + fetch du texte intégral des dossiers AN
+# via `/dyn/opendata/<TEXTE_REF>.html`. Symétrique à R42-L côté Sénat
+# (`/leg/<slug>.html`).
+#
+# Origine : Cyril a remonté la PPR n°2126 « Renforcer le pilotage et la
+# cohérence de la politique nationale du sport » qui matchait 0 keyword
+# via son titre seul mais 11 keywords via son texte intégral (« Agence
+# nationale du sport », « Pass'Sport », « mouvement sportif », « sport
+# de haut niveau », « Éducation physique et sportive »…). Sans fetch du
+# texte intégral, le pipeline AN ne voyait que `title + titreChemin +
+# libelles_haystack` (3000 chars max via R36-E) → PPR invisible.
+#
+# Solution : pour chaque dosleg AN avec un `texte_ref` détecté
+# (PNRE/PION/PRJL/RAPP/AVIS), fetch `/dyn/opendata/<ref>.html` et
+# alimente `raw.haystack_body[:200000]`. Cache 404 dédié pour les
+# texte_refs sans page opendata (anciens textes, types atypiques).
+# ============================================================================
+
+import json
+from pathlib import Path
+
+_AN_DOSSIER_TEXT_CACHE_PATH = Path("data/an_dossier_text_404.json")
+_AN_DOSSIER_TEXT_CACHE: set[str] | None = None
+_AN_DOSSIER_TEXT_DIRTY = False
+
+
+def _load_an_dossier_text_404_cache() -> set[str]:
+    """Charge le cache 404 (lazy, soft-fail)."""
+    global _AN_DOSSIER_TEXT_CACHE
+    if _AN_DOSSIER_TEXT_CACHE is not None:
+        return _AN_DOSSIER_TEXT_CACHE
+    try:
+        if _AN_DOSSIER_TEXT_CACHE_PATH.exists():
+            data = json.loads(_AN_DOSSIER_TEXT_CACHE_PATH.read_text(encoding="utf-8"))
+            refs = data.get("texte_refs_404", [])
+            _AN_DOSSIER_TEXT_CACHE = set(refs) if isinstance(refs, list) else set()
+        else:
+            _AN_DOSSIER_TEXT_CACHE = set()
+    except Exception as e:
+        log.debug("an_dossiers : load 404 cache KO (%s)", e)
+        _AN_DOSSIER_TEXT_CACHE = set()
+    return _AN_DOSSIER_TEXT_CACHE
+
+
+def _mark_an_dossier_text_404(texte_ref: str) -> None:
+    global _AN_DOSSIER_TEXT_DIRTY
+    if not texte_ref:
+        return
+    cache = _load_an_dossier_text_404_cache()
+    if texte_ref not in cache:
+        cache.add(texte_ref)
+        _AN_DOSSIER_TEXT_DIRTY = True
+
+
+def _is_an_dossier_text_404(texte_ref: str) -> bool:
+    if not texte_ref:
+        return False
+    return texte_ref in _load_an_dossier_text_404_cache()
+
+
+def _persist_an_dossier_text_404_cache() -> None:
+    """Persiste le cache si modifié. Appelé en fin de fetch_source AN dossiers."""
+    global _AN_DOSSIER_TEXT_DIRTY
+    if not _AN_DOSSIER_TEXT_DIRTY:
+        return
+    try:
+        _AN_DOSSIER_TEXT_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        refs = sorted(_load_an_dossier_text_404_cache())
+        _AN_DOSSIER_TEXT_CACHE_PATH.write_text(
+            json.dumps({"texte_refs_404": refs}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        _AN_DOSSIER_TEXT_DIRTY = False
+        log.info("an_dossiers : cache 404 texte persisté (%d refs)", len(refs))
+    except Exception as e:
+        log.warning("an_dossiers : persistance cache 404 KO (%s)", e)
+
+
+def _first_texte_ref_from_root(root) -> str:
+    """Parcourt récursivement l'arbre du dossier AN et retourne le 1er
+    `texte_ref` correspondant au regex `_TEXTE_REF_RE`. Retourne `""`
+    si aucun. Le 1er trouvé est typiquement le texte initial du dossier
+    (PION/PNRE/PRJL/PPL) — c'est celui qu'on veut fetcher.
+
+    Préférence : on privilégie PNRE/PION/PRJL/PPL (textes initiaux)
+    sur TA/RAPP/AVIS (étapes ultérieures qui pointent vers le texte
+    adopté ou un rapport, pas le texte de départ).
+    """
+    found: list[str] = []
+
+    def _walk(node):
+        if isinstance(node, str):
+            if _TEXTE_REF_RE.match(node):
+                found.append(node)
+            return
+        if isinstance(node, dict):
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                _walk(v)
+
+    _walk(root)
+    if not found:
+        return ""
+    # Préfixes de textes initiaux (les autres sont des dérivés)
+    initials = ("PION", "PNRE", "PRJL", "PPL", "PNRR")
+    for ref in found:
+        if any(ref.startswith(p) for p in initials):
+            return ref
+    return found[0]
+
+
+def _fetch_an_dossier_text_haystack(
+    texte_ref: str, max_chars: int = 200000,
+) -> str:
+    """Fetch le texte intégral d'un dossier AN via `/dyn/opendata/<ref>.html`.
+
+    R42-X (2026-05-11). Soft-fail systématique :
+    - texte_ref vide → ""
+    - cache 404 → ""
+    - fetch KO (404, timeout, WAF) → cache si 404, sinon non caché
+    - parse BS4 KO → ""
+    """
+    if not texte_ref:
+        return ""
+    if _is_an_dossier_text_404(texte_ref):
+        return ""
+    from ._common import fetch_text  # import local pour cohérence avec senat
+    url = f"https://www.assemblee-nationale.fr/dyn/opendata/{texte_ref}.html"
+    try:
+        html_body = fetch_text(url)
+    except Exception as e:
+        msg = str(e).lower()
+        if "404" in msg or "not found" in msg:
+            _mark_an_dossier_text_404(texte_ref)
+        log.debug("an_dossiers : fetch /dyn/opendata/ KO %s (%s)", url, e)
+        return ""
+    if not html_body:
+        return ""
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html_body, "html.parser")
+        main = soup.find("main") or soup.find("div", id="main")
+        text = main.get_text(" ", strip=True) if main else soup.get_text(" ", strip=True)
+        # Normalise les whitespaces internes (sauts de ligne, indentation)
+        # — sinon « Agence nationale\ndu sport » ne matche pas le keyword
+        # « Agence nationale du sport ».
+        text = re.sub(r"\s+", " ", text)
+    except Exception as e:
+        log.debug("an_dossiers : parse /dyn/opendata/ KO %s (%s)", url, e)
+        return ""
+    return text[:max_chars] if text else ""
+
+
+# ============================================================================
+
 # Fenêtres d'inclusion — alignées sur la mémoire projet
 # (veille_parl_procedure_context.md) : on affiche seulement les dossiers
 # "actifs" ou "promulgués récemment".
@@ -1213,7 +1377,11 @@ _TEXTE_TO_LIBELLES_ACCUM: dict[str, str] = {}
 #   PPL*  (Proposition de loi)
 #   TA*   (Texte Adopté)
 # Format complet : <prefix><chambre><chrono>, ex "PIONANR5L17BTC2335".
-_TEXTE_REF_RE = re.compile(r"^(?:PION|PRJL|PPL|TA)[A-Z0-9]{8,}$")
+_TEXTE_REF_RE = re.compile(r"^(?:PION|PRJL|PPL|TA|PNRE|PNRR|AVIS|RAPP)[A-Z0-9]{8,}$")
+# R42-X (2026-05-11) : PNRE (proposition de résolution) et PNRR (motion)
+# ajoutés. Avant : seules PION/PRJL/PPL/TA étaient captées → les PPR
+# (ex. PNREANR5L17B2126 « politique nationale du sport ») n'avaient
+# pas leur texte_ref harvesté pour le fetch /dyn/opendata/.
 
 
 def _harvest_texte_refs(node, title: str, accum: dict[str, str]) -> None:
@@ -1401,6 +1569,19 @@ def _normalize_dosleg(obj, src, cat):
         first_iso = (actes_timeline[0].get("date") or "")[:10]
         if first_iso and first_iso != last_date.date().isoformat():
             first_act_date_iso = f"{first_iso}T00:00:00"
+
+    # R42-X (2026-05-11) — fetch du texte intégral via `/dyn/opendata/`.
+    # Cas concret : PPR n°2126 (PNREANR5L17B2126) « Renforcer le pilotage
+    # de la politique nationale du sport » dont le titre seul matche 0
+    # keyword mais le texte intégral matche 11+ keywords (Pass'Sport,
+    # mouvement sportif, Agence nationale du sport…). Symétrique R42-L
+    # côté Sénat (`/leg/<slug>.html`).
+    haystack_body = ""
+    dossier_texte_ref = _first_texte_ref_from_root(root)
+    if dossier_texte_ref:
+        haystack_body = _fetch_an_dossier_text_haystack(
+            dossier_texte_ref, max_chars=200000,
+        )
     yield Item(
         source_id=src["id"],
         uid=uid,
@@ -1434,6 +1615,15 @@ def _normalize_dosleg(obj, src, cat):
             # Consommée par R42-M côté frontmatter → affichée comme
             # « Dépôt à l'AN le {date_depot} » sur les cards dosleg.
             "published_at_original": first_act_date_iso,
+            # R42-X (2026-05-11) : texte intégral du dossier (fetch
+            # `/dyn/opendata/<TEXTE_REF>.html`), tronqué à 200k chars.
+            # Consommé par KeywordMatcher.apply via raw.haystack_body —
+            # permet de matcher des keywords présents dans le corps mais
+            # pas dans le titre (cf. PPR n°2126 politique nationale du
+            # sport, PPL 1068 éducateurs sportifs…). Vide si fetch KO /
+            # ref absente / page opendata 404. Symétrique R42-L côté Sénat.
+            "haystack_body": haystack_body[:200000],
+            "texte_ref": dossier_texte_ref,
             # Timeline pour la maquette AN-like — borner à 40 étapes pour
             # garder le JSON raisonnable (certains dossiers ont 70+ actes).
             "actes_timeline": actes_timeline[-40:],

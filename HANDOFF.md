@@ -266,6 +266,28 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-11 (début après-midi, retour Cyril : « C'est un problème structurel non ? ») : **R42-X — Fetch du texte intégral des dossiers AN via `/dyn/opendata/<TEXTE_REF>.html` (symétrique R42-L côté Sénat)**.
+
+  Cyril a remonté que mon investigation de la PPR n°2126 « Renforcer le pilotage et la cohérence de la politique nationale du sport » s'était arrêtée au titre alors que le **texte intégral** matchait 11+ keywords (« Pass'Sport », « mouvement sportif », « Agence nationale du sport », « sport de haut niveau », « Éducation physique et sportive »…). R42-L côté Sénat fait déjà ce fetch via `/leg/<slug>.html`, mais **aucun pendant côté AN** — c'était le problème structurel.
+
+  Implémentation symétrique :
+  - **`_TEXTE_REF_RE`** étendu de `^(?:PION|PRJL|PPL|TA)…$` à `^(?:PION|PRJL|PPL|TA|PNRE|PNRR|AVIS|RAPP)…$`. Avant : seules PION/PRJL/PPL/TA étaient captées → les PPR (PNRE) étaient invisibles.
+  - **`_first_texte_ref_from_root(root)`** : walk récursif sur l'arbre du dossier AN, retourne la 1re ref texte (priorité aux types initiaux PION/PNRE/PRJL/PPL/PNRR sur les dérivés TA/RAPP/AVIS).
+  - **`_fetch_an_dossier_text_haystack(texte_ref, max_chars=200000)`** : fetch `https://www.assemblee-nationale.fr/dyn/opendata/{texte_ref}.html` + BS4 main + truncate 200k chars + normalisation whitespace (`re.sub(r"\s+", " ", text)`). Soft-fail systématique.
+  - **Cache 404 dédié** `data/an_dossier_text_404.json` (texte_refs sans page opendata — anciens textes, types atypiques). Helpers `_load/mark/is/persist_an_dossier_text_404` symétriques R42-B-bis / R42-L côté Sénat. Ajouté au `git add` du workflow `daily.yml`.
+  - **`_normalize_dosleg`** : extrait `dossier_texte_ref`, fetch, alimente `raw.haystack_body[:200000]` + ajoute `raw.texte_ref` (utile pour debug + cross-référence).
+  - **`fetch_source`** appelle `_persist_an_dossier_text_404_cache()` à la fin pour la passe `an_dossiers_legislatifs`.
+
+  Tests `tests/test_r42x_an_dossier_text_haystack.py` : +14 tests (regex étendu PNRE/PNRR/AVIS/RAPP + types historiques + rejet DLR/PO ; extraction first_texte_ref + préférence types initiaux + arbre vide ; fetch graceful (ref vide / cache 404 / mark on 404 / no mark on timeout / extract main avec normalisation whitespace) ; persistance + load corrupt JSON).
+
+  1035 → 1049 tests verts.
+
+  Action prod recommandée pour rattraper l'historique :
+  ```
+  gh workflow run daily.yml -f reset_category=dossiers_legislatifs -f since_days=14
+  ```
+  Coût : ~150 dossiers AN actifs × ~2-3s par fetch /dyn/opendata/ = ~5-7 min ajoutés au pipeline. Le 1er run paie ce coût ; les runs suivants skippent les texte_refs déjà connus 404 via le cache.
+
 - 2026-05-11 (midi, demande Cyril sur Tavernost + PPR sport) : **R42-W — Enrichir keywords : Edgard Grospiron, Ligue 1+, LFP Media, politique nationale du sport**.
   Suite de la session R42 matin.
 
