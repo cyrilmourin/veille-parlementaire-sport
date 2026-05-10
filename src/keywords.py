@@ -28,9 +28,21 @@ def _clean_html(text: str) -> str:
 
 
 def _normalize(text: str) -> str:
-    """Minuscules, sans accent, espaces simples."""
+    """Minuscules, sans accent, espaces simples.
+
+    R41-AO (2026-05-10) : décodage des entités HTML AVANT unidecode +
+    collapse whitespace. Les flux RSS WordPress (Olbia, FFF, FFT, FFA,
+    sport_strategies, etc.) injectent des `&#160;` (espace insécable),
+    `&#8217;` (apostrophe typographique), etc. Sans `html.unescape` :
+    « nommé&#160;président » ne matche pas le keyword « nommé président »
+    → la famille `nomination_event` ne taggait JAMAIS les items presse
+    business → tous étaient supprimés par `_filter_nominations_only_sources`
+    → 0 nominations presse visibles sur le site.
+    """
     if not text:
         return ""
+    import html as _html
+    text = _html.unescape(text)
     text = unidecode(text).lower()
     text = re.sub(r"\s+", " ", text).strip()
     return text
