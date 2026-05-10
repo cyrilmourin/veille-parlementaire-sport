@@ -1772,28 +1772,21 @@ def _agenda_url(uid: str, xsi_type: str, dt, cr_ref: str = "",
     #    URL canonique : /dyn/17/comptes-rendus/seance/{cr_ref}
     if "seance" in xsi_type and cr_ref:
         return f"https://www.assemblee-nationale.fr/dyn/17/comptes-rendus/seance/{cr_ref}"
-    # 2. Réunion rattachée à un organe connu (commission permanente,
-    #    commission spéciale, commission d'enquête, mission d'information,
-    #    délégation, groupe d'études) : page organe AN officielle.
-    #    Ex. `/dyn/17/organes/PO419604` (Commission culture/éducation),
-    #        `/dyn/17/organes/cion-cedu` (même organe, slug alternatif
-    #        accepté par le portail AN pour les 8 commissions permanentes).
-    #    Le code `PO…` fonctionne pour tous les organes connus de l'AMO,
-    #    slug littéral ne marche que pour les commissions permanentes —
-    #    on préfère le code PO (plus universel). Pour les groupes d'études
-    #    (GE Sport = PO800824…), ça renvoie la page GE avec travaux récents.
-    if organe_ref:
-        return (
-            f"https://www.assemblee-nationale.fr/dyn/17/organes/{organe_ref}"
-        )
-    # 3. Date connue sans organe : ancre jour dans l'agenda global.
+    # R41-AL (2026-05-10) : refonte des fallbacks d'URL agenda. L'AN a
+    # cassé `/dyn/17/organes/<code>` (vérifié 2026-05-10 : 404 sur PO419604,
+    # PO838901, cion-cedu, cion-eco, cion-lois — tous renvoyés 404 par le
+    # portail AN). On bascule sur la page agenda jour
+    # `https://www2.assemblee-nationale.fr/agendas/les-agendas/YYYY-MM-DD`
+    # vérifiée 200 OK — elle liste toutes les réunions du jour avec
+    # détail commission. Plus utile pour l'utilisateur que la page d'organe
+    # générique. Si pas de date connue : agenda global du jour courant.
     if dt is not None:
         return (
-            "https://www.assemblee-nationale.fr/dyn/agendas-parlementaires/agenda-an"
-            f"#jour-{dt.date().isoformat()}"
+            "https://www2.assemblee-nationale.fr/agendas/les-agendas/"
+            f"{dt.date().isoformat()}"
         )
-    # 4. Dernier recours : agenda global.
-    return "https://www.assemblee-nationale.fr/dyn/agendas-parlementaires/agenda-an"
+    # Dernier recours : agenda global (toujours 200 OK).
+    return "https://www2.assemblee-nationale.fr/agendas/les-agendas"
 
 
 def _normalize_agenda(obj, src, cat):

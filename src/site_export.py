@@ -3476,8 +3476,13 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         # Si la catégorie y figure, on re-filtre le bucket avant l'affichage.
         home_window = HOMEPAGE_WINDOW_DAYS_BY_CATEGORY.get(cat)
         display_window = home_window if home_window is not None else _window_for(cat)
-        # Tri explicite du bucket par date desc (plus récent en haut)
+        # Tri explicite du bucket par date desc (plus récent en haut).
+        # R41-AL (2026-05-10) : exception pour `agenda` — tri ASC pour
+        # afficher les rendez-vous les plus PROCHES d'abord (ce qui est
+        # à venir > ce qui est passé). Cyril : « les plus proches d'abord ».
         bucket = _sort_by_date_desc(by_cat[cat])
+        if cat == "agenda":
+            bucket = list(reversed(bucket))  # ASC, futur proche en tête
         if home_window is not None:
             cutoff = datetime.now() - timedelta(days=home_window)
             cutoff_iso = cutoff.strftime("%Y-%m-%dT%H:%M:%S")
