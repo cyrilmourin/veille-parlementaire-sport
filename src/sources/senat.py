@@ -119,6 +119,144 @@ def _persist_rap_404_cache() -> None:
         log.warning("senat_rapports : persistance cache 404 KO (%s)", e)
 
 
+# ============================================================================
+# R42-L (2026-05-10) — Extension du matching aux dossiers législatifs Sénat
+# via fetch de la page texte intégral `/leg/<slug>.html`.
+#
+# Origine : Cyril a remonté la PPL Sénat n°25-566 « Repenser l'agencification »
+# (déposée 27/04/2026 par P. MARTIN et M. DARNAUD) qui propose la dissolution
+# de l'Agence nationale du sport — non visible sur le site. Diagnostic :
+#   - Le CSV `ppl.csv` contient bien le dossier (titre + auteurs + thèmes)
+#   - MAIS title + auteurs + thèmes (« Pouvoirs publics et Constitution,
+#     Société ») ne contient AUCUN keyword sport
+#   - Le texte intégral de la PPL (page `/leg/ppl25-566.html`, 85k chars)
+#     contient 9 mentions « Agence nationale du sport » → matche `acteur`
+# Solution symétrique à R42-B (rapports) : fetch la page texte intégral
+# pour les dossiers récents et alimente `raw.haystack_body[:50000]`.
+#
+# Pattern URL : `/dossier-legislatif/<slug>.html` → `/leg/<slug>.html`.
+# Tous les dossiers n'ont PAS de page texte (~50% en 404 sur tests live) :
+# vieux dossiers, dossiers retirés, dépôts en cours sans texte exposé.
+# Cache 404 dédié : `data/senat_dossier_text_404.json`. Pattern symétrique
+# à R42-B-bis pour les rapports.
+# ============================================================================
+
+_RAP_DOSSIER_TEXT_CACHE_PATH = Path("data/senat_dossier_text_404.json")
+_RAP_DOSSIER_TEXT_CACHE: set[str] | None = None
+_RAP_DOSSIER_TEXT_DIRTY = False
+
+_DOSSIER_LEG_RE = re.compile(
+    r"/dossier-legislatif/((?:ppl|pjl|prr|s)\d+(?:-\d+)?)\.html?",
+    re.IGNORECASE,
+)
+
+
+def _build_dossier_leg_url(dossier_url: str) -> str:
+    """Convertit l'URL `/dossier-legislatif/<slug>.html` en `/leg/<slug>.html`.
+
+    Retourne `""` si le format n'est pas reconnu (URL atypique, dossier
+    pré-numérique). Le résultat est en HTTPS.
+    """
+    if not dossier_url:
+        return ""
+    m = _DOSSIER_LEG_RE.search(dossier_url)
+    if not m:
+        return ""
+    slug = m.group(1).lower()
+    return f"https://www.senat.fr/leg/{slug}.html"
+
+
+def _load_dossier_text_404_cache() -> set[str]:
+    """Charge le cache 404 (lazy, soft-fail)."""
+    global _RAP_DOSSIER_TEXT_CACHE
+    if _RAP_DOSSIER_TEXT_CACHE is not None:
+        return _RAP_DOSSIER_TEXT_CACHE
+    try:
+        if _RAP_DOSSIER_TEXT_CACHE_PATH.exists():
+            data = json.loads(_RAP_DOSSIER_TEXT_CACHE_PATH.read_text(encoding="utf-8"))
+            slugs = data.get("slugs_404", [])
+            _RAP_DOSSIER_TEXT_CACHE = set(slugs) if isinstance(slugs, list) else set()
+        else:
+            _RAP_DOSSIER_TEXT_CACHE = set()
+    except Exception as e:
+        log.debug("senat_dosleg : load 404 cache KO (%s) — repart à vide", e)
+        _RAP_DOSSIER_TEXT_CACHE = set()
+    return _RAP_DOSSIER_TEXT_CACHE
+
+
+def _mark_dossier_text_404(slug: str) -> None:
+    global _RAP_DOSSIER_TEXT_DIRTY
+    if not slug:
+        return
+    cache = _load_dossier_text_404_cache()
+    if slug not in cache:
+        cache.add(slug)
+        _RAP_DOSSIER_TEXT_DIRTY = True
+
+
+def _is_dossier_text_404(slug: str) -> bool:
+    if not slug:
+        return False
+    return slug in _load_dossier_text_404_cache()
+
+
+def _persist_dossier_text_404_cache() -> None:
+    """Persiste le cache si modifié. Appelé en fin de fetch dosleg."""
+    global _RAP_DOSSIER_TEXT_DIRTY
+    if not _RAP_DOSSIER_TEXT_DIRTY:
+        return
+    try:
+        _RAP_DOSSIER_TEXT_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        slugs = sorted(_load_dossier_text_404_cache())
+        _RAP_DOSSIER_TEXT_CACHE_PATH.write_text(
+            json.dumps({"slugs_404": slugs}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        _RAP_DOSSIER_TEXT_DIRTY = False
+        log.info("senat_dosleg : cache 404 texte persisté (%d slugs)", len(slugs))
+    except Exception as e:
+        log.warning("senat_dosleg : persistance cache 404 KO (%s)", e)
+
+
+def _fetch_senat_dossier_text_haystack(
+    dossier_url: str, max_chars: int = 50000,
+) -> str:
+    """Fetch la page `/leg/<slug>.html` du Sénat et extrait le texte tronqué.
+
+    R42-L (2026-05-10). Soft-fail systématique :
+    - URL non reconnue → ""
+    - slug en cache 404 → ""
+    - fetch KO (404, timeout, WAF) → cache si 404, sinon non caché
+    - parse BS4 KO → ""
+    """
+    leg_url = _build_dossier_leg_url(dossier_url)
+    if not leg_url:
+        return ""
+    slug_match = re.search(r"/leg/((?:ppl|pjl|prr|s)\d+(?:-\d+)?)\.html?", leg_url)
+    slug = slug_match.group(1) if slug_match else ""
+    if slug and _is_dossier_text_404(slug):
+        return ""
+    try:
+        html_body = fetch_text(leg_url)
+    except Exception as e:
+        msg = str(e).lower()
+        if slug and ("404" in msg or "not found" in msg):
+            _mark_dossier_text_404(slug)
+        log.debug("senat_dosleg : fetch /leg/ KO %s (%s)", leg_url, e)
+        return ""
+    if not html_body:
+        return ""
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html_body, "html.parser")
+        main = soup.find("main") or soup.find("div", id="main")
+        text = main.get_text(" ", strip=True) if main else soup.get_text(" ", strip=True)
+    except Exception as e:
+        log.debug("senat_dosleg : parse /leg/ KO %s (%s)", leg_url, e)
+        return ""
+    return text[:max_chars] if text else ""
+
+
 def _first_sentence(text: str, max_len: int = 140) -> str:
     """Renvoie la 1re phrase du texte, tronquée à max_len."""
     if not text:
@@ -589,6 +727,17 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
     # promulguees : 'Titre', 'Numéro de la loi', 'Date de promulgation', 'URL du dossier'
     # dosleg    : format legacy / peut varier
     if sid in ("senat_dosleg", "senat_ppl", "senat_promulguees"):
+        # R42-L (2026-05-10) : pour chaque dossier récent (< body_window_days),
+        # fetch la page texte intégral `/leg/<slug>.html` et alimente
+        # `raw.haystack_body[:50000]` pour étendre le matching keyword au
+        # contenu réel de la PPL/PJL (pas seulement title + thèmes du CSV).
+        # Cas qui motive ce fetch : PPL 25-566 « Repenser l'agencification »
+        # qui propose la dissolution de l'ANS — le titre et les thèmes ne
+        # contiennent aucun keyword sport, mais le texte intégral mentionne
+        # 9× « Agence nationale du sport ». Sans haystack_body, dossier rate.
+        body_max = int(src.get("body_max_chars", 50000))
+        body_window_days = int(src.get("body_window_days", 800))
+        body_cutoff = datetime.utcnow() - timedelta(days=body_window_days)
         for r in rows:
             uid = _pick(r, "Numéro de texte", "Numéro de la loi",
                          "numero_initiative", "numeroInitiative",
@@ -626,6 +775,11 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
             if sid == "senat_promulguees":
                 raw["is_promulgated"] = True
                 raw.setdefault("status_label", "Promulguée")
+            # R42-L : fetch texte intégral pour les dossiers récents.
+            if date and date >= body_cutoff:
+                hay = _fetch_senat_dossier_text_haystack(url, max_chars=body_max)
+                if hay:
+                    raw["haystack_body"] = hay[:body_max]
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
                 title=titre_disp[:220], url=url,
@@ -633,6 +787,8 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
                 summary=(titre_disp + " — " + extras)[:2000],
                 raw=raw,
             )
+        # R42-L : persistance du cache 404 après tous les fetches.
+        _persist_dossier_text_404_cache()
 
     elif sid == "senat_rapports":
         # Colonnes réelles : Session, Numéro, Tome, Type de rapport, Auteurs,

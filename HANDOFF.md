@@ -266,6 +266,27 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-10 (nuit, demandes Cyril sur PPL ANS absente + label « Dépôt au » incorrect) : **R42-L + R42-M — Extension du matching aux dossiers Sénat via `/leg/<slug>.html` + vraie date de dépôt sur les cards dossiers législatifs**.
+  Lot 2 R-tags atomiques.
+  **R42-L** — Cyril a remonté que la PPL Sénat n°25-566 « Repenser l'agencification pour renforcer l'action publique » (déposée 27/04/2026 par P. MARTIN et M. DARNAUD), qui propose la **dissolution de l'Agence nationale du sport**, n'apparaissait pas dans la veille. Diagnostic :
+  1. Le CSV `ppl.csv` contient bien la PPL (titre + auteurs + thèmes)
+  2. **MAIS** : title (« Repenser l'agencification ») + auteurs + thèmes (« Pouvoirs publics et Constitution, Société ») **ne contiennent AUCUN keyword sport**
+  3. Le texte intégral (page `https://www.senat.fr/leg/ppl25-566.html`, 85k chars) contient en revanche **9 mentions « Agence nationale du sport »** → matche `acteur` si on l'ingère
+
+  Solution symétrique à R42-B (rapports → `_mono.html`) : pour chaque dossier Sénat récent dans le bloc `senat_dosleg / senat_ppl / senat_promulguees`, fetch la page `/leg/<slug>.html` et alimente `raw.haystack_body[:50000]`. Helpers :
+  - `_build_dossier_leg_url` : transforme `/dossier-legislatif/<slug>.html` → `/leg/<slug>.html` via regex `(ppl|pjl|prr|s)\d+-?\d*`.
+  - `_fetch_senat_dossier_text_haystack` : fetch + BS4 main + truncate, soft-fail systématique.
+  - Cache 404 dédié `data/senat_dossier_text_404.json` (séparé du cache rapports R42-B-bis pour éviter les collisions de slug). Helpers `_load/mark/is/persist_dossier_text_404` symétriques.
+  - Skip immédiat si dossier > 800 jours (fenêtre `body_window_days` configurable). Le CSV `ppl.csv` ramène ~6000 dossiers historiques ; on cible les ~150 récents.
+  - `_persist_dossier_text_404_cache()` appelé en fin de boucle dans `fetch_source`. Ajouté au `git add` du workflow `daily.yml` step Commit.
+  Tests `tests/test_r42l_dosleg_text_haystack.py` : 14 tests (build URL pour PPL/PJL modernes, format ancien `s78790566`, format atypique rejeté ; fetch skip-si-cache / mark-on-404 / no-mark-on-timeout / extrait-main / truncate / URL-atypique-no-fetch ; cache persist / noop / load / corrupt).
+  **R42-M** — Sur les cards `/items/dossiers_legislatifs/`, l'intitulé « Dépôt au Sénat le … » donnait en réalité la date d'**examen agenda boostée** par R41-K, pas la vraie date de dépôt. Cyril : « tu donnes la date de la prochaine action ou de la dernière réalisée, mais tu as toujours l'intitulé "Dépot au X le". OR ce n'est pas la date de dépôt ». R41-K avait sauvegardé la date originale dans `raw.published_at_original` mais elle n'était pas exposée au frontmatter Hugo. Fix :
+  - `src/site_export.py` : pour `cat == "dossiers_legislatifs"` ET `raw.published_at_original` ≠ frontmatter_date, émet `date_depot: YYYY-MM-DD` au frontmatter.
+  - `site/layouts/dossiers_legislatifs/list.html` : lecture `.Params.date_depot` en priorité, fallback `.Date` si pas de boost. La date affichée est désormais TOUJOURS la vraie date de dépôt — l'utilisateur comprend la prochaine action via le cartouche `status_label` qui indique « Première lecture AN », « En commission le 12/05/2026 », etc.
+  Tests `tests/test_r42m_date_depot.py` : 2 tests (émission `date_depot:` côté pipeline + utilisation `.Params.date_depot` côté template).
+
+  1007 → 1024 tests verts. Action prod : push direct → daily.yml redéploie. Pour ingérer la PPL 25-566 et autres dossiers récents avec `haystack_body` : `gh workflow run daily.yml -f reset_category=dossiers_legislatifs -f since_days=14` (recommandé pour rattraper l'historique).
+
 - 2026-05-10 (nuit, demande Cyril sur volume nominations) : **R42-J — Enrichissement de la famille `nomination_event` (verbes informels presse business)**.
   Audit Cyril 2026-05-10 sur la page Nominations : 16 newsletters Olbia dans la fenêtre 90j, mais seulement 2 items visibles. Diagnostic : la famille `nomination_event` (78 keywords) couvrait `nommé/élu président` + `prend la présidence/tête` + `succède à la tête/présidence`, mais ratait les formules informelles courantes en presse business (Olbia, Café du Sport Business, Sport Stratégies) :
   - « X devient président de Y » ← absent
@@ -285,7 +306,9 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
   Tentative initiale incluait « nouveau / nouvelle + fonction » mais retirée après échec des tests R41-A (patterns descriptifs interdits depuis R41-A : « le nouveau président de la FFR s'est rendu à la rencontre de… » décrit un état, pas un acte). Trade-off accepté : on perd quelques nominations qui n'utilisent QUE « nouveau X » sans verbe performatif autour, en échange d'un volume de faux positifs très réduit.
 
-  999 → 1007 tests verts. Action prod : push direct → daily.yml redéploie. Pour profiter immédiatement sur les newsletters Olbia/FFF/etc. déjà ingérées : `gh workflow run daily.yml -f reset_category=communiques -f since_days=14` (ré-évalue les keywords sur les items existants ; sinon les nouveaux items du run de demain matin auront immédiatement les nouveaux matches).
+  **AUDIT POST-DÉPLOIEMENT (2026-05-10 nuit)** — sur 88 items presse business scannés en dry-run (10 newsletters Olbia + sport_strategies + fff/fft/ffa) : **0 nouvelle nomination captée par R42-J**. Cause : les newsletters Olbia (source la plus dense en nominations) utilisent quasi-exclusivement « nommé président », « élu président », « a été nommé(e) directrice » — déjà couverts AVANT R42-J. Les 7/10 newsletters non matchées ne contiennent en réalité aucune nomination effective (offres de recrutement, infos JOP, partenariats). Décision Cyril : **on garde R42-J en place comme assurance qualité** pour les futures formulations (« devient président de la FFR » est une formulation susceptible d'apparaître à l'avenir dans un communiqué de fédération) sans dispatch reset car aucun gain immédiat. Pas de migration / pas de reset_communiques.
+
+  999 → 1007 tests verts.
 
 - 2026-05-10 (soir tardif, suite session R42-DEF) : **R42-G + R42-H + R42-B-bis — Cartouches PPL inline desktop, terminologie « séance publique », cache 404 Sénat mono.html**.
   Lot UX + perf, 3 R-tags atomiques.

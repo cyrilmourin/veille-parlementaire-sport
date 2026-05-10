@@ -35,16 +35,25 @@ def _reset_senat_rap_404_cache_per_test():
     Le pointer du cache path est aussi remis à sa valeur par défaut pour
     éviter qu'un monkeypatch d'un test précédent laisse le cache pointer
     sur un tmp_path supprimé.
+
+    R42-L (2026-05-10) : reset également le cache des dossiers (texte
+    intégral `/leg/`).
     """
     from src.sources import senat as senat_mod
     from pathlib import Path as _P
     senat_mod._RAP_404_CACHE = None
     senat_mod._RAP_404_DIRTY = False
     senat_mod._RAP_404_CACHE_PATH = _P("data/senat_rap_mono_404.json")
+    senat_mod._RAP_DOSSIER_TEXT_CACHE = None
+    senat_mod._RAP_DOSSIER_TEXT_DIRTY = False
+    senat_mod._RAP_DOSSIER_TEXT_CACHE_PATH = _P("data/senat_dossier_text_404.json")
     yield
     senat_mod._RAP_404_CACHE = None
     senat_mod._RAP_404_DIRTY = False
     senat_mod._RAP_404_CACHE_PATH = _P("data/senat_rap_mono_404.json")
+    senat_mod._RAP_DOSSIER_TEXT_CACHE = None
+    senat_mod._RAP_DOSSIER_TEXT_DIRTY = False
+    senat_mod._RAP_DOSSIER_TEXT_CACHE_PATH = _P("data/senat_dossier_text_404.json")
 
 
 # ----------------------------------------------------------------- WINDOW

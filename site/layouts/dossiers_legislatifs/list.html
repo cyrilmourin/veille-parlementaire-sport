@@ -82,9 +82,21 @@
 
         {{ with $type }}<div class="dosleg-card__type">{{ . }}</div>{{ end }}
 
+        {{/* R42-M (2026-05-10) — affiche la VRAIE date de dépôt, pas la
+             date boostée par R41-K. Quand un dosleg a été inscrit à
+             l'agenda (commission/séance future), `published_at` est
+             poussée à la date d'examen pour le tri « dossier en cours ».
+             Mais l'utilisateur lit « Dépôt au Sénat le {date} » et
+             attend la VRAIE date de dépôt. Le pipeline expose la date
+             originale dans `.Params.date_depot` quand un boost a eu
+             lieu (sinon `.Date` est déjà la date de dépôt). Cyril
+             2026-05-10 : « garde la date de dépôt uniquement, on
+             comprend la prochaine action par le cartouche ». */}}
+        {{ $depotDate := .Date }}
+        {{ with .Params.date_depot }}{{ $depotDate = (time.AsTime .) }}{{ end }}
         <div class="dosleg-card__deposit">
           {{ $depotLib }}
-          {{ if not .Date.IsZero }} le <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006" }}</time>{{ end }}
+          {{ if not $depotDate.IsZero }} le <time datetime="{{ $depotDate.Format "2006-01-02" }}">{{ $depotDate.Format "02/01/2006" }}</time>{{ end }}
         </div>
 
         {{ with .Params.status_label }}

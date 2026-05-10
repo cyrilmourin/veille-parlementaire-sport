@@ -4109,6 +4109,23 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
         if published_at_real:
             fm.append(f"published_at_real: {published_at_real}")
         fm.append(f"has_real_date: {str(has_real_date).lower()}")
+        # R42-M (2026-05-10) — VRAIE date de dépôt pour les dossiers
+        # législatifs. R41-K booste `published_at` sur la date d'examen
+        # agenda la plus récente (pour le tri « dossier en cours »), ce
+        # qui rend `.Date` Hugo non-fiable comme date de dépôt. On
+        # expose la date originale via `date_depot:`. Cyril 2026-05-10 :
+        # « tu as toujours l'intitulé "Dépot au X le" ; ce n'est pas la
+        # date de dépôt mais la date de la dernière action ; garde
+        # uniquement la date de dépôt ». Posé seulement quand
+        # `raw.published_at_original` existe (cad. quand R41-K a boosté
+        # — sinon `.Date` = date originale, pas besoin de doubler).
+        if cat == "dossiers_legislatifs" and isinstance(raw, dict):
+            orig = raw.get("published_at_original") or ""
+            if orig:
+                # Format ISO court YYYY-MM-DD pour Hugo time.AsTime
+                date_depot = orig[:10]
+                if date_depot and date_depot != frontmatter_date[:10]:
+                    fm.append(f"date_depot: {date_depot}")
         # R23-H (2026-04-23) : famille de source pour le filtre UI exposé
         # sur /items/agenda/ et /items/communiques/. 5 buckets stables :
         # parlement | gouvernement | autorites | operateurs | jorf
