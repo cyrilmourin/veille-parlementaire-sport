@@ -79,7 +79,7 @@ def test_load_blocklist_lit_les_uids_du_yaml_actuel():
     """blocklist.yml actuel doit exposer les 2 amendements PJL n°2632 via
     UIDs techniques (pas via URL navigable, pour qu'ils soient effectivement
     filtrés)."""
-    blocked_urls, blocked_uids = _load_blocklist()
+    blocked_urls, blocked_uids, _recat_urls, _recat_uids = _load_blocklist()
     assert ("an_amendements::AMANR5L17PO419865B2632P0D1N000495"
             in blocked_uids)
     assert ("an_amendements::AMANR5L17PO419865B2632P0D1N000492"
@@ -104,7 +104,7 @@ def test_load_blocklist_url_navigable_ignoree_avec_warning(monkeypatch, tmp_path
     monkeypatch.setattr(mod, "_BLOCKLIST_PATH", yml)
 
     with caplog.at_level(logging.WARNING):
-        blocked_urls, blocked_uids = mod._load_blocklist()
+        blocked_urls, blocked_uids, _recat_urls, _recat_uids = mod._load_blocklist()
 
     canon_navigable = ("www.assemblee-nationale.fr/dyn/17/amendements/"
                        "2632/cion-dvp/cd495")
@@ -131,7 +131,7 @@ def test_load_blocklist_uid_technique_passe_meme_si_url_navigable_skippee(
     )
     import src.site_export as mod
     monkeypatch.setattr(mod, "_BLOCKLIST_PATH", yml)
-    blocked_urls, blocked_uids = mod._load_blocklist()
+    blocked_urls, blocked_uids, _recat_urls, _recat_uids = mod._load_blocklist()
     assert blocked_urls == set()
     assert (blocked_uids
             == {"an_amendements::AMANR5L17PO419865B2632P0D1N000495"})

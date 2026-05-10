@@ -30,8 +30,13 @@ def _row(*, source_id, category="nominations", title="",
 # ---------------------------------------------------------------------------
 
 
-def test_source_presse_normalise_titre_et_masque_url():
-    """Olbia + accroche presse → titre canonique + URL masquée."""
+def test_source_presse_normalise_titre_et_preserve_url():
+    """Olbia + accroche presse → titre canonique + URL préservée.
+
+    R41-AU (2026-05-10) : décision Cyril — l'URL pointe vers la
+    newsletter d'origine (utile pour vérifier la nomination). On revient
+    sur la décision R41-E qui masquait l'URL pour les sources presse.
+    """
     rows = [_row(
         source_id="olbia_conseil",
         title="Cette semaine, Olbia a appris que…",
@@ -41,7 +46,9 @@ def test_source_presse_normalise_titre_et_masque_url():
     out = _normalize_and_dedup_nominations(rows)
     assert len(out) == 1
     assert out[0]["title"] == "Eric Woerth devient président du PMU"
-    assert out[0]["url"] == ""  # URL masquée
+    assert out[0]["url"] == (
+        "https://www.olbia-conseil.com/2026/04/27/cette-semaine-x/"
+    )
 
 
 def test_source_officielle_preserve_titre_et_url():

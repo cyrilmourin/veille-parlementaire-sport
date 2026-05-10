@@ -36,7 +36,7 @@ _REGIONS_CPSF = (
 def test_blocklist_contient_les_12_regions_cpsf():
     """Les 12 URLs régions CPSF (avec double slash `//region/`) sont
     bien dans la blocklist canonicalisée."""
-    blocked_urls, _ = _load_blocklist()
+    blocked_urls, _, _, _ = _load_blocklist()
     for region in _REGIONS_CPSF:
         canon = f"france-paralympique.fr/actualites//region/{region}"
         assert canon in blocked_urls, (
@@ -45,7 +45,7 @@ def test_blocklist_contient_les_12_regions_cpsf():
 
 
 def test_blocklist_contient_page_cnosf_deontologie():
-    blocked_urls, _ = _load_blocklist()
+    blocked_urls, _, _, _ = _load_blocklist()
     assert ("cnosf.franceolympique.com/comite-de-deontologie-du-cnosf"
             in blocked_urls)
 

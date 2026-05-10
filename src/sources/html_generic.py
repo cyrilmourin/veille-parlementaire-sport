@@ -32,6 +32,27 @@ log = logging.getLogger(__name__)
 _RSS_SITEMAP_CUTOFF_DAYS = 120
 
 
+# R41-AS (2026-05-10) — Stop-list de slugs sitemap qui correspondent à
+# des pages techniques / institutionnelles permanentes, pas à des
+# actualités. Cas observé : sitemap CNOSF qui exposait `/accueil` avec
+# un lastmod récent → l'item remontait avec titre = « Accueil ».
+# Le filtre `url_filter: ["/"]` (ouvert) retient ces pages, et le slug
+# reconstitue un titre trompeur. Filtre côté scraper, pas blocklist
+# (générique : couvre les futurs sites Drupal/WP avec mêmes pages
+# techniques).
+_SITEMAP_STOP_SLUGS: frozenset[str] = frozenset({
+    "accueil", "home", "index",
+    "contact", "contacts", "nous-contacter",
+    "mentions-legales", "mentions", "legal",
+    "qui-sommes-nous", "presentation", "a-propos",
+    "rgpd", "cgu", "cgv", "politique-confidentialite",
+    "plan-du-site", "sitemap",
+    "newsletter", "newsletters",
+    "recherche", "search",
+    "accessibilite", "credits",
+})
+
+
 def _from_rss_generic(src: dict) -> list[Item]:
     """Parse un flux RSS 2.0 / Atom — titre + lien + date + description.
 
@@ -147,6 +168,12 @@ def _from_sitemap_generic(src: dict) -> list[Item]:
             continue
         # Titre reconstruit depuis le slug du dernier segment.
         slug = loc.rstrip("/").rsplit("/", 1)[-1]
+        # R41-AS : skip les slugs techniques (accueil, contact, mentions
+        # légales…) — ce ne sont pas des actualités même si elles ont un
+        # lastmod récent dans le sitemap (ex. CNOSF /accueil → titre
+        # « Accueil » polluait la page Publications).
+        if slug.lower() in _SITEMAP_STOP_SLUGS:
+            continue
         title = slug.replace("-", " ").replace("_", " ").strip()[:200]
         if not title:
             continue

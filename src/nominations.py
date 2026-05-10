@@ -333,6 +333,63 @@ def extract_nomination_facts(text: str) -> dict | None:
     return None
 
 
+def extract_all_nominations(text: str) -> list[dict]:
+    """R41-AU (2026-05-10) — Variante multi-match d'`extract_nomination_facts`.
+
+    Itère sur le texte et renvoie TOUTES les nominations détectables (une
+    par occurrence de verbe performatif suivi d'une fonction + structure
+    valides). Dédup interne par clé canonique pour éviter les répétitions
+    quand le même verbe matche plusieurs patterns.
+
+    Cas d'usage : newsletter Olbia / Café du Sport Business / Sport
+    Stratégies, qui mentionnent N nominations dans un seul item DB. On
+    veut produire N occurrences distinctes sur le site (1 par
+    nomination), au lieu de l'unique 1ère extraction historique.
+
+    Algorithme :
+    - Découpe le texte en segments avec `re.split` sur les séparateurs
+      de phrase forts (point, point-virgule, retour ligne) — limite la
+      pollution inter-phrases (ex. la fonction de la phrase 2 ne se
+      retrouve pas attribuée à la personne de la phrase 1).
+    - Pour chaque segment, applique `extract_nomination_facts`.
+    - Dédup par `canonical_key`.
+
+    Renvoie [] si aucune nomination détectable. Idempotent.
+    """
+    if not text or not isinstance(text, str):
+        return []
+    # Normalise les apostrophes / espaces non-breakables avant de splitter,
+    # pour rester aligné avec le pré-traitement de extract_nomination_facts.
+    txt = (
+        text.replace("’", "'")
+            .replace("ʼ", "'")
+            .replace(" ", " ")
+    )
+    # Split sur séparateurs de phrase forts. On garde les segments non-vides.
+    # Le retour à la ligne dans les newsletters HTML peut être encodé en
+    # `\n`, `<br>` (déjà strippé en amont), ou `. ` standard.
+    segments = re.split(r"(?:[.!?;\n]|<br\s*/?>)+", txt)
+    seen: set[str] = set()
+    out: list[dict] = []
+    for seg in segments:
+        seg = seg.strip()
+        if len(seg) < 20:
+            # Trop court — pas de nomination plausible (sujet+verbe+complément
+            # sous 20 chars, c'est rare).
+            continue
+        facts = extract_nomination_facts(seg)
+        if not facts:
+            continue
+        key = canonical_key(facts)
+        if not key or key == "||":
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(facts)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Dédup canonique
 # ---------------------------------------------------------------------------

@@ -42,7 +42,7 @@ def test_canon_block_url_handles_empty_and_none():
 
 def test_load_blocklist_returns_empty_if_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(se, "_BLOCKLIST_PATH", tmp_path / "missing.yml")
-    urls, uids = se._load_blocklist()
+    urls, uids, _recat_urls, _recat_uids = se._load_blocklist()
     assert urls == set()
     assert uids == set()
 
@@ -51,7 +51,7 @@ def test_load_blocklist_tolerates_malformed_yaml(tmp_path, monkeypatch):
     p = tmp_path / "bad.yml"
     p.write_text("not: valid: yaml: at all:::", encoding="utf-8")
     monkeypatch.setattr(se, "_BLOCKLIST_PATH", p)
-    urls, uids = se._load_blocklist()
+    urls, uids, _recat_urls, _recat_uids = se._load_blocklist()
     assert urls == set()
     assert uids == set()
 
@@ -60,7 +60,7 @@ def test_load_blocklist_tolerates_missing_blocklist_key(tmp_path, monkeypatch):
     p = tmp_path / "noroot.yml"
     p.write_text("other_key:\n  - foo\n", encoding="utf-8")
     monkeypatch.setattr(se, "_BLOCKLIST_PATH", p)
-    urls, uids = se._load_blocklist()
+    urls, uids, _recat_urls, _recat_uids = se._load_blocklist()
     assert urls == set()
     assert uids == set()
 
@@ -79,7 +79,7 @@ def test_load_blocklist_parses_url_and_uid_entries(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     monkeypatch.setattr(se, "_BLOCKLIST_PATH", p)
-    urls, uids = se._load_blocklist()
+    urls, uids, _recat_urls, _recat_uids = se._load_blocklist()
     assert urls == {"example.com/a"}
     assert uids == {"foo_src::bar123"}
 
