@@ -27,6 +27,7 @@ from .sources import (  # noqa: F401
     senat,
     senat_commission_agenda,
     senat_cr_commissions,
+    senat_videos_commission,
 )
 
 log = logging.getLogger(__name__)
@@ -83,6 +84,15 @@ ROUTER: list[tuple[Callable[[dict, dict], bool], Callable[[dict], list[Item]]]] 
     (
         lambda group, src: src.get("format") == "senat_cr_commissions_html",
         senat_cr_commissions.fetch_source,
+    ),
+    # R41-AY (2026-05-10) — Vidéothèque commission Sénat (videos.senat.fr).
+    # Couverture historique : le bloc « Réunions passées » de l'agenda
+    # commission (R41-AX) n'expose pas systématiquement les auditions
+    # une fois passées ; videos.senat.fr les liste durablement avec date
+    # complète + URL du player vidéo.
+    (
+        lambda group, src: src.get("format") == "senat_videos_commission_html",
+        senat_videos_commission.fetch_source,
     ),
     # Assemblée nationale — zips JSON
     (lambda group, src: group == "assemblee_nationale", assemblee.fetch_source),

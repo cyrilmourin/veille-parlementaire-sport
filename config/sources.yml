@@ -302,6 +302,22 @@ senat:
       commission_label: Commission affaires sociales Sénat
       commission_organe: PO211493
 
+    # R41-AY (2026-05-10) — Vidéothèque commission culture/sport Sénat.
+    # Source complémentaire au bloc « Réunions passées » de R41-AX :
+    # videos.senat.fr expose chaque audition une fois publiée avec date
+    # complète (année incluse) + URL du player vidéo. Ne fetch que p1
+    # (10 dernières publications) pour rester ciblé sur le récent.
+    # Limité à la commission culture (AFCL) tant que le scraper n'a pas
+    # été validé en prod — les autres commissions (lois, finances,
+    # affaires étrangères) pourront être ajoutées par duplication YAML
+    # comme pour R40-B/C si le besoin est confirmé.
+    - id: senat_videos_culture
+      category: agenda
+      url: https://videos.senat.fr/commission.AFCL.p1
+      format: senat_videos_commission_html
+      commission_label: Commission culture/éducation/communication/sport
+      commission_organe: PO211490
+
     # R37-A (2026-04-24) — Comptes rendus hebdomadaires commission culture
     # Sénat. Le Sénat ne publie pas de dump JSON/XML pour les CR de
     # commissions : on scrape le listing /compte-rendu-commissions/culture.html

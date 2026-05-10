@@ -266,6 +266,21 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-10 (soir, suite R41-AX — Cyril propose en alternative `videos.senat.fr/commission.AFCL.p1`) : **R41-AY — scraper vidéothèque commission Sénat**.
+  Source : `https://videos.senat.fr/commission.{CODE}.p1` (page 1 = 10 dernières publications). Format différent de la page agenda commission (R35-E / R41-AX) — chaque audition expose une carte avec :
+  - URL du player vidéo direct (utilisée comme `Item.url` → meilleur UX que le lien agenda)
+  - Titre complet (attribut `title="..."` sur le `<a class="stretched-link">`)
+  - **Date complète avec année** (`<time class="card-time">Mercredi 6 mai 2026</time>`) — pas besoin d'heuristique year+1/year-1 contrairement à R35-E/R41-AX
+  - Durée affichée
+  Nouveau module `src/sources/senat_videos_commission.py` + format `senat_videos_commission_html` dans le `ROUTER` `normalize.py`. Sélecteur BS4 `div.swiper-slide div.card.card-reduced` exclut explicitement les cards `card-slim` du footer « Le Sénat, c'est aussi ». UID stable basé sur l'ID Sénat extrait de l'URL (`5814747_69f98208892ca`), fallback hash url+date+title si format change.
+  **Couverture** : pour le moment limité à la commission culture/sport (`AFCL` = `senat_videos_culture` dans `sources.yml`). Les autres commissions (lois `LOIS`, finances `FINC`, affaires étrangères `ETRD`) pourront être ajoutées par duplication YAML comme R40-B/C si besoin confirmé après validation prod. 20 nouveaux tests R41-AY (`tests/test_r41ay_senat_videos_commission.py`). Test sources_config étendu avec le nouveau format.
+  **Combinaison R41-AX + R41-AY** : double couverture des auditions passées commission culture. R41-AX couvre les blocs « Réunions passées » du template TYPO3 si présents. R41-AY couvre la vidéothèque (toujours alimentée une fois la vidéo publiée). Dédup naturel par UID — items distincts si URL différente (page agenda vs page vidéo) mais c'est OK : Cyril préférera afficher le lien vidéo quand il existe.
+
+- 2026-05-10 (soir, signalement Cyril « audition Tavernost du 6 mai connue côté AGLAE Sénat mais pas dans la veille ») : **R41-AX — scraper agenda commission Sénat lit aussi le bloc historique**.
+  Contexte : Cyril a constaté qu'une audition de Nicolas de Tavernost (6 mai 2026) listée sur `https://www.senat.fr/aglae/Instance-0-AFCL/agl06052026.html` n'apparaissait pas dans la veille. Cause structurelle : `senat_commission_agenda.py` (R35-E) ne parsait QUE le bloc « Prochaines réunions » de la page `/agenda-de-la-commission.html` ; les events disparaissaient une fois passés. AGLAE n'est pas couvert par le pipeline (aucune référence dans le code).
+  **Fix** : ajout d'un `_BLOCK_PAST_RE` qui capte trois libellés tolérants (« Dernières réunions » / « Réunions précédentes » / « Réunions passées »). `_parse_page` itère maintenant sur les deux blocs (futur + passé) avec dédup `(date_iso, title)`. Nouveau paramètre `prefer_past` sur `_resolve_date` qui inverse l'heuristique year+1 → year-1 quand un event « passé » apparaît dater de plus de 30 j dans le futur (cas début janvier où le bloc historique montre encore novembre/décembre de l'année écoulée). Suppression de l'early-return sur « Aucun événement » qui aurait jeté les blocs passés peuplés quand le bloc « Prochaines » est vide. 11 nouveaux tests R41-AX (`tests/test_r41av_senat_commission_agenda_past.py`), 8 tests R35-E inchangés.
+  **Limite reconnue** : si la page commission n'expose pas (ou plus) de bloc historique, le code est no-op. Dans ce cas il faudra ajouter un scraper séparé — option `videos.senat.fr/commission.<CODE>.p1` mentionnée par Cyril en bonus (lien vidéos auditions). À traiter dans un cycle ultérieur si nécessaire après vérification de la couverture en prod.
+
 - 2026-05-10 (après-midi, demandes Cyril en lot — captures mobile à l'appui) : **R41-AP à R41-AU — lot UX mobile + dédup dosleg + multi-nominations + blocklist recategorize**.
   Lot conséquent traité en une session, 6 R-tags atomiques :
   - **R41-AP** — CSS mobile : sur la page PPL Sport pro, `.ppl-timeline__label` passait en colonne ultra-étroite à droite des cartouches AN/COMMISSION sur écran < 720px (chaque mot sur sa propre ligne). Fix : `@media (max-width: 720px) { flex: 1 1 100% }` — le label passe sous les cartouches sur mobile, prend toute la largeur.

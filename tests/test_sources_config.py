@@ -45,6 +45,9 @@ _KNOWN_FORMATS = {
     # R37-A (2026-04-24) — CR hebdomadaires commission Sénat (scraping
     # /compte-rendu-commissions/<slug>.html puis fetch de chaque CR).
     "senat_cr_commissions_html",
+    # R41-AY (2026-05-10) — vidéothèque commission Sénat
+    # (videos.senat.fr/commission.{CODE}.p1, lien player vidéo).
+    "senat_videos_commission_html",
 }
 
 
