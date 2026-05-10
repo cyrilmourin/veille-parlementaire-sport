@@ -266,6 +266,27 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-10 (nuit, demande Cyril sur volume nominations) : **R42-J — Enrichissement de la famille `nomination_event` (verbes informels presse business)**.
+  Audit Cyril 2026-05-10 sur la page Nominations : 16 newsletters Olbia dans la fenêtre 90j, mais seulement 2 items visibles. Diagnostic : la famille `nomination_event` (78 keywords) couvrait `nommé/élu président` + `prend la présidence/tête` + `succède à la tête/présidence`, mais ratait les formules informelles courantes en presse business (Olbia, Café du Sport Business, Sport Stratégies) :
+  - « X devient président de Y » ← absent
+  - « X est devenu(e) directeur général » ← absent
+  - « X a été désigné(e) président » ← absent
+  - « le nouveau président » ← INTERDIT (descriptif, pas performatif — cf. R41-A `test_nomination_event_exclut_les_patterns_descriptifs`)
+
+  Patterns ajoutés dans `config/keywords.yml::nomination_event` (avec variantes accentuées + non-accentuées pour respecter la convention historique du yaml) :
+  - **devient + fonction** (masc. + fém.) : `devient président/présidente/PDG/directeur général/directrice générale/directeur sportif/directrice sportive/directeur technique/directrice technique/secrétaire général(e)/directeur(rice) de cabinet/conseil`. Garde-fou explicite : on ne liste JAMAIS « devient » seul, toujours combiné avec une fonction stratégique pour éviter les faux positifs (« le sport devient une priorité ministérielle »).
+  - **est devenu(e) + fonction** (passé composé courant en presse).
+  - **désigné(e) + fonction** (terme officiel de désignation par instance) + variantes « a été désigné(e) ».
+
+  Tests `tests/test_keywords.py` : +8 régressions :
+  - 5 tests positifs (devient président, devient DG, devient directrice sportive, est devenu président, désignée présidente) — couvrent les formules Olbia.
+  - 1 test régression « Olbia typique » (Sandra Berger devient présidente FF montagne et escalade).
+  - 2 tests anti-faux-positif (« devient » seul + « devient priorité/enjeu/cause/objectif ») pour garantir qu'on ne crée pas de faux positifs descriptifs.
+
+  Tentative initiale incluait « nouveau / nouvelle + fonction » mais retirée après échec des tests R41-A (patterns descriptifs interdits depuis R41-A : « le nouveau président de la FFR s'est rendu à la rencontre de… » décrit un état, pas un acte). Trade-off accepté : on perd quelques nominations qui n'utilisent QUE « nouveau X » sans verbe performatif autour, en échange d'un volume de faux positifs très réduit.
+
+  999 → 1007 tests verts. Action prod : push direct → daily.yml redéploie. Pour profiter immédiatement sur les newsletters Olbia/FFF/etc. déjà ingérées : `gh workflow run daily.yml -f reset_category=communiques -f since_days=14` (ré-évalue les keywords sur les items existants ; sinon les nouveaux items du run de demain matin auront immédiatement les nouveaux matches).
+
 - 2026-05-10 (soir tardif, suite session R42-DEF) : **R42-G + R42-H + R42-B-bis — Cartouches PPL inline desktop, terminologie « séance publique », cache 404 Sénat mono.html**.
   Lot UX + perf, 3 R-tags atomiques.
   **R42-G** — Étend le fix mobile R41-AP au desktop sur la timeline « Prochaines étapes de la discussion » de la page `/ppl-sport-pro/`. Avant : sur desktop, le titre de l'étape (label) tentait de tenir sur la même ligne que les cartouches (date + chambre + Commission/Séance publique) via `flex: 1 1 0`, ce qui le coinçait dans une colonne étroite à droite des cartouches — illisible quand le titre était long. Cyril : « passer en inline des cartouches l'occurrence, plutôt qu'à côté, pour que le titre aille à la ligne sous les cartouches AN ou Commission ». Après : `flex: 1 1 100%` désormais inconditionnel (suppression de la media query R41-AP devenue obsolète) — le label passe systématiquement sur la ligne suivante, sous les cartouches. Cohérent mobile + desktop. CSS-only, zéro impact pipeline.

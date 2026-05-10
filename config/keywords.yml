@@ -468,3 +468,88 @@ nomination_event:
   - nomination a la tete
   - prendra ses fonctions
   - entrera en fonction le
+
+  # ========================================================================
+  # R42-J (2026-05-10) — Patterns « devient + fonction » / « nouveau +
+  # fonction » / « est devenu(e) + fonction » courants en presse business
+  # (Olbia, Café du Sport Business, Sport Stratégies, etc.). Ces formules
+  # remplacent souvent « nommé/élu » dans le langage journalistique :
+  # « X devient président de la FFR », « Y est la nouvelle directrice du
+  # sport ». Audit 2026-05-10 : sur 16 newsletters Olbia dans la fenêtre
+  # 90j, seules 2 matchaient (« nommé président OM », « élue présidente
+  # FF montagne ») — les 14 autres utilisaient « devient/rejoint/nouveau »
+  # non couverts. CRITIQUE : toujours combiner « devient » avec une
+  # fonction stratégique pour éviter les faux positifs (« le sport devient
+  # une priorité du gouvernement »). On ne liste JAMAIS « devient » seul.
+  # ========================================================================
+
+  # — devient + fonction (masc.)
+  - devient président
+  - devient president
+  - devient président-directeur général
+  - devient president-directeur general
+  - devient pdg
+  - devient directeur général
+  - devient directeur general
+  - devient directeur exécutif
+  - devient directeur executif
+  - devient directeur sportif
+  - devient directeur technique
+  - devient directeur technique national
+  - devient secrétaire général
+  - devient secretaire general
+  - devient directeur de cabinet
+  - devient directeur conseil
+
+  # — devient + fonction (fém.)
+  - devient présidente
+  - devient presidente
+  - devient directrice générale
+  - devient directrice generale
+  - devient directrice exécutive
+  - devient directrice executive
+  - devient directrice sportive
+  - devient directrice technique
+  - devient directrice technique nationale
+  - devient secrétaire générale
+  - devient secretaire generale
+  - devient directrice de cabinet
+  - devient directrice conseil
+
+  # — est devenu(e) + fonction (passé composé courant en presse)
+  - est devenu président
+  - est devenu president
+  - est devenue présidente
+  - est devenue presidente
+  - est devenu directeur général
+  - est devenu directeur general
+  - est devenue directrice générale
+  - est devenue directrice generale
+  - est devenu directeur sportif
+  - est devenue directrice sportive
+  - est devenu directeur technique
+  - est devenue directrice technique
+
+  # — NB : « nouveau / nouvelle + fonction » NE FIGURE PAS dans la liste,
+  #   contrairement à ce qu'on aurait pu croire utile pour les newsletters
+  #   presse. R41-A a explicitement interdit ces patterns (test
+  #   `test_nomination_event_exclut_les_patterns_descriptifs`) car ils sont
+  #   DESCRIPTIFS et non performatifs : « le nouveau président de la FFR
+  #   s'est rendu à la rencontre de… » décrit un état acquis et ne signale
+  #   pas un acte de nomination en cours. Trade-off accepté : on perd
+  #   quelques nominations qui n'utiliseraient QUE « nouveau X » sans verbe
+  #   performatif autour, en échange d'un volume de faux positifs très réduit.
+
+  # — Désigné / désignée (terme officiel de désignation par instance)
+  - désigné président
+  - designe president
+  - désignée présidente
+  - designee presidente
+  - désigné directeur général
+  - designe directeur general
+  - désignée directrice générale
+  - designee directrice generale
+  - a été désigné président
+  - a ete designe president
+  - a été désignée présidente
+  - a ete designee presidente

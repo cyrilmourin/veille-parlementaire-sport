@@ -113,3 +113,71 @@ def test_recapitalize_leaves_unknown_kws_untouched(m):
 def test_recapitalize_empty_input(m):
     assert m.recapitalize([]) == []
     assert m.recapitalize(None) == []
+
+
+# ============================================================
+# R42-J (2026-05-10) — Patterns nomination informels (presse).
+# ============================================================
+
+def test_r42j_devient_president_match(m):
+    """« X devient président de Y » doit déclencher nomination_event."""
+    kws, fams = m.match("Stéphane Richard devient président de l'Olympique de Marseille")
+    assert "nomination_event" in fams
+    # Au moins un kw matché parmi nos patterns
+    assert any("devient président" in k.lower() for k in kws)
+
+
+def test_r42j_devient_directeur_general_match(m):
+    kws, fams = m.match("Sandra Berger devient directrice générale du groupe Décathlon")
+    assert "nomination_event" in fams
+
+
+def test_r42j_devient_directrice_sportive_match(m):
+    kws, fams = m.match("Marie Dupont devient directrice sportive de la FFR")
+    assert "nomination_event" in fams
+
+
+def test_r42j_est_devenu_president_match(m):
+    """Forme passé composé : « X est devenu président de Y »."""
+    kws, fams = m.match("Pierre Martin est devenu président du CNOSF en 2026")
+    assert "nomination_event" in fams
+
+
+def test_r42j_designee_presidente_match(m):
+    kws, fams = m.match(
+        "Amélie Oudéa-Castéra a été désignée présidente du conseil d'administration"
+    )
+    assert "nomination_event" in fams
+
+
+def test_r42j_devient_seul_pas_de_match(m):
+    """« devient » SANS fonction stratégique ne doit PAS matcher
+    nomination_event — garde-fou anti-faux-positif explicite.
+    Cas réel : « le sport devient une priorité ministérielle »."""
+    kws, fams = m.match("Le sport devient une priorité du gouvernement")
+    assert "nomination_event" not in fams
+
+
+def test_r42j_devient_priorite_pas_de_match(m):
+    """Variante de l'anti-faux-positif : « devient un enjeu », « devient
+    une cause » — formules figuratives sans nomination réelle."""
+    for sentence in [
+        "Le tennis devient un enjeu national",
+        "L'inclusion par le sport devient une cause européenne",
+        "La parité devient un objectif fédéral",
+    ]:
+        _, fams = m.match(sentence)
+        assert "nomination_event" not in fams, f"Faux positif sur : {sentence!r}"
+
+
+def test_r42j_devient_avec_fonction_couvre_olbia_typique(m):
+    """Régression : reproduit le pattern Olbia
+    « X devient président(e) de la FF Y » qu'on ratait jusqu'à R42-J."""
+    cases = [
+        "Sandra Berger devient présidente de la FF montagne et escalade",
+        "Antoine Dupond devient président de la FFR",
+        "Marie Bonnet devient directrice technique nationale de la FFA",
+    ]
+    for sent in cases:
+        kws, fams = m.match(sent)
+        assert "nomination_event" in fams, f"Manqué : {sent!r}"
