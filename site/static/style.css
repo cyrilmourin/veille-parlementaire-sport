@@ -2389,6 +2389,18 @@ details.ppl-fold[open] > p {
   font-style: italic;
 }
 
+/* R41-AP (2026-05-10) : sur mobile, le label passe en flex-basis 100%
+   pour s'afficher SOUS les cartouches AN/Sénat + COMMISSION/SÉANCE.
+   Sur desktop il reste inline (cf. R41-AG). Sans ce fix, le label se
+   retrouvait coincé dans une colonne ultra-étroite à droite des
+   cartouches sur écran < 720px (chaque mot finissait sur sa propre
+   ligne — illisible). */
+@media (max-width: 720px) {
+  .ppl-timeline__label {
+    flex: 1 1 100%;
+  }
+}
+
 /* R41-T : ligne overview 50/50 (Étapes / Rapporteurs) */
 .ppl-row-overview {
   display: grid;
