@@ -14,7 +14,11 @@
        sideline-banner.png est utilisée par défaut (1200×630 conseillé). */}}
   {{ $img := "sideline-banner.png" | absURL }}
   {{ $url := .Permalink }}
-  {{ $ogTitle := printf "%s — %s" .Title .Site.Title }}
+  {{/* R42-C (2026-05-10) — Titre OG/Twitter pour la home : titre fixe
+       choisi par Cyril, sans la date du jour ni la duplication de la
+       marque. Sur les autres pages on garde la formule {Title — SiteTitle}
+       qui reste utile pour distinguer les sous-pages dans les partages. */}}
+  {{ $ogTitle := cond .IsHome "Veille institutionnelle du sport de Sideline Conseil" (printf "%s — %s" .Title .Site.Title) }}
   <meta property="og:type" content="website"/>
   <meta property="og:site_name" content="{{ .Site.Title }}"/>
   <meta property="og:title" content="{{ $ogTitle }}"/>
