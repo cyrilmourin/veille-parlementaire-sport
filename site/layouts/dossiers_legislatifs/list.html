@@ -115,7 +115,9 @@
           {{ if .Params.source_url }}
             <a class="dosleg-card__cta" href="{{ .Params.source_url }}" rel="noopener" target="_blank">Voir le dossier législatif &rsaquo;</a>
           {{ end }}
-          <a class="dosleg-card__detail" href="{{ .RelPermalink }}">Procédure détaillée &rsaquo;</a>
+          {{/* R42-A (2026-05-10) : retrait du lien « Procédure détaillée → page Hugo
+               de l'item ». Demande Cyril : la fiche dédiée n'apporte rien de plus
+               que la card listing + le lien externe vers le dossier législatif officiel. */}}
         </div>
       </div>
     </article>
