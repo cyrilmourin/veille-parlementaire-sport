@@ -38,6 +38,67 @@ def _first_sentence(text: str, max_len: int = 140) -> str:
     return clean[:max_len].rstrip() + ("…" if len(clean) > max_len else "")
 
 
+# R42-B (2026-05-10) : extraction du corps complet d'un rapport Sénat à
+# partir de la page mono.html. URL CSV → notice → mono :
+#   /notice-rapport/2024/r24-006-notice.html  →  /rap/r24-006/r24-006_mono.html
+# La page _mono.html agrège tous les chapitres (~150-300k chars de
+# texte). On l'extrait via BeautifulSoup.get_text et on tronque à 50k
+# pour le matcher (compromis Cyril : couvre sommaire + 1ères pages corps).
+_RAP_NOTICE_RE = re.compile(
+    r"/notice-rapport/\d{4}/(r\d{2}-\d+)(?:-notice)?\.html?",
+    re.IGNORECASE,
+)
+
+
+def _build_rap_mono_url(notice_url: str) -> str:
+    """Convertit l'URL `notice-rapport` du CSV en URL `_mono.html` du rapport.
+
+    Retourne `""` si le format n'est pas reconnu (rapport ancien, format
+    pré-1990, ou URL atypique). Idempotent.
+    """
+    if not notice_url:
+        return ""
+    m = _RAP_NOTICE_RE.search(notice_url)
+    if not m:
+        return ""
+    slug = m.group(1).lower()
+    return f"https://www.senat.fr/rap/{slug}/{slug}_mono.html"
+
+
+def _fetch_senat_rap_haystack(notice_url: str, max_chars: int = 50000) -> str:
+    """Fetch la page `_mono.html` du rapport Sénat et extrait le texte.
+
+    R42-B (2026-05-10). Soft-fail systématique :
+    - URL non reconnue (vieille notice ou format atypique) → ""
+    - fetch KO (404, timeout, WAF) → ""
+    - parse BS4 KO → ""
+    Aucun crash possible — le matcher retombe sur title + summary.
+    """
+    mono_url = _build_rap_mono_url(notice_url)
+    if not mono_url:
+        return ""
+    try:
+        # fetch_text gère retry + encoding tolerant.
+        html_body = fetch_text(mono_url)
+    except Exception as e:
+        log.debug("senat_rapports : fetch mono KO %s (%s)", mono_url, e)
+        return ""
+    if not html_body:
+        return ""
+    try:
+        # Import local pour éviter le coût bs4 si cette fonction n'est
+        # jamais appelée (cas de senat_rapports désactivé).
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html_body, "html.parser")
+        # Cible le main content si possible (évite menu / footer Sénat).
+        main = soup.find("main") or soup.find("div", id="main")
+        text = main.get_text(" ", strip=True) if main else soup.get_text(" ", strip=True)
+    except Exception as e:
+        log.debug("senat_rapports : parse mono KO %s (%s)", mono_url, e)
+        return ""
+    return text[:max_chars] if text else ""
+
+
 # Mois français pour formater "11 février 2026" sans dépendre de la locale
 # système (les CI GitHub Actions n'ont pas forcément fr_FR.UTF-8).
 _FR_MONTHS = [
@@ -467,6 +528,19 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
     elif sid == "senat_rapports":
         # Colonnes réelles : Session, Numéro, Tome, Type de rapport, Auteurs,
         # Organismes, Titre court, Titre long, Résumé, Date de dépôt, URL, Thèmes
+        # R42-B (2026-05-10) : pour chaque rapport récent, fetch la page
+        # `_mono.html` et stocke le texte tronqué à 50k chars dans
+        # `raw.haystack_body`. Le matcher consomme cette clé (R26).
+        # Skip silencieusement les rapports trop anciens (URL notice non
+        # reconnue) ou hors fenêtre — pas de fetch inutile.
+        # Limite explicite : la fenêtre dosleg/communiques côté
+        # `_filter_window` est déjà appliquée à l'export, mais la source
+        # CSV ramène l'historique entier (~12 000 rapports depuis 1959).
+        # On limite le fetch mono.html aux rapports < 800 jours pour
+        # borner le temps de fetch (~50 rapports/jour récents max).
+        body_max = int(src.get("body_max_chars", 50000))
+        rap_window_days = int(src.get("rap_haystack_window_days", 800))
+        cutoff = datetime.utcnow() - timedelta(days=rap_window_days)
         for r in rows:
             uid = _pick(r, "Numéro", "numero", "num", "id", "uid")
             titre = (_pick(r, "Titre long", "Titre court", "titre",
@@ -479,11 +553,27 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
                 continue
             extras = " — ".join(p for p in [titre, resume, auteurs, themes,
                                              organismes] if p)
+            published = _parse_date_any(_pick(
+                r, "Date de dépôt", "date",
+                "datePublication", "date_publication",
+            ))
+            url_notice = (_pick(r, "URL", "url", "lien")
+                          or f"https://www.senat.fr/rap/{uid}.html")
+            # R42-B : fetch corps complet uniquement pour les rapports
+            # dans la fenêtre haystack (skip les milliers de rapports
+            # historiques qui sont de toute façon hors fenêtre export).
+            haystack_body = ""
+            if published and published >= cutoff:
+                haystack_body = _fetch_senat_rap_haystack(
+                    url_notice, max_chars=body_max,
+                )
+            raw_with_body = dict(r)
+            if haystack_body:
+                raw_with_body["haystack_body"] = haystack_body[:body_max]
             yield Item(
                 source_id=sid, uid=str(uid), category=cat, chamber="Senat",
                 title=f"Rapport n°{uid} — {titre}"[:220],
-                url=(_pick(r, "URL", "url", "lien")
-                     or f"https://www.senat.fr/rap/{uid}.html"),
+                url=url_notice,
                 # R41-AK (2026-05-09) : `_parse_date_any` au lieu de
                 # `parse_iso` — le CSV Sénat expose la « Date de dépôt » au
                 # format DD/MM/YYYY (ex. « 24/07/1959 ») que parse_iso
@@ -491,11 +581,8 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
                 # rapports éliminés par filter_window. Bug latent depuis
                 # R28, masqué par l'absence de Brotli (Brotli fix R41-AJ a
                 # rendu les fetch fonctionnels et révélé ce bug aval).
-                published_at=_parse_date_any(_pick(
-                    r, "Date de dépôt", "date",
-                    "datePublication", "date_publication",
-                )),
-                summary=extras[:2000], raw=r,
+                published_at=published,
+                summary=extras[:2000], raw=raw_with_body,
             )
 
     elif sid in ("senat_ameli",):

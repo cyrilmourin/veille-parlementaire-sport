@@ -25,6 +25,20 @@ On filtre les entrées RAPP (rapports) en ignorant les `OMC_PRJL`/`PION`
 Choix d'URL de l'item : lien du **dossier législatif** quand présent (page
 HTML riche, dynamique), sinon fallback sur le PDF.
 
+R42-B (2026-05-10) : extension de la profondeur de matching keyword au
+corps des PDF. Avant : matching sur `title + summary[:2000]` uniquement
+→ ratait les rapports dont le titre est générique (« Rapport sur le PJL
+n°… ») mais dont le corps mentionnait des keywords sport spécifiques
+(Pass'Sport, dopage, ANS…). Après : pour chaque rapport ayant un
+`url_pdf`, on fetch le PDF, on extrait le texte avec `pypdf` (helper
+réutilisé de `an_cr_commissions._extract_pdf_text`), tronqué à 50 000
+chars (vs 200k pour les CR — argument Cyril : le sommaire d'un rapport
+est en début de PDF, 50k = ~50 pages, suffit pour la majorité des
+rapports). Le texte est posé dans `raw.haystack_body[:50000]` et
+consommé par `KeywordMatcher.apply()`. Compromis : la fenêtre temps
+des rapports est réduite de 1095j → 730j en parallèle (cf.
+WINDOW_DAYS_BY_SOURCE_ID dans site_export).
+
 Parse ultra-tolérant : bs4 + regex, zéro dépendance réseau secondaire.
 """
 from __future__ import annotations
@@ -39,6 +53,10 @@ from bs4 import BeautifulSoup
 
 from ..models import Item
 from ._common import fetch_bytes
+# R42-B (2026-05-10) : réutilisation du helper PDF de an_cr_commissions
+# pour extraire le corps des rapports. Le helper gère pypdf optionnel
+# (no-op si absent) et nettoie l'entête institutionnel.
+from .an_cr_commissions import _extract_pdf_text
 
 log = logging.getLogger(__name__)
 
@@ -163,6 +181,30 @@ def _extract_reports(html_body: str) -> list[dict]:
     return out
 
 
+def _fetch_pdf_haystack(url_pdf: str, max_chars: int = 50000) -> str:
+    """Fetch le PDF d'un rapport et extrait le texte tronqué à `max_chars`.
+
+    R42-B (2026-05-10). Soft-fail systématique : tout échec réseau, parse
+    pypdf KO, ou pypdf indisponible retourne `""` sans planter. Le matcher
+    retombe alors sur `title + summary` seul — comportement R28 historique.
+    """
+    if not url_pdf:
+        return ""
+    try:
+        pdf_bytes = fetch_bytes(url_pdf)
+    except Exception as e:
+        log.debug("an_rapports : fetch PDF KO %s (%s)", url_pdf, e)
+        return ""
+    if not pdf_bytes:
+        return ""
+    try:
+        text = _extract_pdf_text(pdf_bytes, max_chars=max_chars)
+    except Exception as e:
+        log.debug("an_rapports : extract PDF KO %s (%s)", url_pdf, e)
+        return ""
+    return text or ""
+
+
 def fetch_source(src: dict) -> list[Item]:
     """Scrape la page AN listing rapports et construit les Item.
 
@@ -171,10 +213,19 @@ def fetch_source(src: dict) -> list[Item]:
           category: communiques
           url: https://www2.assemblee-nationale.fr/documents/liste?type=rapports&legis=17
           format: an_rapports_html
+          # R42-B : profondeur extraction PDF (défaut 50000 chars = ~50 pages
+          # PDF stripées — couvre sommaire + intro + 1ères pages corps).
+          body_max_chars: 50000
+
+    R42-B (2026-05-10) : pour chaque rapport ayant `url_pdf`, fetch + extract
+    PDF avec pypdf, tronque à `body_max_chars` (défaut 50000), pose dans
+    `raw.haystack_body`. Le matcher (`KeywordMatcher.apply`) consomme
+    automatiquement cette clé (cf. R26 / R40-G/H pour CR).
     """
     sid = src["id"]
     url = src["url"]
     cat = src.get("category", "communiques")
+    body_max = int(src.get("body_max_chars", 50000))  # R42-B
 
     try:
         payload = fetch_bytes(url)
@@ -189,7 +240,12 @@ def fetch_source(src: dict) -> list[Item]:
         return []
 
     items: list[Item] = []
+    pdf_hits = 0
     for r in reports:
+        # R42-B : extraction du corps PDF si url_pdf disponible.
+        haystack_body = _fetch_pdf_haystack(r["url_pdf"], max_chars=body_max)
+        if haystack_body:
+            pdf_hits += 1
         items.append(Item(
             source_id=sid,
             uid=r["uid"],
@@ -205,7 +261,11 @@ def fetch_source(src: dict) -> list[Item]:
                 "num": r["num"],
                 "url_dossier": r["url_dossier"],
                 "url_pdf": r["url_pdf"],
+                # R42-B : corps PDF tronqué à body_max chars pour matcher.
+                # Vide si fetch/parse KO ou pypdf absent — graceful degrade.
+                "haystack_body": haystack_body[:body_max],
             },
         ))
-    log.info("%s : %d rapports extraits", sid, len(items))
+    log.info("%s : %d rapports extraits (%d avec corps PDF, max %d chars)",
+             sid, len(items), pdf_hits, body_max)
     return items

@@ -109,8 +109,16 @@ WINDOW_DAYS_BY_SOURCE_ID: dict[str, int] = {
     # sport pro Sénat, rapports commission culture sur PJL Alpes 2030,
     # rapports annuels d'activité). Cyril : « quitte à élargir la
     # fenêtre d'éligibilité dans le temps ».
-    "an_rapports": 1095,     # 3 ans — rapports AN
-    "senat_rapports": 1095,  # 3 ans — rapports Sénat
+    # R42-B (2026-05-10) : 1095j → 730j (3 ans → 2 ans). Compromis
+    # explicite Cyril : « plutôt 50 000 chars de profondeur PDF mais
+    # fenêtre de temps réduite à 24 mois ». La profondeur de matching
+    # est désormais étendue au corps PDF (R42-B fetch + extract dans
+    # `assemblee_rapports.py` et `senat.py::senat_rapports`), donc on
+    # capte plus de rapports au sein de la fenêtre — moins besoin de
+    # garder une fenêtre 3 ans pour rattraper les rapports anciens
+    # dont seul le titre matchait.
+    "an_rapports": 730,      # 2 ans — rapports AN (R42-B)
+    "senat_rapports": 730,   # 2 ans — rapports Sénat (R42-B)
     # R41-AC : Cour des comptes publie des rapports thématiques
     # (ex. bilan JO Paris 2024 — 29/09/2025) qui restent référents
     # plusieurs années. La fenêtre `communiques: 90j` les faisait
