@@ -266,6 +266,24 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-10 (soir, demandes Cyril sur partage social et UX sidebar) : **R42-C + R42-D + R42-E + R42-F — Titre OG home, suivi LinkedIn, partage footer, bannière compacte sidebar**.
+  Lot UX sociale + visibilité, 4 R-tags atomiques.
+  **R42-C** — Titre Open Graph de la home : avant `« Veille Institutionnelle Sport — 2026-05-10 — Veille Institutionnelle Sport — Sideline Conseil »` (92 chars, marque dupliquée + date qui change quotidiennement). Après : titre fixe choisi par Cyril `« Veille institutionnelle du sport de Sideline Conseil »` (52 chars). Implémentation Hugo `cond .IsHome ...` dans `baseof.html` — les sous-pages gardent la formule {Title — SiteTitle}. Le `<title>` HTML (onglet navigateur, SEO Google) n'est pas affecté, il garde la valeur dynamique avec date.
+  **R42-D** — Bloc sidebar « Suivre sur LinkedIn » (demande Cyril, en haut de sidebar entre la bannière brand et le module Recherche). Workflow d'investigation :
+  1. Première itération : bouton custom `<a>` avec icône SVG LinkedIn officielle + couleur LinkedIn `#0A66C2`.
+  2. Cyril demande un widget officiel LinkedIn IN/FollowCompany. Implémentation via `<script src="https://platform.linkedin.com/in.js">` dans baseof.html + `<script type="IN/FollowCompany" data-id="112297133">` inline dans le bloc sidebar.
+  3. **Constat live 2026-05-10** : `platform.linkedin.com/in.js` est encore servi (HTTP 200 sur le CDN, build du jour) MAIS l'endpoint widget `/cws/company/profile?id=112297133` répond HTTP 404 — service réellement retiré par LinkedIn en 2018-2020 même si le script source persiste sur le CDN.
+  4. **Bascule finale** : retour au bouton custom inline juste après les `:` (saut de ligne avant `suivez-nous` demandé par Cyril). Texte d'accroche en charte Sideline (crème + Montserrat 900, fond `#11264b` aligné sur la card Recherche), bouton bleu LinkedIn officiel `#0A66C2` avec icône SVG native pour la reconnaissance visuelle. Clic → ouverture page entreprise LinkedIn dans nouvel onglet (le bouton « Suivre » de LinkedIn est immédiatement visible en haut à droite de la page).
+  Trace de la tentative widget officiel conservée en commentaire `R42-D-ter` pour ne pas refaire l'aller-retour si quelqu'un re-tente.
+  **R42-E** — Bloc footer « Partager cette veille » (en bas à droite). 4 boutons ronds 36×36 avec icônes SVG officielles : Facebook, X (twitter), LinkedIn, Mail. Hover : bascule sur la couleur de marque (#1877F2 / #000 / #0A66C2 / sl-red). Liens de partage construits avec l'URL home `https://veille.sideline-conseil.fr/` (pas l'URL courante, conformément à la demande Cyril « génère des liens de partage du lien veille.sideline-conseil.fr ») :
+  - Facebook : `sharer.php?u=...`
+  - X : `twitter.com/intent/tweet?url=...&text=...`
+  - LinkedIn : `linkedin.com/sharing/share-offsite/?url=...`
+  - Mail : `mailto:?subject=...&body=...%0A%0A...`
+  Layout : footer en flex 2 colonnes (main à gauche, partage à droite) ; sur mobile (<720px) les colonnes empilent et les boutons passent à gauche.
+  **R42-F** — Copie compacte de la bannière Sideline pour le module brand sidebar. L'original `sideline-banner.png` (1200×630, ratio 1.91:1 imposé par LinkedIn pour `og:image`) contenait ~75px de bleu marine en haut et ~65px en bas SANS contenu (logo, phrase, URL). Crop à `Y=75 → Y=565` → nouvelle hauteur 490px (vs 630 originale, **-22%** de hauteur dans la sidebar). Sauvegardée sous `sideline-banner-sidebar.png`. Original `sideline-banner.png` strictement inchangé pour les meta `og:image` (LinkedIn / Twitter / Facebook continuent à utiliser le ratio 1.91:1 réglementaire). Card sidebar pointe désormais sur la version compacte.
+  **Pas de tests Python** : ces 4 R-tags sont 100% côté Hugo / static / image. Aucun impact pipeline / DB. Action prod : push direct → daily.yml redéploie en ~3-5 min.
+
 - 2026-05-10 (soir, demandes Cyril dans la même session post-R41-AZ) : **R42-A + R42-B — Retrait lien « Procédure détaillée » + profondeur PDF rapports + fenêtre 24 mois**.
   Deux R-tags atomiques.
   **R42-A** — Sur `/items/dossiers_legislatifs/`, chaque card listing affichait un lien `<a class="dosleg-card__detail">Procédure détaillée &rsaquo;</a>` qui pointait vers la page Hugo de l'item. Demande Cyril : « j'en ai pas besoin, tu peux supprimer ce lien ? ». La card affiche déjà le lien CTA externe « Voir le dossier législatif » qui suffit. Suppression de la ligne 118 de `site/layouts/dossiers_legislatifs/list.html`. 0 effet pipeline / DB / tests Python. Pas d'action prod : prochain build GHA suffit.

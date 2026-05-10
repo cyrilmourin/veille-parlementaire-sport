@@ -111,5 +111,15 @@
     });
   })();
   </script>
+
+  {{/* R42-D-ter (2026-05-10) — Le widget LinkedIn IN/FollowCompany
+       officiel a été RETIRÉ par LinkedIn en 2018-2020 : `platform.linkedin.com/in.js`
+       est encore servi en CDN mais les endpoints qui peuplent les iframes
+       (`/cws/company/profile`) répondent HTTP 404. Constat fait en live
+       le 2026-05-10. On retire donc le chargement du script (économie
+       ~100 KB/page) et on bascule sur un bouton custom dans sidebar.html
+       qui ouvre la page entreprise dans un nouvel onglet (1 clic
+       supplémentaire pour l'utilisateur — bouton « Suivre » immédiatement
+       visible en haut à droite de la page LinkedIn). */}}
 </body>
 </html>

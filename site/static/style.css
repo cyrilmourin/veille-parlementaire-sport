@@ -846,6 +846,65 @@ a:hover { text-decoration: underline; }
   height: auto;
 }
 
+/* R42-D (2026-05-10) — Module sidebar « Suivre sur LinkedIn ».
+   Charte alignée sur la card Recherche : fond bleu marine #11264b,
+   texte crème, Montserrat 900 (extrabold) — demande Cyril. Le bouton
+   garde les couleurs LinkedIn officielles (#0A66C2) pour rester
+   reconnaissable sur fond foncé. */
+.side-card--follow {
+  background: #11264b;
+  color: var(--sl-cream);
+  border-color: #11264b;
+  text-align: left;
+}
+.side-follow-text {
+  /* R42-D-quater : margin bottom 0 — le bouton est inline avec le texte
+     donc plus besoin d'espace en dessous (gain de hauteur sur le module). */
+  margin: 0;
+  font-family: var(--font-title), "Montserrat", sans-serif;
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: -0.1px;
+  line-height: 1.35;
+  color: var(--sl-cream);
+}
+/* R42-D-ter (2026-05-10) — Bouton custom « Suivre » inline juste après
+   le texte d'accroche. Couleurs LinkedIn officielles (#0A66C2 / #004182
+   au hover) pour la reconnaissance visuelle, pill button à la convention
+   LinkedIn, Montserrat 900. Inline-flex pour l'alignement icône+label. */
+.side-follow-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+  margin-left: 8px;
+  background: #0A66C2;
+  color: #ffffff;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-family: var(--font-title), "Montserrat", sans-serif;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  text-decoration: none;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.side-follow-btn:hover,
+.side-follow-btn:focus-visible {
+  background: #004182;
+  color: #ffffff;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+.side-follow-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.side-follow-label {
+  /* hérite parent — placeholder pour overrides futurs */
+}
+
 /* Module recherche dans la sidebar.
    R13-G : plus de gradient (demande Cyril) — fond bleu Sideline uni,
    police crème pour cohérence avec le header.
@@ -1618,6 +1677,81 @@ a:hover { text-decoration: underline; }
 .site-footer a { color: var(--sl-cream); text-decoration: underline; }
 .site-footer a:hover { color: #fff; }
 .site-footer .small { font-size: 11px; opacity: .7; }
+
+/* R42-E (2026-05-10) — Footer 2 colonnes : main à gauche, partage à droite.
+   Sur mobile (<720px) les colonnes empilent. */
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+.site-footer__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.site-footer__main p { margin: 0 0 6px; }
+.site-footer__share {
+  flex: 0 0 auto;
+  text-align: right;
+}
+.site-footer__share-title {
+  margin: 0 0 8px;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.85;
+}
+.site-footer__share-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.site-footer__share-list li { margin: 0; }
+
+/* Boutons de partage : ronds, fond blanc semi-transparent, icône claire,
+   couleur de marque au hover. */
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--sl-cream);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.share-btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+.share-btn:hover,
+.share-btn:focus-visible {
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+/* Couleurs de marque au hover */
+.share-btn--facebook:hover,
+.share-btn--facebook:focus-visible { background: #1877F2; color: #fff; }
+.share-btn--x:hover,
+.share-btn--x:focus-visible { background: #000000; color: #fff; }
+.share-btn--linkedin:hover,
+.share-btn--linkedin:focus-visible { background: #0A66C2; color: #fff; }
+.share-btn--mail:hover,
+.share-btn--mail:focus-visible { background: var(--sl-red); color: #fff; }
+
+@media (max-width: 720px) {
+  .site-footer__share { width: 100%; text-align: left; }
+  .site-footer__share-list { justify-content: flex-start; }
+}
 
 /* ---------- Page Recherche ----------------------------------------------- */
 .search-page h1 {
