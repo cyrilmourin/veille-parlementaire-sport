@@ -870,8 +870,12 @@ a:hover { text-decoration: underline; }
 }
 /* R42-D-ter (2026-05-10) — Bouton custom « Suivre » inline juste après
    le texte d'accroche. Couleurs LinkedIn officielles (#0A66C2 / #004182
-   au hover) pour la reconnaissance visuelle, pill button à la convention
-   LinkedIn, Montserrat 900. Inline-flex pour l'alignement icône+label. */
+   au hover) pour la reconnaissance visuelle, Montserrat 900. Inline-flex
+   pour l'alignement icône+label.
+   R42-K (2026-05-10) : border-radius aligné sur `var(--radius)` (= 10px,
+   identique aux side-card et autres modules sidebar) — demande Cyril.
+   Avant : `999px` (pill button convention LinkedIn) qui détonnait avec
+   l'arrondi modéré du reste de la sidebar. */
 .side-follow-btn {
   display: inline-flex;
   align-items: center;
@@ -881,7 +885,7 @@ a:hover { text-decoration: underline; }
   background: #0A66C2;
   color: #ffffff;
   padding: 5px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   font-family: var(--font-title), "Montserrat", sans-serif;
   font-weight: 900;
   font-size: 13px;
