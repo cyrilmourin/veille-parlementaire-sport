@@ -706,6 +706,19 @@ autorites:
       url: https://www.afld.fr/feed/
       format: rss
 
+    # R41-AN (2026-05-10) — Agence Française de Développement.
+    # L'AFD a un volet « Sport et développement » actif (Coupe d'Afrique
+    # des Nations, Sport pour tous, héritage JO 2024 international…).
+    # RSS officiel `/fr/rss.xml` → Drupal RSS 2.0 standard, ~10 items
+    # récents pubDate RFC 822 (vérifié 2026-05-10 : 200 OK, items du 07/05).
+    # Le flux mélange tous les sujets AFD (climat, énergie, santé, sport,
+    # culture…) ; le KeywordMatcher filtre sur les mots sport — bruit
+    # non-sport naturellement écarté.
+    - id: afd
+      category: communiques
+      url: https://www.afd.fr/fr/rss.xml
+      format: rss
+
     # R19+ (2026-04-23) — INJEP (Institut national de la jeunesse et de
     # l'éducation populaire). Site WordPress avec flux RSS 2.0 standard
     # exposé en <link rel="alternate"> dans la home. Flux UTF-8, ~10 items

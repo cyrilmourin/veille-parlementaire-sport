@@ -330,6 +330,12 @@ def _chamber(domain: str) -> str:
         return "Matignon"
     if "afld.fr" in d:
         return "AFLD"
+    if "afd.fr" in d:
+        # R41-AN (2026-05-10) — Agence Française de Développement.
+        # Volet « Sport et développement » : bilan annuel + actions
+        # programmatiques sport pour tous, JO 2024, CAN, etc. Le matcher
+        # keyword filtre naturellement le bruit non-sport (climat, agri…).
+        return "AFD"
     if "agencedusport" in d:
         return "ANS"
     if "arcom.fr" in d:
