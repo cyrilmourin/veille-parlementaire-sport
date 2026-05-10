@@ -266,6 +266,18 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-10 (soir, suite R41-AY — clôture session AFD côté veille sport) : **R41-AZ — AFD bascule URL RSS sur flux taxonomique sport (term/686/feed)**.
+  Le RSS générique `https://www.afd.fr/fr/rss.xml` ajouté en R41-AN agrège tous les sujets AFD (climat, IA, traite, voisinage Est, énergie, culture…) et ne ressort que des items hors-sport. Vérifié sur le run 25622653048 (R41-AN poussé seul) : 10 items fetchés / **0 matchés keywords sport** → aucun item AFD visible sur `/items/communiques/`.
+  **Fix** : bascule de l'URL vers `https://www.afd.fr/fr/taxonomy/term/686/feed` (terme Drupal « Sport et développement »), qui ressort 10 items réellement sport :
+  - Mouvement sportif sénégalais
+  - Formation/réseau acteurs africains sport — Pass'sport
+  - Infrastructures sportives - Guide technique
+  - Africa Forward : sport comme levier
+  - Évaluation programme Afrique Créative
+  Drupal RSS 2.0 standard, pubDate RFC 822, vérifié 2026-05-10 : 200 OK.
+  **Naming** : R41-AP avait été pris en parallèle par la livraison mobile UX `.ppl-timeline__label` (commit 37dbdda) → renommé en R41-AZ pour éviter le conflit.
+  **Action prod** : push direct sur main → workflow `daily.yml` se déclenche → ingestion automatique des 10 items du nouveau flux. Pas de `reset_category=communiques` nécessaire (la source n'a aucun item legacy à purger, vu qu'elle vient d'être ajoutée en R41-AN il y a quelques heures).
+
 - 2026-05-10 (soir, suite R41-AX — Cyril propose en alternative `videos.senat.fr/commission.AFCL.p1`) : **R41-AY — scraper vidéothèque commission Sénat**.
   Source : `https://videos.senat.fr/commission.{CODE}.p1` (page 1 = 10 dernières publications). Format différent de la page agenda commission (R35-E / R41-AX) — chaque audition expose une carte avec :
   - URL du player vidéo direct (utilisée comme `Item.url` → meilleur UX que le lien agenda)
