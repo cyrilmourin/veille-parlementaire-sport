@@ -2210,10 +2210,19 @@ def _filter_window(rows: list[dict]) -> list[dict]:
         cutoff = now - timedelta(days=window)
         dt = _parse_dt(r.get("published_at"))
         if cat in STRICT_DATED_CATEGORIES:
-            # Strict : impose une published_at valide, non-future, dans la fenêtre.
+            # Strict : impose une published_at valide dans la fenêtre.
             if dt is None:
                 continue
-            if dt > now:
+            # R41-AM (2026-05-10) : exception pour `dossiers_legislatifs`
+            # — `published_at` reflète le DERNIER ACTE qui peut être futur
+            # (inscription en commission / hémicycle programmée). Cas
+            # concret PPL n°2667 (DLR5L17N54138) « Encourager les
+            # partenariats... » : last_date=2026-05-28 (séance prévue) →
+            # auparavant rejeté car dt > now → invisible alors que le
+            # dossier est en pleine actualité. On accepte les dates
+            # futures pour les dosleg uniquement (autres cat strictes :
+            # questions, jorf, agenda, comptes_rendus restent rejetées).
+            if dt > now and cat != "dossiers_legislatifs":
                 continue
             if dt >= cutoff:
                 kept.append(r)
