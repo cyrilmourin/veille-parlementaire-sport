@@ -266,6 +266,24 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-11 (midi, demande Cyril sur Tavernost + PPR sport) : **R42-W — Enrichir keywords : Edgard Grospiron, Ligue 1+, LFP Media, politique nationale du sport**.
+  Suite de la session R42 matin.
+
+  Cyril : « Si Tavernost ne match pas on a un problème. Il faut donc ajouter quelques mots clés comme "Ligue 1 plus" ou "Ligue 1 +", j'en profite pour ajouter "Edgard Grospiron". Donc on ne change pas R39K, mais on modifie les mots clés. »
+
+  Et investigation PPR n°2126 « Renforcer le pilotage et la cohérence de la politique nationale du sport » (déposée 20/11/2025, adoptée 16/02/2026) — invisible alors qu'elle est 100% sport. Diagnostic : titre seul matche 0 keyword (« politique nationale du sport » n'était pas dans le yaml).
+
+  Keywords ajoutés :
+  - **Famille `acteur`** : `Edgard Grospiron` (variante orthographique avec D — courante en presse, alors que la forme officielle est `Edgar Grospiron` sans D)
+  - **Famille `federation`** : `LFP Media`, `Ligue 1+`, `Ligue 1 +`, `Ligue 1 plus`, `L1+` (chaîne LFP Media lancée pour la saison 2025-2026, suite à l'audition Tavernost commission culture Sénat 06/05/2026 sur la crise des droits TV foot pro)
+  - **Famille `theme`** : `politique nationale du sport`, `politique nationale sportive`, `politique sportive nationale`, `stratégie nationale du sport`, `pilotage de la politique du sport`, `pilotage du sport` (couvre la PPR 2126 et futurs textes parlementaires de politique sportive globale)
+
+  Décision Cyril sur R42-U / R39-K : on **ne réactive PAS** le bypass organe R27. À la place, on enrichit le yaml ciblé pour capter les sujets sport business qui passaient à travers (Tavernost via « LFP Media » dans le contenu).
+
+  Tests `tests/test_keywords.py` : +5 régressions (Ligue 1+, LFP Media, Edgard Grospiron, politique nationale du sport, garde-fou anti-faux-positif sur « politique nationale de santé/agricole/énergie »).
+
+  1030 → 1035 tests verts. Action prod : push direct → daily.yml. Pour rattraper sur les CR + agenda existants : `gh workflow run daily.yml -f reset_category=comptes_rendus -f since_days=14` + `reset_category=agenda` + `reset_category=dossiers_legislatifs`.
+
 - 2026-05-11 (matin tardif, suite audit Cyril) : **R42-R + R42-T + R42-V — Étendre fenêtre dosleg AN 365j→1095j (PPL manquantes) + lien agenda data.gouv humain au lieu de JSON brut + bouton Suivre LinkedIn border-radius 5px**.
   Lot 3 R-tags atomiques, suite de la session R42-N/O/P/Q.
 

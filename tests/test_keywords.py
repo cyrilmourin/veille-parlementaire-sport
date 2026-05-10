@@ -219,3 +219,57 @@ def test_r42p_forme_longue_rugby_match_toujours(m):
     kws, fams = m.match("La Ligue nationale de rugby organise le Top 14")
     assert "Ligue nationale de rugby" in kws
     assert "federation" in fams
+
+
+# ============================================================
+# R42-W (2026-05-11) — Nouveaux keywords sport business + acteur.
+# ============================================================
+
+def test_r42w_ligue_1_plus_match(m):
+    """« Ligue 1+ » (chaîne LFP Media) doit matcher la famille
+    federation — ajouté suite à l'audition Tavernost commission
+    culture Sénat 06/05/2026 sur les droits TV foot pro."""
+    kws, fams = m.match("Lancement de Ligue 1+ pour la saison 2026-2027")
+    assert "Ligue 1+" in kws
+    assert "federation" in fams
+
+
+def test_r42w_lfp_media_match(m):
+    """« LFP Media » (filiale média de la LFP)."""
+    kws, fams = m.match("Audition de Nicolas de Tavernost, directeur de LFP Media")
+    assert "LFP Media" in kws
+
+
+def test_r42w_edgard_grospiron_avec_d_match(m):
+    """Variante orthographique « Edgard Grospiron » (avec D) — courante
+    en presse alors que la forme officielle est « Edgar Grospiron »
+    (sans D)."""
+    kws, fams = m.match("Edgard Grospiron, président du COJOP Alpes 2030")
+    # On accepte les 2 graphies
+    assert any(g in kws for g in ["Edgard Grospiron", "Edgar Grospiron"])
+    assert "acteur" in fams
+
+
+def test_r42w_politique_nationale_du_sport_match(m):
+    """Nouveau keyword `theme` couvrant les textes parlementaires de
+    politique sportive globale — cas concret PPR n°2126 « Renforcer
+    le pilotage et la cohérence de la politique nationale du sport »
+    dont le titre seul matchait 0 keyword avant R42-W."""
+    title = "Renforcer le pilotage et la cohérence de la politique nationale du sport"
+    kws, fams = m.match(title)
+    assert "politique nationale du sport" in kws
+    assert "theme" in fams
+
+
+def test_r42w_politique_nationale_autre_domaine_pas_match(m):
+    """Garde-fou anti-faux-positif : « politique nationale de X »
+    sans rapport avec le sport NE doit PAS matcher (les keywords
+    R42-W exigent « du sport » / « sportive » / etc.)."""
+    cases = [
+        "Renforcer la politique nationale de santé publique",
+        "Réformer la politique nationale agricole",
+        "La politique nationale de l'énergie",
+    ]
+    for sentence in cases:
+        _, fams = m.match(sentence)
+        assert "theme" not in fams, f"Faux positif sur : {sentence!r}"

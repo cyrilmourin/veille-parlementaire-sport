@@ -41,6 +41,10 @@ acteur:
   - Grand INSEP
   - Tony Estanguet
   - Edgar Grospiron
+  # R42-W (2026-05-11) : variante orthographique courante en presse
+  # (« Edgard » avec D final). Sans cette entrée, un article qui écrit
+  # le nom avec D ne matche pas — le matcher distingue les deux.
+  - Edgard Grospiron
   - DIJOP
   - COOJOP
   - COJOP
@@ -112,6 +116,17 @@ federation:
   - FFSU                        # sport universitaire
   - Ligue de football professionnel
   - LFP
+  # R42-W (2026-05-11) : ajout de LFP Media + Ligue 1+ (la nouvelle
+  # chaîne LFP Media lancée pour la saison 2025-2026, suite à
+  # l'audition de Nicolas de Tavernost devant la commission culture
+  # Sénat sur la crise des droits TV foot pro). Sans ces keywords,
+  # un article qui ne mentionnait QUE « Ligue 1+ » sans cite LFP
+  # explicitement ratait le match.
+  - LFP Media
+  - Ligue 1+
+  - Ligue 1 +
+  - Ligue 1 plus
+  - L1+
   - LNH
   - FFTri                       # triathlon
   - FFGym
@@ -287,6 +302,20 @@ evenement:
   - Marathon de Paris
 
 theme:
+  # R42-W (2026-05-11) — « politique nationale du sport » et variantes,
+  # ajoutés suite à la PPR n°2126 « Renforcer le pilotage et la cohérence
+  # de la politique nationale du sport » qui matchait 0 keyword via son
+  # titre seul (pas d'« ANS » / « JOP » / etc. dans le titre). Le terme
+  # est suffisamment spécifique au domaine sport-institutionnel pour
+  # éviter les faux positifs (cf. propositions de résolution de portée
+  # générale qui parlent de « politique nationale de X » sans rapport).
+  - politique nationale du sport
+  - politique nationale sportive
+  - politique sportive nationale
+  - stratégie nationale du sport
+  - strategie nationale du sport
+  - pilotage de la politique du sport
+  - pilotage du sport
   # R40-S (2026-04-27) — diplomatie sportive (sujet récurrent en
   # commission affaires étrangères, JO, accords bilatéraux).
   - diplomatie sportive
