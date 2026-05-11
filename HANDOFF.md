@@ -266,7 +266,18 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
-- 2026-05-11 (fin de journée, clôture session) : **Bump `SYSTEM_VERSION_LABEL` R41 → R42** (commit local, push prévu demain matin avec R42-BF et R42-BG).
+- 2026-05-11 (fin de journée, retour Cyril post-clôture) : **R42-BH — Extension R42-AW aux comptes_rendus parlement**. **Commit local, NON pushé**.
+
+  Cyril : « l'utilisation des mots-clés pour les nominations, que je retrouve désormais aussi dans les comptes rendus, est-elle exclue par les dernières mises à jour ? ». **Réponse : non**, R42-AW couvrait UNIQUEMENT `category=communiques`. Confirmé sur search_index prod : 9 CR contiennent un marqueur nomination_event dans leur snippet visible.
+
+  Nouvelle fonction `_filter_parlement_cr_nominations_only` strictement symétrique R42-AW :
+    - `category == "comptes_rendus"`
+    - `family_source == "parlement"`
+    - `keyword_families ne contient QUE nomination_event` → drop
+
+  Branchée dans `export()` juste après R42-AW. +8 tests. 1141 → 1149 verts. À pusher demain avec R42-BF / R42-BG.
+
+- 2026-05-11 (fin de journée, clôture session) : **Bump `SYSTEM_VERSION_LABEL` R41 → R42** (commit local, push prévu demain matin avec R42-BF, R42-BG, R42-BH).
 
 - 2026-05-11 (soir, demande Cyril après découverte du flux officiel) : **R42-BG — Handler RSS Drupal dédié ANS (`agencedusport.fr/flux-rss`)**. **Commit local `961ab6f`, NON pushé** — déploiement prévu demain.
 

@@ -17,6 +17,7 @@ from src.sources.assemblee_rapports import (
 )
 from src.site_export import (
     _filter_parlement_publications_nominations_only,
+    _filter_parlement_cr_nominations_only,
     _filter_publications_texte_comparatif,
 )
 
@@ -283,3 +284,101 @@ def test_r42bf_ne_touche_pas_les_autres_champs():
     out = _filter_publications_texte_comparatif(rows)
     # summary mentionne « texte comparatif » mais title non → on garde
     assert len(out) == 1
+
+
+# ===========================================================================
+# R42-BH — Symétrique R42-AW pour comptes_rendus parlement
+# ===========================================================================
+
+def _row_cr(source_id: str, families: list[str] | None = None,
+            chamber: str = "AN") -> dict:
+    return {
+        "source_id": source_id,
+        "category": "comptes_rendus",
+        "chamber": chamber,
+        "keyword_families": families or [],
+    }
+
+
+def test_r42bh_drop_cr_an_avec_nomination_seule():
+    """CR AN comptes_rendus avec families=['nomination_event'] → drop."""
+    for sid in ("an_syceron", "an_cr_commissions"):
+        rows = [_row_cr(sid, families=["nomination_event"], chamber="AN")]
+        out = _filter_parlement_cr_nominations_only(rows)
+        assert len(out) == 0, f"{sid} pas filtré"
+
+
+def test_r42bh_drop_cr_senat_avec_nomination_seule():
+    """Idem côté Sénat (senat_debats, senat_cri, senat_cr_commissions, etc.)."""
+    for sid in ("senat_debats", "senat_cri", "senat_cr_commissions",
+                "senat_cr_affaires_sociales"):
+        rows = [_row_cr(sid, families=["nomination_event"], chamber="Senat")]
+        out = _filter_parlement_cr_nominations_only(rows)
+        assert len(out) == 0, f"{sid} pas filtré"
+
+
+def test_r42bh_garde_cr_avec_famille_sport_en_plus():
+    """Si un CR matche aussi une famille sport en plus de nomination_event,
+    on garde — c'est probablement un vrai item sport avec mention
+    incidente d'une nomination."""
+    for extra in ("acteur", "dispositif", "federation", "theme", "evenement"):
+        rows = [_row_cr("an_syceron",
+                        families=["nomination_event", extra])]
+        out = _filter_parlement_cr_nominations_only(rows)
+        assert len(out) == 1, f"CR avec famille {extra} drop à tort"
+
+
+def test_r42bh_garde_cr_sans_nomination_event():
+    """CR avec UNE famille sport pure (acteur) → on garde."""
+    rows = [_row_cr("an_syceron", families=["acteur"])]
+    out = _filter_parlement_cr_nominations_only(rows)
+    assert len(out) == 1
+
+
+def test_r42bh_ignore_communiques():
+    """Un communiques avec families=['nomination_event'] n'est PAS touché
+    par R42-BH — c'est R42-AW (publications) qui gère ce cas."""
+    rows = [{
+        "source_id": "an_rapports",
+        "category": "communiques",
+        "chamber": "AN",
+        "keyword_families": ["nomination_event"],
+    }]
+    out = _filter_parlement_cr_nominations_only(rows)
+    assert len(out) == 1  # R42-BH n'agit que sur comptes_rendus
+
+
+def test_r42bh_ignore_amendements_questions_etc():
+    """Les autres catégories (amendements, questions, jorf, agenda)
+    avec families=['nomination_event'] ne sont PAS touchées."""
+    for cat in ("amendements", "questions", "jorf", "agenda",
+                "dossiers_legislatifs", "nominations"):
+        rows = [{
+            "source_id": "an_amendements",
+            "category": cat,
+            "chamber": "AN",
+            "keyword_families": ["nomination_event"],
+        }]
+        out = _filter_parlement_cr_nominations_only(rows)
+        assert len(out) == 1, f"cat={cat} drop à tort"
+
+
+def test_r42bh_ignore_sources_non_parlement():
+    """Un CR d'une source non-parlement (ex. agenda ministériel mal
+    catégorisé) n'est pas touché ici."""
+    rows = [_row_cr("min_sports_actualites", families=["nomination_event"],
+                    chamber="MinSports")]
+    out = _filter_parlement_cr_nominations_only(rows)
+    assert len(out) == 1
+
+
+def test_r42bh_keyword_families_serialise_string():
+    """Cas robustesse : keyword_families string JSON parsé correctement."""
+    rows = [{
+        "source_id": "an_syceron",
+        "category": "comptes_rendus",
+        "chamber": "AN",
+        "keyword_families": '["nomination_event"]',
+    }]
+    out = _filter_parlement_cr_nominations_only(rows)
+    assert len(out) == 0

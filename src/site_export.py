@@ -2300,6 +2300,64 @@ def _filter_nominations_only_sources(rows: list[dict]) -> list[dict]:
 _TEXTE_COMPARATIF_RE = re.compile(r"texte\s+comparatif", re.IGNORECASE)
 
 
+def _filter_parlement_cr_nominations_only(rows: list[dict]) -> list[dict]:
+    """R42-BH (2026-05-11) — Retire des comptes rendus parlementaires
+    (catégorie `comptes_rendus`) les items dont le seul signal sport
+    est la famille `nomination_event`.
+
+    Cyril : « l'utilisation des mots clés pour les nominations, que je
+    retrouve désormais aussi dans les comptes rendus, est-elle exclue ? ».
+    Réponse : non, R42-AW couvrait UNIQUEMENT category=communiques.
+    Cette fonction étend la règle aux CR.
+
+    Cas remontés (search_index 2026-05-11) :
+      - Séance AN du 04/05/2026 (« élu président » mentionné en passant)
+      - CR Commission des affaires économiques n°74 (« nommé président »)
+      - CR séance 18/12/2025 « Présentation » (« élu président »)
+      - …9 CR au total avec un marqueur nomination_event
+
+    Critère d'exclusion (strict, identique R42-AW) :
+      - category == "comptes_rendus"
+      - source family == "parlement" (cf. `_source_family`)
+      - keyword_families ne contient QUE `nomination_event` (aucune autre
+        famille sport : acteur, federation, dispositif, evenement, theme)
+
+    Les CR qui matchent aussi une autre famille sport (Code du sport,
+    Pass'Sport, etc.) gardent leur place — on retire UNIQUEMENT les CR
+    dont la seule pertinence sport est un verbe de nomination incident.
+    """
+    kept: list[dict] = []
+    dropped = 0
+    for r in rows:
+        cat = (r.get("category") or "").strip()
+        if cat != "comptes_rendus":
+            kept.append(r)
+            continue
+        fam = _source_family(r.get("source_id"), r.get("chamber"))
+        if fam != "parlement":
+            kept.append(r)
+            continue
+        families = r.get("keyword_families") or []
+        if isinstance(families, str):
+            try:
+                families = json.loads(families)
+            except Exception:
+                families = []
+        families_set = set(families)
+        if families_set and families_set <= {"nomination_event"}:
+            dropped += 1
+            continue
+        kept.append(r)
+    if dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "R42-BH : %d comptes rendus parlement supprimés"
+            " (famille nomination_event seule, aucun keyword sport spécifique)",
+            dropped,
+        )
+    return kept
+
+
 def _filter_publications_texte_comparatif(rows: list[dict]) -> list[dict]:
     """R42-BF (2026-05-11) — Retire des publications parlementaires les
     items dont le TITRE contient « texte comparatif ».
@@ -3207,6 +3265,10 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # « arrêter d'utiliser les mots-clés des nominations pour les
     # publications parlementaires ».
     rows = _filter_parlement_publications_nominations_only(rows)
+    # R42-BH (2026-05-11) — extension R42-AW aux comptes rendus parlement.
+    # Cyril remontait que des CR matchaient « élu président » / « nommé
+    # président » dans leurs séances/réunions sans rapport avec le sport.
+    rows = _filter_parlement_cr_nominations_only(rows)
     # R42-BF (2026-05-11) — miroir export de R42-AV : masque les items
     # « Texte comparatif » résiduels en DB (ingérés avant R42-AV) sans
     # nécessiter de reset_category=communiques. Filtre strict : titre +
