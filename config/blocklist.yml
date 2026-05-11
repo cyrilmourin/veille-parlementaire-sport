@@ -300,3 +300,10 @@ blocklist:
     reason: "Rapport n°304 — Instruments migratoires internationaux (faux positif) (R42-AY)"
   - url: http://www.senat.fr/notice-rapport/1985/r85-045-notice.html
     reason: "Rapport n°45 — IVG (faux positif keyword sport) (R42-AY)"
+
+  # R42-BC (2026-05-11) — amendement AN n°59 hors scope sport (PJL
+  # programmation militaire 2024-2030). Demande Cyril ciblée sur cet
+  # amendement précis ; 3 autres amendements (n°452, n°486, n°720) sur la
+  # même PJL restent visibles — à blacklister séparément si nécessaire.
+  - url: https://www.assemblee-nationale.fr/dyn/17/amendements/AMANR5L17PO838901BTC2695P0D1N000059
+    reason: "Amdt AN n°59 art. 21 PJL programmation militaire 2024-2030 — hors scope sport (R42-BC)"
