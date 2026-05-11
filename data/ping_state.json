@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-11T00:14:34+00:00",
+  "last_run_at": "2026-05-11T01:01:06+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419604B1560P0D1N000001",
@@ -210,13 +210,12 @@
       "senat_amendements::fdc4aeeb693f0384"
     ],
     "comptes_rendus": [
-      "an_cr_commissions::an-cr-cion-cedu-2526-058",
-      "an_cr_commissions::an-cr-cion-cedu-2526-059",
       "an_cr_commissions::an-cr-cion-cedu-2526-069",
       "an_cr_commissions::an-cr-cion-dvp-2526-032",
-      "an_cr_commissions::an-cr-cion-soc-2526-058",
+      "an_cr_commissions::an-cr-cion-eco-2526-074",
       "an_cr_commissions::an-cr-cion-soc-2526-059",
       "an_cr_commissions::an-cr-cion-soc-2526-061",
+      "an_cr_commissions::an-cr-cion-soc-2526-068",
       "an_syceron::00215237407b6223",
       "an_syceron::008b19da4a0cd6f2",
       "an_syceron::00c12618e8f1c31c",
@@ -423,11 +422,9 @@
       "senat_cr_etrangeres::9fa3519a304a169e",
       "senat_cr_etrangeres::cff8c33e053aa8ba",
       "senat_cr_finances::3569ad2585217432",
-      "senat_cr_finances::3b8b16f7efa68536",
       "senat_cr_lois::49b4292382fff2ce",
       "senat_cr_lois::72457dca48bebb2d",
       "senat_cr_lois::764d6d1093f8d50b",
-      "senat_cr_lois::b6548f99eb3041b7",
       "senat_cr_lois::f9260ad30848a802",
       "senat_cri::00037554ae34f5e0",
       "senat_cri::0011a2c9cefda592",
