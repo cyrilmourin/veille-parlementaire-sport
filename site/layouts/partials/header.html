@@ -1,5 +1,11 @@
 <header class="site-header">
   <div class="container">
+    {{/* R42-AH (2026-05-11) — Bloc partage en haut à droite du header (copie
+         du footer). Masqué sur mobile via CSS. Position absolute pour ne
+         PAS modifier la hauteur du header. Voir share_links.html. */}}
+    <div class="site-header__share" aria-label="Partager cette veille">
+      {{ partial "share_links.html" . }}
+    </div>
     <a class="brand" href="/">
       <img class="brand-logo" src="/sideline-logo.png" alt="Sideline Conseil" width="90" height="90"/>
       <span class="brand-text">

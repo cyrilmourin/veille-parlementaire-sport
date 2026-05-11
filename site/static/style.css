@@ -1708,7 +1708,10 @@ a:hover { text-decoration: underline; }
   letter-spacing: 0.4px;
   opacity: 0.85;
 }
-.site-footer__share-list {
+/* R42-AH (2026-05-11) — Liste générique partagée header + footer (extraite
+   du partial share_links.html). Justification = flex-end pour rester collé
+   au bord droit aussi bien dans le footer que dans le header. */
+.share-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1716,7 +1719,7 @@ a:hover { text-decoration: underline; }
   gap: 10px;
   justify-content: flex-end;
 }
-.site-footer__share-list li { margin: 0; }
+.share-list li { margin: 0; }
 
 /* Boutons de partage : ronds, fond blanc semi-transparent, icône claire,
    couleur de marque au hover. */
@@ -1754,7 +1757,27 @@ a:hover { text-decoration: underline; }
 
 @media (max-width: 720px) {
   .site-footer__share { width: 100%; text-align: left; }
-  .site-footer__share-list { justify-content: flex-start; }
+  .site-footer__share .share-list { justify-content: flex-start; }
+}
+
+/* R42-AH (2026-05-11) — Bloc partage en haut à droite du header (copie du
+   footer), demande Cyril : « également visible en haut à droite dans le
+   header sans changer la hauteur du header, aligné horizontalement avec
+   sa position dans le footer ».
+   - position: absolute pour ne PAS modifier la hauteur du header.
+   - right: 24px = padding container, donc même X que le bloc footer.
+   - top: 22px = padding-top du container, soit à la même ligne que le
+     logo (visuellement collé en haut à droite).
+   - Masqué sous 720px (mobile / nav repliée en hamburger). */
+.site-header .container { position: relative; }
+.site-header__share {
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  z-index: 2;
+}
+@media (max-width: 720px) {
+  .site-header__share { display: none; }
 }
 
 /* ---------- Page Recherche ----------------------------------------------- */
