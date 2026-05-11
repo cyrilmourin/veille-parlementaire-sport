@@ -52,6 +52,12 @@ _KNOWN_FORMATS = {
     # (agencedusport.fr/flux-rss : title/link encapsulés <a>,
     # pubDate FR « mer 01/04/2026 - 12:00 », dédup GUID).
     "ans_rss",
+    # R42-BJ (2026-05-11) — page MinSports rapports IGESR sport (PDF
+    # directs hébergés sur sports.gouv.fr/sites/default/files/YYYY-MM/).
+    "min_sports_igesr_html",
+    # R42-BK (2026-05-11) — page INJEP publications sport (CPT
+    # WordPress <li class="publication">, date via URL image uploads/YYYY/MM/).
+    "injep_sport_publications_html",
 }
 
 

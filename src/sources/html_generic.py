@@ -75,6 +75,159 @@ def _parse_ans_date(s: str) -> datetime | None:
         return None
 
 
+_MIN_SPORTS_IGESR_PDF_RE = re.compile(
+    r"/sites/default/files/(\d{4})-(\d{2})/([^/]+\.(?:pdf|PDF))$"
+)
+
+
+def _from_min_sports_igesr_html(src: dict) -> list[Item]:
+    """R42-BJ (2026-05-11) — Handler dédié à la page MinSports listant
+    les rapports IGESR « dans le champ du sport ».
+
+    URL : https://www.sports.gouv.fr/rapports-de-l-igesr-dans-le-champ-du-sport-1703
+
+    La page liste ~28 rapports IGESR sport sous forme de liens PDF directs
+    vers `/sites/default/files/<YYYY-MM>/<slug>.pdf`. La date est extraite
+    de l'URL (le PDF est archivé dans le dossier du mois où il a été mis
+    en ligne sur le site MinSports — date d'archivage, suffisante pour
+    le tri éditorial).
+
+    Le titre est le texte du `<a>` (déjà bien formulé par le site MinSports,
+    incluant souvent le numéro de rapport et le mois en clair).
+
+    Chamber forcée MinSports. Cyril : page peu actualisée (1-3 rapports
+    nouveaux par an), pas besoin de fenêtre courte → 1095j (3 ans) côté
+    `WINDOW_DAYS_BY_SOURCE_ID`. Couvre tous les rapports archivés depuis
+    2023.
+    """
+    impersonate = bool(src.get("impersonate", False))
+    try:
+        html = fetch_text(src["url"], impersonate=impersonate)
+    except Exception as e:
+        log.warning("HTML KO %s : %s", src["id"], e)
+        return []
+    soup = BeautifulSoup(html, "html.parser")
+    chamber = src.get("chamber", "MinSports")
+    seen: set[str] = set()
+    out: list[Item] = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        m = _MIN_SPORTS_IGESR_PDF_RE.search(href)
+        if not m:
+            continue
+        year, month = int(m.group(1)), int(m.group(2))
+        title = a.get_text(" ", strip=True)
+        if not title or len(title) < 10:
+            continue
+        url_abs = href if href.startswith("http") else urljoin(src["url"], href)
+        if url_abs in seen:
+            continue
+        seen.add(url_abs)
+        try:
+            published_at = datetime(year, month, 1)
+        except ValueError:
+            published_at = None
+        out.append(Item(
+            source_id=src["id"],
+            uid=url_abs[:200],
+            category=src["category"],
+            chamber=chamber,
+            title=title[:220],
+            url=url_abs,
+            published_at=published_at,
+            summary="",
+            raw={"path": "min_sports_igesr_html"},
+        ))
+    log.info("%s : %d rapports IGESR sport extraits", src["id"], len(out))
+    return out
+
+
+# R42-BK (2026-05-11) — Regex extraction date depuis l'URL de l'image
+# (WordPress range les uploads dans `/wp-content/uploads/YYYY/MM/`).
+_INJEP_IMG_DATE_RE = re.compile(r"/wp-content/uploads/(\d{4})/(\d{2})/")
+
+
+def _from_injep_sport_publications_html(src: dict) -> list[Item]:
+    """R42-BK (2026-05-11) — Handler dédié à la page INJEP publications sport.
+
+    URL : https://injep.fr/sport/les-publications-sport/
+
+    Page WordPress avec ~92 publications sport (rapports, INJEP Analyses
+    & synthèses, baromètres, études). Chaque publication est un
+    `<li class="publication ...">` avec :
+      - <h2><a href="/publication/<slug>/">Titre</a></h2>
+      - <img src=".../wp-content/uploads/YYYY/MM/..."> → date approximative
+
+    La date est extraite de l'URL de l'image de couverture (date de
+    mise en ligne du visuel = date de publication à ±quelques jours,
+    suffisante pour le tri et le filtre fenêtre).
+
+    Cyril a validé l'abandon du RSS injep.fr/feed/ (= flux actualités,
+    pas flux publications). Cette page couvre tout le catalogue sport
+    INJEP. Fenêtre 1095j (3 ans) côté WINDOW_DAYS_BY_SOURCE_ID.
+
+    Chamber forcée INJEP. La source est dans BYPASS_KEYWORDS_SOURCES
+    (cf. R25-H) → tous les items remontent sans matching keyword (la
+    page est déjà filtrée éditorialement « sport » par l'INJEP).
+    """
+    impersonate = bool(src.get("impersonate", False))
+    try:
+        html = fetch_text(src["url"], impersonate=impersonate)
+    except Exception as e:
+        log.warning("HTML KO %s : %s", src["id"], e)
+        return []
+    soup = BeautifulSoup(html, "html.parser")
+    chamber = src.get("chamber", "INJEP")
+    out: list[Item] = []
+    seen: set[str] = set()
+    for li in soup.select("li.publication"):
+        # Titre + lien depuis le <h2><a>
+        title_a = li.select_one("h2 a") or li.select_one("h3 a")
+        if not title_a:
+            continue
+        title = title_a.get_text(" ", strip=True)
+        href = (title_a.get("href") or "").strip()
+        if not title or not href:
+            continue
+        url_abs = href if href.startswith("http") else urljoin(src["url"], href)
+        if url_abs in seen:
+            continue
+        seen.add(url_abs)
+        # Date depuis l'URL de l'image de couverture (uploads/YYYY/MM/).
+        published_at: datetime | None = None
+        img = li.find("img")
+        if img:
+            for attr in ("src", "data-src", "srcset"):
+                v = img.get(attr) or ""
+                m = _INJEP_IMG_DATE_RE.search(v)
+                if m:
+                    try:
+                        published_at = datetime(int(m.group(1)), int(m.group(2)), 1)
+                        break
+                    except ValueError:
+                        pass
+        # Collection (INJEP Analyses & synthèses, JEUNESSES études…) pour
+        # information éditoriale dans raw.
+        collection = ""
+        col_a = li.select_one("a[href*='/collection/']")
+        if col_a:
+            collection = col_a.get_text(" ", strip=True)[:120]
+        out.append(Item(
+            source_id=src["id"],
+            uid=url_abs[:200],
+            category=src["category"],
+            chamber=chamber,
+            title=title[:220],
+            url=url_abs,
+            published_at=published_at,
+            summary=collection,  # affiché comme sous-titre/snippet sur les cards
+            raw={"path": "injep_sport_publications_html",
+                 "collection": collection},
+        ))
+    log.info("%s : %d publications sport INJEP extraites", src["id"], len(out))
+    return out
+
+
 def _from_ans_rss(src: dict) -> list[Item]:
     """R42-BG (2026-05-11) — Handler dédié au RSS Drupal de l'ANS
     (agencedusport.fr/flux-rss). 3 spécificités vs RSS standard :
@@ -616,6 +769,10 @@ def fetch_source(src: dict) -> list[Item]:
         return _from_rss_generic(src)
     if fmt == "ans_rss":
         return _from_ans_rss(src)
+    if fmt == "min_sports_igesr_html":
+        return _from_min_sports_igesr_html(src)
+    if fmt == "injep_sport_publications_html":
+        return _from_injep_sport_publications_html(src)
     if fmt == "sitemap":
         return _from_sitemap_generic(src)
 

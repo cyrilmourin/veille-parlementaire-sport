@@ -84,10 +84,16 @@ DEFAULT_SITE_URL = os.environ.get("SITE_URL", "https://veille.sideline-conseil.f
 BYPASS_KEYWORDS_SOURCES: set[str] = {
     "ans",
     "insep",
-    "injep",
+    # R42-BK (2026-05-11) — `injep` (RSS actualités) désactivé, remplacé
+    # par `injep_sport_publications` (catalogue thématique sport,
+    # éditorialement filtré 100 % sport par l'INJEP).
+    "injep_sport_publications",
     "afld",
     "min_sports_actualites",
     "min_sports_presse",
+    # R42-BJ (2026-05-11) — rapports IGESR sport agrégés par MinSports,
+    # page éditorialement filtrée champ du sport. Bypass justifié.
+    "min_sports_igesr",
 }
 BYPASS_KEYWORD_LABEL = "(flux complet)"
 

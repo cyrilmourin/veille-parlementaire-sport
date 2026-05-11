@@ -135,6 +135,14 @@ WINDOW_DAYS_BY_SOURCE_ID: dict[str, int] = {
     # plusieurs années. La fenêtre `communiques: 90j` les faisait
     # sortir trop tôt. 2 ans permet de garder le rapport JO visible.
     "ccomptes_publications": 730,
+    # R42-BJ (2026-05-11) — Rapports IGESR sport sur sports.gouv.fr.
+    # Cyril : « peu d'actualisation, fenêtre 3 ans ». Couvre tous les
+    # rapports archivés depuis 2023.
+    "min_sports_igesr": 1095,
+    # R42-BK (2026-05-11) — Publications sport INJEP. Catalogue WordPress
+    # avec ~92 rapports/études (INJEP Analyses & synthèses, baromètres,
+    # études thématiques). Fenêtre 3 ans cohérente avec IGESR sport.
+    "injep_sport_publications": 1095,
 }
 
 # Catégories pour lesquelles on exige une vraie `published_at` ≤ now (pas de
@@ -922,6 +930,13 @@ _SOURCE_FAMILY_BY_ID = {
     # métier de Cyril (filtre Publications + Agenda).
     "afld": "operateurs_publics",
     "igesr_rapports": "operateurs_publics",
+    # R42-BJ (2026-05-11) — Cyril : « INJEP et IGESR sont à classer dans
+    # opérateurs publics ». Override explicite pour les 2 nouvelles
+    # sources sport — sinon `min_sports_igesr` matcherait le préfixe
+    # `min_` → gouvernement, et `injep_sport_publications` aurait un
+    # fallback inadéquat (pas de préfixe `injep_` dans le mapping).
+    "min_sports_igesr": "operateurs_publics",
+    "injep_sport_publications": "operateurs_publics",
     # R23-O : opérateurs publics (établissements / services publics
     # rattachés aux ministères Sports / Jeunesse). Séparés du mouvement
     # sportif associatif pour donner deux boutons distincts au filtre.

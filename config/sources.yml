@@ -628,6 +628,26 @@ ministeres:
       impersonate: true
       poids: 3
 
+    # R42-BJ (2026-05-11) — Rapports IGESR dans le champ du sport.
+    # Page MinSports qui agrège ~28 rapports IGESR thématiques sport
+    # (« Maisons sport-santé », « Héritage JOP Paris 2024 au plan
+    # éducatif », « Gouvernance du e-sport », « Pratique sportive
+    # étudiante », etc.). Liens vers PDF direct hébergés sur
+    # `sports.gouv.fr/sites/default/files/<YYYY-MM>/...pdf` — la date
+    # est extraite de l'URL (dossier d'archivage mensuel).
+    # Cyril 2026-05-11 : page peu actualisée (1-3 rapports nouveaux par
+    # an), pas besoin de fenêtre courte — `WINDOW_DAYS_BY_SOURCE_ID`
+    # passe à 1095j (3 ans) pour cette source.
+    # Distinct de `igesr_rapports` côté ESRI (rapports IGESR étudiants
+    # non-sport, à part).
+    - id: min_sports_igesr
+      category: communiques
+      url: https://www.sports.gouv.fr/rapports-de-l-igesr-dans-le-champ-du-sport-1703
+      format: min_sports_igesr_html
+      chamber: MinSports
+      impersonate: true
+      poids: 3
+
     # R18 (2026-04-22) — Education + Intérieur + Economie : Cloudflare
     # challenge JS débloqué via `impersonate: true` (curl_cffi).
     # Vérifié live 2026-04-22 : pages presse accessibles en 50/96/93 Ko.
@@ -765,12 +785,19 @@ ministeres:
     # html_generic._chamber(). Catégorie `communiques` (fenêtre 90j).
     # NB : `title_prefix` / `chamber` ignorés par html_generic ; le chamber
     # MinESR est résolu automatiquement depuis le domaine.
+    # R42-BJ (2026-05-11) — DÉSACTIVÉ. Cyril 2026-05-11 : « le site de
+    # l'IGESR sur le MESRI ne propose que les rapports qui touchent les
+    # étudiants » (formation universitaire, Erasmus+, agronomie, etc.).
+    # Aucun rapport sport-pertinent dans les 6 derniers mois (vérifié
+    # par simulation locale). Remplacé éditorialement par
+    # `min_sports_igesr` (page MinSports filtrée champ du sport).
     - id: igesr_rapports
       category: communiques
       url: https://www.enseignementsup-recherche.gouv.fr/fr/rapport-igesr
       format: html
       fetch_meta: true
       fetch_meta_limit: 40
+      enabled: false
 
 autorites:
   sources:
@@ -832,12 +859,38 @@ autorites:
     # publications touchent régulièrement le sport (enquêtes BPJEPS,
     # licences sportives en QPV, pratique licenciée, etc.).
     # Mapping chamber "INJEP" ajouté dans html_generic._chamber().
+    # R42-BK (2026-05-11) — DÉSACTIVÉ. Le RSS injep.fr/feed/ est un flux
+    # « actualités » (appels à projets, acquisitions du centre de
+    # ressources, lancements d'enquêtes) — il rate les vraies publications
+    # INJEP sport (INJEP Analyses & synthèses, baromètres, études). Cyril
+    # 2026-05-11 : « on ne garde pas la page RSS, on se contente des
+    # publications sport ». Remplacée par `injep_sport_publications`
+    # ci-dessous qui scrape la page catalogue dédiée
+    # `injep.fr/sport/les-publications-sport/`.
     - id: injep
       category: communiques
       url: https://injep.fr/feed/
       format: rss
-      # R42-BB (2026-05-11) — injep.fr ConnectTimeout côté GHA. impersonate
-      # via curl_cffi pour passer les protections IP-based.
+      impersonate: true
+      enabled: false
+
+    # R42-BK (2026-05-11) — Publications sport INJEP (catalogue dédié).
+    # Page WordPress qui liste ~92 publications sport : INJEP Analyses &
+    # synthèses, baromètres nationaux des pratiques sportives, études
+    # (rapport « Entre 14 et 18 ans, un jeune sur quatre abandonne… »,
+    # « Pratique sportive en France en 2025 après les Jeux de Paris »,
+    # « Poids économique du sport en 2023 », etc.).
+    # Format dédié `injep_sport_publications_html` (cf. html_generic.py) :
+    # parse `<li class="publication">`, date extraite de l'URL de l'image
+    # de couverture (`/wp-content/uploads/YYYY/MM/`).
+    # Mapping chamber "INJEP" ajouté dans html_generic._chamber().
+    # Source dans BYPASS_KEYWORDS_SOURCES → tous items remontent (page
+    # déjà filtrée éditorialement sport par l'INJEP).
+    - id: injep_sport_publications
+      category: communiques
+      url: https://injep.fr/sport/les-publications-sport/
+      format: injep_sport_publications_html
+      chamber: INJEP
       impersonate: true
 
     # R23-I (2026-04-23) — INSEP (Institut national du sport, de
