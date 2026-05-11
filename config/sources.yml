@@ -833,6 +833,9 @@ autorites:
       category: communiques
       url: https://injep.fr/feed/
       format: rss
+      # R42-BB (2026-05-11) — injep.fr ConnectTimeout côté GHA. impersonate
+      # via curl_cffi pour passer les protections IP-based.
+      impersonate: true
 
     # R23-I (2026-04-23) — INSEP (Institut national du sport, de
     # l'expertise et de la performance), établissement public national
@@ -850,6 +853,10 @@ autorites:
       category: communiques
       url: https://www.insep.fr/fr/actualites.xml
       format: rss
+      # R42-BB (2026-05-11) — insep.fr renvoie HTTP 418 (« I'm a teapot »
+      # = signal anti-bot) sur les IPs GHA. curl_cffi + TLS Chrome 120
+      # débloque (handler RSS étendu pour propager le param).
+      impersonate: true
       poids: 3
 
     # R23-J (2026-04-23) — Fondation du Sport Français (reconnue d'utilité
@@ -901,6 +908,8 @@ autorites:
       category: communiques
       url: https://www.ccomptes.fr/rss/publications
       format: rss
+      # R42-BB (2026-05-11) — ccomptes.fr ConnectTimeout côté GHA.
+      impersonate: true
 
     # R15 (2026-04-22) — Défenseur des droits : passage en RSS officiel.
     # /rss.xml renvoie un flux valide (49 Ko, dates ISO 2026-04 récentes)

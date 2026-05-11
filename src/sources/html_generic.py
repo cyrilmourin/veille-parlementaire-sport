@@ -59,13 +59,18 @@ def _from_rss_generic(src: dict) -> list[Item]:
     Tolérant : utilise feedparser (même lib que senat._normalize_rss).
     Chamber résolu via `_chamber(domain)` pour cohérence avec les badges
     d'affichage existants.
+
+    R42-BB (2026-05-11) : `impersonate: true` propagé pour les flux RSS
+    protégés par anti-bot (ex. insep.fr/fr/actualites.xml retourne HTTP
+    418 « I'm a teapot » sans impersonate côté GHA).
     """
+    impersonate = bool(src.get("impersonate", False))
     try:
         # R19-A : passer bytes à feedparser pour respecter l'encoding
         # déclaré (PI XML ou header Content-Type). Avec str + UTF-8 forcé,
         # les flux ISO-8859-15 comme les RSS thématiques Sénat produisent
         # du mojibake "ï¿œ" sur les caractères accentués / signes comme °.
-        payload = fetch_bytes(src["url"])
+        payload = fetch_bytes(src["url"], impersonate=impersonate)
     except Exception as e:
         log.warning("RSS KO %s : %s", src["id"], e)
         return []
