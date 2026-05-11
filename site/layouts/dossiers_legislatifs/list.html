@@ -51,11 +51,20 @@
     {{ else if hasPrefix $low "proposition de résolution européenne" }}{{ $type = "Proposition de résolution européenne" }}
     {{ end }}
 
-    {{/* Préposition selon la chambre */}}
+    {{/* Préposition selon la chambre du PREMIER dépôt (R42-AA, 2026-05-11).
+         Avant : on utilisait `.Params.chamber` qui = chambre du parser
+         (toujours AN pour an_dossiers_legislatifs, toujours Senat pour
+         senat_dosleg). Une PPL/PJL déposée au Sénat puis transmise à l'AN
+         (cf. PPL 1560 sport pro) s'affichait à tort « Dépôt à l'Assemblée
+         nationale ». R42-AA expose `first_deposit_chamber` extrait de
+         l'institution du 1er acte de la timeline AN. Si présent, on l'utilise
+         en priorité ; sinon fallback sur `chamber` (cas Sénat sans timeline). */}}
     {{ $cham := .Params.chamber | default "" }}
+    {{ $firstDep := .Params.first_deposit_chamber | default "" }}
+    {{ $chamForLabel := cond (ne $firstDep "") $firstDep $cham }}
     {{ $depotLib := "Dépôt" }}
-    {{ if eq $cham "AN" }}{{ $depotLib = "Dépôt à l'Assemblée nationale" }}
-    {{ else if or (eq $cham "Senat") (eq $cham "Sénat") }}{{ $depotLib = "Dépôt au Sénat" }}
+    {{ if eq $chamForLabel "AN" }}{{ $depotLib = "Dépôt à l'Assemblée nationale" }}
+    {{ else if or (eq $chamForLabel "Senat") (eq $chamForLabel "Sénat") }}{{ $depotLib = "Dépôt au Sénat" }}
     {{ end }}
 
     <article class="dosleg-card" data-chamber="{{ $cham }}"{{ if .Params.is_promulgated }} data-promulgated="true"{{ end }}>

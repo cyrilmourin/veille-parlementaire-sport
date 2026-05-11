@@ -4126,6 +4126,17 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
                 date_depot = orig[:10]
                 if date_depot and date_depot != frontmatter_date[:10]:
                     fm.append(f"date_depot: {date_depot}")
+            # R42-AA (2026-05-11) — Chambre du PREMIER dépôt (AN / Sénat).
+            # Le `chamber` du dosleg = chambre du parser (toujours AN pour
+            # an_dossiers_legislatifs, toujours Senat pour senat_dosleg)
+            # mais ne reflète pas le 1er dépôt réel (ex. PPL 1560 sport
+            # pro : déposée au Sénat puis transmise à l'AN → ingérée par
+            # le parser AN avec chamber=AN mais 1er dépôt = Sénat). Le
+            # template lit `.Params.first_deposit_chamber` en priorité
+            # pour le label « Dépôt à l'Assemblée nationale / au Sénat ».
+            first_dep = (raw.get("first_deposit_chamber") or "").strip()
+            if first_dep in ("AN", "Senat"):
+                fm.append(f'first_deposit_chamber: "{first_dep}"')
         # R23-H (2026-04-23) : famille de source pour le filtre UI exposé
         # sur /items/agenda/ et /items/communiques/. 5 buckets stables :
         # parlement | gouvernement | autorites | operateurs | jorf

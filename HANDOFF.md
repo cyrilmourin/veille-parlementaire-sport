@@ -266,6 +266,18 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-11 (matin, demande Cyril sur étiquette chambre du dépôt) : **R42-AA — Chambre du PREMIER dépôt (AN / Sénat) sur les cards dossiers législatifs**.
+
+  Cyril : « Dans les dossiers législatifs, tu indiques systématiquement déposé à l'AN, alors que c'est parfois déposé au sénat en premier. Il faut donc que la mention évolue selon que le 1er dépôt ait été effectué à l'AN ou au Sénat. »
+
+  Cas concret : PPL 1560 sport pro (DLR5L17N51732), déposée au **Sénat** le 18/03/2025 puis transmise à l'AN. Comme elle est ingérée par le parser `an_dossiers_legislatifs` (qui pose `chamber=AN`), le template affichait à tort « Dépôt à l'Assemblée nationale le 18/03/2025 ».
+
+  Fix : extraction de l'`institution` du 1er acte de `actes_timeline` (le mapping `_map_code_acte` renvoie déjà "AN" | "Senat" | "CMP" | "Gouvernement" | "ConseilConst"). Si "AN" ou "Senat", on pose `raw.first_deposit_chamber` qui est propagé au frontmatter Hugo (`first_deposit_chamber: "AN"` ou `"Senat"`). Le template `list.html` lit `.Params.first_deposit_chamber` en priorité, fallback `.Params.chamber` si vide. Comportement Sénat inchangé pour `senat_dosleg` (parser CSV ne pose pas de timeline, fallback chamber=Senat reste correct).
+
+  1049 → 1053 tests verts (+4 tests R42-Z blocklist intégrés ce matin via PR #7).
+
+  Action prod : nécessite un reset_dossiers_legislatifs pour réingérer les items avec `raw.first_deposit_chamber` (`raw.*` ne se refresh pas à hash_key constant via upsert_many).
+
 - 2026-05-11 (matin, demande Cyril sur faux positifs dossiers post-R42-X) : **R42-Z — Blocklist de 7 dossiers législatifs faux positifs (6 AN + 1 Sénat)**.
 
   Suite au passage R42-X (fetch texte intégral des dossiers AN via `/dyn/opendata/<TEXTE_REF>.html`), 7 dossiers remontaient en `dossiers_legislatifs` via une mention incidente d'un keyword sport, sans rapport avec la veille sport-institutionnel. Cyril a ciblé chaque dossier via le text-fragment du keyword qui matchait. Ajoutés à `config/blocklist.yml` :

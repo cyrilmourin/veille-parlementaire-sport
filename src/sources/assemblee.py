@@ -1565,10 +1565,22 @@ def _normalize_dosleg(obj, src, cat):
     # `raw.published_at_original` côté frontmatter et l'affiche en lieu
     # et place de la date `last_date`. Demande Cyril 2026-05-11.
     first_act_date_iso = ""
+    first_deposit_chamber = ""  # R42-AA
     if actes_timeline:
         first_iso = (actes_timeline[0].get("date") or "")[:10]
         if first_iso and first_iso != last_date.date().isoformat():
             first_act_date_iso = f"{first_iso}T00:00:00"
+        # R42-AA (2026-05-11) — Chambre du PREMIER dépôt (PPL/PJL peuvent
+        # être déposées au Sénat puis transmises à l'AN — ex. PPL 1560
+        # sport pro, dépôt initial Sénat 18/03/2025, transmise AN après).
+        # Le label « Dépôt à l'AN/Sénat » sur les cards doit refléter le
+        # 1er dépôt réel, pas la chambre du parser. Demande Cyril 2026-05-11.
+        # On extrait `institution` du 1er acte timeline (= "AN" | "Senat" |
+        # autre). Pour les autres valeurs (CMP, Gouvernement…) on laisse
+        # vide et le template retombera sur le `chamber` du dosleg.
+        first_inst = (actes_timeline[0].get("institution") or "").strip()
+        if first_inst in ("AN", "Senat"):
+            first_deposit_chamber = first_inst
 
     # R42-X (2026-05-11) — fetch du texte intégral via `/dyn/opendata/`.
     # Cas concret : PPR n°2126 (PNREANR5L17B2126) « Renforcer le pilotage
@@ -1615,6 +1627,14 @@ def _normalize_dosleg(obj, src, cat):
             # Consommée par R42-M côté frontmatter → affichée comme
             # « Dépôt à l'AN le {date_depot} » sur les cards dosleg.
             "published_at_original": first_act_date_iso,
+            # R42-AA (2026-05-11) : chambre du PREMIER dépôt (institution
+            # du 1er acte de la timeline). « AN » ou « Senat ». Vide si
+            # l'institution n'est pas une des deux chambres (cas rare :
+            # acte d'origine CMP / Gouvernement…). Consommée par le
+            # frontmatter Hugo + le template list.html dosleg pour
+            # afficher « Dépôt à l'Assemblée nationale » ou « Dépôt au
+            # Sénat » selon le 1er dépôt RÉEL et non la chambre du parser.
+            "first_deposit_chamber": first_deposit_chamber,
             # R42-X (2026-05-11) : texte intégral du dossier (fetch
             # `/dyn/opendata/<TEXTE_REF>.html`), tronqué à 200k chars.
             # Consommé par KeywordMatcher.apply via raw.haystack_body —
