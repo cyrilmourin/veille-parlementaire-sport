@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-11T08:35:36+00:00",
+  "last_run_at": "2026-05-11T09:52:42+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419604B1560P0D1N000001",
@@ -265,6 +265,9 @@
       "an_cr_commissions::an-cr-cion-dvp-2526-022",
       "an_cr_commissions::an-cr-cion-dvp-2526-024",
       "an_cr_commissions::an-cr-cion-dvp-2526-032",
+      "an_cr_commissions::an-cr-cion-eco-2526-006",
+      "an_cr_commissions::an-cr-cion-eco-2526-007",
+      "an_cr_commissions::an-cr-cion-eco-2526-008",
       "an_cr_commissions::an-cr-cion-eco-2526-025",
       "an_cr_commissions::an-cr-cion-eco-2526-030",
       "an_cr_commissions::an-cr-cion-eco-2526-031",
