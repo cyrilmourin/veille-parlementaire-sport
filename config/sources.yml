@@ -784,14 +784,17 @@ autorites:
       # R41-AC (2026-05-09) — `impersonate: true` ajouté : le pipeline
       # passe désormais via curl_cffi avec signature TLS Chrome, ce qui
       # contourne les WAF / Cloudflare-like qui bloquent httpx standard.
-      # Cyril : pas de RSS exploitable côté ANS, scraping HTML est la
-      # seule option (Drupal moderne, pas de feed natif).
-      url: https://www.agencedusport.fr/actualites
-      format: html
+      # R42-BG (2026-05-11) — Bascule sur le RSS officiel ANS découvert
+      # par Cyril : https://www.agencedusport.fr/flux-rss. Format Drupal
+      # atypique (titre/lien encapsulés dans `<a>`, pubDate au format FR
+      # `mer 01/04/2026 - 12:00`, doublons par GUID) → handler dédié
+      # `ans_rss` dans `html_generic.py`. Plus stable et plus rapide
+      # que le scraping HTML qui souffrait de ConnectTimeout intermittents.
+      url: https://www.agencedusport.fr/flux-rss
+      format: ans_rss
+      chamber: ANS
       impersonate: true
       poids: 3
-      fetch_meta: true
-      fetch_meta_limit: 60
 
     # R15 (2026-04-22) — AFLD : passage en RSS officiel (WordPress).
     # La page /actualites/ en HTML ne remontait qu'1 item (le lien de nav

@@ -53,6 +53,102 @@ _SITEMAP_STOP_SLUGS: frozenset[str] = frozenset({
 })
 
 
+_ANS_DATE_RE = re.compile(r"(\d{1,2})/(\d{1,2})/(\d{4})\s*-\s*(\d{1,2}):(\d{2})")
+
+
+def _parse_ans_date(s: str) -> datetime | None:
+    """Parse une date ANS Drupal au format `mer 01/04/2026 - 12:00`.
+
+    Le RSS de l'ANS (agencedusport.fr/flux-rss) sort les pubDate au
+    format jour-FR/JJ/MM/AAAA - HH:MM au lieu du RFC822, ce qui empêche
+    feedparser de poser `published_parsed`. On parse manuellement la
+    partie numérique. Retourne None si format inconnu (soft-fail)."""
+    if not s:
+        return None
+    m = _ANS_DATE_RE.search(s)
+    if not m:
+        return None
+    d, mo, y, h, mi = (int(g) for g in m.groups())
+    try:
+        return datetime(y, mo, d, h, mi)
+    except ValueError:
+        return None
+
+
+def _from_ans_rss(src: dict) -> list[Item]:
+    """R42-BG (2026-05-11) — Handler dédié au RSS Drupal de l'ANS
+    (agencedusport.fr/flux-rss). 3 spécificités vs RSS standard :
+
+    - `<title>` contient un `<a href="...">Texte</a>` au lieu du titre
+      en clair → on strippe pour récupérer texte + href.
+    - `<link>` retourne `…/view` parce que feedparser prend le texte du
+      `<a>` interne, pas le href → on utilise l'href du title.
+    - `<pubDate>` au format `mer 01/04/2026 - 12:00` (non RFC822) →
+      `published_parsed` est None côté feedparser, on parse via
+      `_parse_ans_date`.
+
+    + dédup par GUID : le feed Drupal renvoie chaque item 2-3 fois.
+
+    Chamber forcée à ANS (cohérent avec la source HTML scraping qu'on
+    remplace via R42-BG). Le filtre cutoff RSS standard
+    (_RSS_SITEMAP_CUTOFF_DAYS) reste appliqué pour cohérence avec les
+    autres flux RSS.
+    """
+    impersonate = bool(src.get("impersonate", False))
+    try:
+        payload = fetch_bytes(src["url"], impersonate=impersonate)
+    except Exception as e:
+        log.warning("RSS KO %s : %s", src["id"], e)
+        return []
+    d = feedparser.parse(payload)
+
+    chamber = src.get("chamber", "ANS")
+    cutoff = datetime.utcnow() - timedelta(days=_RSS_SITEMAP_CUTOFF_DAYS)
+    seen_guids: set[str] = set()
+    out: list[Item] = []
+    for e in d.entries:
+        guid = (getattr(e, "id", "") or "").strip()
+        if guid and guid in seen_guids:
+            continue
+        if guid:
+            seen_guids.add(guid)
+
+        # Title + lien : extraire depuis le <a> interne au <title>.
+        raw_title = (getattr(e, "title", "") or "").strip()
+        if not raw_title:
+            continue
+        soup = BeautifulSoup(raw_title, "html.parser")
+        a = soup.find("a")
+        if a is not None:
+            title = a.get_text(" ", strip=True)
+            href = (a.get("href") or "").strip()
+            link = urljoin(src["url"], href) if href else ""
+        else:
+            title = raw_title
+            link = (getattr(e, "link", "") or "").strip()
+        if not title or not link:
+            continue
+
+        # Date FR : « mer 01/04/2026 - 12:00 ».
+        dt = _parse_ans_date(getattr(e, "published", "") or "")
+        if dt and dt < cutoff:
+            continue
+        out.append(Item(
+            source_id=src["id"],
+            uid=(guid or link)[:200],
+            category=src["category"],
+            chamber=chamber,
+            title=title[:220],
+            url=link,
+            published_at=dt,
+            summary="",
+            raw={"path": "ans_rss", "guid": guid},
+        ))
+    log.info("%s : %d items RSS ANS (cutoff %dj)",
+             src["id"], len(out), _RSS_SITEMAP_CUTOFF_DAYS)
+    return out
+
+
 def _from_rss_generic(src: dict) -> list[Item]:
     """Parse un flux RSS 2.0 / Atom — titre + lien + date + description.
 
@@ -518,6 +614,8 @@ def fetch_source(src: dict) -> list[Item]:
     fmt = (src.get("format") or "html").lower()
     if fmt == "rss":
         return _from_rss_generic(src)
+    if fmt == "ans_rss":
+        return _from_ans_rss(src)
     if fmt == "sitemap":
         return _from_sitemap_generic(src)
 

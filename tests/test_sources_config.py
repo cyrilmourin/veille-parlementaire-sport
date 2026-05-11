@@ -48,6 +48,10 @@ _KNOWN_FORMATS = {
     # R41-AY (2026-05-10) — vidéothèque commission Sénat
     # (videos.senat.fr/commission.{CODE}.p1, lien player vidéo).
     "senat_videos_commission_html",
+    # R42-BG (2026-05-11) — handler RSS Drupal dédié ANS
+    # (agencedusport.fr/flux-rss : title/link encapsulés <a>,
+    # pubDate FR « mer 01/04/2026 - 12:00 », dédup GUID).
+    "ans_rss",
 }
 
 
