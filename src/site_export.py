@@ -2297,6 +2297,69 @@ def _filter_nominations_only_sources(rows: list[dict]) -> list[dict]:
     return kept
 
 
+def _filter_parlement_publications_nominations_only(rows: list[dict]) -> list[dict]:
+    """R42-AW (2026-05-11) — Retire des publications parlementaires les
+    rapports dont le seul signal sport est la famille `nomination_event`.
+
+    Cyril : « arrêter d'utiliser les mots-clés des nominations pour les
+    publications parlementaires ». Les rapports parlementaires (AN/Sénat
+    senat_rapports, an_rapports, an_rapports_information, an_avis,
+    an_rapports_application_loi, an_rapports_information_ce) sont des
+    documents de contrôle/évaluation/avis ; ils mentionnent parfois en
+    passant un verbe de nomination (« X a été élu président de … »,
+    « Y succède à la présidence de … ») sans que le rapport lui-même
+    relève de la veille sport.
+
+    Cas remontés (reset_category=communiques 2026-05-11) :
+      - Rapport n°14 — Une Europe redevenue centrale (« élu président »)
+      - Rapport n°850 — Brésil/Pérou (« succède à la présidence »)
+      - Rapport n°378 — Égypte/Moyen-Orient
+      - Rapport n°288 — Voir l'Afrique
+      - Rapport n°766 — Délégation APCE
+
+    Critère d'exclusion :
+      - category == "communiques"
+      - source family == "parlement" (cf. `_source_family`)
+      - keyword_families ne contient QUE `nomination_event` (aucune autre
+        famille sport : acteur, federation, dispositif, evenement, theme)
+
+    Les rapports parlementaires légitimes qui mentionnent aussi un sujet
+    sport (Code du sport, ANS, etc.) gardent une famille acteur/dispositif
+    en plus → ils passent. Symétrique R41-I qui fait la même chose côté
+    JORF nominations.
+    """
+    kept: list[dict] = []
+    dropped = 0
+    for r in rows:
+        cat = (r.get("category") or "").strip()
+        if cat != "communiques":
+            kept.append(r)
+            continue
+        fam = _source_family(r.get("source_id"), r.get("chamber"))
+        if fam != "parlement":
+            kept.append(r)
+            continue
+        families = r.get("keyword_families") or []
+        if isinstance(families, str):
+            try:
+                families = json.loads(families)
+            except Exception:
+                families = []
+        families_set = set(families)
+        if families_set and families_set <= {"nomination_event"}:
+            dropped += 1
+            continue
+        kept.append(r)
+    if dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "R42-AW : %d publications parlement supprimées"
+            " (famille nomination_event seule, aucun keyword sport spécifique)",
+            dropped,
+        )
+    return kept
+
+
 def _filter_jorf_nominations_hors_sport(rows: list[dict]) -> list[dict]:
     """R41-I (2026-05-05) — Retire les nominations JORF dont le seul signal
     sport est la famille `nomination_event` (verbes génériques : nommé,
@@ -3089,6 +3152,12 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # nominations pour tous les organismes publics ; seules celles qui matchent
     # aussi une famille sport spécifique (acteur, federation…) sont pertinentes.
     rows = _filter_jorf_nominations_hors_sport(rows)
+    # R42-AW (2026-05-11) — symétrique pour les publications parlementaires :
+    # rapports AN/Sénat dont le seul signal sport est nomination_event
+    # (« élu président », « succède à la présidence »…) → exclus. Cyril :
+    # « arrêter d'utiliser les mots-clés des nominations pour les
+    # publications parlementaires ».
+    rows = _filter_parlement_publications_nominations_only(rows)
     # R41-E (2026-04-27) : pour les items en catégorie `nominations`,
     # extraire (Personne, Fonction, Structure) et normaliser le titre
     # en « X devient Y de Z » sur les sources presse business (Olbia,

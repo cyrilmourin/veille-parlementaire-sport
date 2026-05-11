@@ -277,3 +277,26 @@ blocklist:
     reason: "Création réserve citoyenne diplomatie — hors scope sport (R42-AF)"
   - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53010
     reason: "Réaffirmer décarbonation transport routier — hors scope sport (R42-AF)"
+
+  # ----- R42-AY (2026-05-11) — Faux positifs rapports Sénat hors scope sport.
+  # Items remontés par Cyril après le reset_category=communiques R42-AJ/AK/AM.
+  # Cause : keywords sport-univoques captés hors contexte (LFP, FFA, dopage,
+  # Éducation physique et sportive, etc.) dans des rapports thématiques non
+  # sportifs. Blocklist plus chirurgical qu'une modification du yaml qui
+  # affecterait d'autres items légitimes.
+  - url: http://www.senat.fr/notice-rapport/1994/i1994_1995_0235-notice.html
+    reason: "Rapport Sénat 1994 — Golf hors contexte sport (R42-AY)"
+  - url: http://www.senat.fr/notice-rapport/2000/r00-037-notice.html
+    reason: "Rapport n°37 — Industrie automobile (« LFP » hors contexte sport) (R42-AY)"
+  - url: http://www.senat.fr/notice-rapport/1966/i1966_1967_0031-notice.html
+    reason: "Rapport n°31 — Langues régionales (« Éducation physique et sportive » hors contexte) (R42-AY)"
+  - url: http://www.senat.fr/notice-rapport/2020/r20-848-notice.html
+    reason: "Rapport n°848 — Opioïdes (« FFA » hors contexte sport) (R42-AY)"
+  - url: http://www.senat.fr/notice-rapport/2024/r24-849-notice.html
+    reason: "Rapport n°849 — Nord de l'Europe (« dopage » hors contexte sport) (R42-AY)"
+  - url: http://www.senat.fr/notice-rapport/2013/r13-757-notice.html
+    reason: "Rapport n°757 — Argent gangrène société (faux positif keyword) (R42-AY)"
+  - url: http://www.senat.fr/notice-rapport/1987/i1987_1988_0304-notice.html
+    reason: "Rapport n°304 — Instruments migratoires internationaux (faux positif) (R42-AY)"
+  - url: http://www.senat.fr/notice-rapport/1985/r85-045-notice.html
+    reason: "Rapport n°45 — IVG (faux positif keyword sport) (R42-AY)"

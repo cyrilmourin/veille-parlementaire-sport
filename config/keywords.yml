@@ -22,7 +22,13 @@ acteur:
   - CPSF
   - Comité paralympique et sportif
   - Comite paralympique et sportif
-  - CNSE                        # comité national du sport de haut niveau
+  # R42-AX (2026-05-11) — `CNSE` retiré : trop ambigu en pratique (le
+  # sigle est aussi utilisé pour « Caisse nationale de Solidarité pour
+  # l'Énergie », « Conseil national de la sécurité civile », etc.).
+  # Cas qui motive : rapport Sénat n°841 « L'aide médicale de l'État »
+  # remontait en publications uniquement parce que « CNSE » y figurait
+  # dans un contexte non-sport. Demande Cyril 2026-05-11.
+  # - CNSE                        # comité national du sport de haut niveau
   # ANS seul retiré — faux positifs avec le mot "ans" (unidecode).
   # On garde uniquement la forme longue.
   - Agence nationale du sport

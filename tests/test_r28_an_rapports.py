@@ -105,7 +105,12 @@ def test_parse_report_li_nominal_rapp():
 
 
 def test_parse_report_li_rapp_compa():
-    """Suffix -COMPA : entrée conservée, uid distinct de la version principale."""
+    """Suffix -COMPA : DÉSORMAIS REJETÉ (R42-AV, 2026-05-11).
+
+    Avant R42-AV : entrée conservée, uid distinct de la version principale.
+    Après R42-AV : Cyril « les "texte comparatif" m'intéressent pas, c'est
+    du doublon ». Tout data-id `-COMPA` ou titre contenant « texte
+    comparatif » est désormais filtré au plus tôt côté `_parse_report_li`."""
     html = """
     <li data-id="OMC_RAPPANR5L17B2396-COMPA">
       <span class="heure">Mis en ligne jeudi 29 janvier 2026 à 11h00</span>
@@ -114,12 +119,7 @@ def test_parse_report_li_rapp_compa():
       <a href="/dyn/17/pdf/rapports/r2396-a0-COMPA.pdf">Document</a>
     </li>
     """
-    r = _parse_report_li(_li_fragment(html))
-    assert r is not None
-    assert r["data_id"] == "OMC_RAPPANR5L17B2396-COMPA"
-    # Pas de dossier législatif → fallback sur PDF
-    assert r["url"] == "/dyn/17/pdf/rapports/r2396-a0-COMPA.pdf"
-    assert r["url_dossier"] == ""
+    assert _parse_report_li(_li_fragment(html)) is None
 
 
 def test_parse_report_li_skip_non_rapp():

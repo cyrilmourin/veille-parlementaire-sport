@@ -121,9 +121,20 @@ def _parse_report_li(li) -> dict | None:
 
     Retourne None si l'entrée n'est pas un vrai rapport RAPP ou si les
     champs obligatoires manquent (titre + url).
+
+    R42-AV (2026-05-11) — Exclusion des « Texte comparatif » : ce sont
+    des versions cosmétiques jumelles du rapport principal (data-id avec
+    suffixe `-COMPA`, ou titre se terminant par « Texte comparatif »).
+    Cyril : « les "texte comparatif" m'intéressent pas, c'est du
+    doublon ». On filtre ici au plus tôt pour éviter de polluer DB +
+    matcher + export Hugo. Le rapport principal (sans -COMPA) reste
+    ingéré normalement.
     """
     data_id = (li.get("data-id") or "").strip()
     if not data_id or not _DATA_ID_RE.match(data_id):
+        return None
+    # R42-AV : exclusion des « Texte comparatif » (data-id `-COMPA*`).
+    if "-COMPA" in data_id:
         return None
 
     # Numéro du rapport depuis data-id : OMC_RAPPANR5L17B2396 → 2396
@@ -140,8 +151,15 @@ def _parse_report_li(li) -> dict | None:
 
     h3 = li.find("h3")
     title = h3.get_text(" ", strip=True) if h3 else ""
-    # Certaines entrées RAPP sont dupliquées en version "Texte comparatif" :
-    # on les garde (date/contenu distincts) — l'uid data-id diffère déjà.
+    # R42-AV (2026-05-11) — exclusion défense en profondeur : si pour une
+    # raison quelconque le data-id `-COMPA` n'a pas matché (variante de
+    # nommage AN, futur changement), on rejette aussi par marqueur titre.
+    # Normalisation case-insensitive + ignore l'espace insécable U+00A0
+    # parfois utilisé par l'AN entre « Texte » et « comparatif ».
+    if title:
+        title_norm = re.sub(r"\s+", " ", title).lower()
+        if "texte comparatif" in title_norm:
+            return None
 
     # Résumé = premier <p> proche du <h3>
     p = li.find("p")
