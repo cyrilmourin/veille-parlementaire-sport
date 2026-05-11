@@ -3855,9 +3855,17 @@ def _amendement_chip(raw: dict) -> tuple[str, str]:
 
 
 def _write_item_pages(items_dir: Path, rows: list[dict]):
-    # On évite l'explosion du nombre de fichiers : on garde les 500 plus récents.
+    # On évite l'explosion du nombre de fichiers : on garde les N plus récents.
+    # R42-AB (2026-05-11) — cap 500 → 1500. Cyril a remonté que la page
+    # /items/dossiers_legislatifs/ annonçait « 109 dossiers » dans
+    # l'intro mais n'en affichait que ~16. Cause : 500 .md max toutes
+    # catégories confondues, mais ~700 items globaux après R42-N/R/W/X/Y/Z.
+    # Les dosleg anciens (2024) étaient écartés au profit des items plus
+    # récents (amendements, CR, JORF). 1500 couvre la fenêtre complète
+    # (3 ans dosleg + 30j agenda + 30j JORF + 6 mois CR + 14j amendements
+    # actifs + etc.) avec marge.
     rows_sorted = _sort_by_date_desc(rows)
-    for r in rows_sorted[:500]:
+    for r in rows_sorted[:1500]:
         cat = r.get("category") or "autre"
         d = items_dir / cat
         d.mkdir(parents=True, exist_ok=True)
