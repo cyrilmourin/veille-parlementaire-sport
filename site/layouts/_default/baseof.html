@@ -7,6 +7,12 @@
   {{ $desc := cond (gt (len (.Description | default "")) 0) .Description .Site.Params.description }}
   <meta name="description" content="{{ $desc }}"/>
   <meta name="robots" content="index,follow"/>
+  {{/* R42-AQ (2026-05-11) — Vérification de propriété Google Search Console.
+       Méthode officielle balise HTML (préfixe d'URL `veille.sideline-conseil.fr`).
+       La propriété était déjà validée implicitement via le compte GA4
+       partagé ; cette balise garantit la persistance de la validation
+       même si le compte GA change ou si GA est temporairement désactivé. */}}
+  <meta name="google-site-verification" content="4iFVyNXtcJKzCexfqCGIa_WPw12UCC4WR2FZlHJkJow"/>
 
   {{/* R41-Y (2026-05-09) — Open Graph + Twitter Cards pour le partage
        LinkedIn / Facebook / Twitter / Slack / WhatsApp. Sans ces meta
