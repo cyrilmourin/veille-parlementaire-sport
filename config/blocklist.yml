@@ -307,3 +307,10 @@ blocklist:
   # même PJL restent visibles — à blacklister séparément si nécessaire.
   - url: https://www.assemblee-nationale.fr/dyn/17/amendements/AMANR5L17PO838901BTC2695P0D1N000059
     reason: "Amdt AN n°59 art. 21 PJL programmation militaire 2024-2030 — hors scope sport (R42-BC)"
+
+  # R42-BE (2026-05-11) — Dossier législatif PPL « Lutter contre l'entrisme
+  # islamiste dans les communes » (DLR5L17N53296). Hors scope sport
+  # (demande Cyril). Le CR plénière du 06/01/2026 sur le même thème
+  # reste visible — à blacklister séparément si confirmation.
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53296
+    reason: "PPL Lutter contre l'entrisme islamiste dans les communes — hors scope sport (R42-BE)"
