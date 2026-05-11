@@ -291,6 +291,35 @@ def dry(verbose: bool = False) -> int:
     return 0
 
 
+def export_only(verbose: bool = False) -> int:
+    """R42-AG (2026-05-11) — Mode 'export-only' : rebuild rapide du site
+    sans fetch ni matching.
+
+    Lit la DB existante (`data/veille.sqlite3`), récupère tous les items
+    matchés, et appelle directement `site_export.export()` qui applique
+    la blocklist + filter_window + dédup + écrit les .md pour Hugo.
+
+    Usage : urgence blocklist (faux positifs à masquer ASAP), ajustement
+    template / CSS, changement de mots du yaml qu'on veut juste rafraîchir
+    sans re-ingest. Pas adapté pour ajouter des keywords (les items en DB
+    gardent leur matched_keywords figé) — pour ça il faut un reset_category.
+
+    Estimation durée : ~30s pipeline + 1-2 min Hugo build + 1 min Pages
+    deploy = ~3-5 min total vs ~10-12 min pour un run nominal complet.
+    """
+    _setup_logging(verbose)
+    log.info("=== Export-only — %s ===", datetime.now().isoformat(timespec="seconds"))
+    store = Store(SQLITE_PATH)
+    try:
+        all_matched = store.fetch_matched_since(datetime(1970, 1, 1), only_matched=True)
+        log.info("DB : %d items matchés à exporter", len(all_matched))
+        summary = site_export.export(all_matched, SITE_ROOT)
+        log.info("Site statique exporté : %s", summary)
+    finally:
+        store.close()
+    return 0
+
+
 def ping(send: bool = True, verbose: bool = False) -> int:
     """Ping 17h30 : lit la DB, compare avec l'état du matin (`ping_state.json`),
     envoie un email court si de nouveaux items matchés sont apparus dans les
@@ -325,6 +354,14 @@ def main():
     p_ping.add_argument("--no-email", action="store_true")
     p_ping.add_argument("-v", "--verbose", action="store_true")
 
+    # R42-AG (2026-05-11) — quick rebuild : skip fetch + matching,
+    # juste site_export depuis la DB. ~3-5 min vs ~10-12 min full.
+    p_export = sub.add_parser(
+        "export",
+        help="Rebuild rapide site (lit DB existante, applique blocklist + export Hugo)",
+    )
+    p_export.add_argument("-v", "--verbose", action="store_true")
+
     args = ap.parse_args()
 
     if args.cmd == "run":
@@ -333,6 +370,8 @@ def main():
         sys.exit(dry(verbose=args.verbose))
     elif args.cmd == "ping":
         sys.exit(ping(send=not args.no_email, verbose=args.verbose))
+    elif args.cmd == "export":
+        sys.exit(export_only(verbose=args.verbose))
 
 
 if __name__ == "__main__":

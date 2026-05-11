@@ -1,0 +1,102 @@
+name: Quick rebuild (no fetch)
+
+# R42-AG (2026-05-11) — Rebuild rapide du site sans fetch ni matching.
+#
+# Usage : pour les modifs qui n'affectent que l'export (blocklist,
+# template Hugo, CSS, image statique…). Lit la DB existante via le
+# cache actions/cache, applique blocklist + filter_window + dédup,
+# régénère les .md pour Hugo, build et déploie Pages.
+#
+# Délai estimé : ~3-5 min (vs ~10-12 min pour daily.yml run nominal).
+#
+# Limites : ne reprend PAS les nouveaux items publiés depuis le dernier
+# run (pas de fetch). Pas adapté pour ajout de keywords (les items en
+# DB gardent leur matched_keywords figé — il faut un reset_category
+# via daily.yml).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  actions: write
+
+concurrency:
+  group: veille-daily  # Même group que daily.yml — pas de double déploiement Pages
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Restore SQLite cache
+        uses: actions/cache@v4
+        with:
+          path: data/veille.sqlite3
+          # Même clé que daily.yml pour partager le cache
+          key: veille-sqlite-${{ github.run_id }}
+          restore-keys: |
+            veille-sqlite-
+
+      - name: Run export-only (skip fetch + matching)
+        run: |
+          python -m src.main export -v
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: '0.140.2'
+          extended: true
+
+      - name: Build Hugo site
+        working-directory: site
+        run: |
+          rm -rf public
+          hugo --minify --baseURL "https://veille.sideline-conseil.fr/"
+
+      - name: Purge stale github-pages artifacts from this run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runId = context.runId;
+            const { owner, repo } = context.repo;
+            const arts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner, repo, run_id: runId,
+            });
+            for (const art of arts.data.artifacts) {
+              if (art.name === 'github-pages') {
+                await github.rest.actions.deleteArtifact({
+                  owner, repo, artifact_id: art.id,
+                });
+                console.log(`Purged stale github-pages artifact ${art.id}`);
+              }
+            }
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
