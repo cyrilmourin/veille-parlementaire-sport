@@ -1345,17 +1345,20 @@ def _fetch_an_dossier_text_haystack(
 # (veille_parl_procedure_context.md) : on affiche seulement les dossiers
 # "actifs" ou "promulgués récemment".
 # R42-R (2026-05-11) — passage 365j → 1095j pour les NON promulgués.
-# Origine : Cyril a remonté l'absence de PPL sport déposées il y a 12-18
-# mois qui restent juridiquement actives mais sans activité parlementaire
-# récente (ex. PPL n°1068 « Protéger les éducateurs sportifs » déposée
-# 11/03/2025, PPL n°1803 « Responsabiliser les clubs pour mettre fin à
-# l'homophobie dans le sport », PPL n°332, n°269, n°699). Avant : filtre
-# `age_days > 365` les éliminait → invisibles malgré titre 100% sport.
-# Après : aligné sur la fenêtre `site_export.WINDOW_DAYS_BY_CATEGORY`
-# qui est déjà à 1095j pour les dossiers législatifs. Le filtre keyword
-# en aval garantit qu'on ne ramène que les dosleg sport-relevants.
-_DOSLEG_MAX_AGE_ACTIVE_DAYS = 1095      # 3 ans (R42-R, étendu depuis 365j)
-_DOSLEG_MAX_AGE_PROMULGATED_DAYS = 548  # promulgués : < 18 mois (inchangé)
+# R42-AD (2026-05-11) — fenêtre dynamique selon `RUN_MODE` :
+# - `full` (reset_category/reset_db) → 1095j : ré-ingest historique
+# - `nominal` (run quotidien) → 90j : ne traite que les dossiers
+#   récemment actifs. Les anciens restent en DB et exposés via
+#   `_filter_window` côté site_export. Les actualisations (nouvel
+#   acte, transmission AN↔Sénat) mettent `last_date` à jour → le
+#   dossier rentre automatiquement dans la fenêtre 90j.
+# Gain : ~2500 dossiers AN à fetcher /dyn/opendata/ → ~50-100 en
+# mode nominal (économise ~5-7 min sur les runs quotidiens).
+_DOSLEG_MAX_AGE_ACTIVE_DAYS_NOMINAL = 90    # R42-AD : runs quotidiens
+_DOSLEG_MAX_AGE_ACTIVE_DAYS_FULL = 1095     # R42-AD : resets (anciennement R42-R)
+_DOSLEG_MAX_AGE_PROMULGATED_DAYS = 548      # promulgués : < 18 mois (inchangé)
+# Compat pour les usages externes (lecture pure, non modifiée par R42-AD)
+_DOSLEG_MAX_AGE_ACTIVE_DAYS = _DOSLEG_MAX_AGE_ACTIVE_DAYS_FULL
 
 # Accumulateur du cache `texteLegislatifRef → dossier_title`, rempli par
 # `_normalize_dosleg` au fil de l'itération sur le dump `Dossiers_Legislatifs.json.zip`,
@@ -1520,7 +1523,14 @@ def _normalize_dosleg(obj, src, cat):
     # sont écartés — cf. ticket Cyril "un dossier de 1990 remontait".
     today = _utcnow_naive()
     age_days = (today - last_date).days
-    max_age = _DOSLEG_MAX_AGE_PROMULGATED_DAYS if has_promulgation else _DOSLEG_MAX_AGE_ACTIVE_DAYS
+    # R42-AD (2026-05-11) — fenêtre dynamique selon `RUN_MODE` :
+    # mode `full` (reset_*) → 1095j, mode `nominal` → 90j.
+    from ..run_mode import window_days
+    max_age_active = window_days(
+        nominal=_DOSLEG_MAX_AGE_ACTIVE_DAYS_NOMINAL,
+        full=_DOSLEG_MAX_AGE_ACTIVE_DAYS_FULL,
+    )
+    max_age = _DOSLEG_MAX_AGE_PROMULGATED_DAYS if has_promulgation else max_age_active
     if age_days > max_age:
         return
 

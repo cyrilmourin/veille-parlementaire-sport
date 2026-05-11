@@ -147,6 +147,23 @@ jobs:
           SINCE="${{ github.event.inputs.since_days || '1' }}"
           NOEMAIL=""
           if [ "${{ github.event.inputs.no_email }}" = "1" ]; then NOEMAIL="--no-email"; fi
+          # R42-AD (2026-05-11) — Mode du pipeline :
+          # - RUN_MODE=full quand un reset (reset_category ou reset_db) est
+          #   demandé via workflow_dispatch → fenêtres LARGES (1095j dosleg
+          #   AN, 800j texte Sénat) pour ré-ingest historique complet.
+          # - RUN_MODE=nominal sinon (cron quotidien, push trigger) →
+          #   fenêtres COURTES (90j) pour ne traiter que les items récents.
+          # Les anciens items restent en DB et exposés via _filter_window
+          # côté site_export (1095j inchangé). Une actualisation (nouvel
+          # acte AN, transmission AN↔Sénat) met `last_date` à jour →
+          # l'item rentre dans la fenêtre 90j au run suivant.
+          if [ -n "${{ github.event.inputs.reset_category }}" ] || [ "${{ github.event.inputs.reset_db }}" = "1" ]; then
+            export RUN_MODE=full
+            echo "RUN_MODE=full (reset demandé)"
+          else
+            export RUN_MODE=nominal
+            echo "RUN_MODE=nominal (run quotidien)"
+          fi
           # R24b (2026-04-23) : sur le cron 17h30, on fait un run SANS
           # digest email complet (évite de doubler le mail du matin) puis
           # un ping qui envoie un email court UNIQUEMENT si des nouveautés

@@ -747,7 +747,16 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
         # rapports volumineux où le keyword sport tombe après cette
         # position (cf. r24-710 où « Jeux olympiques » est à pos 62449).
         body_max = int(src.get("body_max_chars", 200000))
-        body_window_days = int(src.get("body_window_days", 800))
+        # R42-AD (2026-05-11) — fenêtre dynamique pour les fetches /leg/ :
+        # `nominal` → 90j (skip dosleg dormants), `full` → 800j (R42-L
+        # historique complet). Les dosleg dormants restent en DB et
+        # exposés ; quand un nouvel acte arrive, leur date se met à
+        # jour côté CSV Sénat → ils rentrent dans la fenêtre 90j.
+        from ..run_mode import window_days
+        body_window_days = int(
+            src.get("body_window_days")
+            or window_days(nominal=90, full=800)
+        )
         body_cutoff = datetime.utcnow() - timedelta(days=body_window_days)
         for r in rows:
             uid = _pick(r, "Numéro de texte", "Numéro de la loi",
@@ -828,7 +837,13 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
         # rapports volumineux où le keyword sport tombe après cette
         # position (cf. r24-710 où « Jeux olympiques » est à pos 62449).
         body_max = int(src.get("body_max_chars", 200000))
-        rap_window_days = int(src.get("rap_haystack_window_days", 800))
+        # R42-AD (2026-05-11) — fenêtre dynamique : `nominal` → 90j,
+        # `full` → 800j (R42-B historique).
+        from ..run_mode import window_days
+        rap_window_days = int(
+            src.get("rap_haystack_window_days")
+            or window_days(nominal=90, full=800)
+        )
         cutoff = datetime.utcnow() - timedelta(days=rap_window_days)
         for r in rows:
             uid = _pick(r, "Numéro", "numero", "num", "id", "uid")

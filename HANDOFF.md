@@ -266,6 +266,35 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-11 (matin tardif, discussion stratégique sur la performance des runs nominaux) : **R42-AD — Fenêtres dynamiques `nominal` vs `full` selon `RUN_MODE`**.
+
+  Cyril a remonté que les runs nominaux quotidiens duraient ~28 min alors que la plupart du travail (fetch des textes intégraux R42-X /dyn/opendata/, R42-L /leg/, R42-B/Q PDF rapports) est redondant : ces items sont déjà en DB et `upsert_many` ne refresh pas leur `raw.*` à hash_key constant.
+
+  Esprit Cyril : reset périodique (workflow_dispatch avec reset_category ou reset_db) ré-ingère TOUT l'historique sur la fenêtre LARGE (3 ans). Les runs nominaux quotidiens scannent UNIQUEMENT les items récents (90j) pour capter les actualisations.
+
+  Préservation des actualisations : quand un dossier ancien reçoit un nouvel acte (transmission AN↔Sénat, nouveau vote…), son `last_date = max(dateActe)` se met à jour automatiquement → il rentre dans la fenêtre 90j au run suivant → re-fetché texte intégral, re-matché.
+
+  Implémentation :
+  - Nouveau module `src/run_mode.py` : helpers `is_full_mode()` et `window_days(nominal, full)` lisant l'env var `RUN_MODE`.
+  - `src/sources/assemblee.py::_normalize_dosleg` : la fenêtre `_DOSLEG_MAX_AGE_ACTIVE_DAYS` devient dynamique (90j nominal / 1095j full).
+  - `src/sources/senat.py::senat_dosleg + senat_rapports` : le `body_window_days` / `rap_window_days` devient dynamique (90j nominal / 800j full).
+  - `.github/workflows/daily.yml` : set `RUN_MODE=full` quand `reset_category` ou `reset_db=1` est passé, sinon `RUN_MODE=nominal`.
+  - `tests/conftest.py` : par défaut, tous les tests tournent en `RUN_MODE=full` pour préserver la rétrocompat avec les fixtures à dates > 90j.
+
+  Trade-off accepté : si on ajoute un keyword au yaml entre 2 runs, les anciens en DB ne sont PAS re-matchés (comportement actuel). Solution : reset périodique pour ré-appliquer les keywords à l'historique. Pas de cron hebdomadaire automatique pour l'instant (à débattre).
+
+  Sources NON impactées par R42-AD (déjà optimisées) :
+  - Amendements AN (an_amendements) : `since_days: 30` côté yaml
+  - Questions AN : `since_days: 30`
+  - Agenda AN : `since_days: 30`
+  - CR plénier AN (an_syceron) : `since_days: 30` (défaut code)
+  - CR Sénat (senat_debats, senat_cri) : `since_days: 30`
+  - CR commissions AN/Sénat : déjà 30j
+
+  Tests `tests/test_r42ad_run_mode.py` : +11 tests (helpers run_mode + intégration assemblee/senat + workflow yaml). 1053 → 1064 tests verts.
+
+  Gain estimé : runs nominaux 28 min → **~10-12 min** (-60%, par économie de ~2500 fetches `/dyn/opendata/` AN inutiles).
+
 - 2026-05-11 (matin, demande Cyril sur étiquette chambre du dépôt) : **R42-AA — Chambre du PREMIER dépôt (AN / Sénat) sur les cards dossiers législatifs**.
 
   Cyril : « Dans les dossiers législatifs, tu indiques systématiquement déposé à l'AN, alors que c'est parfois déposé au sénat en premier. Il faut donc que la mention évolue selon que le 1er dépôt ait été effectué à l'AN ou au Sénat. »
