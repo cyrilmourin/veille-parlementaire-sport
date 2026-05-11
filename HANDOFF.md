@@ -266,6 +266,43 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-11 (début d'après-midi, post-audit run 25659789715 jugé trop long par Cyril) : **R42-AI — Cache SQLite des textes intégraux `/dyn/opendata/` AN + `/leg/` Sénat (table `dosleg_text_cache`)**.
+
+  **Contexte.** Le run nominal R42-AF a duré 26 min, alors que l'estimation R42-AD annonçait ~10-12 min. Audit logs :
+  - Fetch + normalize : ~15 min (588 fetches `/dyn/opendata/` AN + 154 fetches `/leg/` Sénat, soit 742 fetches lourds malgré `RUN_MODE=nominal` et la fenêtre 90j de R42-AD).
+  - Matching : ~9 min (48 081 items, non touchés par R42-AD).
+  - Export Hugo + deploy Pages : ~1 min.
+
+  La fenêtre 90j filtre sur `last_date = max(dateActe)`. Beaucoup de vieux dossiers reçoivent un acte récent (transmission AN↔Sénat, séance, rapport, inscription agenda) → ils rentrent dans la fenêtre et déclenchent un re-fetch du texte intégral alors que `texte_ref` n'a pas bougé.
+
+  **Solution R42-AI.** Cache SQLite du HTML extrait `(source, ref) → haystack`, partagé entre runs via le cache GHA qui restaure déjà `data/veille.sqlite3`.
+  - Module : `src/text_haystack_cache.py` (API : `get_cached_haystack`, `put_cached_haystack`, `purge_haystack_cache`, `reset_stats`, `get_stats`).
+  - Table : `dosleg_text_cache(source TEXT, ref TEXT, haystack TEXT, is_promulgated INT, fetched_at TEXT, PRIMARY KEY (source, ref))` — créée par `_ensure_schema` au premier accès (idempotent, pas de migration dans Store).
+  - Sources : `an_dosleg` (clé = `texte_ref`, ex. `PRJLANR5L17B2155`) et `senat_dosleg` (clé = slug `/leg/`, ex. `ppl25-566`). Espaces de clés disjoints — vérifié par `test_cles_an_et_senat_disjointes`.
+  - TTL : **14 jours pour les actifs**, **infini pour les promulgués** (texte gelé légalement). `is_promulgated` propagé par les callers (`_normalize_dosleg` via `has_promulgation` côté AN, `sid == "senat_promulguees"` côté Sénat).
+  - Validation cache empoisonné : `put_cached_haystack` refuse si `len(haystack) < 500` chars. Évite de cacher des pages d'erreur HTML 200 OK (WAF, maintenance). Compteur `put_rejected_too_short` loggé en fin de fetch_source.
+  - Intégration : `_fetch_an_dossier_text_haystack` (assemblee.py L1300) et `_fetch_senat_dossier_text_haystack` (senat.py L221) → check cache en tête, fetch live si miss, put en queue. Le path cache 404 (R42-X / R42-B-bis) est préservé en amont.
+  - Stats par source AN/Sénat indépendantes, loggées en fin de passe : `hits / miss_absent / miss_expired / put / put_rejected_too_short`.
+  - Reset : `scripts/reset_category.py dossiers_legislatifs` purge la table (`source_id=an_*` → AN seul, `source_id=senat*` → Sénat seul, sans source_id → AN+Sénat).
+
+  **Gain attendu.** ~21-26 min → **~13-16 min** pour un run nominal (586 hits cache attendus dès le 2e run après merge, économie ~6-10 min sur fetch).
+
+  **Risques et mitigations.**
+  - *Cache stale si corrigendum AN/Sénat sur un texte sous la même ref.* Probabilité très faible (les `/dyn/opendata/` et `/leg/` sont quasi-immutables). Mitigation : TTL 14j pour les actifs.
+  - *Ne résout PAS l'ajout de keyword.* Le `raw.haystack_body` reste figé en DB à hash_key constant (limitation pré-existante de `upsert_many`). R42-AI ne touche pas à cette mécanique. Pour propager un nouveau keyword, il faut toujours `reset_category=dossiers_legislatifs` — ce reset purge maintenant aussi le cache (cohérent).
+  - *Cache empoisonné via 200 OK + body court.* Mitigation : seuil 500 chars. Si une vraie PPL fait < 500 chars (cas pathologique), elle ne sera juste pas cachée (re-fetch chaque run, comportement pré-R42-AI).
+  - *Pollution des tests existants.* Conftest pose `VEILLE_DOSLEG_TEXT_CACHE_DISABLE=1` par défaut. Les tests R42-AI utilisent `monkeypatch.delenv` pour activer le cache + `tmp_path` pour la DB.
+
+  **Debug.**
+  - Logger les stats : déjà fait en INFO en fin de passe AN dossiers + Sénat dosleg (cherche `cache /dyn/opendata/` ou `cache /leg/` dans les logs daily.yml).
+  - Forcer un bypass complet : `VEILLE_DOSLEG_TEXT_CACHE_DISABLE=1` env var (utile localement pour reproduire un fetch live).
+  - Inspecter la table : `sqlite3 data/veille.sqlite3 "SELECT source, ref, length(haystack), is_promulgated, fetched_at FROM dosleg_text_cache;"`.
+  - Vider sans full reset : `sqlite3 data/veille.sqlite3 "DELETE FROM dosleg_text_cache;"` (le prochain run repopule sur fetch live).
+
+  Tests `tests/test_r42ai_text_haystack_cache.py` : 16 tests (miss/put/hit, validation 500 chars, TTL actifs 14j, TTL ∞ promulgués, cohabitation AN/Sénat, purge totale/par-source, env var disable, intégration _fetch_*_haystack). 1064 → **1080 tests verts**.
+
+  **Baptême du 3ᵉ mode.** En complément de `nominal` et `full` (RUN_MODE), le workflow `quick_rebuild.yml` + commande `python -m src.main export` (R42-AG) constituent le mode **`quick`** : pas de fetch, juste re-export Hugo depuis la DB existante. Triplet de référence : `full` (~30 min, reset) / `nominal` (~15 min visé, daily) / `quick` (~3-5 min, blocklist ou tweak template).
+
 - 2026-05-11 (midi, demande Cyril après création du quick_rebuild) : **R42-AH — Module de partage en haut à droite du header (desktop)**.
 
   Demande Cyril : « Est-ce que le module de partage de cette veille (sauf pour l'affichage mobile) pourrait être également visible en haut à droite dans le header sans changer la hauteur du header, aligné horizontalement avec sa position dans le footer ? Fais une prévisualisation locale avant push. »

@@ -219,7 +219,10 @@ def _persist_dossier_text_404_cache() -> None:
 
 
 def _fetch_senat_dossier_text_haystack(
-    dossier_url: str, max_chars: int = 50000,
+    dossier_url: str,
+    max_chars: int = 50000,
+    *,
+    is_promulgated: bool = False,
 ) -> str:
     """Fetch la page `/leg/<slug>.html` du Sénat et extrait le texte tronqué.
 
@@ -228,6 +231,12 @@ def _fetch_senat_dossier_text_haystack(
     - slug en cache 404 → ""
     - fetch KO (404, timeout, WAF) → cache si 404, sinon non caché
     - parse BS4 KO → ""
+
+    R42-AI (2026-05-11) — cache SQLite par `slug` (table
+    `dosleg_text_cache`, source `senat_dosleg`). TTL 14 j actifs,
+    infini promulgués. Symétrique au cache AN R42-AI côté
+    `_fetch_an_dossier_text_haystack`. Cache empoisonné évité via
+    seuil 500 chars.
     """
     leg_url = _build_dossier_leg_url(dossier_url)
     if not leg_url:
@@ -236,6 +245,15 @@ def _fetch_senat_dossier_text_haystack(
     slug = slug_match.group(1) if slug_match else ""
     if slug and _is_dossier_text_404(slug):
         return ""
+
+    # R42-AI : lookup cache avant fetch live (slug = clé canonique).
+    if slug:
+        from .. import text_haystack_cache as _hc
+        from ..main import SQLITE_PATH
+        cached = _hc.get_cached_haystack(SQLITE_PATH, _hc.SOURCE_SENAT, slug)
+        if cached is not None:
+            return cached[:max_chars]
+
     try:
         html_body = fetch_text(leg_url)
     except Exception as e:
@@ -254,7 +272,18 @@ def _fetch_senat_dossier_text_haystack(
     except Exception as e:
         log.debug("senat_dosleg : parse /leg/ KO %s (%s)", leg_url, e)
         return ""
-    return text[:max_chars] if text else ""
+    if not text:
+        return ""
+    # R42-AI : cache le résultat. put_cached_haystack refuse si len < 500
+    # (cache empoisonné suspecté).
+    if slug:
+        from .. import text_haystack_cache as _hc
+        from ..main import SQLITE_PATH
+        _hc.put_cached_haystack(
+            SQLITE_PATH, _hc.SOURCE_SENAT, slug, text,
+            is_promulgated=is_promulgated,
+        )
+    return text[:max_chars]
 
 
 def _first_sentence(text: str, max_len: int = 140) -> str:
@@ -805,8 +834,12 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
                 raw["is_promulgated"] = True
                 raw.setdefault("status_label", "Promulguée")
             # R42-L : fetch texte intégral pour les dossiers récents.
+            # R42-AI : pass is_promulgated pour TTL ∞ côté cache.
             if date and date >= body_cutoff:
-                hay = _fetch_senat_dossier_text_haystack(url, max_chars=body_max)
+                hay = _fetch_senat_dossier_text_haystack(
+                    url, max_chars=body_max,
+                    is_promulgated=(sid == "senat_promulguees"),
+                )
                 if hay:
                     raw["haystack_body"] = hay[:body_max]
             yield Item(
@@ -818,6 +851,22 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
             )
         # R42-L : persistance du cache 404 après tous les fetches.
         _persist_dossier_text_404_cache()
+        # R42-AI (2026-05-11) — Stats cache /leg/ pour debug TTL / cache
+        # empoisonné. Symétrique au log AN dans assemblee.py.
+        try:
+            from .. import text_haystack_cache as _hc
+            stats = _hc.get_stats(_hc.SOURCE_SENAT)
+            if any(v for v in stats.values()):
+                log.info(
+                    "senat_dosleg : cache /leg/ — hits=%d, "
+                    "miss_absent=%d, miss_expired=%d, put=%d, "
+                    "put_rejected_too_short=%d",
+                    stats["hits"], stats["miss_absent"],
+                    stats["miss_expired"], stats["put"],
+                    stats["put_rejected_too_short"],
+                )
+        except Exception:
+            pass
 
     elif sid == "senat_rapports":
         # Colonnes réelles : Session, Numéro, Tome, Type de rapport, Auteurs,

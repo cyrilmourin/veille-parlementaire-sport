@@ -705,6 +705,23 @@ def fetch_source(src: dict) -> list[Item]:
     # à R42-B-bis côté Sénat.
     if src["id"] == "an_dossiers_legislatifs":
         _persist_an_dossier_text_404_cache()
+        # R42-AI (2026-05-11) — Stats cache /dyn/opendata/ (hit/miss/put)
+        # pour diagnostiquer d'éventuels problèmes (TTL trop court, cache
+        # empoisonné, etc.). Log seulement si la passe AN dossiers a tourné.
+        try:
+            from .. import text_haystack_cache as _hc
+            stats = _hc.get_stats(_hc.SOURCE_AN)
+            if any(v for v in stats.values()):
+                log.info(
+                    "an_dossiers : cache /dyn/opendata/ — hits=%d, "
+                    "miss_absent=%d, miss_expired=%d, put=%d, "
+                    "put_rejected_too_short=%d",
+                    stats["hits"], stats["miss_absent"],
+                    stats["miss_expired"], stats["put"],
+                    stats["put_rejected_too_short"],
+                )
+        except Exception:
+            pass
 
     return items
 
@@ -1298,7 +1315,10 @@ def _first_texte_ref_from_root(root) -> str:
 
 
 def _fetch_an_dossier_text_haystack(
-    texte_ref: str, max_chars: int = 200000,
+    texte_ref: str,
+    max_chars: int = 200000,
+    *,
+    is_promulgated: bool = False,
 ) -> str:
     """Fetch le texte intégral d'un dossier AN via `/dyn/opendata/<ref>.html`.
 
@@ -1307,11 +1327,24 @@ def _fetch_an_dossier_text_haystack(
     - cache 404 → ""
     - fetch KO (404, timeout, WAF) → cache si 404, sinon non caché
     - parse BS4 KO → ""
+
+    R42-AI (2026-05-11) — cache SQLite par `texte_ref` (table
+    `dosleg_text_cache`, source `an_dosleg`). TTL 14 j actifs, infini
+    promulgués (texte gelé légalement). Évite ~6-10 min/run nominal
+    (588 fetches → ~50-100). Cache empoisonné évité via seuil 500 chars.
     """
     if not texte_ref:
         return ""
     if _is_an_dossier_text_404(texte_ref):
         return ""
+
+    # R42-AI : lookup cache avant fetch live.
+    from .. import text_haystack_cache as _hc
+    from ..main import SQLITE_PATH
+    cached = _hc.get_cached_haystack(SQLITE_PATH, _hc.SOURCE_AN, texte_ref)
+    if cached is not None:
+        return cached[:max_chars]
+
     from ._common import fetch_text  # import local pour cohérence avec senat
     url = f"https://www.assemblee-nationale.fr/dyn/opendata/{texte_ref}.html"
     try:
@@ -1336,7 +1369,15 @@ def _fetch_an_dossier_text_haystack(
     except Exception as e:
         log.debug("an_dossiers : parse /dyn/opendata/ KO %s (%s)", url, e)
         return ""
-    return text[:max_chars] if text else ""
+    if not text:
+        return ""
+    # R42-AI : cache le résultat. put_cached_haystack refuse si len < 500
+    # (cache empoisonné suspecté — page d'erreur HTML 200 OK).
+    _hc.put_cached_haystack(
+        SQLITE_PATH, _hc.SOURCE_AN, texte_ref, text,
+        is_promulgated=is_promulgated,
+    )
+    return text[:max_chars]
 
 
 # ============================================================================
@@ -1603,6 +1644,7 @@ def _normalize_dosleg(obj, src, cat):
     if dossier_texte_ref:
         haystack_body = _fetch_an_dossier_text_haystack(
             dossier_texte_ref, max_chars=200000,
+            is_promulgated=has_promulgation,
         )
     yield Item(
         source_id=src["id"],

@@ -79,20 +79,40 @@ def main():
 
 def _purge_incremental_state(category: str, source_id: str | None) -> None:
     """Purge les state files des scrapers incrémentaux concernés par la
-    catégorie. Aujourd'hui : `data/an_cr_state.json` pour les CR AN.
-    Idempotent : si le fichier n'existe pas, no-op."""
-    if category != "comptes_rendus":
-        return
-    if source_id and source_id != "an_cr_commissions":
-        return
-    state_path = ROOT / "data" / "an_cr_state.json"
-    if not state_path.exists():
-        return
-    try:
-        state_path.unlink()
-        print(f"State file purgé : {state_path}")
-    except OSError as exc:
-        print(f"Échec purge state {state_path} : {exc}", file=sys.stderr)
+    catégorie. Aujourd'hui :
+      - `data/an_cr_state.json` pour les CR AN
+      - table SQLite `dosleg_text_cache` pour les dossiers législatifs
+        (R42-AI : cache HTML `/dyn/opendata/` + `/leg/`).
+    Idempotent : si le fichier/table n'existe pas, no-op."""
+    if category == "comptes_rendus" and (
+        not source_id or source_id == "an_cr_commissions"
+    ):
+        state_path = ROOT / "data" / "an_cr_state.json"
+        if state_path.exists():
+            try:
+                state_path.unlink()
+                print(f"State file purgé : {state_path}")
+            except OSError as exc:
+                print(f"Échec purge state {state_path} : {exc}",
+                      file=sys.stderr)
+    if category == "dossiers_legislatifs":
+        # R42-AI : si on reset les dosleg, on vide aussi le cache HTML
+        # texte intégral pour forcer un re-fetch propre. Sinon les items
+        # ré-insérés piochent dans l'ancien cache et ne reflètent pas un
+        # éventuel changement de parser/normalisation.
+        try:
+            sys.path.insert(0, str(ROOT))
+            from src import text_haystack_cache as _hc
+            restrict_source = None
+            if source_id and source_id.startswith("senat"):
+                restrict_source = _hc.SOURCE_SENAT
+            elif source_id and source_id.startswith("an_"):
+                restrict_source = _hc.SOURCE_AN
+            n = _hc.purge_haystack_cache(DB, source=restrict_source)
+            scope = restrict_source or "AN+Sénat"
+            print(f"Cache haystack purgé : {n} entrées ({scope})")
+        except Exception as exc:
+            print(f"Échec purge dosleg_text_cache : {exc}", file=sys.stderr)
 
 
 if __name__ == "__main__":

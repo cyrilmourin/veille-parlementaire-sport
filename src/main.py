@@ -159,6 +159,12 @@ def run(since_days: int = 1, send: bool = True, verbose: bool = False) -> int:
     _setup_logging(verbose)
     log.info("=== Veille parlementaire sport — %s ===", datetime.now().isoformat(timespec="seconds"))
 
+    # R42-AI (2026-05-11) — Reset des compteurs du cache haystack dosleg.
+    # Garantit un log propre par run (sinon les compteurs cumulent au fil
+    # des appels dans la même process — pertinent surtout pour les tests).
+    from . import text_haystack_cache as _hc
+    _hc.reset_stats()
+
     # 1. Fetch toutes les sources
     items, fetch_stats = normalize.run_all(CONFIG_SOURCES)
 
