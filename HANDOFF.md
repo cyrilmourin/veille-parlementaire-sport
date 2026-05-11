@@ -266,6 +266,24 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-11 (matin, demande Cyril sur faux positifs dossiers post-R42-X) : **R42-Z — Blocklist de 7 dossiers législatifs faux positifs (6 AN + 1 Sénat)**.
+
+  Suite au passage R42-X (fetch texte intégral des dossiers AN via `/dyn/opendata/<TEXTE_REF>.html`), 7 dossiers remontaient en `dossiers_legislatifs` via une mention incidente d'un keyword sport, sans rapport avec la veille sport-institutionnel. Cyril a ciblé chaque dossier via le text-fragment du keyword qui matchait. Ajoutés à `config/blocklist.yml` :
+
+  - `DLR5L17N52293` — match « Ligue des champions »
+  - `DLR5L17N53522` — match « Pratique sportive »
+  - `DLR5L17N51720` — match « Jeux olympiques »
+  - `ppl95-400` (Sénat) — match « Pratique sportive »
+  - `DLR5L17N53171` — match « Éducation physique et sportive »
+  - `DLR5L17N54095` — match « Activité physique adaptée »
+  - `DLR5L17N54133` — match « équipements sportifs »
+
+  Filtre à l'export uniquement (cf. `_filter_blocklist` dans `src/site_export.py`). Les items restent en DB et continueront d'être ingérés au prochain run — retirer une entrée de cette liste les ferait réapparaître au build suivant sans `reset_category`. Symétrique aux 3 blocklist faux positifs ajoutés en R42-O.
+
+  Tests `tests/test_r42z_blocklist_dossiers.py` : 4 tests (présence des 6 URLs AN canonicalisées + 1 URL Sénat dans `_load_blocklist()` ; drop bout-en-bout des 7 dossiers + un dossier sport-relevant légitime conservé ; matching scheme-insensible `http://` vs `https://` pour l'URL Sénat fournie en http par Cyril).
+
+  Action prod : push direct → daily.yml redéploie en ~3-5 min. Pas de `reset_category` nécessaire (la blocklist agit à l'export).
+
 - 2026-05-11 (nuit, validation finale post-resets) : **R42-Y — Compléter le yaml avec les keywords spécifiques manquants des PPL sport peu visibles**.
 
   Audit post-reset_dossiers_legislatifs : sur les 6 PPL sport identifiées par Cyril hier (1068 éducateurs, 1803 homophobie, 332 héritage JOP, 269 pratique sportive jeunes, 56 pneus terrains, 699 sport-sucre), aucune n'apparaissait après le 1er reset malgré R42-X (fetch texte intégral). Diagnostic : ces PPL ont des titres et corps centrés sur des termes qui n'étaient pas dans le yaml (« éducateurs sportifs », « activités physiques et sportives », « terrains de sport », « homophobie dans le sport », « bénévoles sportifs »).

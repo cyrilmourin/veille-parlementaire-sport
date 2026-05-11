@@ -181,3 +181,23 @@ blocklist:
     reason: "Rapport Sénat 1982/1983 — mention LNR hors contexte (faux positif R42-B)"
   - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/statut_personnel_sante_services_incendie_secours
     reason: "PPL 2525 personnels santé incendie/secours — mention JO Paris 2024 marginale (article modificatif), faux positif R42-B AN"
+
+  # 2026-05-11 (R42-Z) — Faux positifs dossiers législatifs identifiés
+  # par Cyril après le passage R42-X (fetch texte intégral dossiers AN
+  # via /dyn/opendata/<TEXTE_REF>.html) qui a fait remonter ces dossiers
+  # via une mention incidente du keyword indiqué dans le text-fragment.
+  # Le pipeline les classait à tort en `dossiers_legislatifs` sport-relevant.
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52293
+    reason: "Faux positif dossier AN DLR5L17N52293 — match keyword 'Ligue des champions' hors contexte sport-institutionnel"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53522
+    reason: "Faux positif dossier AN DLR5L17N53522 — match keyword 'Pratique sportive' hors contexte sport-institutionnel"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51720
+    reason: "Faux positif dossier AN DLR5L17N51720 — match keyword 'Jeux olympiques' hors contexte sport-institutionnel"
+  - url: https://www.senat.fr/dossier-legislatif/ppl95-400.html
+    reason: "Faux positif dossier Sénat ppl95-400 — match keyword 'Pratique sportive' hors contexte sport-institutionnel"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53171
+    reason: "Faux positif dossier AN DLR5L17N53171 — match keyword 'Éducation physique et sportive' hors contexte sport-institutionnel"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N54095
+    reason: "Faux positif dossier AN DLR5L17N54095 — match keyword 'Activité physique adaptée' hors contexte sport-institutionnel"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N54133
+    reason: "Faux positif dossier AN DLR5L17N54133 — match keyword 'équipements sportifs' hors contexte sport-institutionnel"
