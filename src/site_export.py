@@ -2297,6 +2297,55 @@ def _filter_nominations_only_sources(rows: list[dict]) -> list[dict]:
     return kept
 
 
+_TEXTE_COMPARATIF_RE = re.compile(r"texte\s+comparatif", re.IGNORECASE)
+
+
+def _filter_publications_texte_comparatif(rows: list[dict]) -> list[dict]:
+    """R42-BF (2026-05-11) — Retire des publications parlementaires les
+    items dont le TITRE contient « texte comparatif ».
+
+    Miroir à l'export de R42-AV (qui filtre au scraping côté
+    `assemblee_rapports._parse_report_li`). R42-AV évite l'ingestion des
+    futurs items COMPA, mais les items déjà en DB avant ce patch restent
+    visibles tant qu'un reset_category=communiques n'a pas tourné. Comme
+    le dernier reset a précédé R42-AV et que les nouveaux resets sont en
+    pause à cause du rate-limit WAF ministériel, ce filtre export permet
+    de masquer les doublons COMPA résiduels sans toucher à la DB ni
+    refetcher quoi que ce soit (déployable via quick_rebuild).
+
+    Scope strict :
+      - category == "communiques"
+      - family_source == "parlement"
+      - titre contient « texte comparatif » (insensible casse + whitespace)
+
+    Préservation : on ne touche ni summary, ni keywords, ni les autres
+    catégories — uniquement le drop d'export.
+    """
+    kept: list[dict] = []
+    dropped = 0
+    for r in rows:
+        cat = (r.get("category") or "").strip()
+        if cat != "communiques":
+            kept.append(r)
+            continue
+        fam = _source_family(r.get("source_id"), r.get("chamber"))
+        if fam != "parlement":
+            kept.append(r)
+            continue
+        title = r.get("title") or ""
+        if _TEXTE_COMPARATIF_RE.search(title):
+            dropped += 1
+            continue
+        kept.append(r)
+    if dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "R42-BF : %d publications parlement « Texte comparatif » masquées",
+            dropped,
+        )
+    return kept
+
+
 def _filter_parlement_publications_nominations_only(rows: list[dict]) -> list[dict]:
     """R42-AW (2026-05-11) — Retire des publications parlementaires les
     rapports dont le seul signal sport est la famille `nomination_event`.
@@ -3158,6 +3207,11 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # « arrêter d'utiliser les mots-clés des nominations pour les
     # publications parlementaires ».
     rows = _filter_parlement_publications_nominations_only(rows)
+    # R42-BF (2026-05-11) — miroir export de R42-AV : masque les items
+    # « Texte comparatif » résiduels en DB (ingérés avant R42-AV) sans
+    # nécessiter de reset_category=communiques. Filtre strict : titre +
+    # publications parlementaires uniquement.
+    rows = _filter_publications_texte_comparatif(rows)
     # R41-E (2026-04-27) : pour les items en catégorie `nominations`,
     # extraire (Personne, Fonction, Structure) et normaliser le titre
     # en « X devient Y de Z » sur les sources presse business (Olbia,

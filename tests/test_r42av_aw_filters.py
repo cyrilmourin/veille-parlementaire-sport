@@ -15,7 +15,10 @@ from src.sources.assemblee_rapports import (
     _extract_reports,
     fetch_source,
 )
-from src.site_export import _filter_parlement_publications_nominations_only
+from src.site_export import (
+    _filter_parlement_publications_nominations_only,
+    _filter_publications_texte_comparatif,
+)
 
 
 def _li(html: str):
@@ -197,3 +200,86 @@ def test_r42aw_keyword_families_serialise_string():
     }]
     out = _filter_parlement_publications_nominations_only(rows)
     assert len(out) == 0
+
+
+# ===========================================================================
+# R42-BF — Miroir export du filtre « Texte comparatif »
+# ===========================================================================
+
+def _row_pub(title: str, source_id: str = "an_rapports", chamber: str = "AN") -> dict:
+    return {
+        "source_id": source_id,
+        "category": "communiques",
+        "chamber": chamber,
+        "title": title,
+    }
+
+
+def test_r42bf_drop_titre_texte_comparatif_minuscule():
+    rows = [_row_pub("Projet de loi machin - N° 9999 Texte comparatif")]
+    out = _filter_publications_texte_comparatif(rows)
+    assert len(out) == 0
+
+
+def test_r42bf_drop_titre_texte_comparatif_case_insensitive():
+    """TEXTE COMPARATIF, Texte Comparatif, etc. — match insensible casse."""
+    for title in ("Rapport - TEXTE COMPARATIF",
+                  "Rapport - Texte Comparatif",
+                  "Rapport - texte COMPARATIF"):
+        rows = [_row_pub(title)]
+        out = _filter_publications_texte_comparatif(rows)
+        assert len(out) == 0, f"Pas filtré : {title!r}"
+
+
+def test_r42bf_drop_titre_whitespace_insecable():
+    """Espace insécable U+00A0 entre « Texte » et « comparatif » — \\s+ matche."""
+    rows = [_row_pub("Rapport - Texte comparatif")]
+    out = _filter_publications_texte_comparatif(rows)
+    assert len(out) == 0
+
+
+def test_r42bf_garde_titre_sans_marker():
+    """Un titre normal de rapport reste."""
+    rows = [_row_pub("Pour plus de sport et moins de sucre - N° 699")]
+    out = _filter_publications_texte_comparatif(rows)
+    assert len(out) == 1
+
+
+def test_r42bf_ignore_autres_categories():
+    """Un dossier législatif qui CONTIENT « Texte comparatif » dans son
+    titre n'est PAS filtré (scope strict : category=communiques)."""
+    rows = [{
+        "source_id": "an_dossiers_legislatifs",
+        "category": "dossiers_legislatifs",
+        "chamber": "AN",
+        "title": "Étude d'un Texte comparatif sur les pratiques sportives",
+    }]
+    out = _filter_publications_texte_comparatif(rows)
+    assert len(out) == 1
+
+
+def test_r42bf_ignore_sources_non_parlement():
+    """Un communiqué CNOSF ou MinSports avec « texte comparatif » dans le
+    titre n'est PAS filtré non plus."""
+    for sid, ch in (("cnosf", "CNOSF"), ("min_sports_actualites", "MinSports")):
+        rows = [_row_pub("Conférence sur le texte comparatif", source_id=sid, chamber=ch)]
+        out = _filter_publications_texte_comparatif(rows)
+        assert len(out) == 1, f"Filtré à tort sur source {sid}"
+
+
+def test_r42bf_couvre_an_rapports_information_et_avis():
+    """Couverture aussi des nouvelles sources R42-AJ : RINF et AVIS."""
+    for sid in ("an_rapports", "an_rapports_information", "an_avis"):
+        rows = [_row_pub("Truc - N° X Texte comparatif", source_id=sid, chamber="AN")]
+        out = _filter_publications_texte_comparatif(rows)
+        assert len(out) == 0, f"{sid} non filtré"
+
+
+def test_r42bf_ne_touche_pas_les_autres_champs():
+    """Les champs autres que title (summary, keywords…) ne sont pas
+    consultés — on filtre strictement sur title."""
+    rows = [_row_pub("Rapport normal sport")]
+    rows[0]["summary"] = "Ce rapport contient une analyse texte comparatif…"
+    out = _filter_publications_texte_comparatif(rows)
+    # summary mentionne « texte comparatif » mais title non → on garde
+    assert len(out) == 1
