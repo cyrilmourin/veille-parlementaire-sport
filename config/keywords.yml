@@ -296,6 +296,31 @@ dispositif:
   - Formation arbitres
   - Formation entraîneurs
   - Formation entraineurs
+  # R42-AM (2026-05-11) — keywords ciblés pour capter les rapports et
+  # avis AN listés par Cyril qui ne matchaient pas malgré un sujet
+  # 100% sport. Symétrique R42-Y mais pour les sources rapports/avis
+  # (an_rapports, an_rapports_information, an_avis).
+  # - « Démocratiser le sport » : titre du RINF B2465 « évaluation de
+  #   la loi du 2 mars 2022 visant à démocratiser le sport en France ».
+  #   Le yaml avait déjà « Loi democratiser le sport » mais préfixe
+  #   « Loi » trop strict pour matcher « visant à démocratiser ».
+  - Démocratiser le sport
+  - Democratiser le sport
+  # - « Sport, jeunesse et vie associative » : nom officiel et stable
+  #   de la mission budgétaire PLF (cf. avis AN B2043 Tome VIII/IX 2026,
+  #   B472 Tome VIII/IX 2025, ainsi que tous les rapports spéciaux
+  #   « Sport, J&VA »). Le titre de ces avis/rapports est strictement
+  #   générique (« PLF 2026 N°2043 Tome IX ») mais le summary contient
+  #   systématiquement « Sport, jeunesse et vie associative ».
+  - Sport, jeunesse et vie associative
+  # - « Nation sportive » : extraite du titre du RAPP B2074 OPECST
+  #   « science dans la mêlée pour une nation sportive » (David Ros).
+  #   Sport-univoque dans ce contexte parlementaire.
+  - Nation sportive
+  # - « Pour plus de sport et moins de sucre » : titre du RAPP B0699
+  #   (commission affaires culturelles sur la PPL B0558 Sother). Couvre
+  #   aussi les futurs rapports/avis sur cette PPL.
+  - Plus de sport et moins de sucre
 
 evenement:
   - Jeux olympiques
