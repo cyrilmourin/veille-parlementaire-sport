@@ -3497,7 +3497,16 @@ def _render_special_ppl_card(payload: dict) -> list[str]:
     lines: list[str] = ['<aside class="special-ppl-card" aria-label="Spécial PPL Sport professionnel">']
     lines.append('<div class="special-ppl-card__head">')
     lines.append('<span class="special-ppl-card__kicker">SPÉCIAL</span>')
-    lines.append('<h3 class="special-ppl-card__title">PPL Sport professionnel</h3>')
+    # R42-AS (2026-05-11) — Le titre devient un lien vers la page dédiée.
+    # CSS .special-ppl-card__title-link force la couleur blanche y compris
+    # au hover (demande Cyril : pas de variation de couleur).
+    lines.append(
+        '<h3 class="special-ppl-card__title">'
+        '<a href="/ppl-sport-professionnel/" class="special-ppl-card__title-link" '
+        'title="Aller à la page dédiée PPL Sport professionnel">'
+        'PPL Sport professionnel'
+        '</a></h3>'
+    )
     lines.append(
         '<div class="special-ppl-card__sub">Proposition de loi n° 1560 — '
         'organisation, gestion et financement</div>'

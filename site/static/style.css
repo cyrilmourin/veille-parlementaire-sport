@@ -2150,6 +2150,21 @@ a:hover { text-decoration: underline; }
   padding: 0;
   background: transparent;
 }
+/* R42-AS (2026-05-11) — Le titre est désormais un <a> vers la page
+   /ppl-sport-professionnel/. On garde la couleur blanche du h3 parent,
+   y compris au hover/focus/visited (demande Cyril : aucune variation
+   de couleur). Cursor pointer pour l'affordance. */
+.special-ppl-card__title-link,
+.special-ppl-card__title-link:link,
+.special-ppl-card__title-link:visited,
+.special-ppl-card__title-link:hover,
+.special-ppl-card__title-link:focus,
+.special-ppl-card__title-link:active {
+  color: #fff !important;
+  text-decoration: none;
+  background: transparent;
+  cursor: pointer;
+}
 .special-ppl-card__sub {
   font-size: 12px;
   color: var(--sl-cream);

@@ -81,9 +81,22 @@
         {{ end }}
       </div>
       <div class="dosleg-card__body">
+        {{/* R42-AT (2026-05-11) — Exception PPL 1560 sport pro : on redirige
+             le lien de la card (titre + CTA bas) vers la page dédiée Hugo
+             `/ppl-sport-professionnel/` au lieu du dossier AN, car la page
+             dédiée offre un suivi enrichi (agenda, amendements, texte).
+             L'identifiant canonique AN du dossier est DLR5L17N51732 ; il
+             apparaît dans `source_url`. */}}
+        {{ $isPplSportPro := and .Params.source_url (in .Params.source_url "DLR5L17N51732") }}
+        {{ $linkUrl := .Params.source_url }}
+        {{ $linkAttrs := `rel="noopener" target="_blank"` }}
+        {{ if $isPplSportPro }}
+          {{ $linkUrl = "/ppl-sport-professionnel/" }}
+          {{ $linkAttrs = "" }}
+        {{ end }}
         <h2 class="dosleg-card__title">
-          {{ if .Params.source_url }}
-            <a href="{{ .Params.source_url }}" rel="noopener" target="_blank">{{ $titleDisplay }}</a>
+          {{ if $linkUrl }}
+            <a href="{{ $linkUrl }}" {{ $linkAttrs | safeHTMLAttr }}>{{ $titleDisplay }}</a>
           {{ else }}
             <span>{{ $titleDisplay }}</span>
           {{ end }}
@@ -133,8 +146,13 @@
         {{ end }}{{ end }}
 
         <div class="dosleg-card__links">
-          {{ if .Params.source_url }}
-            <a class="dosleg-card__cta" href="{{ .Params.source_url }}" rel="noopener" target="_blank">Voir le dossier législatif &rsaquo;</a>
+          {{ if $linkUrl }}
+            {{/* R42-AT : même override pour le CTA bas de card. Libellé
+                 adapté pour la PPL 1560 (page dédiée Hugo, pas le dossier
+                 AN brut). */}}
+            {{ $ctaLabel := "Voir le dossier législatif" }}
+            {{ if $isPplSportPro }}{{ $ctaLabel = "Voir la page dédiée PPL Sport pro" }}{{ end }}
+            <a class="dosleg-card__cta" href="{{ $linkUrl }}" {{ $linkAttrs | safeHTMLAttr }}>{{ $ctaLabel }} &rsaquo;</a>
           {{ end }}
           {{/* R42-A (2026-05-10) : retrait du lien « Procédure détaillée → page Hugo
                de l'item ». Demande Cyril : la fiche dédiée n'apporte rien de plus
