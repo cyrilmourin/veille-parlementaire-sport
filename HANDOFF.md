@@ -266,6 +266,113 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-11 (fin de journée, clôture session) : **Bump `SYSTEM_VERSION_LABEL` R41 → R42** (commit local, push prévu demain matin avec R42-BF et R42-BG).
+
+- 2026-05-11 (soir, demande Cyril après découverte du flux officiel) : **R42-BG — Handler RSS Drupal dédié ANS (`agencedusport.fr/flux-rss`)**. **Commit local `961ab6f`, NON pushé** — déploiement prévu demain.
+
+  Cyril a découvert le flux RSS officiel ANS qu'on cherchait depuis longtemps. Bascule de scraping HTML `/actualites` (ConnectTimeout chronique + impersonate) vers le flux RSS officiel. 3 spécificités Drupal nécessitent un handler dédié (ne marche pas avec `_from_rss_generic`) :
+
+  1. `<title>` contient `<a href="...">Texte</a>` → strip + extraire texte
+  2. `<link>` retourne `.../view` (feedparser lit le texte du `<a>` interne) → utiliser l'href du title
+  3. `<pubDate>` au format FR « mer 01/04/2026 - 12:00 » non RFC822 → parser via regex `_parse_ans_date`
+
+  + dédup par GUID (le feed renvoie chaque item 2-3×).
+
+  Nouveau format `ans_rss` dans `html_generic.py`, ajouté au dispatcher et à `_KNOWN_FORMATS`. Test live : 4 items extraits (2 actualités datées + 2 offres d'emploi sans date naturellement filtrées par STRICT_DATED_CATEGORIES). 15 tests R42-BG. 1126 → 1141 verts.
+
+- 2026-05-11 (soir, suite question Cyril sur les « Texte comparatif » résiduels) : **R42-BF — Miroir export du filtre R42-AV pour les COMPA déjà en DB**. **Commit local `df482de`, NON pushé**.
+
+  R42-AV filtre les Texte comparatif au SCRAPING (`_parse_report_li`), mais les items ingérés AVANT R42-AV restent en DB et continuent de s'afficher. Le dernier reset_category=communiques précédait R42-AV ; le suivant a été cancelled à cause du rate-limit WAF (R42-BA).
+
+  Nouvelle fonction `_filter_publications_texte_comparatif` dans `site_export.py`. Scope strict : `category=communiques` + `family_source=parlement` + regex `texte\s+comparatif` (case-insensitive) sur le **titre** uniquement (pas summary, pas keywords). Ne touche pas la DB — juste un drop d'export. Symétrique défensif de R42-AV. 8 nouveaux tests. 1118 → 1126 verts.
+
+  À pusher demain via `quick_rebuild` (~3 min, pas de fetch).
+
+- 2026-05-11 (soir, demande Cyril ciblée) : **R42-BE — Blocklist PPL « Lutter contre l'entrisme islamiste dans les communes »** (DLR5L17N53296). Hors scope sport. Commit `0f463dc`, run cancelled pour ne pas aggraver le rate-limit WAF (cf. R42-BA).
+
+- 2026-05-11 (soir, demande Cyril ciblée) : **R42-BC — Blocklist Amdt AN n°59 art. 21 sur PJL programmation militaire 2024-2030**. Faux positif keyword sport mentionné incidemment. URL `AMANR5L17PO838901BTC2695P0D1N000059` ajoutée à `config/blocklist.yml`. Commit `326fc2f` + quick_rebuild `25683111926`.
+
+  Note : 3 autres amendements sur le même PJL (n°452, n°486, n°720) restent visibles — à blacklister séparément si confirmation Cyril.
+
+- 2026-05-11 (soir, suite audit régression « pas d'INSEP dans opérateurs publics ») : **R42-BB — `impersonate: true` sur RSS bloqués anti-bot** (INSEP HTTP 418, INJEP/Cour des comptes ConnectTimeout).
+
+  Patch `_from_rss_generic` dans `html_generic.py` pour propager le param `impersonate` (curl_cffi + Chrome 120 TLS) qu'il ignorait avant. Config YAML : `impersonate: true` sur `insep`, `injep`, `ccomptes_publications`. Commit `4916025`.
+
+- 2026-05-11 (soir, audit régression « pas de Min Sports, MESRI, Min Éduc en Publications ») : **R42-BA — `impersonate: true` sur scrapers ministériels bloqués par anti-bot GHA**.
+
+  Cause racine non triviale : ce n'était PAS un drift de DOM (le label `FORMAT_DRIFT` du monitoring était trompeur) mais des **ConnectTimeout** côté `sports.gouv.fr` et `enseignementsup-recherche.gouv.fr` (les IPs GitHub Actions sont blacklistées par leur WAF). Confirmé en local : 18/17/21 items extraits par le scraper actuel sans réseau bloqué.
+
+  Visible MAINTENANT car le reset_category=communiques de la matinée a purgé la DB et le re-fetch n'a rien rapporté.
+
+  Patch : `impersonate: true` (curl_cffi) sur 4 sources YAML : `min_sports_presse`, `min_sports_actualites`, `min_sports_agenda`, `min_enseignement_sup`. Propagation du flag jusqu'au handler dédié `min_sports._fetch_agenda_hebdo` (nouvelle signature `_resolve_agenda_url(landing, impersonate=...)`). Commit `32ea7ab`.
+
+  Reste un cas dur en TODO bas : `info_gouv_actualites`, `matignon_actualites`, `min_education`, `min_interieur` retournent HTTP 403 **avec** impersonate — WAF plus strict à étudier séparément.
+
+  **Conséquence pratique** : Cyril a remonté en fin de journée qu'on a fait 34 runs GHA aujourd'hui, et que des sources qui marchaient hier soir sont KO aujourd'hui → **rate-limit IP côté serveurs ministériels probablement déclenché par nos hits successifs**. Décision : pause des dispatchs manuels jusqu'à demain matin pour laisser le cooldown WAF s'effacer.
+
+- 2026-05-11 (après-midi, demandes Cyril UX) : **R42-AS — Titre PPL Sport pro home = lien blanc** + **R42-AT — Exception URL card PPL 1560 dans dosleg → page dédiée**.
+
+  R42-AS : le `<h3>` du module « Spécial PPL Sport professionnel » (home, colonne droite à côté du 24h) devient cliquable vers `/ppl-sport-professionnel/`. Couleur **blanche y compris au hover/focus** (5 pseudo-classes couvertes par CSS `.special-ppl-card__title-link` avec `color: #fff !important`).
+
+  R42-AT : sur `/items/dossiers_legislatifs/`, la card de la PPL 1560 (DLR5L17N51732) redirige vers la page Hugo `/ppl-sport-professionnel/` au lieu du dossier AN brut. Detection via `in .Params.source_url "DLR5L17N51732"` côté template. CTA bas : « Voir la page dédiée PPL Sport pro » (au lieu de « Voir le dossier législatif »). Aucun impact sur les 8 autres cards dosleg locales testées.
+
+  Commit `df671c6` + quick_rebuild `25679712526`.
+
+- 2026-05-11 (après-midi, fix bug R42-AG) : **R42-AR — Fix `quick_rebuild.yml`** : `pip install -r requirements.txt` (n'existe pas, le projet utilise pyproject.toml) → `pip install -e .` (idem daily.yml). Cache key alignée sur `veille-sqlite-v3-*` au lieu de `veille-sqlite-*`. Commit `a7ea5cf`.
+
+- 2026-05-11 (après-midi, fin étape Google Search Console) : **R42-AQ — Balise `google-site-verification`** Search Console (`4iFVyNXtcJKzCexfqCGIa_WPw12UCC4WR2FZlHJkJow`) dans `baseof.html`. Token fourni par Cyril depuis Search Console — la propriété `veille.sideline-conseil.fr` était déjà validée via GA4, mais cette balise persiste la validation indépendamment de GA. Commit `0bcca61`.
+
+- 2026-05-11 (après-midi, 3 questions Cyril SEO/UX) : **R42-AN / AO / AP — Apostrophes search, robots.txt sitemap, JSON-LD schema.org**.
+
+  R42-AN : la fonction `norm()` dans `recherche/list.html` unifie désormais les apostrophes typographiques `’ ‘ ʼ \` ´` vers `'` ASCII. Avant : taper « jeux d'argent » (clavier U+0027) ne matchait pas les items qui contiennent « jeux d'argent » (typo U+2019, 27 items dans l'index actuel). Validé sur cas réel : « l'activité » ASCII matche désormais « l'activité physique » typo.
+
+  R42-AO : nouveau template `site/layouts/robots.txt` qui ajoute la directive `Sitemap: https://veille.sideline-conseil.fr/sitemap.xml`. Avant : robots.txt minimal d'Hugo qui ne pointait vers aucune sitemap.
+
+  R42-AP : blocs JSON-LD schema.org dans `baseof.html` :
+    * `WebSite` global avec `potentialAction: SearchAction` (active la sitelinks search box dans la SERP Google pour les requêtes de marque)
+    * `Article` sur les pages individuelles (`.IsPage`) avec headline, description (.Summary plainify truncate 200), datePublished/dateModified au format ISO 8601, publisher = Organization Sideline Conseil.
+    * Échappement manuel des `"` `\` `\n` car `| jsonify` Hugo double-encode les pipelines `.Title`/`.Summary`.
+
+  Validations Google : Rich Results Test → « 1 élément valide détecté (Article) » sur page item. Schema Markup Validator → WebSite + SearchAction valide sur home. Sitemap soumise dans Search Console. Commit `bd01b0d`.
+
+- 2026-05-11 (midi, après dry-run R42-AJ/AK montrant des cas Cyril non matchés) : **R42-AM — Keywords yaml ciblés pour les rapports/avis AN**.
+
+  Ajout dans `dispositif` (symétrique R42-Y pour PPL) :
+    - « Démocratiser le sport » + variante sans accent (capture RINF B2465 « évaluation loi du 2 mars 2022 visant à démocratiser le sport »)
+    - « Sport, jeunesse et vie associative » (nom officiel de la mission budgétaire — capture systématiquement les avis PLF et rapports spéciaux)
+    - « Nation sportive » (titre RAPP B2074 OPECST « science dans la mêlée pour une nation sportive »)
+    - « Plus de sport et moins de sucre » (titre RAPP B0699)
+
+  Pas de bypass URL (R39-K Cyril a exigé que tout item visible ait un keyword thématique traçable). 6 tests + 1 non-régression FP. Commit `7f673d5`.
+
+- 2026-05-11 (midi, audit pourquoi pas de rapports/avis AN sport) : **R42-AJ + R42-AK — Élargissement scraper rapports AN + pagination par offset**.
+
+  R42-AJ : `_DATA_ID_RE` passe de `^OMC_RAPP` à `^OMC_(RAPP|RINF|AVIS)`. Avant ce patch, les **147 rapports d'information** (RINF) et **18 avis** (AVIS) listés par l'AN à des URL distinctes n'étaient JAMAIS ingérés. Cas qui motivent (Cyril) : RINF B2465 démocratiser le sport, OPECST B2074 nation sportive, 4 avis PLF Sport-J&VA (2025+2026).
+
+  2 nouvelles sources YAML : `an_rapports_information` (URL `?type=rapports-information&legis=17`) et `an_avis` (URL `?type=avis&legis=17`). `raw.doc_type` propagé (« RAPP » | « RINF » | « AVIS »).
+
+  R42-AK : pagination des listings AN via `?offset=N&limit=N` (le param `&page=N` est ignoré côté AN). Helper `_paginate_url` + boucle dans `fetch_source` jusqu'à `max_pages` ou stop précoce si une page n'apporte aucun nouveau data_id. `max_pages: 8 / page_size: 150` sur les 3 sources principales → couvre 2 ans (`WINDOW_DAYS_BY_SOURCE_ID = 730`).
+
+  + 2 sources mineures découvertes : `an_rapports_application_loi` (~4 entrées), `an_rapports_information_ce` (~8 entrées RINF Commission européenne).
+
+  Mappings côté `site_export.py` : `WINDOW_DAYS_BY_SOURCE_ID` à 730j sur les 4 nouvelles sources + `_PARLEMENT_PUBLICATIONS_ALLOWED_SOURCES` étendu pour le bucket parlement de la page Publications.
+
+  Préservation séparation textes vs rapports : le regex rejette PRJL/PION/PNRE → tous les textes (PLF inclus) restent ingérés par `an_dossiers_legislatifs` en catégorie `dossiers_legislatifs`.
+
+  Tests : +18 tests R42-AJ/AK. Commit `5f8dc98`.
+
+- 2026-05-11 (midi, suite R42-AJ/AK, audit FP côté Cyril) : **R42-AV/AW/AX/AY — Nettoyage faux positifs publications parlement (4 patches)**.
+
+  R42-AV — Filtrage `Texte comparatif` dans `an_rapports*` : les versions cosmétiques jumelles (data-id `-COMPA` ou titre contenant « texte comparatif ») sont désormais rejetées au scraping (`_parse_report_li`). Cyril : « les texte comparatif m'intéressent pas, c'est du doublon ». Résout 5 doublons (PJL JOP 2030, PLF 2025, Mayotte, simplification, sport-sucre).
+
+  R42-AW — Retire les publications parlement avec `nomination_event` seul : pour les sources family_source=parlement en `communiques`, si la SEULE famille keyword est `nomination_event` (« élu président », « succède à la présidence »…) → drop l'item à l'export. Cyril : « arrêter d'utiliser les mots-clés des nominations pour les publications parlementaires ». Symétrique R41-I (JORF nominations). Résout 5 rapports (n°14 Europe, n°850 Brésil, n°378 Égypte, n°288 Afrique, n°766 APCE).
+
+  R42-AX — Retrait du keyword `CNSE` du yaml (trop ambigu : Caisse nationale de Solidarité pour l'Énergie, Conseil national de la sécurité civile, etc.). Résout rapport n°841 aide médicale.
+
+  R42-AY — Blocklist 8 URLs explicites (faux positifs résiduels où le keyword est sport-univoque mais utilisé hors contexte) : Golf 1994, n°37 industrie auto (LFP), n°31 langues régionales (EPS), n°848 Opioïdes (FFA), n°849 Nord Europe (dopage), n°757 milliards, n°304 migratoires, n°45 IVG.
+
+  +13 tests R42-AV/AW. Commit `e110700` + reset_category=communiques `25681389352` (success, 162 communiques exportés).
+
 - 2026-05-11 (début d'après-midi, post-audit run 25659789715 jugé trop long par Cyril) : **R42-AI — Cache SQLite des textes intégraux `/dyn/opendata/` AN + `/leg/` Sénat (table `dosleg_text_cache`)**.
 
   **Contexte.** Le run nominal R42-AF a duré 26 min, alors que l'estimation R42-AD annonçait ~10-12 min. Audit logs :
