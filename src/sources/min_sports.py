@@ -124,16 +124,20 @@ def fetch_source(src: dict) -> list[Item]:
     return []
 
 
-def _resolve_agenda_url(landing_url: str) -> str | None:
+def _resolve_agenda_url(landing_url: str, impersonate: bool = False) -> str | None:
     """Cherche le lien courant vers l'agenda hebdo depuis une page de
     navigation (typiquement la home sports.gouv.fr).
 
     Le slug change chaque semaine (`agenda-previsionnel-de-<nom>-<id>`),
     d'où ce resolver. On retourne None si aucun lien n'est trouvé — le
     caller loggue WARNING et return [].
+
+    R42-BA (2026-05-11) : param `impersonate` propagé. sports.gouv.fr
+    bloque les IPs GHA en ConnectTimeout depuis ~mai 2026 — curl_cffi
+    (TLS Chrome 120) débloque.
     """
     try:
-        html = fetch_text(landing_url)
+        html = fetch_text(landing_url, impersonate=impersonate)
     except Exception as e:
         log.warning("min_sports : home KO (%s) : %s", landing_url, e)
         return None
@@ -239,6 +243,9 @@ def _fetch_agenda_hebdo(src: dict) -> list[Item]:
     cat = src.get("category", "agenda")
     chamber = src.get("chamber", "MinSports")
     title_prefix = src.get("title_prefix", "")
+    # R42-BA (2026-05-11) : impersonate propagé depuis YAML pour passer le
+    # ConnectTimeout côté GHA (sports.gouv.fr bloque les IPs GitHub Actions).
+    impersonate = bool(src.get("impersonate", False))
 
     # Si l'URL pointe déjà vers une page agenda (cas des tests, du diag
     # manuel, ou d'un snapshot archivé), pas besoin de passer par la
@@ -246,12 +253,12 @@ def _fetch_agenda_hebdo(src: dict) -> list[Item]:
     if "/agenda-previsionnel-de-" in landing_url:
         agenda_url = landing_url
     else:
-        agenda_url = _resolve_agenda_url(landing_url)
+        agenda_url = _resolve_agenda_url(landing_url, impersonate=impersonate)
         if not agenda_url:
             return []
 
     try:
-        html = fetch_text(agenda_url)
+        html = fetch_text(agenda_url, impersonate=impersonate)
     except Exception as e:
         log.warning("min_sports %s : fetch KO %s : %s", sid, agenda_url, e)
         return []

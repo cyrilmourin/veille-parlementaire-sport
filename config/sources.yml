@@ -585,6 +585,12 @@ ministeres:
       category: communiques
       url: https://www.sports.gouv.fr/espace-presse
       format: html
+      # R42-BA (2026-05-11) — sports.gouv.fr bloque les IPs GitHub Actions
+      # avec ConnectTimeout depuis ~mai 2026 (vérifié runs 25677885731 et
+      # antérieurs : `RetryError[ConnectTimeout]`). `impersonate: true`
+      # passe par curl_cffi (TLS fingerprint Chrome 120) pour contourner.
+      # Vérifié en local : 18 items extraits par le scraper actuel.
+      impersonate: true
       poids: 3           # priorité maximale (ministère cœur de cible)
       fetch_meta: true
       fetch_meta_limit: 60
@@ -593,6 +599,7 @@ ministeres:
       category: communiques
       url: https://www.sports.gouv.fr/actualites-et-evenements
       format: html
+      impersonate: true  # R42-BA — idem min_sports_presse (ConnectTimeout GHA).
       poids: 3
       fetch_meta: true
       fetch_meta_limit: 60
@@ -615,6 +622,10 @@ ministeres:
       format: min_sports_agenda_hebdo
       chamber: MinSports
       title_prefix: "MinSports —"
+      # R42-BA (2026-05-11) — sports.gouv.fr bloque les IPs GHA en
+      # ConnectTimeout. impersonate=true propagé jusqu'au handler dédié
+      # `min_sports._fetch_agenda_hebdo` (cf. patch même tag).
+      impersonate: true
       poids: 3
 
     # R18 (2026-04-22) — Education + Intérieur + Economie : Cloudflare
@@ -734,6 +745,9 @@ ministeres:
       # /fr/presse redirige vers /404. Nouveau slug stable : /fr/espace-presse-50621.
       url: https://www.enseignementsup-recherche.gouv.fr/fr/espace-presse-50621
       format: html
+      # R42-BA (2026-05-11) — enseignementsup-recherche.gouv.fr bloque
+      # les IPs GHA en ConnectTimeout (vérifié run 25677885731).
+      impersonate: true
       fetch_meta: true
       fetch_meta_limit: 40
 

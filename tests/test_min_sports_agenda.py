@@ -62,7 +62,10 @@ _FIXTURE_FULL = """
 # ------------------------------------------------------------------
 
 def _make_fetch(text: str):
-    def _fake(url: str) -> str:
+    # R42-BA (2026-05-11) : `_resolve_agenda_url` et `_fetch_agenda_hebdo`
+    # passent désormais `impersonate=...` à `fetch_text`. La fake accepte
+    # **kwargs pour rester compatible.
+    def _fake(url: str, **kwargs) -> str:
         return text
     return _fake
 
@@ -204,7 +207,7 @@ def test_resolve_from_home(monkeypatch):
     )
     fetched_urls: list[str] = []
 
-    def _fake(url: str) -> str:
+    def _fake(url: str, **kwargs) -> str:
         fetched_urls.append(url)
         if url.endswith("/"):
             return home_html
@@ -232,7 +235,7 @@ def test_direct_agenda_url_skips_resolution(monkeypatch):
     """Si l'URL pointe déjà vers une page agenda, on parse directement."""
     calls: list[str] = []
 
-    def _fake(url: str) -> str:
+    def _fake(url: str, **kwargs) -> str:
         calls.append(url)
         return _FIXTURE_FULL
 
