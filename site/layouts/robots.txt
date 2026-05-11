@@ -1,0 +1,9 @@
+{{/* R42-AO (2026-05-11) — Override du robots.txt par défaut Hugo.
+     Ajoute explicitement la directive `Sitemap:` (recommandation
+     standard sitemaps.org + Google Search Central). Sans cette
+     directive, le robots.txt minimal d'Hugo (`User-agent: *`) ne
+     pointait vers aucune sitemap, obligeant Google à la deviner. */ -}}
+User-agent: *
+Allow: /
+
+Sitemap: {{ "sitemap.xml" | absURL }}

@@ -34,6 +34,97 @@
   <meta name="twitter:description" content="{{ $desc }}"/>
   <meta name="twitter:image" content="{{ $img }}"/>
   <link rel="canonical" href="{{ $url }}"/>
+
+  {{/* R42-AP (2026-05-11) — Données structurées JSON-LD (schema.org).
+       Permet à Google d'enrichir l'affichage en SERP :
+       - WebSite + potentialAction (SearchAction) active la sitelinks
+         search box dans Google (zone de recherche intégrée à la SERP).
+       - Organization rattache le site à la marque Sideline Conseil
+         (knowledge graph, brand signals).
+       - Sur les pages d'item (.IsPage), on ajoute Article avec
+         datePublished / author / publisher.
+       Les meta OG/Twitter Cards restent pour les partages sociaux ;
+       le JSON-LD est lu UNIQUEMENT par les moteurs (Google, Bing). */}}
+  {{ $orgLogo := "sideline-logo.png" | absURL }}
+  {{ $orgName := "Sideline Conseil" }}
+  {{ $orgUrl := "https://sideline-conseil.fr" }}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "{{ .Site.Title }}",
+    "alternateName": "Veille institutionnelle du sport de Sideline Conseil",
+    "url": "{{ .Site.BaseURL }}",
+    "inLanguage": "fr-FR",
+    "description": "{{ .Site.Params.description }}",
+    "publisher": {
+      "@type": "Organization",
+      "name": "{{ $orgName }}",
+      "url": "{{ $orgUrl }}",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "{{ $orgLogo }}"
+      }
+    },
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "{{ .Site.BaseURL }}recherche/?q={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+  {{ if .IsPage }}
+  {{/* R42-AP : description spécifique à la page si présente, sinon
+       on retombe sur le summary Hugo (texte court extrait du body).
+       Évite de répliquer la description globale du site sur chaque
+       page (Google traite ça comme du duplicate metadata).
+       Le `plainify | truncate 200` retire le HTML et borne à 200 chars.
+       N.B. on échappe à la main les `"` et `\n` pour produire un JSON
+       valide — `jsonify` Hugo ajoute des guillemets parasites pour les
+       string venant de pipelines `.Title` / `.Summary` (testé). */}}
+  {{ $articleDesc := cond (gt (len (.Description | default "")) 0) .Description (.Summary | plainify | truncate 200) }}
+  {{ $headline := .Title | replaceRE `\\` `\\\\` | replaceRE `"` `\"` | replaceRE "\n" `\n` }}
+  {{ $descEsc  := $articleDesc | replaceRE `\\` `\\\\` | replaceRE `"` `\"` | replaceRE "\n" `\n` }}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "{{ $headline | safeJS }}",
+    "description": "{{ $descEsc | safeJS }}",
+    "url": "{{ $url }}",
+    "inLanguage": "fr-FR",
+    {{ with .Date -}}
+    "datePublished": "{{ .Format "2006-01-02T15:04:05Z07:00" }}",
+    {{- end }}
+    {{ with .Lastmod -}}
+    "dateModified": "{{ .Format "2006-01-02T15:04:05Z07:00" }}",
+    {{- end }}
+    "image": "{{ $img }}",
+    "author": {
+      "@type": "Organization",
+      "name": "{{ $orgName }}",
+      "url": "{{ $orgUrl }}"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "{{ $orgName }}",
+      "url": "{{ $orgUrl }}",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "{{ $orgLogo }}"
+      }
+    },
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "{{ $url }}"
+    }
+  }
+  </script>
+  {{ end }}
+
   <!-- Google Analytics 4 — chargé uniquement après consentement explicite -->
   <script>
   (function(){

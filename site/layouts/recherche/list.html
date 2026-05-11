@@ -69,10 +69,19 @@
     communiques: 'Publications',
   };
 
-  // normalisation : minuscules + retrait des accents (NFD + range U+0300-U+036F)
+  // normalisation : minuscules + retrait des accents (NFD + range U+0300-U+036F).
+  // R42-AN (2026-05-11) : on unifie aussi les apostrophes typographiques
+  // (\u2019 \u2018 \u02bc ` \u00b4) vers l'apostrophe ASCII droite ('). Cas qui motive : les
+  // textes parlementaires AN/S\u00e9nat utilisent massivement l'apostrophe
+  // typographique U+2019, alors que le clavier fran\u00e7ais produit U+0027.
+  // Sans cette normalisation, taper \u00ab jeux d'argent \u00bb (ASCII) ne matche
+  // pas les items qui contiennent \u00ab jeux d\u2019argent \u00bb (typo) \u2192 0 r\u00e9sultat
+  // alors que \u00ab jeux argent \u00bb fonctionnait (split sur espace contourne
+  // l'apostrophe). Cf. Cyril 2026-05-11 ticket Q1.
   function norm(s) {
     return (s || '').toString().toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\u2019\u2018\u02bc`\u00b4]/g, "'");
   }
 
   function escapeHTML(s) {
