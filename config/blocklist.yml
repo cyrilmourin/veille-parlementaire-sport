@@ -201,3 +201,79 @@ blocklist:
     reason: "Faux positif dossier AN DLR5L17N54095 — match keyword 'Activité physique adaptée' hors contexte sport-institutionnel"
   - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N54133
     reason: "Faux positif dossier AN DLR5L17N54133 — match keyword 'équipements sportifs' hors contexte sport-institutionnel"
+
+  # 2026-05-11 (R42-AF) — Vague de blocklist post-R42-X (fetch texte
+  # intégral /dyn/opendata/ AN). Cyril a remonté 38 dossiers AN qui
+  # remontaient à tort dans la veille via mention incidente d'un
+  # keyword sport dans leur texte (terrain de sport, fédération sportive,
+  # équipements sportifs, pratique sportive, etc.). 34 identifiés
+  # via search_index — les 4 restants à investiguer ultérieurement
+  # (probably retirés du flux entre temps).
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N50439
+    reason: "Nationaliser le boulevard périphérique parisien — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N50371
+    reason: "Rétablir le droit à l'instruction en famille — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N50592
+    reason: "Condamner la dérive liberticide et belliciste de la Fédération de Russie — hors scope (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N50666
+    reason: "Reconnaître la pénibilité des métiers féminisés — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51020
+    reason: "Rendre obligatoire la signalisation des radars mobiles privés — hors scope (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53135
+    reason: "Projet de loi de finances de fin de gestion 2025 — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51148
+    reason: "Supprimer sanctions pénales usage simple stupéfiants — hors scope (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N50781
+    reason: "Former jeunes premiers secours santé mentale — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51428
+    reason: "Aide effective population civile afghane femmes — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51515
+    reason: "Verdissement flottes automobiles entreprises collectivités — hors scope (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51707
+    reason: "Préservation environnement nocturne — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51903
+    reason: "L'islamophobie — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51912
+    reason: "Lutte groupuscules extrême droite France — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51953
+    reason: "Interdiction reconnaissance faciale — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51396
+    reason: "Coopération européenne antisémitisme — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52065
+    reason: "Développer animation locale communes rurales — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52058
+    reason: "Protéger santé populations nuisances aériennes — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52126
+    reason: "Condamner éducation à la haine enfants palestiniens — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52219
+    reason: "Réussir la transition foncière — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L16N49107
+    reason: "Faciliter transformation bureaux en logements — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52231
+    reason: "Liens mouvements politiques organisations terroristes islamistes — hors scope (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52348
+    reason: "Droit de vote municipales résidents étrangers extra-européens — hors scope (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52357
+    reason: "Mesures police administrative Ile-de-France 31 mai 1er juin 2025 — hors scope (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51919
+    reason: "Projet de loi résultats gestion comptes 2024 — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52533
+    reason: "Établir taxe utilisation jets privés — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52518
+    reason: "Valoriser bienfaits lien animaux-humains — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52745
+    reason: "Expérimentation brigades tranquillité publique police nationale — hors scope (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52786
+    reason: "Interdire décrets scélérats attentatoires santé publique — hors scope (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51726
+    reason: "Condamner ségrégation femmes afghanes Talibans — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53162
+    reason: "Renforcer lutte violences conjugales territoires ruraux — hors scope (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53289
+    reason: "Accès équitable soins drépanocytose — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53325
+    reason: "Traitement algorithmique vidéoprotection transports — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53334
+    reason: "Création réserve citoyenne diplomatie — hors scope sport (R42-AF)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53010
+    reason: "Réaffirmer décarbonation transport routier — hors scope sport (R42-AF)"
