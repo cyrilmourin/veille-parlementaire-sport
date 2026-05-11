@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-11T13:44:21+00:00",
+  "last_run_at": "2026-05-11T17:53:46+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419604B1560P0D1N000001",
@@ -188,6 +188,8 @@
       "an_amendements::AMANR5L17PO59051B2464P0D1N000244",
       "an_amendements::AMANR5L17PO59051B2464P0D1N000245",
       "an_amendements::AMANR5L17PO838901B2755P0D1N000097",
+      "an_amendements::AMANR5L17PO838901B2755P0D1N000103",
+      "an_amendements::AMANR5L17PO838901B2755P0D1N000108",
       "an_amendements::AMANR5L17PO838901B2755P0D1N000125",
       "an_amendements::AMANR5L17PO838901B2755P0D1N000127",
       "an_amendements::AMANR5L17PO838901B2755P0D1N000138",
