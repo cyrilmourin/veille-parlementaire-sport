@@ -3856,16 +3856,17 @@ def _amendement_chip(raw: dict) -> tuple[str, str]:
 
 def _write_item_pages(items_dir: Path, rows: list[dict]):
     # On évite l'explosion du nombre de fichiers : on garde les N plus récents.
-    # R42-AB (2026-05-11) — cap 500 → 1500. Cyril a remonté que la page
-    # /items/dossiers_legislatifs/ annonçait « 109 dossiers » dans
-    # l'intro mais n'en affichait que ~16. Cause : 500 .md max toutes
-    # catégories confondues, mais ~700 items globaux après R42-N/R/W/X/Y/Z.
-    # Les dosleg anciens (2024) étaient écartés au profit des items plus
-    # récents (amendements, CR, JORF). 1500 couvre la fenêtre complète
-    # (3 ans dosleg + 30j agenda + 30j JORF + 6 mois CR + 14j amendements
-    # actifs + etc.) avec marge.
+    # R42-AB (2026-05-11) — cap 500 → 1500 puis 2000 (sur demande Cyril
+    # pour anticiper un futur texte avec beaucoup d'amendements). Cyril
+    # a remonté que la page /items/dossiers_legislatifs/ annonçait
+    # « 109 dossiers » dans l'intro mais n'en affichait que ~16. Cause :
+    # cap 500 .md max toutes catégories confondues, mais ~700 items
+    # globaux après R42-N/R/W/X/Y/Z. Les dosleg anciens (2024) étaient
+    # écartés au profit des items plus récents. 2000 couvre la fenêtre
+    # complète avec une marge confortable (ex. PPL hyper amendée comme
+    # 1560 sport pro avec 200+ amendements).
     rows_sorted = _sort_by_date_desc(rows)
-    for r in rows_sorted[:1500]:
+    for r in rows_sorted[:2000]:
         cat = r.get("category") or "autre"
         d = items_dir / cat
         d.mkdir(parents=True, exist_ok=True)

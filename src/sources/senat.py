@@ -783,6 +783,15 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
             # CSV (absent des colonnes) — le mapping AN se fera via
             # senat_akn qui a l'alias url-AN dans le FRBR.
             raw["dossier_id"] = str(uid)
+            # R42-AC (2026-05-11) — Extraire le champ « État du dossier »
+            # du CSV pour poser `raw.status_label`. Sans ça, les dosleg
+            # Sénat n'avaient pas de cartouche statut sur les cards (vu
+            # par Cyril sur PPL 25-566 « Agencification » et 25-448
+            # « Activité physique à l'école »). Valeurs CSV typiques :
+            # « Première lecture (Sénat) », « Caduc », « Promulgué », etc.
+            etat_dossier = (_pick(r, "État du dossier", "etat") or "").strip()
+            if etat_dossier:
+                raw.setdefault("status_label", etat_dossier)
             if sid == "senat_promulguees":
                 raw["is_promulgated"] = True
                 raw.setdefault("status_label", "Promulguée")
