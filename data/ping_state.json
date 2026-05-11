@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-11T01:01:06+00:00",
+  "last_run_at": "2026-05-11T01:34:00+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419604B1560P0D1N000001",
@@ -210,9 +210,23 @@
       "senat_amendements::fdc4aeeb693f0384"
     ],
     "comptes_rendus": [
+      "an_cr_commissions::an-cr-cion-cedu-2526-052",
+      "an_cr_commissions::an-cr-cion-cedu-2526-053",
+      "an_cr_commissions::an-cr-cion-cedu-2526-054",
+      "an_cr_commissions::an-cr-cion-cedu-2526-055",
+      "an_cr_commissions::an-cr-cion-cedu-2526-056",
+      "an_cr_commissions::an-cr-cion-cedu-2526-057",
+      "an_cr_commissions::an-cr-cion-cedu-2526-058",
+      "an_cr_commissions::an-cr-cion-cedu-2526-059",
       "an_cr_commissions::an-cr-cion-cedu-2526-069",
+      "an_cr_commissions::an-cr-cion-dvp-2526-022",
+      "an_cr_commissions::an-cr-cion-dvp-2526-024",
       "an_cr_commissions::an-cr-cion-dvp-2526-032",
       "an_cr_commissions::an-cr-cion-eco-2526-074",
+      "an_cr_commissions::an-cr-cion-soc-2526-048",
+      "an_cr_commissions::an-cr-cion-soc-2526-049",
+      "an_cr_commissions::an-cr-cion-soc-2526-056",
+      "an_cr_commissions::an-cr-cion-soc-2526-058",
       "an_cr_commissions::an-cr-cion-soc-2526-059",
       "an_cr_commissions::an-cr-cion-soc-2526-061",
       "an_cr_commissions::an-cr-cion-soc-2526-068",
