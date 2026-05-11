@@ -214,6 +214,36 @@ dispositif:
   - Credit d'impot sport
   - Mécénat sportif
   - Mecenat sportif
+  # R42-Y (2026-05-11) — keywords ajoutés suite à l'audit des PPL sport
+  # qui matchaient 0 keyword malgré titre 100% sport (PPL 1068 « Protéger
+  # les éducateurs sportifs », PPL 269 « Favoriser la pratique des
+  # activités physiques et sportives par les jeunes », PPL 56 « Pneus
+  # terrains de sport », etc.). Ces termes très spécifiques au domaine
+  # sport-institutionnel sont peu propices aux faux positifs.
+  - Éducateurs sportifs
+  - Educateurs sportifs
+  - Éducateur sportif
+  - Educateur sportif
+  - Arbitres sportifs
+  - Arbitres et juges sportifs
+  - Juges sportifs
+  - Activités physiques et sportives
+  - Activite physique et sportive
+  - Pratique sportive
+  - Pratiques sportives
+  - Pratique des activités physiques et sportives
+  - Pratique des activités sportives
+  - Pratique sportive régulière
+  - Terrain de sport
+  - Terrains de sport
+  - Terrain sportif
+  - Terrains sportifs
+  - Code du sport
+  - Homophobie dans le sport
+  - Bénévoles du sport
+  - Benevoles du sport
+  - Bénévoles sportifs
+  - Benevoles sportifs
   - TVA billetterie sportive
   - PSF                         # projets sportifs fédéraux
   - Projets sportifs fédéraux

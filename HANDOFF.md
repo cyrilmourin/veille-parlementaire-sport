@@ -266,6 +266,23 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-11 (nuit, validation finale post-resets) : **R42-Y — Compléter le yaml avec les keywords spécifiques manquants des PPL sport peu visibles**.
+
+  Audit post-reset_dossiers_legislatifs : sur les 6 PPL sport identifiées par Cyril hier (1068 éducateurs, 1803 homophobie, 332 héritage JOP, 269 pratique sportive jeunes, 56 pneus terrains, 699 sport-sucre), aucune n'apparaissait après le 1er reset malgré R42-X (fetch texte intégral). Diagnostic : ces PPL ont des titres et corps centrés sur des termes qui n'étaient pas dans le yaml (« éducateurs sportifs », « activités physiques et sportives », « terrains de sport », « homophobie dans le sport », « bénévoles sportifs »).
+
+  Keywords ajoutés dans la famille `dispositif` :
+  - « Éducateurs sportifs » / « Educateurs sportifs » / formes singulières
+  - « Arbitres sportifs », « Arbitres et juges sportifs », « Juges sportifs »
+  - « Activités physiques et sportives », « Pratique sportive », « Pratiques sportives », « Pratique des activités physiques et sportives »
+  - « Terrain de sport » / « Terrains de sport » / « Terrain sportif »
+  - « Code du sport » (terme juridique récurrent)
+  - « Homophobie dans le sport »
+  - « Bénévoles du sport » / « Bénévoles sportifs »
+
+  Test live : 5/6 PPL ciblées matchent désormais via leur titre seul. La 6ᵉ (PPL 699 « Pour plus de sport et moins de sucre ») reste avec un titre trop générique mais devrait matcher via R42-X (texte intégral). 1049 → 1049 tests verts.
+
+  Action prod : nécessite un **autre reset_dossiers_legislatifs** pour appliquer ces keywords sur les items déjà en DB (qui ont leur `matched_keywords` figés depuis le reset précédent). À dispatcher demain matin par Cyril (ou par moi si la session reprend) : `gh workflow run daily.yml -f reset_category=dossiers_legislatifs -f since_days=14`.
+
 - 2026-05-11 (début après-midi, retour Cyril : « C'est un problème structurel non ? ») : **R42-X — Fetch du texte intégral des dossiers AN via `/dyn/opendata/<TEXTE_REF>.html` (symétrique R42-L côté Sénat)**.
 
   Cyril a remonté que mon investigation de la PPR n°2126 « Renforcer le pilotage et la cohérence de la politique nationale du sport » s'était arrêtée au titre alors que le **texte intégral** matchait 11+ keywords (« Pass'Sport », « mouvement sportif », « Agence nationale du sport », « sport de haut niveau », « Éducation physique et sportive »…). R42-L côté Sénat fait déjà ce fetch via `/leg/<slug>.html`, mais **aucun pendant côté AN** — c'était le problème structurel.
