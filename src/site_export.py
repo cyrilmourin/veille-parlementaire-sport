@@ -118,6 +118,16 @@ WINDOW_DAYS_BY_SOURCE_ID: dict[str, int] = {
     # garder une fenêtre 3 ans pour rattraper les rapports anciens
     # dont seul le titre matchait.
     "an_rapports": 730,      # 2 ans — rapports AN (R42-B)
+    # R42-AJ (2026-05-11) — nouveaux flux AN : rapports d'information et
+    # avis. Même fenêtre 2 ans que `an_rapports` pour la cohérence visuelle
+    # (cards mélangées dans Publications) et capter les rapports
+    # d'évaluation / d'info / avis budgétaires des deux derniers PLF.
+    "an_rapports_information": 730,  # 2 ans — rapports d'information AN
+    "an_avis": 730,                  # 2 ans — avis (budgétaires PLF, autres)
+    # R42-AK (2026-05-11) — deux types AN supplémentaires (volumes très
+    # réduits mais à inclure pour la complétude).
+    "an_rapports_application_loi": 730,
+    "an_rapports_information_ce": 730,
     "senat_rapports": 730,   # 2 ans — rapports Sénat (R42-B)
     # R41-AC : Cour des comptes publie des rapports thématiques
     # (ex. bilan JO Paris 2024 — 29/09/2025) qui restent référents
@@ -2187,7 +2197,18 @@ def _apply_blocklist_recategorize(rows: list[dict]) -> list[dict]:
 # Autres catégories (agenda, dossiers_legislatifs, questions, etc.) :
 # pas touchées — la famille parlement continue à couvrir tous les flux
 # AN/Sénat sur ces volets.
-_PARLEMENT_PUBLICATIONS_ALLOWED_SOURCES = {"senat_rapports", "an_rapports"}
+# R42-AJ (2026-05-11) — ajout an_rapports_information et an_avis pour
+# qu'ils apparaissent dans le bucket parlement de la page Publications.
+# Sans ça le filtre R28 les masquerait (regression silencieuse).
+_PARLEMENT_PUBLICATIONS_ALLOWED_SOURCES = {
+    "senat_rapports",
+    "an_rapports",
+    "an_rapports_information",
+    "an_avis",
+    # R42-AK : types AN supplémentaires (rapports d'application + RINF UE).
+    "an_rapports_application_loi",
+    "an_rapports_information_ce",
+}
 
 
 def _filter_parlement_publications(rows: list[dict]) -> list[dict]:

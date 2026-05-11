@@ -123,8 +123,13 @@ def test_parse_report_li_rapp_compa():
 
 
 def test_parse_report_li_skip_non_rapp():
-    """Les entrées OMC_PRJL (projet de loi) / OMC_PION (texte adopté) sont ignorées."""
-    for did in ("OMC_PRJLANR5L17B2100", "OMC_PIONANR5L17B2050", "OMC_AVISANR5L17B2200"):
+    """Les entrées OMC_PRJL / OMC_PION / OMC_PNRE (textes) sont ignorées.
+
+    R42-AJ (2026-05-11) : OMC_AVIS et OMC_RINF retirés de cette liste car
+    désormais ACCEPTÉS par le scraper (rapports d'information + avis).
+    Cf. `test_r42aj_rapports_avis_rinf.py` pour la couverture explicite."""
+    for did in ("OMC_PRJLANR5L17B2100", "OMC_PIONANR5L17B2050",
+                "OMC_PNREANR5L17B2300"):
         html = f'<li data-id="{did}"><h3>T</h3><a href="/x">Dossier</a></li>'
         assert _parse_report_li(_li_fragment(html)) is None
 

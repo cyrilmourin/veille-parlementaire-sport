@@ -75,10 +75,70 @@ assemblee_nationale:
     # (« Mis en ligne … »), lien dossier législatif + PDF. Le handler
     # `assemblee_rapports.fetch_source` filtre les entrées `OMC_RAPP`
     # (ignore PRJL/PION/AVIS) et privilégie l'URL du dossier législatif.
+    # R42-AK (2026-05-11) — `max_pages: 8` active la pagination AN par
+    # offset (`?offset=N&limit=150`). 8 pages × 150 = 1200 items max
+    # couvre largement la fenêtre 2 ans (cf. WINDOW_DAYS_BY_SOURCE_ID).
+    # Permet de remonter aux rapports plus anciens (cas concret : RAPP
+    # B0699 sport+sucre, B2074 OPECST « science dans la mêlée » — hors
+    # top 150 récents). Stop automatique si une page n'apporte aucun
+    # nouveau data-id (défense si AN ignore le param offset).
     - id: an_rapports
       category: communiques
       url: https://www2.assemblee-nationale.fr/documents/liste?type=rapports&legis=17
       format: an_rapports_html
+      max_pages: 8
+      page_size: 150
+
+    # R42-AJ (2026-05-11) — Rapports d'information AN (RINF).
+    # Listing distinct des rapports classiques (RAPP) : missions d'info,
+    # rapports d'évaluation de loi (art. 145-7), délégation aux droits
+    # des femmes, etc. Cas qui motive : RINF B2465 « évaluation de la
+    # loi du 2 mars 2022 démocratiser le sport en France » (Bruneau /
+    # Clavet / Riotton). Format/parser réutilisés depuis assemblee_rapports
+    # car le HTML est strictement le même (même <li data-id="OMC_RINF…">).
+    - id: an_rapports_information
+      category: communiques
+      url: https://www2.assemblee-nationale.fr/documents/liste?type=rapports-information&legis=17
+      format: an_rapports_html
+      max_pages: 8
+      page_size: 150
+
+    # R42-AJ (2026-05-11) — Avis AN (AVIS).
+    # Avis budgétaires sur les PLF (rapport « pour avis » d'une commission
+    # saisie au fond ou pour avis sur un secteur) et avis sur PPL/PJL.
+    # Cas qui motive : 4 avis sport sur PLF 2025/2026 listés par Cyril
+    # (commission affaires culturelles « Sport, jeunesse et vie associative
+    # — Sport » et « — Jeunesse et vie associative »). Format identique.
+    - id: an_avis
+      category: communiques
+      url: https://www2.assemblee-nationale.fr/documents/liste?type=avis&legis=17
+      format: an_rapports_html
+      max_pages: 8
+      page_size: 150
+
+    # R42-AK (2026-05-11) — Rapports d'application des lois.
+    # Type mineur (~4 entrées en 17e légis) mais distinct des RINF
+    # standards : c'est le contrôle de l'exécution des lois (suivi
+    # règlementaire). Petit volume, on fetch en 1 page suffit.
+    - id: an_rapports_application_loi
+      category: communiques
+      url: https://www2.assemblee-nationale.fr/documents/liste?type=rapports-application-loi&legis=17
+      format: an_rapports_html
+      max_pages: 1
+      page_size: 150
+
+    # R42-AK (2026-05-11) — Rapports d'information de la commission
+    # des affaires européennes (~8 entrées en 17e légis). Distinct
+    # des RINF de la commission affaires culturelles ou autres : ces
+    # rapports traitent de PPR européennes et politiques UE — peuvent
+    # contenir du sport (mobilité étudiants-sportifs, harmonisation
+    # antidopage UE, paris en ligne, etc.).
+    - id: an_rapports_information_ce
+      category: communiques
+      url: https://www2.assemblee-nationale.fr/documents/liste?type=rapports-information-ce&legis=17
+      format: an_rapports_html
+      max_pages: 1
+      page_size: 150
 
     # R35-B (2026-04-24) — Comptes rendus de commissions AN.
     # L'agenda AN (`an_agenda`) expose les réunions de commission mais pas

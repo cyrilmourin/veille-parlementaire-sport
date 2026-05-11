@@ -76,8 +76,23 @@ _DATE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# `data-id="OMC_RAPPANR5L17B2396"` — on garde RAPP, ignore PRJL/PION/AVIS…
-_DATA_ID_RE = re.compile(r"^OMC_RAPP")
+# `data-id="OMC_RAPPANR5L17B2396"` — préfixe selon le type de document AN :
+# - RAPP : rapports de commission (sur PPL/PJL, ou OPECST « au nom de
+#          l'office »). Listing : `?type=rapports&legis=17`.
+# - RINF : rapports d'information (missions d'info, évaluations, délégation
+#          aux droits des femmes, etc.). Listing : `?type=rapports-information&legis=17`.
+# - AVIS : avis budgétaires (PLF) ou avis sur projet/proposition de loi.
+#          Listing : `?type=avis&legis=17`.
+# R42-AJ (2026-05-11) : élargissement RAPP → (RAPP|RINF|AVIS). Avant, le
+# scraper ne gardait que RAPP — donc 147 RINF + 18 AVIS récents n'étaient
+# JAMAIS ingérés, dont notamment le rapport d'évaluation de la loi
+# du 2 mars 2022 « démocratiser le sport » (RINF B2465), l'OPECST « science
+# dans la mêlée pour une nation sportive » (RAPP B2074), les avis PLF
+# sport-J&VA (n°1906 pour 2026, n°324 pour 2025), etc. Les textes
+# (PRJL/PION/PNRE) restent volontairement exclus — ils sont ingérés par
+# `an_dossiers_legislatifs` (catégorie `dossiers_legislatifs`), pas
+# `communiques` (Publications).
+_DATA_ID_RE = re.compile(r"^OMC_(RAPP|RINF|AVIS)")
 
 
 def _parse_date_fr(text: str) -> datetime | None:
@@ -116,6 +131,12 @@ def _parse_report_li(li) -> dict | None:
     #  pour dédup avec la version principale).
     num_m = re.search(r"B(\d+)", data_id)
     num = num_m.group(1) if num_m else ""
+
+    # R42-AJ (2026-05-11) — type extrait depuis le préfixe data-id.
+    # Permet au caller d'enrichir raw + de distinguer RAPP/RINF/AVIS dans
+    # le frontmatter Hugo si besoin (étiquette différenciée sur les cards).
+    type_m = re.match(r"^OMC_(RAPP|RINF|AVIS)", data_id)
+    doc_type = type_m.group(1) if type_m else ""
 
     h3 = li.find("h3")
     title = h3.get_text(" ", strip=True) if h3 else ""
@@ -159,6 +180,7 @@ def _parse_report_li(li) -> dict | None:
         "uid": uid,
         "data_id": data_id,
         "num": num,
+        "doc_type": doc_type,  # R42-AJ : "RAPP" | "RINF" | "AVIS"
         "title": title,
         "summary": summary,
         "published_at": published_at,
@@ -205,6 +227,22 @@ def _fetch_pdf_haystack(url_pdf: str, max_chars: int = 50000) -> str:
     return text or ""
 
 
+def _paginate_url(base_url: str, offset: int, limit: int) -> str:
+    """R42-AK (2026-05-11) — Ajoute (ou remplace) les params `offset`/`limit`
+    sur l'URL de listing AN. La pagination AN se fait via `?offset=N&limit=N`
+    (param `&page=` est ignoré). Préserve les params existants (type, legis,
+    type_tri…).
+    """
+    if offset == 0 and "offset=" not in base_url:
+        return base_url
+    from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+    parts = urlparse(base_url)
+    q = dict(parse_qsl(parts.query, keep_blank_values=True))
+    q["offset"] = str(offset)
+    q["limit"] = str(limit)
+    return urlunparse(parts._replace(query=urlencode(q)))
+
+
 def fetch_source(src: dict) -> list[Item]:
     """Scrape la page AN listing rapports et construit les Item.
 
@@ -217,6 +255,14 @@ def fetch_source(src: dict) -> list[Item]:
           # AN volumineux dont le keyword sport tombe au-delà du seuil
           # initial. Symétrie avec senat_rapports + senat_cr_commissions.
           body_max_chars: 200000
+          # R42-AK (2026-05-11) — pagination par offset (param AN officiel,
+          # ?offset=N&limit=N). Défaut max_pages=8 = jusqu'à 1200 items, ce
+          # qui couvre largement les 2 ans de fenêtre `WINDOW_DAYS_BY_SOURCE_ID`
+          # (rythme typique ~50-100 rapports/mois pour les rapports
+          # législatifs, moins pour RINF/AVIS). Backward-compat : max_pages=1
+          # = comportement R42-AJ (1 fetch).
+          max_pages: 8
+          page_size: 150
 
     R42-B (2026-05-10) + R42-Q (2026-05-11) : pour chaque rapport ayant
     `url_pdf`, fetch + extract PDF avec pypdf, tronque à `body_max_chars`
@@ -228,17 +274,45 @@ def fetch_source(src: dict) -> list[Item]:
     url = src["url"]
     cat = src.get("category", "communiques")
     body_max = int(src.get("body_max_chars", 200000))  # R42-B + R42-Q
+    # R42-AK : pagination. max_pages=1 (par défaut prudent côté tests
+    # qui mocke 1 fetch) ; les sources YAML actives en prod posent 8.
+    max_pages = int(src.get("max_pages", 1))
+    page_size = int(src.get("page_size", 150))
 
-    try:
-        payload = fetch_bytes(url)
-    except Exception as e:
-        log.warning("%s : fetch KO (%s)", sid, e)
-        return []
-
-    html_body = payload.decode("utf-8", errors="replace")
-    reports = _extract_reports(html_body)
+    # R42-AK : boucle de pagination. Stop sur :
+    # - HTTP KO (réseau, 4xx, 5xx)
+    # - page vide (parseur retourne [])
+    # - page sans NOUVEAU data-id (déjà tous vus → AN renvoie même top en
+    #   boucle, défense contre param non honoré)
+    seen_data_ids: set[str] = set()
+    reports: list[dict] = []
+    for page_idx in range(max_pages):
+        page_url = _paginate_url(url, offset=page_idx * page_size,
+                                 limit=page_size)
+        try:
+            payload = fetch_bytes(page_url)
+        except Exception as e:
+            log.warning("%s : fetch KO page %d (%s)", sid, page_idx, e)
+            break
+        html_body = payload.decode("utf-8", errors="replace")
+        page_reports = _extract_reports(html_body)
+        if not page_reports:
+            if page_idx == 0:
+                log.warning("%s : aucun rapport extrait (layout AN changé ?)", sid)
+            break
+        new_count = 0
+        for r in page_reports:
+            did = r.get("data_id")
+            if did and did not in seen_data_ids:
+                seen_data_ids.add(did)
+                reports.append(r)
+                new_count += 1
+        # Pas de nouveau item → l'AN ne pagine plus (peu importe la raison),
+        # on s'arrête pour ne pas multiplier les fetches inutiles.
+        if new_count == 0:
+            log.debug("%s : page %d sans nouveau item, arrêt", sid, page_idx)
+            break
     if not reports:
-        log.warning("%s : aucun rapport extrait (layout AN changé ?)", sid)
         return []
 
     items: list[Item] = []
@@ -261,6 +335,12 @@ def fetch_source(src: dict) -> list[Item]:
                 "path": "assemblee:rapport",
                 "data_id": r["data_id"],
                 "num": r["num"],
+                # R42-AJ : "RAPP" | "RINF" | "AVIS". Vide pour les anciens
+                # items en DB pré-R42-AJ (champ ajouté). Le frontmatter Hugo
+                # peut afficher une étiquette différenciée si souhaité plus
+                # tard, sans casser la rétrocompat (fallback affichage si
+                # vide = "Rapport").
+                "doc_type": r.get("doc_type", ""),
                 "url_dossier": r["url_dossier"],
                 "url_pdf": r["url_pdf"],
                 # R42-B : corps PDF tronqué à body_max chars pour matcher.
@@ -268,6 +348,17 @@ def fetch_source(src: dict) -> list[Item]:
                 "haystack_body": haystack_body[:body_max],
             },
         ))
-    log.info("%s : %d rapports extraits (%d avec corps PDF, max %d chars)",
-             sid, len(items), pdf_hits, body_max)
+    # R42-AJ : log la répartition par type (RAPP/RINF/AVIS) pour suivre
+    # la couverture après l'élargissement du regex et le dispatch des
+    # trois listings AN distincts (rapports / rapports-information / avis).
+    by_type: dict[str, int] = {}
+    for it in items:
+        dt = (it.raw.get("doc_type") or "?")
+        by_type[dt] = by_type.get(dt, 0) + 1
+    type_summary = ", ".join(f"{k}={v}" for k, v in sorted(by_type.items()))
+    log.info(
+        "%s : %d documents extraits (%d avec corps PDF, max %d chars, "
+        "%d page(s) fetchée(s)) — %s",
+        sid, len(items), pdf_hits, body_max, max_pages, type_summary,
+    )
     return items
