@@ -266,6 +266,38 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-11 (midi, demande Cyril après création du quick_rebuild) : **R42-AH — Module de partage en haut à droite du header (desktop)**.
+
+  Demande Cyril : « Est-ce que le module de partage de cette veille (sauf pour l'affichage mobile) pourrait être également visible en haut à droite dans le header sans changer la hauteur du header, aligné horizontalement avec sa position dans le footer ? Fais une prévisualisation locale avant push. »
+
+  Implémentation :
+  - Refacto : extraction des 4 boutons partage (Facebook / X / LinkedIn / Mail) dans un nouveau partial `site/layouts/partials/share_links.html`. Footer et header partagent le même HTML.
+  - Classe `.site-footer__share-list` renommée en `.share-list` (générique, réutilisable).
+  - Header : `<div class="site-header__share">` ajouté dans `.container`, juste avant le `.brand`. `{{ partial "share_links.html" . }}`.
+  - CSS : `.site-header .container { position: relative; }` + `.site-header__share { position: absolute; top: 22px; right: 24px; }`. `top: 22px` aligne avec le padding-top du container ; `right: 24px` matche le padding (donc même X que le bloc footer).
+  - `position: absolute` garantit que la hauteur du header reste strictement inchangée (point dur posé par Cyril).
+  - Mobile : `@media (max-width: 720px) { .site-header__share { display: none; } }` — le partage reste accessible via le footer sur mobile.
+
+  Preview locale validée par Cyril avant push (« C'est bon pour le visuel du module »). 1064 tests verts (pas de test pour ce changement purement visuel CSS/template).
+
+- 2026-05-11 (midi, demande Cyril « créer un quick rebuild pour les petites modifications ») : **R42-AG — Workflow `quick_rebuild.yml` + commande `python -m src.main export`**.
+
+  Besoin : après R42-AF (blocklist 34 dossiers en urgence), Cyril veut un cycle court pour les modifs qui n'affectent QUE l'export (blocklist, template Hugo, CSS, image statique). Le run nominal complet dure ~10-12 min depuis R42-AD ; un export-only doit descendre à ~3-5 min.
+
+  Implémentation :
+  - Nouvelle commande `python -m src.main export -v` : lit la DB existante via `fetch_matched_since(1970, only_matched=True)`, appelle directement `site_export.export()` qui ré-applique blocklist + filter_window + dédup + ré-écrit les .md. Pas de fetch, pas de matching.
+  - Workflow `.github/workflows/quick_rebuild.yml` : `workflow_dispatch` uniquement (pas de cron). Restore SQLite via `actions/cache@v4` avec restore-keys identiques à daily.yml (partage du cache). Concurrency group `veille-daily` partagé (pas de double déploiement Pages).
+
+  Limites (commentées en tête de workflow) : ne reprend PAS les nouveaux items publiés depuis le dernier daily.yml (pas de fetch). Pas adapté pour ajout de keywords — `matched_keywords` figés en DB. Pour ça : `daily.yml` avec `reset_category`.
+
+  Usage : `gh workflow run quick_rebuild.yml` (ou via UI GitHub Actions). 1064 tests inchangés (la commande `export` est un thin wrapper sans logique métier nouvelle).
+
+- 2026-05-11 (matin, urgence après dépôt PDF Cyril) : **R42-AF — Blocklist URGENCE de 34 dossiers AN « hors scope sport »** (commit 5552947, run daily.yml déclenché).
+
+  Cyril a déposé un PDF « Nationaliser le boulevard périphérique parisien » listant 38 dossiers législatifs AN à blacklister. 34/38 matchaient effectivement le `search_index` et ont été ajoutés à `config/blocklist.yml` sous le marqueur R42-AF. 4 entrées du PDF n'ont pas de correspondance actuelle dans `search_index` — laissées en attente d'un audit séparé. Pas de keyword retiré du yaml : c'est bien la blocklist qui agit à l'export (cf. R42-O / R42-Z).
+
+  Action : push direct → daily.yml redéploie. Pas de `reset_category` nécessaire.
+
 - 2026-05-11 (matin tardif, discussion stratégique sur la performance des runs nominaux) : **R42-AD — Fenêtres dynamiques `nominal` vs `full` selon `RUN_MODE`**.
 
   Cyril a remonté que les runs nominaux quotidiens duraient ~28 min alors que la plupart du travail (fetch des textes intégraux R42-X /dyn/opendata/, R42-L /leg/, R42-B/Q PDF rapports) est redondant : ces items sont déjà en DB et `upsert_many` ne refresh pas leur `raw.*` à hash_key constant.
