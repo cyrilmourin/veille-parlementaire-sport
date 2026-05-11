@@ -43,20 +43,26 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: "pip"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -e .
 
       - name: Restore SQLite cache
         uses: actions/cache@v4
         with:
           path: data/veille.sqlite3
-          # Même clé que daily.yml pour partager le cache
-          key: veille-sqlite-${{ github.run_id }}
+          # R42-AR (2026-05-11) — alignement avec daily.yml :
+          # même clé `veille-sqlite-v3-<run_id>` et même restore-keys
+          # `veille-sqlite-v3-` pour partager le cache. La version
+          # précédente (`veille-sqlite-`) ne matchait jamais le cache
+          # de daily.yml qui utilise `v3-`, donc on partait sur une DB
+          # vide → site_export plantait sans items à exporter.
+          key: veille-sqlite-v3-${{ github.run_id }}
           restore-keys: |
-            veille-sqlite-
+            veille-sqlite-v3-
 
       - name: Run export-only (skip fetch + matching)
         run: |
