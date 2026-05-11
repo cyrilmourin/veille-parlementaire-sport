@@ -266,6 +266,36 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-11 (fin de journée, Cyril remet en cause l'architecture après R42-BH) : **R42-BI — Filtre architectural famille `nomination_event` par whitelist de sources**. **Commit local, NON pushé**.
+
+  Cyril a posé une question logique simple :
+    1. Les keywords nomination_event ne fonctionnent que pour les nominations
+    2. Ils ne s'appliquent qu'aux sources « publications nominations »
+
+  → Les CR / dosleg / questions / amendements / agenda etc. ne devraient JAMAIS être visibles si leur seul signal sport est nomination_event.
+
+  L'existant (R41-A + R41-H + R41-I + R42-AW + R42-BH) appliquait nomination_event PARTOUT puis patchait au coup par coup les 5 catégories où c'était problématique. Architecture symptomatique.
+
+  R42-BI = **1 seule règle architecturale en amont** : `_strip_nomination_event_outside_whitelist(rows)` retire les keywords nomination_event des items dont `source_id ∉ whitelist`. Si l'item n'a plus de keywords → drop.
+
+  Whitelist (`_NOMINATION_EVENT_SOURCES`) validée Cyril :
+    - JORF (`dila_jorf`)
+    - Presse business sport : `olbia_conseil`, `cafe_sport_business`, `sport_buzz_business`, `sport_business_club`, `sport_strategies`
+    - Mouvement sportif : `cnosf`, `france_paralympique`
+    - Min Sports : `min_sports_actualites`, `min_sports_presse`, `min_sports_agenda`
+    - Opérateurs publics : `ans`, `fdsf`
+    - Fédérations : `fff_actualites`, `fft_actualites`, `ffa_actualites`
+
+  Ces sources peuvent par ailleurs alimenter `communiques` via d'autres familles (acteur, dispositif…) — c'est cohérent. Un communiqué CNOSF Pass'Sport reste en Publications. Un communiqué CNOSF « X élue présidente » bascule en Nominations via R41-A.
+
+  Helper `_load_nomination_event_keyword_set()` (lru_cache) parse `config/keywords.yml` famille `nomination_event` et stocke les keywords normalisés (lower + unidecode) pour comparer avec les `matched_keywords` recapitalisés.
+
+  Branchement dans `export()` AVANT `_reroute_to_nominations` (R41-A) — sinon les items hors whitelist seraient reroutés à tort.
+
+  R41-I, R42-AW, R42-BH deviennent **redondants** en pratique mais conservés en défense en profondeur (no-op si R42-BI fait son job).
+
+  +19 tests R42-BI. 1149 → 1168 verts.
+
 - 2026-05-11 (fin de journée, retour Cyril post-clôture) : **R42-BH — Extension R42-AW aux comptes_rendus parlement**. **Commit local, NON pushé**.
 
   Cyril : « l'utilisation des mots-clés pour les nominations, que je retrouve désormais aussi dans les comptes rendus, est-elle exclue par les dernières mises à jour ? ». **Réponse : non**, R42-AW couvrait UNIQUEMENT `category=communiques`. Confirmé sur search_index prod : 9 CR contiennent un marqueur nomination_event dans leur snippet visible.

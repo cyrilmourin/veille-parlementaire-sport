@@ -11,6 +11,7 @@ Structure produite :
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import re
@@ -2300,6 +2301,141 @@ def _filter_nominations_only_sources(rows: list[dict]) -> list[dict]:
 _TEXTE_COMPARATIF_RE = re.compile(r"texte\s+comparatif", re.IGNORECASE)
 
 
+# R42-BI (2026-05-11) — Whitelist des sources autorisées à matcher la
+# famille `nomination_event`. Cyril : « les mots-clés pour les nominations
+# 1/ ne fonctionnent que pour les nominations 2/ et ne s'appliquent que
+# pour les contenus issus des publications [sources nominations] ».
+#
+# La famille nomination_event est destinée éditorialement à la catégorie
+# `nominations`. Elle ne doit s'appliquer qu'aux sources qui peuvent
+# LÉGITIMEMENT produire une annonce de nomination :
+#   - JORF (décrets de nomination officiels)
+#   - Presse business sport (Olbia, Sport Strats, Café Sport Biz, etc.)
+#   - Mouvement sportif (CNOSF, CPSF/France Paralympique)
+#   - Ministère des Sports (actualités, presse, agenda hebdo)
+#   - Agence Nationale du Sport (ANS) + Fondation du Sport Français (FDSF)
+#   - Fédérations sportives (FFF, FFT, FFA)
+#
+# Sur les autres sources (parlement, ministères non-sport, autorités, etc.),
+# un match nomination_event SEUL est nécessairement un faux positif
+# (mention incidente). R42-BI strip ces matches en amont du pipeline
+# d'export, ce qui rend redondants (mais conservés en défense en
+# profondeur) R41-I, R42-AW, R42-BH.
+#
+# Ces sources peuvent par ailleurs alimenter la thématique `communiques`
+# (publications) via d'autres familles (acteur, dispositif, etc.) :
+# c'est cohérent — un communiqué CNOSF sur Pass'Sport reste en
+# Publications, une annonce CNOSF « X élue présidente » bascule en
+# Nominations via R41-A.
+_NOMINATION_EVENT_SOURCES: frozenset[str] = frozenset({
+    # JORF
+    "dila_jorf",
+    # Presse business sport
+    "olbia_conseil",
+    "cafe_sport_business",
+    "sport_buzz_business",
+    "sport_business_club",
+    "sport_strategies",
+    # Mouvement sportif
+    "cnosf",
+    "france_paralympique",
+    # Ministère des Sports
+    "min_sports_actualites",
+    "min_sports_presse",
+    "min_sports_agenda",
+    # Opérateurs publics sport
+    "ans",
+    "fdsf",
+    # Fédérations sportives
+    "fff_actualites",
+    "fft_actualites",
+    "ffa_actualites",
+})
+
+
+@functools.lru_cache(maxsize=1)
+def _load_nomination_event_keyword_set() -> frozenset[str]:
+    """Charge depuis `config/keywords.yml` les keywords de famille
+    `nomination_event` et retourne leur forme normalisée (NFD + lower
+    + unidecode), utilisable pour comparer avec les `matched_keywords`
+    déjà recapitalisés."""
+    import yaml as _yaml
+    from .keywords import _normalize as _kw_normalize
+    yaml_path = Path(__file__).resolve().parent.parent / "config" / "keywords.yml"
+    try:
+        with open(yaml_path, encoding="utf-8") as f:
+            cfg = _yaml.safe_load(f) or {}
+    except Exception:
+        return frozenset()
+    raw = cfg.get("nomination_event", []) or []
+    return frozenset(_kw_normalize(k) for k in raw if k)
+
+
+def _strip_nomination_event_outside_whitelist(rows: list[dict]) -> list[dict]:
+    """R42-BI (2026-05-11) — Filtre architectural famille `nomination_event`.
+
+    Pour les rows dont `source_id` n'est PAS dans
+    `_NOMINATION_EVENT_SOURCES` :
+      - Retire les keywords de famille nomination_event de `keywords`
+      - Retire `"nomination_event"` de `keyword_families`
+      - Si `keywords` devient vide → drop l'item (R39-K : pas d'item
+        visible sans keyword thématique).
+
+    Idempotent. Doit tourner TÔT dans le pipeline export, AVANT R41-A
+    (`_reroute_to_nominations`) — sinon les items hors whitelist seraient
+    reroutés à tort vers `nominations`.
+
+    Remplace en pratique R41-I (JORF), R42-AW (publications parlement)
+    et R42-BH (CR parlement) qui restent en place comme défense en
+    profondeur.
+    """
+    nom_kws_norm = _load_nomination_event_keyword_set()
+    if not nom_kws_norm:
+        return rows
+    from .keywords import _normalize as _kw_normalize
+    kept: list[dict] = []
+    stripped = 0
+    dropped = 0
+    for r in rows:
+        sid = (r.get("source_id") or "").strip()
+        if sid in _NOMINATION_EVENT_SOURCES:
+            kept.append(r)
+            continue
+        families = r.get("keyword_families") or []
+        if isinstance(families, str):
+            try:
+                families = json.loads(families)
+            except Exception:
+                families = []
+        if "nomination_event" not in families:
+            kept.append(r)
+            continue
+        # Source hors whitelist + nomination_event présent → strip.
+        kws = r.get("keywords") or []
+        if isinstance(kws, str):
+            try:
+                kws = json.loads(kws)
+            except Exception:
+                kws = []
+        new_kws = [k for k in kws if _kw_normalize(k) not in nom_kws_norm]
+        new_families = [f for f in families if f != "nomination_event"]
+        if not new_kws:
+            dropped += 1
+            continue
+        r["keywords"] = new_kws
+        r["keyword_families"] = new_families
+        stripped += 1
+        kept.append(r)
+    if stripped or dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "R42-BI : %d items hors whitelist dépouillés de nomination_event"
+            " (+%d drop sans keyword restant)",
+            stripped, dropped,
+        )
+    return kept
+
+
 def _filter_parlement_cr_nominations_only(rows: list[dict]) -> list[dict]:
     """R42-BH (2026-05-11) — Retire des comptes rendus parlementaires
     (catégorie `comptes_rendus`) les items dont le seul signal sport
@@ -3233,6 +3369,14 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # garde que les rapports officiels (AN + Sénat). Les actualités RSS
     # Sénat (senat_rss) sont exclues de ce bucket (cf. docstring).
     rows = _filter_parlement_publications(rows)
+    # R42-BI (2026-05-11) — Filtre architectural famille nomination_event :
+    # ne s'applique qu'aux sources de la whitelist `_NOMINATION_EVENT_SOURCES`
+    # (JORF + presse business sport + CNOSF/CPSF + Min Sports + ANS/FDSF +
+    # fédérations FFF/FFT/FFA). Sur les autres sources, retire les
+    # matches nomination_event et drop l'item si plus aucun keyword.
+    # DOIT tourner AVANT _reroute_to_nominations sinon des items hors
+    # whitelist seraient reroutés à tort.
+    rows = _strip_nomination_event_outside_whitelist(rows)
     # R41-A (2026-04-27) : items qui matchent la famille nomination_event
     # sont re-routés de `communiques` vers `nominations` pour exposer
     # les actes d'élection / nomination de présidents fédé / DG / DTN
