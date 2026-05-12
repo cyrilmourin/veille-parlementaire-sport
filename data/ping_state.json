@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-12T21:16:48+00:00",
+  "last_run_at": "2026-05-12T22:01:03+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419604B1560P0D1N000001",
@@ -1837,6 +1837,7 @@
       "an_dossiers_legislatifs::DLR5L17N54133",
       "an_dossiers_legislatifs::DLR5L17N54138",
       "an_dossiers_legislatifs::DLR5L17N54251",
+      "an_dossiers_legislatifs::DLR5L17N54317",
       "senat_akn_adoptions::pjl24-630",
       "senat_akn_depots::ppl25-533",
       "senat_dosleg::2000-627",
