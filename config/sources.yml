@@ -1061,6 +1061,29 @@ autorites:
       url: https://cnosf.franceolympique.com/sitemap.xml
       format: sitemap
       url_filter: ["/"]
+      # R42-BM (2026-05-12) — Le sitemap Drupal CNOSF touche le <lastmod>
+      # à chaque édition mineure, y compris sur les pages institutionnelles
+      # statiques (composition CAHN, charte olympique, conciliation…) qui
+      # remontent alors à tort comme « actualités fraîches ». Cas Cyril
+      # 2026-05-12 : /la-composition-de-la-conference-des-conciliateurs.
+      # Patterns d'URL rejetés au scrape (avant matching keyword).
+      # Note : les patterns sont matchés via `substring in url.lower()`.
+      # Patterns sans `/` initial = match plus large (n'importe où dans
+      # le slug). Avec `/` = match en début de path uniquement.
+      url_filter_exclude:
+        - "/organisation-"
+        - "/composition-"
+        - "/la-composition-"
+        - "/role-et-missions-"
+        - "/comment-saisir-"
+        - "/le-medicosport"
+        - "/comite-de-deontologie"
+        - "/la-charte-"
+        - "/documents-officiels"
+        - "cahn"             # CAHN partout (rôle, composition, athletes-rdv…)
+        - "chambre-arbitrale"  # chambre arbitrale du sport partout
+        - "conciliation"     # conciliation/conciliateurs (saisir, conférence…)
+        - "conciliateur"
       # R22e-2 (2026-04-23) : sitemap sans chapo → enrichissement meta
       # description pour que le matcher ait autre chose que le slug reconstitué.
       fetch_meta: true

@@ -391,6 +391,14 @@ def _from_sitemap_generic(src: dict) -> list[Item]:
     url_filter_patterns = src.get("url_filter") or [
         "actualites", "actualite", "actu-", "news", "communique", "presse",
     ]
+    # R42-BM (2026-05-12) — patterns d'EXCLUSION : si l'URL matche un de
+    # ces patterns, l'item est rejeté quel que soit son lastmod. Utilisé
+    # pour CNOSF (sitemap Drupal qui touche le lastmod des pages
+    # institutionnelles statiques — composition CAHN, charte olympique,
+    # comment-saisir-la-conciliation… — qui apparaissent à tort comme
+    # « actualités fraîches »). Cas Cyril 2026-05-12 :
+    # /la-composition-de-la-conference-des-conciliateurs.
+    url_filter_exclude = src.get("url_filter_exclude") or []
     # R22c (2026-04-23) : certaines sources (CNOSF/Drupal) publient un
     # sitemap avec <loc> en protocol-relative (`domaine.tld/slug`, sans
     # https://). On détecte et préfixe `https://` pour obtenir une URL
@@ -412,6 +420,9 @@ def _from_sitemap_generic(src: dict) -> list[Item]:
         # Filtre : doit matcher au moins un pattern "actualité-like".
         low = loc.lower()
         if not any(p in low for p in url_filter_patterns):
+            continue
+        # R42-BM : rejet si l'URL matche un pattern d'exclusion.
+        if url_filter_exclude and any(p in low for p in url_filter_exclude):
             continue
         last = parse_iso((url_node.findtext("s:lastmod", namespaces=ns) or "").strip())
         # R22c : skip si pas de lastmod (évite d'ingérer les pages racines,
