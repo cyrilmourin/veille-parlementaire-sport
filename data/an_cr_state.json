@@ -80,7 +80,7 @@
       "scanned": []
     },
     "cion-dvp": {
-      "last_num": 46,
+      "last_num": 47,
       "scanned": [
         1,
         2,
@@ -121,11 +121,12 @@
         39,
         40,
         41,
-        46
+        46,
+        47
       ]
     },
     "cion-eco": {
-      "last_num": 85,
+      "last_num": 86,
       "scanned": [
         1,
         2,
@@ -210,7 +211,8 @@
         81,
         82,
         83,
-        85
+        85,
+        86
       ]
     },
     "cion-etran": {
