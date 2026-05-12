@@ -104,7 +104,8 @@
           {{ with .Params.keywords }}
             <div class="dosleg-card__kws">
               {{ $fam := "" }}{{ with $.Params.families }}{{ $fam = index . 0 }}{{ end }}
-              {{ range first 8 . }}<span class="kw-tag"{{ with $fam }} data-family="{{ . }}"{{ end }}>{{ . }}</span>{{ end }}
+              {{/* R42-BN (2026-05-12) : 8 → 3 keywords max sur les cards (allège l'affichage) */}}
+              {{ range first 3 . }}<span class="kw-tag"{{ with $fam }} data-family="{{ . }}"{{ end }}>{{ . }}</span>{{ end }}
             </div>
           {{ end }}
 

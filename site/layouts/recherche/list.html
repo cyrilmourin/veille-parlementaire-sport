@@ -141,7 +141,9 @@
       const title = r.u
         ? '<a href="' + escapeHTML(r.u) + '" rel="noopener" target="_blank">' + escapeHTML(r.t) + '</a>'
         : escapeHTML(r.t);
-      const kws = (r.k || []).slice(0, 6).map(k =>
+      // R42-BN (2026-05-12) : 3 keywords max affichés (Cyril : alléger
+      // les cards). Cohérent avec les listings catégorie côté Hugo.
+      const kws = (r.k || []).slice(0, 3).map(k =>
         '<span class="kw-tag">' + escapeHTML(k) + '</span>'
       ).join(' ');
       const summary = r.s ? '<p class="search-snippet">' + escapeHTML(r.s) + '&hellip;</p>' : '';

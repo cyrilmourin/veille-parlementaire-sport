@@ -134,14 +134,15 @@
 
         {{ with .Params.snippet }}<div class="snippet-inline">« {{ . }} »</div>{{ end }}
 
+        {{/* R42-BN (2026-05-12) : 8 → 3 keywords max sur les cards */}}
         {{ with .Params.families }}{{ $fam := index . 0 }}{{ with $.Params.keywords }}
           <div class="dosleg-card__kws">
-            {{ range first 8 . }}<span class="kw-tag" data-family="{{ $fam }}">{{ . }}</span>{{ end }}
+            {{ range first 3 . }}<span class="kw-tag" data-family="{{ $fam }}">{{ . }}</span>{{ end }}
           </div>
         {{ end }}{{ end }}
         {{ if not .Params.families }}{{ with .Params.keywords }}
           <div class="dosleg-card__kws">
-            {{ range first 8 . }}<span class="kw-tag">{{ . }}</span>{{ end }}
+            {{ range first 3 . }}<span class="kw-tag">{{ . }}</span>{{ end }}
           </div>
         {{ end }}{{ end }}
 

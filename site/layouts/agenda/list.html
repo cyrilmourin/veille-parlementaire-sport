@@ -90,7 +90,8 @@
           {{ with .Params.keywords }}
             <span class="meta-tags">
               {{ $fam := "" }}{{ with $.Params.families }}{{ $fam = index . 0 }}{{ end }}
-              {{ range first 8 . }}<span class="kw-tag"{{ with $fam }} data-family="{{ . }}"{{ end }}>{{ . }}</span>{{ end }}
+              {{/* R42-BN (2026-05-12) : 8 → 3 keywords max sur les cards */}}
+              {{ range first 3 . }}<span class="kw-tag"{{ with $fam }} data-family="{{ . }}"{{ end }}>{{ . }}</span>{{ end }}
             </span>
           {{ end }}
         </div>
@@ -134,7 +135,8 @@
           {{ with .Params.keywords }}
             <span class="meta-tags">
               {{ $fam := "" }}{{ with $.Params.families }}{{ $fam = index . 0 }}{{ end }}
-              {{ range first 8 . }}<span class="kw-tag"{{ with $fam }} data-family="{{ . }}"{{ end }}>{{ . }}</span>{{ end }}
+              {{/* R42-BN (2026-05-12) : 8 → 3 keywords max sur les cards */}}
+              {{ range first 3 . }}<span class="kw-tag"{{ with $fam }} data-family="{{ . }}"{{ end }}>{{ . }}</span>{{ end }}
             </span>
           {{ end }}
         </div>

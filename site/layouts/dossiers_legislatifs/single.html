@@ -25,7 +25,8 @@
 
   {{ with .Params.keywords }}
     <div class="kw-list">
-      {{ range . }}<span class="kw-tag">{{ . }}</span>{{ end }}
+      {{/* R42-BN (2026-05-12) : 3 keywords max sur les pages détail */}}
+      {{ range first 3 . }}<span class="kw-tag">{{ . }}</span>{{ end }}
     </div>
   {{ end }}
 
