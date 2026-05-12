@@ -32,24 +32,11 @@ class TestNominal:
     def test_jorf_7j(self):
         assert _window_for("jorf") == 7
 
-    def test_an_rapports_15j(self):
-        assert _window_for("communiques", source_id="an_rapports") == 15
-
-    def test_senat_rapports_15j(self):
-        assert _window_for("communiques", source_id="senat_rapports") == 15
-
-    def test_an_rapports_information_15j(self):
-        """R42-AJ : extension scraper aux RINF couverte aussi par les
-        fenêtres dynamiques."""
-        assert _window_for("communiques", source_id="an_rapports_information") == 15
-
-    def test_an_avis_15j(self):
-        assert _window_for("communiques", source_id="an_avis") == 15
-
-    def test_source_id_prime_sur_category(self):
-        """an_rapports a source_id-dyn (15j), pas la fenêtre statique
-        communiques (90j)."""
-        assert _window_for("communiques", source_id="an_rapports") == 15
+    # R42-BS (2026-05-13) — tests retirés : les rapports parlementaires
+    # ont été sortis de la dynamique nominale 15j car le volume est trop
+    # faible (Cyril a constaté la disparition quasi totale des
+    # publications parlementaires). Ils repassent sur la fenêtre statique
+    # 730j (cf. test_r42bs_chamber_bypass_window_excludes.py).
 
     def test_non_dynamic_categorie_garde_fenetre_statique(self):
         """Catégorie non listée (ex. communiques pour une source non
@@ -73,11 +60,8 @@ class TestFull:
     def test_jorf_90j(self):
         assert _window_for("jorf") == 90
 
-    def test_an_rapports_730j(self):
-        assert _window_for("communiques", source_id="an_rapports") == 730
-
-    def test_senat_rapports_730j(self):
-        assert _window_for("communiques", source_id="senat_rapports") == 730
+    # R42-BS : tests an_rapports/senat_rapports retirés (sortis de la
+    # dynamique). Voir test_r42bs_chamber_bypass_window_excludes.py.
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +72,6 @@ def test_run_mode_absent_default_nominal(monkeypatch):
     monkeypatch.delenv("RUN_MODE", raising=False)
     assert _window_for("comptes_rendus") == 15
     assert _window_for("jorf") == 7
-    assert _window_for("communiques", source_id="an_rapports") == 15
 
 
 # ---------------------------------------------------------------------------
@@ -103,15 +86,12 @@ def test_dyn_categories_definies():
         assert n < f, f"{cat} nominal={n} >= full={f}"
 
 
-def test_dyn_sources_definies():
-    """Tous les types de rapports parlementaires R42-AJ/AK couverts."""
-    for sid in ("an_rapports", "an_rapports_information", "an_avis",
-                "an_rapports_application_loi", "an_rapports_information_ce",
-                "senat_rapports"):
-        assert sid in _DYNAMIC_WINDOWS_BY_SOURCE_ID, f"{sid} absent dyn"
-    # nominal < full
+def test_dyn_sources_invariant():
+    """R42-BS : le mapping `_DYNAMIC_WINDOWS_BY_SOURCE_ID` est vide
+    désormais (les rapports parlementaires en sont sortis). On garde
+    juste l'invariant nominal < full au cas où on en rajouterait."""
     for sid, (n, f) in _DYNAMIC_WINDOWS_BY_SOURCE_ID.items():
-        assert n < f
+        assert n < f, f"{sid} nominal={n} >= full={f}"
 
 
 # ---------------------------------------------------------------------------

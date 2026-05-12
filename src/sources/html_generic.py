@@ -108,7 +108,9 @@ def _from_min_sports_igesr_html(src: dict) -> list[Item]:
         log.warning("HTML KO %s : %s", src["id"], e)
         return []
     soup = BeautifulSoup(html, "html.parser")
-    chamber = src.get("chamber", "MinSports")
+    # R42-BS (2026-05-13) : défaut IGESR — les rapports listés sont des
+    # productions de l'Inspection générale, MinSports n'est que l'hôte.
+    chamber = src.get("chamber", "IGESR")
     seen: set[str] = set()
     out: list[Item] = []
     for a in soup.find_all("a", href=True):

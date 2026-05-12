@@ -91,9 +91,12 @@ BYPASS_KEYWORDS_SOURCES: set[str] = {
     "afld",
     "min_sports_actualites",
     "min_sports_presse",
-    # R42-BJ (2026-05-11) — rapports IGESR sport agrégés par MinSports,
-    # page éditorialement filtrée champ du sport. Bypass justifié.
-    "min_sports_igesr",
+    # R42-BS (2026-05-13) — retrait de `min_sports_igesr` du bypass : Cyril
+    # ne veut pas du badge « ⊕ Source institutionnelle (flux complet) » sur
+    # les cards IGESR. Le titre + description des rapports IGESR sport
+    # contiennent quasi systématiquement des keywords sport explicites
+    # (« sport-santé », « sport scolaire », « olympique », noms de fédés,
+    # etc.) → le matching standard les capte sans le filet bypass.
 }
 BYPASS_KEYWORD_LABEL = "(flux complet)"
 

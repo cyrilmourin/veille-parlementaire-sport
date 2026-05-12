@@ -296,6 +296,15 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
   +19 tests R42-BI. 1149 → 1168 verts.
 
+- 2026-05-13 (matin, retours Cyril Publications) : **R42-BS**. 4 fixes.
+
+  1. **Chamber IGESR** : `min_sports_igesr` sortait en `chamber: MinSports`. Cyril : « le cartouche pour l'IGESR est MIN SPORT, je souhaite que ce soit IGESR ». Bascule sur `chamber: IGESR` (config YAML + défaut handler).
+  2. **Retrait bypass keyword IGESR** : Cyril : « je ne veux pas voir apparaitre ⊕ Source institutionnelle (flux complet) dans les occurrences de l'IGESR ». Sortie de `min_sports_igesr` de `BYPASS_KEYWORDS_SOURCES`. Les rapports IGESR sport ont quasi systématiquement des keywords sport explicites dans leur titre (« sport-santé », « sport scolaire », noms de fédés…) → matching standard suffit.
+  3. **Publications parlementaires disparues** : R42-AE avait posé la fenêtre nominale 15j sur les 6 sources rapports parlementaires (an_rapports, senat_rapports, an_avis, an_rapports_information, an_rapports_application_loi, an_rapports_information_ce). Vérif live : 0 rapport AN + 1 seul rapport Sénat (lien interne d'un autre item) visible côté `/items/communiques/`. Volume trop faible et cycle trop long pour 15j. Retrait du `_DYNAMIC_WINDOWS_BY_SOURCE_ID` → repassage sur la fenêtre statique 730j en permanence.
+  4. **CNOSF lien institutionnel récurrent** : R42-BM filtrait au scrape mais ne purgeait pas les items déjà ingérés (`/la-composition-de-la-conference-des-conciliateurs` était en DB depuis avant R42-BM). Nouveau filtre symétrique `_filter_excluded_sitemap_urls` côté export qui applique RÉTROACTIVEMENT les patterns `url_filter_exclude` du YAML aux items legacy. Pas de purge nécessaire : retirer un pattern du YAML les fait réapparaître au prochain build (cohérent avec `_filter_blocklist` et `_filter_disabled_sources`).
+
+  +10 tests R42-BS, ajustement -7 tests R42-AE (rapports parlementaires sortis de la dyn). 1238 → 1241 verts.
+
 - 2026-05-12 (nuit, INSEP) : **R42-BR**. Bascule INSEP en scraping HTML.
 
   Cyril 2026-05-12 : « les flux INSEP ne marchent pas bien, ils sont pas actualisés. On ne peut pas scraper la page d'actualité : https://www.insep.fr/fr/actualites ». Le RSS `/fr/actualites.xml` n'est plus mis à jour côté source, et le proxy Cloudflare R42-BO est inopérant (HTTP 418 systématique). Test live confirme : curl_cffi + TLS Chrome 120 sur le path HTML `/fr/actualites` répond HTTP 200 depuis poste local (8 articles).

@@ -1325,13 +1325,14 @@ _DYNAMIC_WINDOWS_BY_CATEGORY: dict[str, tuple[int, int]] = {
     "jorf": (7, 90),
 }
 _DYNAMIC_WINDOWS_BY_SOURCE_ID: dict[str, tuple[int, int]] = {
-    # Rapports parlementaires (AN + Sénat + R42-AJ/AK nouveaux types).
-    "an_rapports": (15, 730),
-    "an_rapports_information": (15, 730),
-    "an_avis": (15, 730),
-    "an_rapports_application_loi": (15, 730),
-    "an_rapports_information_ce": (15, 730),
-    "senat_rapports": (15, 730),
+    # R42-BS (2026-05-13) — Les rapports parlementaires ont été RETIRÉS
+    # de la dynamique nominale 15j : volume trop faible (1-3/mois côté
+    # scope sport) pour justifier un cutoff aussi serré, et Cyril a
+    # constaté la disparition quasi totale des publications parlementaires
+    # de la page Publications. Ils repassent désormais sur la fenêtre
+    # statique 730j (cf. `WINDOW_DAYS_BY_SOURCE_ID`) en permanence.
+    # Le mapping reste vide mais conservé pour pouvoir y rajouter
+    # ultérieurement des sources si besoin sans modifier la signature.
 }
 
 
@@ -1626,6 +1627,88 @@ def _load_disabled_source_ids(config_path: str = "config/sources.yml") -> set[st
                 if isinstance(sid, str) and sid.strip():
                     disabled.add(sid.strip())
     return disabled
+
+
+def _load_url_filter_exclude_by_source(
+    config_path: str = "config/sources.yml",
+) -> dict[str, list[str]]:
+    """R42-BS (2026-05-13) — retourne, par `source_id`, la liste des
+    patterns `url_filter_exclude` déclarés en config.
+
+    Motivation : R42-BM filtre les URLs au SCRAPE (rejet d'items qui
+    matchent un pattern d'exclusion AVANT ingestion), mais les items déjà
+    en DB depuis un run antérieur n'étaient pas purgés. Cyril
+    (2026-05-13) : la page CNOSF
+    `/la-composition-de-la-conference-des-conciliateurs` continue à
+    remonter en haut du flux car ingérée avant l'ajout du filtre.
+
+    Symétrique à `_filter_blocklist` (R39-O) et
+    `_filter_disabled_sources` (R22b) — applique RÉTROACTIVEMENT côté
+    export les exclusions YAML pour qu'un ajout dans
+    `url_filter_exclude` masque immédiatement les items historiques sans
+    nécessiter un reset_category.
+    """
+    try:
+        import yaml
+        with open(config_path, "r", encoding="utf-8") as fp:
+            cfg = yaml.safe_load(fp) or {}
+    except Exception:
+        return {}
+    out: dict[str, list[str]] = {}
+    if not isinstance(cfg, dict):
+        return out
+    for group in cfg.values():
+        if not isinstance(group, dict):
+            continue
+        for src in (group.get("sources") or []):
+            if not isinstance(src, dict):
+                continue
+            patterns = src.get("url_filter_exclude")
+            if not patterns:
+                continue
+            sid = src.get("id")
+            if not isinstance(sid, str) or not sid.strip():
+                continue
+            normalized = [str(p).strip().lower() for p in patterns if p]
+            if normalized:
+                out[sid.strip()] = normalized
+    return out
+
+
+def _filter_excluded_sitemap_urls(rows: list[dict]) -> list[dict]:
+    """R42-BS (2026-05-13) — applique RÉTROACTIVEMENT les patterns
+    `url_filter_exclude` du YAML aux items déjà en DB.
+
+    Critère : si l'item appartient à une source qui déclare des patterns
+    d'exclusion et que son URL (lowercase) en contient au moins un, on
+    masque l'item. Match substring `in` — cohérent avec le filtre côté
+    scrape (`_from_sitemap_generic` ligne 607).
+
+    Idempotent. Aucun effet sur les sources sans `url_filter_exclude`.
+    """
+    exclude_by_sid = _load_url_filter_exclude_by_source()
+    if not exclude_by_sid:
+        return rows
+    kept: list[dict] = []
+    dropped = 0
+    for r in rows:
+        sid = (r.get("source_id") or "").strip()
+        patterns = exclude_by_sid.get(sid)
+        if not patterns:
+            kept.append(r)
+            continue
+        url_low = (r.get("url") or "").lower()
+        if any(p in url_low for p in patterns):
+            dropped += 1
+            continue
+        kept.append(r)
+    if dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "R42-BS : %d items masqués via url_filter_exclude rétroactif",
+            dropped,
+        )
+    return kept
 
 
 def _reroute_to_nominations(rows: list[dict]) -> list[dict]:
@@ -3426,6 +3509,11 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # depuis config/blocklist.yml. Filtre à l'export uniquement, items
     # restent en DB → retirer une entrée les fait réapparaître au build.
     rows = _filter_blocklist(rows)
+    # R42-BS (2026-05-13) : applique rétroactivement les patterns
+    # `url_filter_exclude` du YAML aux items déjà en DB (un ajout de
+    # pattern post-ingestion ne purgeait pas les anciens items — Cyril a
+    # constaté le retour d'une page CNOSF institutionnelle malgré R42-BM).
+    rows = _filter_excluded_sitemap_urls(rows)
     # R28 (2026-04-23) : dans la famille parlement x publications, on ne
     # garde que les rapports officiels (AN + Sénat). Les actualités RSS
     # Sénat (senat_rss) sont exclues de ce bucket (cf. docstring).

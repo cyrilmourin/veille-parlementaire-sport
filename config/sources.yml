@@ -652,7 +652,10 @@ ministeres:
       category: communiques
       url: https://www.sports.gouv.fr/rapports-de-l-igesr-dans-le-champ-du-sport-1703
       format: min_sports_igesr_html
-      chamber: MinSports
+      # R42-BS (2026-05-13) — chamber: IGESR (et non MinSports) : ces
+      # rapports sont des productions de l'Inspection générale, MinSports
+      # ne fait que les héberger. Cyril veut le cartouche IGESR sur les cards.
+      chamber: IGESR
       impersonate: true
       # R42-BO : sports.gouv.fr/rapports-de-l-igesr → ConnectTimeout côté GHA
       proxy: cloudflare
