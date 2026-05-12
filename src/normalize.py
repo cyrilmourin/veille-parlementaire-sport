@@ -46,7 +46,7 @@ ROUTER: list[tuple[Callable[[dict, dict], bool], Callable[[dict], list[Item]]]] 
     # dédié, cf. `min_sports.py`). Route par format pour rester dans
     # le groupe `ministeres` sans forker la topologie YAML.
     (
-        lambda group, src: src.get("format", "").startswith("min_sports_"),
+        lambda group, src: src.get("format", "").startswith("min_sports_agenda_"),
         min_sports.fetch_source,
     ),
     # R28 (2026-04-23) — Rapports AN scrappés depuis la page HTML de

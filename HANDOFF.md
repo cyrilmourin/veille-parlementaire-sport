@@ -296,6 +296,23 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
   +19 tests R42-BI. 1149 → 1168 verts.
 
+- 2026-05-12 (soir, validation R42-BO en prod) : **R42-BP**. Fix router min_sports_*.
+
+  Daily nominal post-R42-BO confirme que le proxy CF fonctionne : info_gouv_actualites 20 items (vs 0), min_education 2, min_interieur 18, soit **40 items récupérés** sur des sources auparavant entièrement bloquées par WAF GHA.
+
+  Mais 4/7 sources restent KO via le proxy, pour 2 causes distinctes :
+
+  1) **Bug router découvert sur `min_sports_igesr`** : la règle `src.normalize.ROUTER` envoyait TOUT format commençant par `min_sports_` à `min_sports.fetch_source`, qui ne gère pourtant que `min_sports_agenda_hebdo`. Conséquence : `min_sports_igesr_html` tombait dans la branche WARNING « format non géré » et renvoyait 0 items — alors que le handler `_from_min_sports_igesr_html` existe bel et bien dans `html_generic.py` (R42-BJ). Fix : restreindre le predicate à `min_sports_agenda_`. +3 tests non-régression dans `test_r42bp_router_min_sports_scope.py`.
+
+  2) **Limites côté origine, indépendantes du proxy** (à traiter ultérieurement) :
+     - `insep` : HTTP 418 « I'm a teapot » — refus volontaire du site Drupal INSEP, probablement filtre IPs Cloudflare (anti-scraping spécifique aux ranges CF).
+     - `injep_sport_publications` : HTTP 522 (timeout origine → CF). Site lent, probablement bloqué côté firewall sur les ranges CF aussi.
+     - `ccomptes_publications` : HTTP 522 (timeout origine → CF). Idem.
+
+     Ces 3 sources nécessitent une autre stratégie qu'un simple proxy IP-rotation : soit changer de pool d'IPs proxy (Workers payant ? IPs résidentielles ?), soit trouver des sources alternatives (data.gouv ? Légifrance ? RSS tiers ?).
+
+  1220 → 1223 tests verts. SYSTEM_VERSION_LABEL pas bumpé (cycle R42 toujours en cours).
+
 - 2026-05-12 (après-midi, suite TODO list + WAF stricts résolus) : **R42-BM + R42-BN + R42-BO**.
 
   **R42-BM — `url_filter_exclude` pour scraper sitemap_generic.**
