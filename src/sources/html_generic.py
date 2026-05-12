@@ -316,6 +316,99 @@ def _from_ccomptes_publications_html(src: dict) -> list[Item]:
     return out
 
 
+def _from_insep_actualites_html(src: dict) -> list[Item]:
+    """R42-BR (2026-05-12) — Handler page INSEP actualités HTML.
+
+    URL : https://www.insep.fr/fr/actualites
+
+    Pourquoi pas le RSS : le flux `actualites.xml` n'était plus actualisé
+    côté INSEP (constat Cyril 2026-05-12). Et le proxy Cloudflare R42-BO
+    ne passe pas (HTTP 418 « I'm a teapot » systématique côté INSEP dès
+    qu'il détecte une IP CF Worker — anti-scraping volontaire reproductible
+    aussi depuis poste local via le worker). curl_cffi + TLS Chrome 120
+    sur le path HTML `/fr/actualites` répond HTTP 200 depuis poste local —
+    on espère pareil côté GHA (test conditionnel à valider au 1er daily).
+
+    Structure HTML (Drupal INSEP) :
+      - `<article class="news-block__item ...">`
+      - chaque article : `<a href="/fr/actualites/<slug>"><h2/h3>Titre</h2></a>`
+      - PAS de `<time>` au niveau du listing → on fetche chaque page
+        individuelle pour récupérer le `<time datetime="YYYY-MM-DD">`
+        (8 articles par page, +8 fetches = ~5-8 sec/run, acceptable).
+
+    Sans date détaillée disponible, on retourne `published_at=None` et le
+    fallback `inserted_at` du pipeline gérera le tri (cohérent avec d'autres
+    sources sans date — cf. `WINDOW_DAYS_BY_*` en non-strict).
+    """
+    impersonate = bool(src.get("impersonate", True))  # défaut True : INSEP exige TLS Chrome
+    via_proxy = (src.get("proxy") or "").lower() == "cloudflare"
+    try:
+        html = fetch_text(src["url"], impersonate=impersonate, via_proxy=via_proxy)
+    except Exception as e:
+        log.warning("HTML KO %s : %s", src["id"], e)
+        return []
+    soup = BeautifulSoup(html, "html.parser")
+    chamber = src.get("chamber", "INSEP")
+    out: list[Item] = []
+    seen: set[str] = set()
+    # Listing : <article class="news-block__item ...">. On capte le 1er <a>
+    # interne pointant vers une page actualité (`/fr/actualites/<slug>`).
+    for art in soup.find_all("article", class_=lambda c: c and "news-block__item" in c):
+        a = art.find("a", href=lambda h: h and "/fr/actualites/" in h)
+        if not a:
+            continue
+        href = a["href"].strip()
+        url_abs = href if href.startswith("http") else urljoin(src["url"], href)
+        if url_abs in seen or url_abs.rstrip("/").endswith("/actualites"):
+            continue
+        seen.add(url_abs)
+        # Titre : heading dédié si présent, sinon texte du lien.
+        heading = art.find(["h1", "h2", "h3"])
+        title = (heading.get_text(" ", strip=True) if heading
+                 else a.get_text(" ", strip=True))
+        if not title or len(title) < 10:
+            continue
+        # Date : fetch de la page individuelle. Coût ~1s × 8 articles.
+        # Le pipeline keyword aval matchera sur titre + summary (les cards
+        # listing exposent aussi un résumé court qu'on capte plus loin).
+        published_at: datetime | None = None
+        try:
+            page = fetch_text(url_abs, impersonate=impersonate, via_proxy=via_proxy)
+            page_soup = BeautifulSoup(page, "html.parser")
+            time_el = page_soup.find("time")
+            if time_el and time_el.get("datetime"):
+                published_at = parse_iso(time_el["datetime"])
+        except Exception as e:
+            log.debug("INSEP date fetch KO %s : %s", url_abs, e)
+        # Tags/catégories (Réseau international, Laboratoire SEP, Médical…)
+        # — affichés sur la card listing, captés pour le summary.
+        summary_bits: list[str] = []
+        for tag_a in art.find_all("a", href=lambda h: h and "/taxonomy/term/" in h):
+            t = tag_a.get_text(" ", strip=True)
+            if t:
+                summary_bits.append(t)
+        # Résumé : chercher un <p> ou texte introductif court dans l'article.
+        intro = art.find("p")
+        if intro:
+            intro_text = intro.get_text(" ", strip=True)
+            if intro_text and intro_text not in summary_bits:
+                summary_bits.append(intro_text[:200])
+        summary = " — ".join(summary_bits)[:500]
+        out.append(Item(
+            source_id=src["id"],
+            uid=url_abs[:200],
+            category=src["category"],
+            chamber=chamber,
+            title=title[:220],
+            url=url_abs,
+            published_at=published_at,
+            summary=summary,
+            raw={"path": "insep_actualites_html"},
+        ))
+    log.info("%s : %d actualités INSEP extraites", src["id"], len(out))
+    return out
+
+
 def _from_ans_rss(src: dict) -> list[Item]:
     """R42-BG (2026-05-11) — Handler dédié au RSS Drupal de l'ANS
     (agencedusport.fr/flux-rss). 3 spécificités vs RSS standard :
@@ -875,6 +968,8 @@ def fetch_source(src: dict) -> list[Item]:
         return _from_injep_sport_publications_html(src)
     if fmt == "ccomptes_publications_html":
         return _from_ccomptes_publications_html(src)
+    if fmt == "insep_actualites_html":
+        return _from_insep_actualites_html(src)
     if fmt == "sitemap":
         return _from_sitemap_generic(src)
 

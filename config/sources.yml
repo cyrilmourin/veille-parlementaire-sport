@@ -934,12 +934,15 @@ autorites:
     # min_sports_presse, min_sports_actualites).
     - id: insep
       category: communiques
-      url: https://www.insep.fr/fr/actualites.xml
-      format: rss
-      # R42-BB (2026-05-11) — insep.fr renvoie HTTP 418 (« I'm a teapot »
-      # = signal anti-bot) sur les IPs GHA. curl_cffi + TLS Chrome 120
-      # débloque (handler RSS étendu pour propager le param).
-      # R42-BO (2026-05-12) — impersonate insuffisant côté GHA, proxy CF.
+      # R42-BR (2026-05-12) — RSS `actualites.xml` côté INSEP n'est plus
+      # actualisé (constat Cyril). Et proxy Cloudflare R42-BO inopérant :
+      # INSEP répond HTTP 418 « I'm a teapot » dès qu'il détecte une IP
+      # CF Worker (reproductible aussi depuis poste local via le worker).
+      # Bascule sur le scraping HTML direct du listing /fr/actualites
+      # avec curl_cffi + TLS Chrome 120 — répond 200 depuis poste local.
+      # Pari : ça marche aussi depuis IPs GHA. Si non, soft-fail (0 items).
+      url: https://www.insep.fr/fr/actualites
+      format: insep_actualites_html
       impersonate: true
       proxy: cloudflare
       poids: 3

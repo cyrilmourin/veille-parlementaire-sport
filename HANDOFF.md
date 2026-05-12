@@ -296,6 +296,20 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
   +19 tests R42-BI. 1149 → 1168 verts.
 
+- 2026-05-12 (nuit, INSEP) : **R42-BR**. Bascule INSEP en scraping HTML.
+
+  Cyril 2026-05-12 : « les flux INSEP ne marchent pas bien, ils sont pas actualisés. On ne peut pas scraper la page d'actualité : https://www.insep.fr/fr/actualites ». Le RSS `/fr/actualites.xml` n'est plus mis à jour côté source, et le proxy Cloudflare R42-BO est inopérant (HTTP 418 systématique). Test live confirme : curl_cffi + TLS Chrome 120 sur le path HTML `/fr/actualites` répond HTTP 200 depuis poste local (8 articles).
+
+  Pari : ça marche aussi depuis IPs GHA. Si non, soft-fail (0 items) — à confirmer au 1er daily post-push.
+
+  Handler `_from_insep_actualites_html` dans `html_generic.py` :
+  - Parse `<article class="news-block__item">` (8/page)
+  - Pour chaque article, fetch la page individuelle pour extraire `<time datetime="YYYY-MM-DD">` (la date n'est pas exposée sur le listing).
+  - Tags taxonomy + intro `<p>` → summary
+  - Coût total : 1 + 8 = 9 fetches/run, ~5-8 sec. Acceptable.
+
+  YAML : url = `/fr/actualites`, format = `insep_actualites_html`, `impersonate: true`, retiré `proxy: cloudflare`. +7 tests. 1231 → 1238.
+
 - 2026-05-12 (soir, suite validation R42-BO) : **R42-BQ**. Retry proxy CF + CCOMPTES sport ciblé.
 
   **Retry tenacity sur `_fetch_bytes_via_proxy`.** Test live démontre que les HTTP 522 (timeout origine → CF Worker) observés sur INJEP et CCOMPTES dans le run R42-BO étaient transitoires : depuis le poste local via le même worker, les 2 sites répondent 200. Ajout de 3 tentatives tenacity (`wait_exponential 2-10s`) en réutilisant `_is_retryable` (5xx oui, 4xx non — l'INSEP HTTP 418 « I'm a teapot » est un refus volontaire qu'on ne retry pas).

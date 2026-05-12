@@ -61,6 +61,9 @@ _KNOWN_FORMATS = {
     # R42-BQ (2026-05-12) — page Cour des comptes filtrée thématique sport
     # (Drupal listing, `<a><h2 class='title'>` + `<time datetime>`).
     "ccomptes_publications_html",
+    # R42-BR (2026-05-12) — page INSEP /fr/actualites scrapée en HTML
+    # avec curl_cffi (RSS obsolète, proxy CF bloqué 418).
+    "insep_actualites_html",
 }
 
 
@@ -152,23 +155,24 @@ def test_dispatch_covers_all_enabled_sources(cfg):
 def test_r23ij_insep_fdsf_present(cfg):
     """R23-I + R23-J (2026-04-23) — opérateurs et fondations sport ajoutés.
 
-    - INSEP : établissement public MinSports, flux RSS Drupal /fr/actualites.xml,
-      poids 3 (cœur de cible).
+    - INSEP : établissement public MinSports. R42-BR (2026-05-12) bascule
+      du RSS `/fr/actualites.xml` (obsolète côté source) vers le scraping
+      HTML du listing `/fr/actualites` via curl_cffi.
     - FDSF  : fondation reconnue d'utilité publique adossée au CNOSF, flux
       RSS Squarespace via ?format=rss sur le blog /web/fsf/actualites.
 
     Garde-fou : régression si l'un est désactivé ou si quelqu'un change
-    l'URL sans vérifier. Les deux doivent rester en `format: rss` (pas
-    scrape HTML — le RSS officiel est beaucoup plus fiable).
+    l'URL sans vérifier.
     """
     by_id = {s["id"]: s for _g, s in _iter_sources(cfg)}
     assert "insep" in by_id, "source insep manquante (R23-I)"
     assert "fdsf" in by_id, "source fdsf manquante (R23-J)"
     insep = by_id["insep"]
     fdsf = by_id["fdsf"]
-    assert insep.get("format") == "rss", (
-        "insep doit rester en format rss (/fr/actualites.xml est un RSS "
-        "Drupal natif, pas besoin de scrape HTML)"
+    assert insep.get("format") == "insep_actualites_html", (
+        "insep doit être en format insep_actualites_html (R42-BR : le RSS "
+        "/fr/actualites.xml n'est plus actualisé côté source, scrape HTML "
+        "du listing /fr/actualites via curl_cffi)"
     )
     assert fdsf.get("format") == "rss", (
         "fdsf doit rester en format rss (?format=rss est le feed Squarespace "
@@ -176,10 +180,9 @@ def test_r23ij_insep_fdsf_present(cfg):
     )
     assert insep.get("enabled", True) is not False, "insep désactivé"
     assert fdsf.get("enabled", True) is not False, "fdsf désactivé"
-    # L'URL INSEP DOIT finir par .xml (c'est le suffixe magique Drupal
-    # Views pour export RSS — /fr/actualites tout court renvoie le HTML).
-    assert insep["url"].endswith(".xml"), (
-        f"insep URL doit finir par .xml : {insep['url']!r}"
+    # L'URL INSEP doit pointer sur le listing HTML /fr/actualites (sans .xml).
+    assert insep["url"].rstrip("/").endswith("/fr/actualites"), (
+        f"insep URL doit pointer sur /fr/actualites (HTML) : {insep['url']!r}"
     )
     # L'URL FDSF DOIT contenir `?format=rss` (suffixe magique Squarespace).
     assert "format=rss" in fdsf["url"], (
