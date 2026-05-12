@@ -296,6 +296,31 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
   +19 tests R42-BI. 1149 → 1168 verts.
 
+- 2026-05-12 (après-midi, suite TODO list + WAF stricts résolus) : **R42-BM + R42-BN + R42-BO**.
+
+  **R42-BM — `url_filter_exclude` pour scraper sitemap_generic.**
+  Cyril 2026-05-12 : « occurrence ancienne CNOSF en dernière actu »
+  (`/la-composition-de-la-conference-des-conciliateurs`). Le sitemap Drupal CNOSF met à jour `<lastmod>` à chaque édition mineure, y compris sur les pages institutionnelles statiques (composition CAHN, charte olympique, conciliation…) qui remontent à tort comme « actualités fraîches ». Nouveau paramètre yaml `url_filter_exclude` dans `_from_sitemap_generic` (patterns d'exclusion `in url.lower()`). Config CNOSF : 13 patterns d'exclusion. +4 tests.
+
+  **R42-BN — Limite à 3 keywords affichés par card partout.**
+  Cyril : « pour ne pas trop alourdir les affichages, limite à 3 le nombre de mots-clés qui apparaissent visuellement pour chaque occurrence ». 7 templates Hugo patchés : `comptes_rendus/list.html`, `_default/list.html`, `_default/single.html`, `dossiers_legislatifs/list.html` (×2), `dossiers_legislatifs/single.html`, `agenda/list.html` (×2), `recherche/list.html` JS. Limites précédentes : 8 ou 12 selon les pages. Pas d'impact DB/matching — strictement affichage. Déployable via quick_rebuild.
+
+  **R42-BO — Proxy Cloudflare Workers pour les sources WAF-bloquées GHA.**
+  Audit ce matin confirmait que info.gouv, education, intérieur, sports/rapports-igesr, insep, injep, ccomptes sont blacklistés au niveau IP côté plage GHA (Azure). Test live depuis poste local : toutes répondent HTTP 200 avec n'importe quel impersonate. Solution : faire transiter ces requêtes par un Cloudflare Worker (plan Free 100 000 req/jour).
+
+  Architecture :
+  - `scripts/cloudflare_worker.js` : code worker (JS, ~80 LOC). Whitelist d'hostnames stricte + auth via header `X-Proxy-Token` (variable secret).
+  - `src/sources/_common.py::_fetch_bytes_via_proxy` : helper Python qui forward via `{CLOUDFLARE_PROXY_URL}/?url=<encoded>` avec header token.
+  - `fetch_text(via_proxy=True)` : si env vars `CLOUDFLARE_PROXY_URL` + `CLOUDFLARE_PROXY_TOKEN` présentes → proxy, sinon fallback fetch direct.
+  - `html_generic.py` : tous les handlers (HTML, RSS, igesr_html, injep_html) propagent le flag YAML `proxy: cloudflare` → `via_proxy=True`.
+  - `daily.yml` expose les 2 secrets en env vars au step pipeline.
+  - 7 sources YAML configurées avec `proxy: cloudflare` : `info_gouv_actualites`, `min_education`, `min_interieur`, `min_sports_igesr`, `injep_sport_publications`, `insep`, `ccomptes_publications`.
+  - `docs/cloudflare_proxy_setup.md` : guide de déploiement pas-à-pas pour Cyril (8 étapes : compte CF → worker → token → secrets GHA → test).
+
+  Sécurité : token obligatoire (sans → HTTP 403), whitelist hostnames, méthode GET uniquement. Fallback dégradé compatible : sans env vars, les sources `proxy: cloudflare` retombent en fetch direct (donc KO comme avant — pas de régression).
+
+  Effectif dès que Cyril déploie le worker côté Cloudflare et pose les secrets GHA. +7 tests R42-BO. 1213→1220.
+
 - 2026-05-12 (matin, programme TODO list) : **R42-BD + R42-AU + R42-BL + R42-AE**.
 
   **R42-BD — `reset_category.py` préserve les sources actuellement KO.**

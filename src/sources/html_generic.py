@@ -101,8 +101,9 @@ def _from_min_sports_igesr_html(src: dict) -> list[Item]:
     2023.
     """
     impersonate = bool(src.get("impersonate", False))
+    via_proxy = (src.get("proxy") or "").lower() == "cloudflare"
     try:
-        html = fetch_text(src["url"], impersonate=impersonate)
+        html = fetch_text(src["url"], impersonate=impersonate, via_proxy=via_proxy)
     except Exception as e:
         log.warning("HTML KO %s : %s", src["id"], e)
         return []
@@ -171,8 +172,9 @@ def _from_injep_sport_publications_html(src: dict) -> list[Item]:
     page est déjà filtrée éditorialement « sport » par l'INJEP).
     """
     impersonate = bool(src.get("impersonate", False))
+    via_proxy = (src.get("proxy") or "").lower() == "cloudflare"
     try:
-        html = fetch_text(src["url"], impersonate=impersonate)
+        html = fetch_text(src["url"], impersonate=impersonate, via_proxy=via_proxy)
     except Exception as e:
         log.warning("HTML KO %s : %s", src["id"], e)
         return []
@@ -314,12 +316,13 @@ def _from_rss_generic(src: dict) -> list[Item]:
     418 « I'm a teapot » sans impersonate côté GHA).
     """
     impersonate = bool(src.get("impersonate", False))
+    via_proxy = (src.get("proxy") or "").lower() == "cloudflare"
     try:
         # R19-A : passer bytes à feedparser pour respecter l'encoding
         # déclaré (PI XML ou header Content-Type). Avec str + UTF-8 forcé,
         # les flux ISO-8859-15 comme les RSS thématiques Sénat produisent
         # du mojibake "ï¿œ" sur les caractères accentués / signes comme °.
-        payload = fetch_bytes(src["url"], impersonate=impersonate)
+        payload = fetch_bytes(src["url"], impersonate=impersonate, via_proxy=via_proxy)
     except Exception as e:
         log.warning("RSS KO %s : %s", src["id"], e)
         return []
@@ -789,9 +792,12 @@ def fetch_source(src: dict) -> list[Item]:
 
     # R18 : `impersonate=True` dans le YAML → fetch via curl_cffi pour passer
     # les protections Cloudflare (education/interieur/economie/info.gouv…).
+    # R42-BO : `proxy: cloudflare` → passe par le worker Cloudflare quand
+    # CLOUDFLARE_PROXY_URL + CLOUDFLARE_PROXY_TOKEN env vars définies.
     impersonate = bool(src.get("impersonate", False))
+    via_proxy = (src.get("proxy") or "").lower() == "cloudflare"
     try:
-        html = fetch_text(src["url"], impersonate=impersonate)
+        html = fetch_text(src["url"], impersonate=impersonate, via_proxy=via_proxy)
     except Exception as e:
         log.warning("HTML KO %s : %s", src["id"], e)
         return []

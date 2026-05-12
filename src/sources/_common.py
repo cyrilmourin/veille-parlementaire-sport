@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -163,13 +164,52 @@ def _fetch_bytes_httpx(url: str) -> bytes:
         return r.content
 
 
-def fetch_bytes(url: str, impersonate: bool = False) -> bytes:
+def _fetch_bytes_via_proxy(url: str, timeout: float = 30.0) -> bytes:
+    """R42-BO (2026-05-12) — Fetch via le worker Cloudflare proxy.
+
+    Utilisé pour les sources dont les serveurs bloquent les IPs GitHub
+    Actions (info.gouv.fr, education.gouv.fr, interieur.gouv.fr,
+    sports.gouv.fr/rapports-igesr, insep.fr, injep.fr, ccomptes.fr).
+
+    Le worker Cloudflare (cf. `scripts/cloudflare_worker.js`) reçoit
+    `?url=<encoded>` + header `X-Proxy-Token` et forward le GET côté CF
+    (IP propre, pas blacklistée). Whitelist de hosts côté worker.
+
+    Active uniquement si les 2 env vars sont définies :
+      - CLOUDFLARE_PROXY_URL  : URL publique du worker (https://...)
+      - CLOUDFLARE_PROXY_TOKEN : secret partagé worker ↔ pipeline
+    Sinon : fallback fetch direct (préserve le comportement legacy).
+    """
+    proxy_url = os.environ.get("CLOUDFLARE_PROXY_URL", "").strip()
+    proxy_token = os.environ.get("CLOUDFLARE_PROXY_TOKEN", "").strip()
+    if not proxy_url or not proxy_token:
+        log.debug("via_proxy demandé mais CLOUDFLARE_PROXY_* absent — fetch direct")
+        return _fetch_bytes_httpx(url)
+    from urllib.parse import quote
+    proxied = f"{proxy_url.rstrip('/')}/?url={quote(url, safe='')}"
+    log.info("GET (via CF proxy) %s", url)
+    with _client(timeout=timeout) as c:
+        r = c.get(proxied, headers={"X-Proxy-Token": proxy_token})
+        _raise_for_status_loud(r)
+        return r.content
+
+
+def fetch_bytes(url: str, impersonate: bool = False,
+                via_proxy: bool = False) -> bytes:
     """Récupère les bytes d'une URL.
 
     `impersonate=True` → passe par curl_cffi avec signature TLS Chrome120.
     Utile pour les sites protégés par Cloudflare qui bloquent httpx en
     403 (education.gouv.fr, interieur.gouv.fr, info.gouv.fr, …).
+
+    `via_proxy=True` (R42-BO) → passe par le worker Cloudflare configuré
+    via env vars CLOUDFLARE_PROXY_URL + CLOUDFLARE_PROXY_TOKEN. Override
+    `impersonate` car les sites ciblés bloquent à la couche IP avant
+    même la négociation TLS — curl_cffi n'aide pas. Si env vars
+    absentes : fallback fetch direct (cohérent avec install par étapes).
     """
+    if via_proxy:
+        return _fetch_bytes_via_proxy(url)
     if impersonate:
         return _fetch_bytes_impersonate(url)
     return _fetch_bytes_httpx(url)
@@ -191,8 +231,10 @@ def fetch_bytes_heavy(url: str) -> bytes:
         return r.content
 
 
-def fetch_text(url: str, impersonate: bool = False) -> str:
-    return fetch_bytes(url, impersonate=impersonate).decode("utf-8", errors="replace")
+def fetch_text(url: str, impersonate: bool = False,
+               via_proxy: bool = False) -> str:
+    return fetch_bytes(url, impersonate=impersonate,
+                       via_proxy=via_proxy).decode("utf-8", errors="replace")
 
 
 def unzip_members(payload: bytes) -> Iterable[tuple[str, bytes]]:

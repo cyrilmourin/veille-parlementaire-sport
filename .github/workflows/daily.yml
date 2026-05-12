@@ -150,6 +150,13 @@ jobs:
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
           DIGEST_TO: ${{ secrets.DIGEST_TO }}
           SITE_URL: "https://veille.sideline-conseil.fr"
+          # R42-BO (2026-05-12) — proxy Cloudflare pour les sources dont les
+          # serveurs blacklistent les IPs GHA (info.gouv, education, intérieur,
+          # sports.gouv/rapports-igesr, insep, injep, ccomptes). Sans ces 2
+          # secrets définis, `fetch_text(via_proxy=True)` fallback en fetch
+          # direct (mode dégradé compatible).
+          CLOUDFLARE_PROXY_URL: ${{ secrets.CLOUDFLARE_PROXY_URL }}
+          CLOUDFLARE_PROXY_TOKEN: ${{ secrets.CLOUDFLARE_PROXY_TOKEN }}
         run: |
           SINCE="${{ github.event.inputs.since_days || '1' }}"
           NOEMAIL=""

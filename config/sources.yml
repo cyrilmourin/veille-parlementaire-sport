@@ -515,18 +515,15 @@ executif:
     # info.gouv.fr (fusion 2024). On consolide sur le domaine cible.
     # Historique : cf. R15/R16 (enabled: false) — levée par `impersonate: true`.
     # R42-BL (2026-05-12) — Bascule HTML → RSS officiel.
-    # `info.gouv.fr/toute-l-actualite` était bloqué HTTP 403 (WAF strict
-    # IP-bound côté GHA, impersonate insuffisant). Le RSS officiel
-    # `info.gouv.fr/rss` est accessible et couvre l'ensemble du
-    # gouvernement transversal (annonces interministérielles,
-    # commémorations, sujets stratégiques). 20 entries fraîches.
-    # Couvre aussi le contenu Matignon → `matignon_actualites` peut être
-    # désactivé pour éviter doublons.
+    # R42-BO (2026-05-12) — `proxy: cloudflare` activé car même le RSS
+    # est en HTTP 403 côté GHA (vérifié run 25732430229). Effectif dès
+    # que CLOUDFLARE_PROXY_URL + CLOUDFLARE_PROXY_TOKEN sont en env GHA.
     - id: info_gouv_actualites
       category: communiques
       url: https://www.info.gouv.fr/rss
       format: rss
       impersonate: true
+      proxy: cloudflare
 
     # R42-BL (2026-05-12) — DÉSACTIVÉ. Devenu redondant avec
     # `info_gouv_actualites` qui est passé au RSS officiel
@@ -657,6 +654,8 @@ ministeres:
       format: min_sports_igesr_html
       chamber: MinSports
       impersonate: true
+      # R42-BO : sports.gouv.fr/rapports-de-l-igesr → ConnectTimeout côté GHA
+      proxy: cloudflare
       poids: 3
 
     # R18 (2026-04-22) — Education + Intérieur + Economie : Cloudflare
@@ -669,6 +668,8 @@ ministeres:
       url: https://www.education.gouv.fr/presse
       format: html
       impersonate: true
+      # R42-BO : WAF intermittent côté GHA → proxy Cloudflare comme fallback
+      proxy: cloudflare
       chamber: MinEduc
       title_prefix: "MinEduc —"
       fetch_meta: true
@@ -679,6 +680,8 @@ ministeres:
       url: https://www.interieur.gouv.fr/actualites/presse
       format: html
       impersonate: true
+      # R42-BO : interieur.gouv.fr HTTP 403 même avec impersonate → proxy CF
+      proxy: cloudflare
       chamber: MinInterieur
       title_prefix: "MinInt —"
       fetch_meta: true
@@ -914,6 +917,8 @@ autorites:
       format: injep_sport_publications_html
       chamber: INJEP
       impersonate: true
+      # R42-BO : injep.fr ConnectTimeout côté GHA → proxy Cloudflare
+      proxy: cloudflare
 
     # R23-I (2026-04-23) — INSEP (Institut national du sport, de
     # l'expertise et de la performance), établissement public national
@@ -934,7 +939,9 @@ autorites:
       # R42-BB (2026-05-11) — insep.fr renvoie HTTP 418 (« I'm a teapot »
       # = signal anti-bot) sur les IPs GHA. curl_cffi + TLS Chrome 120
       # débloque (handler RSS étendu pour propager le param).
+      # R42-BO (2026-05-12) — impersonate insuffisant côté GHA, proxy CF.
       impersonate: true
+      proxy: cloudflare
       poids: 3
 
     # R23-J (2026-04-23) — Fondation du Sport Français (reconnue d'utilité
@@ -987,7 +994,9 @@ autorites:
       url: https://www.ccomptes.fr/rss/publications
       format: rss
       # R42-BB (2026-05-11) — ccomptes.fr ConnectTimeout côté GHA.
+      # R42-BO (2026-05-12) — fallback proxy Cloudflare.
       impersonate: true
+      proxy: cloudflare
 
     # R15 (2026-04-22) — Défenseur des droits : passage en RSS officiel.
     # /rss.xml renvoie un flux valide (49 Ko, dates ISO 2026-04 récentes)
