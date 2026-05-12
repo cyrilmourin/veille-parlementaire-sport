@@ -296,6 +296,30 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
   +19 tests R42-BI. 1149 → 1168 verts.
 
+- 2026-05-12 (matin, programme TODO list) : **R42-BD + R42-AU + R42-BL + R42-AE**.
+
+  **R42-BD — `reset_category.py` préserve les sources actuellement KO.**
+  Avant : un `reset_category=communiques` purgeait tous les items d'une catégorie, et si une source était KO (WAF, ConnectTimeout, 403), ses items étaient perdus définitivement faute de re-fetch (blank-out observé hier sur min_sports_*). Maintenant : le script lit `data/pipeline_health.json::sources[sid].last_fetched`, et si une source a `last_fetched=0` (KO actuel), ses items en DB sont **préservés**. Flag `--force` pour ignorer la protection. `--source-id` ciblé bypass aussi (intention explicite). +8 tests.
+
+  **R42-AU — Sync DB locale depuis prod.**
+  Modifier `daily.yml` pour upload `data/veille.sqlite3` en artifact à chaque run (rétention 7j). Nouveau script `scripts/sync_from_prod.sh` qui :
+  1. Trouve le dernier run daily.yml success avec artifact `veille-db-latest`
+  2. Backup la DB locale (`.bak.YYYYMMDDTHHMMSSZ`)
+  3. Télécharge l'artifact via `gh run download` → écrase `data/veille.sqlite3`
+  4. Affiche les stats (count items, dernier inserted_at)
+
+  Élargissement `paths-ignore` du daily push trigger : `scripts/**`, `.github/workflows/**`, `.claude/**` n'engendrent plus de daily auto (modifs purement outillage). Cohérent avec « pas de nouveau run généré ». L'artifact sera dispo dès le prochain daily naturel.
+
+  **R42-BL — +1 ministère (Agriculture) + fix info_gouv en RSS + désactivation matignon.**
+  Audit live des ministères : Agriculture a un RSS officiel `agriculture.gouv.fr/rss.xml` (30 entries fraîches), info.gouv.fr aussi : `info.gouv.fr/rss` (20 entries, gouv transversal incluant Matignon). Bascule de `info_gouv_actualites` HTML→RSS (HTTP 403 WAF strict → résolu via RSS), désactivation de `matignon_actualites` (devient redondant). Outre-mer pas faisable (cert SSL/site KO). Santé/Travail/Intérieur restent désactivés (WAF F5 universel).
+
+  **R42-AE — Fenêtres dynamiques nominal/full par catégorie + source.**
+  Cyril 2026-05-11 : « Comptes rendus 15j/60j ; JORF 7j/90j ; rapports 15j/730j ». Nouveau mapping `_DYNAMIC_WINDOWS_BY_CATEGORY` + `_DYNAMIC_WINDOWS_BY_SOURCE_ID` dans `site_export.py`. `_window_for` priorise désormais dynamic-source > dynamic-cat > static-source > static-cat > défaut. Symétrique R42-AD (dosleg). Couvre les 6 sources rapports R42-AJ/AK. +16 tests.
+
+  Sur audit point 2 (WAF stricts résiduels) : verdict **aucun fix code possible**. Tests live depuis poste local OK (chrome120/131/safari17 → HTTP 200) sur info_gouv, matignon, min_education, min_interieur, insep, injep, ccomptes — donc le blocage est purement IP-bound côté plage GHA (Azure). Solutions architecturales (proxy résidentiel, worker Cloudflare, self-hosted runner) parkées en TODO bas. R42-BD pallie en attendant.
+
+  Tests : 1185 → 1209 verts.
+
 - 2026-05-11 (fin de journée, retour Cyril post-clôture) : **R42-BH — Extension R42-AW aux comptes_rendus parlement**. **Commit local, NON pushé**.
 
   Cyril : « l'utilisation des mots-clés pour les nominations, que je retrouve désormais aussi dans les comptes rendus, est-elle exclue par les dernières mises à jour ? ». **Réponse : non**, R42-AW couvrait UNIQUEMENT `category=communiques`. Confirmé sur search_index prod : 9 CR contiennent un marqueur nomination_event dans leur snippet visible.

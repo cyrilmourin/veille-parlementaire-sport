@@ -1305,12 +1305,58 @@ def _fix_agenda_row(r: dict) -> None:
             r["title"] = (organe_label or "Réunion parlementaire")[:220]
 
 
+# R42-AE (2026-05-12) — Fenêtres DYNAMIQUES selon RUN_MODE pour les
+# catégories à fort volume éditorial. Cohérent avec R42-AD (dosleg).
+#
+# Mode `nominal` (cron quotidien) → fenêtre courte : on n'affiche que
+# l'actualité récente. Mode `full` (reset_db / reset_category dispatché
+# manuellement) → fenêtre large : on rebuild l'historique éditorial.
+#
+# Cyril 2026-05-11 : « les Comptes rendus mode nominal descend à 15
+# jours, mode full passe à 60 jours. JORF nominal 7 jours / full 90.
+# Rapports AN/Sénat mode full 2 ans / nominal 15 jours. »
+#
+# Format : { catégorie OU source_id : (nominal, full) }
+# Override : si la clé matche source_id, prime sur category. Le mapping
+# `WINDOW_DAYS_BY_CATEGORY` et `WINDOW_DAYS_BY_SOURCE_ID` statiques
+# restent fallback si on n'est pas en mode dynamique.
+_DYNAMIC_WINDOWS_BY_CATEGORY: dict[str, tuple[int, int]] = {
+    "comptes_rendus": (15, 60),
+    "jorf": (7, 90),
+}
+_DYNAMIC_WINDOWS_BY_SOURCE_ID: dict[str, tuple[int, int]] = {
+    # Rapports parlementaires (AN + Sénat + R42-AJ/AK nouveaux types).
+    "an_rapports": (15, 730),
+    "an_rapports_information": (15, 730),
+    "an_avis": (15, 730),
+    "an_rapports_application_loi": (15, 730),
+    "an_rapports_information_ce": (15, 730),
+    "senat_rapports": (15, 730),
+}
+
+
 def _window_for(category: str | None, source_id: str | None = None) -> int:
     """Fenêtre (jours) applicable à un (source_id, category) donné.
 
-    Priorité : WINDOW_DAYS_BY_SOURCE_ID (R36-J, override fin) >
-    WINDOW_DAYS_BY_CATEGORY (override catégorie) > WINDOW_DAYS (défaut).
+    Priorité :
+      1. R42-AE — fenêtre DYNAMIQUE selon RUN_MODE pour les sources/cats
+         dans `_DYNAMIC_WINDOWS_BY_SOURCE_ID` / `_DYNAMIC_WINDOWS_BY_CATEGORY`.
+         L'override par source_id prime sur celui par category.
+      2. WINDOW_DAYS_BY_SOURCE_ID (R36-J, statique) — fallback.
+      3. WINDOW_DAYS_BY_CATEGORY (statique) — fallback.
+      4. WINDOW_DAYS (défaut).
     """
+    # R42-AE : 1. fenêtre dynamique par source_id (le plus spécifique)
+    if source_id and source_id in _DYNAMIC_WINDOWS_BY_SOURCE_ID:
+        nominal, full = _DYNAMIC_WINDOWS_BY_SOURCE_ID[source_id]
+        from .run_mode import window_days
+        return window_days(nominal=nominal, full=full)
+    # R42-AE : 2. fenêtre dynamique par catégorie
+    if category and category in _DYNAMIC_WINDOWS_BY_CATEGORY:
+        nominal, full = _DYNAMIC_WINDOWS_BY_CATEGORY[category]
+        from .run_mode import window_days
+        return window_days(nominal=nominal, full=full)
+    # Statique : override par source_id
     if source_id and source_id in WINDOW_DAYS_BY_SOURCE_ID:
         return WINDOW_DAYS_BY_SOURCE_ID[source_id]
     if category and category in WINDOW_DAYS_BY_CATEGORY:

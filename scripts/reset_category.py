@@ -10,20 +10,50 @@ items déjà en base gardent leur ancien summary/matching même après
 un patch côté connecteur. Ce script supprime ces items pour qu'ils
 soient ré-insérés au prochain `python -m src.main run`.
 
+R42-BD (2026-05-12) — fetch préservé :
+Par défaut, les items des sources ayant ramené 0 items au dernier run
+(WAF, ConnectTimeout, 403…) NE SONT PAS purgés — on conserve leurs
+items existants en DB plutôt que de les perdre faute de re-fetch
+possible. Cf. blank-out observé 2026-05-11 sur les ministères. Logique
+basée sur `data/pipeline_health.json::sources[sid].last_fetched`.
+Flag `--force` pour ignorer cette protection et tout purger.
+
 Usage :
     python scripts/reset_category.py amendements
     python scripts/reset_category.py comptes_rendus --dry-run
     python scripts/reset_category.py amendements --yes    # non-interactif (CI)
+    python scripts/reset_category.py communiques --force  # purge totale (R42-BD bypass)
 """
 from __future__ import annotations
 
 import argparse
+import json
 import sqlite3
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DB = ROOT / "data" / "veille.sqlite3"
+HEALTH = ROOT / "data" / "pipeline_health.json"
+
+
+def _load_failing_sources() -> set[str]:
+    """R42-BD — Retourne le set des source_id dont le dernier fetch a
+    ramené 0 items (= source KO actuellement : WAF, timeout, 403…).
+
+    Lit `data/pipeline_health.json` produit par le monitoring. Retourne
+    un set vide si le fichier n'existe pas (compat) ou est corrompu."""
+    if not HEALTH.exists():
+        return set()
+    try:
+        data = json.loads(HEALTH.read_text(encoding="utf-8"))
+    except Exception:
+        return set()
+    sources = (data or {}).get("sources") or {}
+    return {
+        sid for sid, stat in sources.items()
+        if isinstance(stat, dict) and stat.get("last_fetched", 0) == 0
+    }
 
 
 def main():
@@ -37,6 +67,9 @@ def main():
                     help="Affiche le count sans supprimer")
     ap.add_argument("--yes", "-y", action="store_true",
                     help="Ne demande pas confirmation (mode CI)")
+    ap.add_argument("--force", action="store_true",
+                    help="R42-BD bypass : purge AUSSI les sources actuellement"
+                         " KO (last_fetched=0). Par défaut elles sont préservées.")
     args = ap.parse_args()
 
     if not DB.exists():
@@ -47,15 +80,39 @@ def main():
     cur = conn.cursor()
 
     where = "WHERE category = ?"
-    params = [args.category]
+    params: list = [args.category]
     if args.source_id:
         where += " AND source_id = ?"
         params.append(args.source_id)
 
+    # R42-BD : protection sources KO (sauf --force ou --source-id ciblé).
+    preserved: list[tuple[str, int]] = []
+    if not args.force and not args.source_id:
+        failing = _load_failing_sources()
+        if failing:
+            preserved_counts = cur.execute(
+                f"SELECT source_id, COUNT(*) FROM items {where}"
+                f" AND source_id IN ({','.join(['?'] * len(failing))})"
+                f" GROUP BY source_id",
+                params + sorted(failing),
+            ).fetchall()
+            preserved = [(sid, n) for sid, n in preserved_counts if n > 0]
+            if preserved:
+                placeholders = ",".join(["?"] * len(failing))
+                where += f" AND source_id NOT IN ({placeholders})"
+                params.extend(sorted(failing))
+
     (n,) = cur.execute(f"SELECT COUNT(*) FROM items {where}", params).fetchone()
-    print(f"Items à purger : {n} (category={args.category}"
-          + (f", source_id={args.source_id}" if args.source_id else "")
-          + ")")
+    target = (f"category={args.category}"
+              + (f", source_id={args.source_id}" if args.source_id else ""))
+    print(f"Items à purger : {n} ({target})")
+    if preserved:
+        total_preserved = sum(c for _, c in preserved)
+        print(f"R42-BD : {total_preserved} item(s) préservés"
+              f" sur {len(preserved)} source(s) KO (last_fetched=0) :")
+        for sid, c in sorted(preserved):
+            print(f"   - {sid}: {c} items conservés")
+        print(f"   (utiliser --force pour purger aussi ces sources)")
 
     if args.dry_run or n == 0:
         return

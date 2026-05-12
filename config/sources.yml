@@ -514,22 +514,33 @@ executif:
     # Les URLs /actualite de gouvernement.fr redirigent toutes vers
     # info.gouv.fr (fusion 2024). On consolide sur le domaine cible.
     # Historique : cf. R15/R16 (enabled: false) — levée par `impersonate: true`.
+    # R42-BL (2026-05-12) — Bascule HTML → RSS officiel.
+    # `info.gouv.fr/toute-l-actualite` était bloqué HTTP 403 (WAF strict
+    # IP-bound côté GHA, impersonate insuffisant). Le RSS officiel
+    # `info.gouv.fr/rss` est accessible et couvre l'ensemble du
+    # gouvernement transversal (annonces interministérielles,
+    # commémorations, sujets stratégiques). 20 entries fraîches.
+    # Couvre aussi le contenu Matignon → `matignon_actualites` peut être
+    # désactivé pour éviter doublons.
     - id: info_gouv_actualites
       category: communiques
-      url: https://www.info.gouv.fr/toute-l-actualite
-      format: html
+      url: https://www.info.gouv.fr/rss
+      format: rss
       impersonate: true
-      # R22e-2 (2026-04-23) : enrichissement meta description (opt-in).
-      fetch_meta: true
-      fetch_meta_limit: 40
 
-    # info.gouv — section spécifique PM (Premier Ministre).
+    # R42-BL (2026-05-12) — DÉSACTIVÉ. Devenu redondant avec
+    # `info_gouv_actualites` qui est passé au RSS officiel
+    # `info.gouv.fr/rss` (contient tout le contenu interministériel +
+    # Matignon). Garder cette source en parallèle créerait des
+    # doublons (même contenu source / URLs proches). Réactivable si
+    # un jour Matignon expose un flux dédié distinct.
     - id: matignon_actualites
       category: communiques
       url: https://www.info.gouv.fr/suivre-l-actualite-du-premier-ministre
       format: html
       impersonate: true
       chamber: Matignon
+      enabled: false
       title_prefix: "PM —"
       fetch_meta: true
       fetch_meta_limit: 40
@@ -752,6 +763,17 @@ ministeres:
       format: html
       fetch_meta: true
       fetch_meta_limit: 40
+
+    # R42-BL (2026-05-12) — Ministère de l'Agriculture et de la
+    # Souveraineté alimentaire. Flux RSS officiel `agriculture.gouv.fr/rss.xml`
+    # (30 entries fraîches, application/rss+xml). Pertinent pour la veille
+    # sport : sport rural, héritage JOP territoires, jeunesse rurale, etc.
+    # Couverture probablement marginale en matches sport mais cohérence
+    # avec l'objectif « plus de ministères » (demande Cyril 2026-05-12).
+    - id: min_agriculture
+      category: communiques
+      url: https://agriculture.gouv.fr/rss.xml
+      format: rss
 
     - id: min_ruralite
       category: communiques

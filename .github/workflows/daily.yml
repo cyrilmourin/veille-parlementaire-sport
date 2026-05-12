@@ -31,6 +31,13 @@ on:
       - 'docs/**'
       - 'HANDOFF*'
       - 'README*'
+      # R42-AU (2026-05-12) : modifications purement dev/outillage —
+      # scripts CLI locaux, workflows GHA et fichiers Claude — ne doivent
+      # PAS déclencher un daily auto au push. Évite les runs parasites
+      # quand on bouge juste un script local ou un commentaire workflow.
+      - 'scripts/**'
+      - '.github/workflows/**'
+      - '.claude/**'
   workflow_dispatch:
     inputs:
       since_days:
@@ -244,6 +251,21 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # R42-AU (2026-05-12) — Upload de la DB SQLite en artifact pour
+      # permettre la synchronisation avec un poste local via
+      # `scripts/sync_from_prod.sh`. Rétention 7 jours pour limiter le
+      # stockage artifacts (~80 Mo × ~3 runs/jour = ~1.6 Go max sur 7j).
+      # `if: success()` car on ne veut pas exposer une DB potentiellement
+      # incohérente après échec du pipeline.
+      - name: Upload SQLite DB as artifact for local sync
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veille-db-latest
+          path: data/veille.sqlite3
+          retention-days: 7
+          compression-level: 6
 
       # Commit du dernier digest HTML (~300 Ko) + cache AMO acteurs/organes
       # (~100 Ko) + cache texte→dossier AN (~500 Ko) si régénérés. La DB
