@@ -944,7 +944,6 @@ autorites:
       url: https://www.insep.fr/fr/actualites
       format: insep_actualites_html
       impersonate: true
-      proxy: cloudflare
       poids: 3
 
     # R23-J (2026-04-23) — Fondation du Sport Français (reconnue d'utilité
