@@ -296,6 +296,16 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
   +19 tests R42-BI. 1149 → 1168 verts.
 
+- 2026-05-12 (soir, suite validation R42-BO) : **R42-BQ**. Retry proxy CF + CCOMPTES sport ciblé.
+
+  **Retry tenacity sur `_fetch_bytes_via_proxy`.** Test live démontre que les HTTP 522 (timeout origine → CF Worker) observés sur INJEP et CCOMPTES dans le run R42-BO étaient transitoires : depuis le poste local via le même worker, les 2 sites répondent 200. Ajout de 3 tentatives tenacity (`wait_exponential 2-10s`) en réutilisant `_is_retryable` (5xx oui, 4xx non — l'INSEP HTTP 418 « I'm a teapot » est un refus volontaire qu'on ne retry pas).
+
+  **Source `ccomptes_publications_sport`.** Cyril a partagé l'URL filtrée par thématique CC : `?f[0]=institution:98&f[1]=thematic:17182`. La thématique 17182 = « Famille, handicap, sport et jeunes » — méga-thème CC qui mélange sport/handicap/famille/jeunes. Le filtre keyword sport aval triera, mais on capte ainsi des rapports sport au titre peu évident (École nationale des sports de montagne, Fédération française de rugby, …) que le RSS global pourrait rater. Nouveau handler `_from_ccomptes_publications_html` dans `html_generic.py` qui parse la structure Drupal réelle `<a href="/fr/publications/<slug>"><h2 class="title">Titre</h2></a>` + `<time datetime>` à proximité. Live fetch 2026-05-12 : 10 publications récupérées dont Paris 2024 (mai 2026), FFRugby (fév 2026), École nationale sports montagne (déc 2025). Source en parallèle du RSS global (pas un remplacement).
+
+  **INSEP** : confirmé inopérant via proxy CF. INSEP répond systématiquement HTTP 418 « I'm a teapot » dès qu'il détecte une requête depuis le pool d'IPs Cloudflare Workers (anti-scraping volontaire). Reproductible depuis poste local via le même worker. Pas réparable avec ce setup — autre stratégie à discuter avec Cyril (source alternative, autre proxy…).
+
+  +8 tests R42-BQ. 1223 → 1231 verts.
+
 - 2026-05-12 (soir, validation R42-BO en prod) : **R42-BP**. Fix router min_sports_*.
 
   Daily nominal post-R42-BO confirme que le proxy CF fonctionne : info_gouv_actualites 20 items (vs 0), min_education 2, min_interieur 18, soit **40 items récupérés** sur des sources auparavant entièrement bloquées par WAF GHA.

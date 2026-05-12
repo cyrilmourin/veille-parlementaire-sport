@@ -164,6 +164,11 @@ def _fetch_bytes_httpx(url: str) -> bytes:
         return r.content
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=2, max=10),
+    retry=retry_if_exception(_is_retryable),
+)
 def _fetch_bytes_via_proxy(url: str, timeout: float = 30.0) -> bytes:
     """R42-BO (2026-05-12) — Fetch via le worker Cloudflare proxy.
 
@@ -179,6 +184,12 @@ def _fetch_bytes_via_proxy(url: str, timeout: float = 30.0) -> bytes:
       - CLOUDFLARE_PROXY_URL  : URL publique du worker (https://...)
       - CLOUDFLARE_PROXY_TOKEN : secret partagé worker ↔ pipeline
     Sinon : fallback fetch direct (préserve le comportement legacy).
+
+    R42-BQ (2026-05-12) — Retry tenacity 3 tentatives sur 5xx/timeouts.
+    Cause : INJEP / Cour des comptes répondent parfois HTTP 522 (timeout
+    CF→origine) sous charge serveur. Le 522 est transitoire — un retry
+    2-3s plus tard repasse en 200. On ne retry PAS sur les 4xx (refus
+    volontaire de l'origine, ex. INSEP HTTP 418 « I'm a teapot »).
     """
     proxy_url = os.environ.get("CLOUDFLARE_PROXY_URL", "").strip()
     proxy_token = os.environ.get("CLOUDFLARE_PROXY_TOKEN", "").strip()

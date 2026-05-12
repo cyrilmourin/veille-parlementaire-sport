@@ -58,6 +58,9 @@ _KNOWN_FORMATS = {
     # R42-BK (2026-05-11) — page INJEP publications sport (CPT
     # WordPress <li class="publication">, date via URL image uploads/YYYY/MM/).
     "injep_sport_publications_html",
+    # R42-BQ (2026-05-12) — page Cour des comptes filtrée thématique sport
+    # (Drupal listing, `<a><h2 class='title'>` + `<time datetime>`).
+    "ccomptes_publications_html",
 }
 
 

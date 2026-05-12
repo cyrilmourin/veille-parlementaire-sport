@@ -230,6 +230,92 @@ def _from_injep_sport_publications_html(src: dict) -> list[Item]:
     return out
 
 
+def _from_ccomptes_publications_html(src: dict) -> list[Item]:
+    """R42-BQ (2026-05-12) — Handler page Cour des comptes filtrée par
+    thématique « Famille, handicap, sport et jeunes » (id 17182).
+
+    URL : https://www.ccomptes.fr/fr/publications?f%5B0%5D=institution%3A98&f%5B1%5D=thematic%3A17182
+
+    Pourquoi ce filtre : le RSS global `/rss/publications` agrège toutes
+    les publications de la Cour, et le matcher keyword sport peut rater
+    des rapports dont le titre ne contient pas un mot-clé sport explicite
+    (ex. « Fédération française de rugby », « Comité d'organisation des
+    Jeux olympiques et paralympiques de Paris 2024 » — qui matchent
+    quand même nos keywords, mais aussi des rapports plus génériques
+    type « politique fédérations sportives » qui pourraient passer
+    inaperçus). Le filtre thématique CC est plus large que sport (inclut
+    handicap / famille / jeunes) → le filtre keyword sport aval triera
+    de toute façon. Avantage net : couverture plus exhaustive.
+
+    Structure HTML (Drupal CC) :
+      - `<h2><a href="/fr/publications/<slug>">Titre</a></h2>`
+      - `<time datetime="YYYY-MM-DD">` à proximité (date de publication
+        officielle, plus fiable que le RSS qui ne porte parfois que la
+        date de mise en ligne).
+    """
+    impersonate = bool(src.get("impersonate", False))
+    via_proxy = (src.get("proxy") or "").lower() == "cloudflare"
+    try:
+        html = fetch_text(src["url"], impersonate=impersonate, via_proxy=via_proxy)
+    except Exception as e:
+        log.warning("HTML KO %s : %s", src["id"], e)
+        return []
+    soup = BeautifulSoup(html, "html.parser")
+    chamber = src.get("chamber", "Cour des comptes")
+    out: list[Item] = []
+    seen: set[str] = set()
+    # Structure Drupal CC observée 2026-05-12 : `<a href="/fr/publications/<slug>">
+    # <h2 class="title">Titre</h2></a>`. On ratisse tous les <a> pointant vers
+    # une publication unitaire — tolère aussi la forme inversée `<h2><a>` au
+    # cas où Drupal change le template.
+    candidates: list[tuple[str, "BeautifulSoup", "BeautifulSoup"]] = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        m = re.search(r"/publications/([A-Za-z0-9][^?#]*)", href)
+        if not m:
+            continue
+        # On préfère un titre porté par un <h2>/<h3> à l'intérieur (texte
+        # canonique de la card), sinon on tombe sur le texte brut du lien.
+        heading = a.find(["h2", "h3"]) or a
+        title = heading.get_text(" ", strip=True)
+        candidates.append((href, a, heading))
+    for href, a, heading in candidates:
+        title = heading.get_text(" ", strip=True)
+        if not title or len(title) < 10:
+            continue
+        url_abs = href if href.startswith("http") else urljoin(src["url"], href)
+        if url_abs in seen:
+            continue
+        seen.add(url_abs)
+        # Date depuis le <time datetime="..."> le plus proche en remontant
+        # dans les ancêtres (la carte publication contient le titre et le time).
+        published_at: datetime | None = None
+        anc = a
+        for _ in range(6):
+            anc = anc.parent
+            if anc is None:
+                break
+            time_el = anc.find("time") if hasattr(anc, "find") else None
+            if time_el and time_el.get("datetime"):
+                published_at = parse_iso(time_el["datetime"])
+                if published_at:
+                    break
+        out.append(Item(
+            source_id=src["id"],
+            uid=url_abs[:200],
+            category=src["category"],
+            chamber=chamber,
+            title=title[:220],
+            url=url_abs,
+            published_at=published_at,
+            summary="",
+            raw={"path": "ccomptes_publications_html"},
+        ))
+    log.info("%s : %d publications Cour des comptes (thème sport) extraites",
+             src["id"], len(out))
+    return out
+
+
 def _from_ans_rss(src: dict) -> list[Item]:
     """R42-BG (2026-05-11) — Handler dédié au RSS Drupal de l'ANS
     (agencedusport.fr/flux-rss). 3 spécificités vs RSS standard :
@@ -787,6 +873,8 @@ def fetch_source(src: dict) -> list[Item]:
         return _from_min_sports_igesr_html(src)
     if fmt == "injep_sport_publications_html":
         return _from_injep_sport_publications_html(src)
+    if fmt == "ccomptes_publications_html":
+        return _from_ccomptes_publications_html(src)
     if fmt == "sitemap":
         return _from_sitemap_generic(src)
 

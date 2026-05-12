@@ -998,6 +998,20 @@ autorites:
       impersonate: true
       proxy: cloudflare
 
+    # R42-BQ (2026-05-12) — Cour des comptes filtré thématique
+    # « Famille, handicap, sport et jeunes » (id 17182, institution
+    # Cour des comptes id 98). Couverture additionnelle : le RSS global
+    # /rss/publications peut rater des rapports sport dont le titre ne
+    # contient pas un mot-clé sport explicite (ex. rapports « FFRugby »,
+    # « Comité d'organisation Paris 2024 »). Le filtrage thématique
+    # CC inclut handicap/famille/jeunes en plus du sport — le filtre
+    # keyword sport aval triera.
+    - id: ccomptes_publications_sport
+      category: communiques
+      url: "https://www.ccomptes.fr/fr/publications?f%5B0%5D=institution%3A98&f%5B1%5D=thematic%3A17182"
+      format: ccomptes_publications_html
+      proxy: cloudflare
+
     # R15 (2026-04-22) — Défenseur des droits : passage en RSS officiel.
     # /rss.xml renvoie un flux valide (49 Ko, dates ISO 2026-04 récentes)
     # alors que le scraping HTML capte ~30 items dont beaucoup de nav.
