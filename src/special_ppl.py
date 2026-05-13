@@ -556,6 +556,172 @@ def _row_to_payload(r: dict, max_title: int = 220) -> dict:
     }
 
 
+_WC_TOKEN_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ\-]{4,}", re.UNICODE)
+# Stopwords FR + bruits procéduraux. Tous accentués comme l'écrit l'AN.
+_WC_STOPWORDS: frozenset[str] = frozenset({
+    # Mots vides FR classiques
+    "alors", "ainsi", "aprés", "après", "aucun", "aucune", "aussi", "autre",
+    "autres", "avant", "avec", "avoir", "cela", "cela", "celle", "celles",
+    "celui", "cent", "cette", "ceux", "chaque", "comme", "comment", "dans",
+    "depuis", "deux", "dont", "donc", "elle", "elles", "encore", "entre",
+    "etre", "être", "eux", "fait", "faire", "fois", "hors", "ici", "ils",
+    "jusqu", "leur", "leurs", "lors", "lorsque", "mais", "mêmes", "même",
+    "mois", "moins", "nous", "notre", "notamment", "outre", "parce", "pour",
+    "pourquoi", "plus", "près", "puis", "quand", "quel", "quelle", "quels",
+    "quelles", "rien", "sans", "sera", "ses", "seul", "seule", "seuls",
+    "seules", "sous", "soit", "sont", "sous", "sur", "tant", "tels",
+    "telles", "tous", "toute", "toutes", "très", "trop", "vers", "vous",
+    "votre", "vos", "celle-ci", "celui-ci", "qu'il", "qu'elle", "qu'ils",
+    "afin", "doit", "doivent", "peut", "peuvent", "ainsi", "cas", "été",
+    "été", "telle", "tel", "etc",
+    # Articles & prépositions multi-formes
+    "des", "les", "une", "aux", "que", "qui", "ces", "cet",
+    # Verbes auxiliaires fréquents
+    "avait", "avaient", "aura", "auront", "avait", "aurait", "auraient",
+    "était", "étaient", "sera", "seront", "serait", "seraient", "est",
+    # Bruits procéduraux (déjà connus du contexte amdt)
+    "amendement", "amendements", "article", "articles", "alinéa", "alinéas",
+    "loi", "lois", "code", "projet", "proposition", "présent", "présente",
+    "présents", "présentes", "rédaction", "rédigé", "rédigée", "rédigés",
+    "rédigées", "supprimer", "remplacer", "ajouter", "insérer", "modifier",
+    "complété", "complétée", "complétés", "complétées", "fin", "phrase",
+    "premier", "deuxième", "troisième", "quatrième", "cinquième",
+    "président", "présidente", "rapporteur", "rapporteurs", "rapporteure",
+    "ministre", "ministère", "ministériel", "ministérielle",
+    "national", "nationale", "nationaux", "nationales",
+    "fédération", "fédérations", "fédérale", "fédéral", "fédéraux",
+    # Trop génériques pour la PPL Sport pro (sinon dominent toutes les fréquences)
+    "sport", "sports", "sportif", "sportifs", "sportive", "sportives",
+    "professionnel", "professionnelle", "professionnels", "professionnelles",
+    "société", "sociétés",
+    # Connecteurs / divers
+    "ainsi", "lieu", "autre", "autres", "ainsi", "même", "mêmes",
+    "compte", "comptes", "raison", "raisons", "ensemble",
+    "exemple", "permet", "permettre", "viser", "vise", "visant", "visent",
+    "matière", "place", "mise", "mises", "mis", "rend", "rendre",
+    "indique", "indiquer", "supprime", "supprimer",
+    "selon", "doivent", "concerne", "concernant", "concerné", "concernée",
+    "concernés", "concernées",
+    "afin", "objet", "objets", "objectif", "objectifs",
+    "fait", "faite", "faits", "faites",
+    "tout", "toute", "tous", "toutes",
+})
+
+
+def _build_wordcloud(amdt_rows_payload: list[dict],
+                     top_n: int = 40) -> list[dict]:
+    """R42-BX (2026-05-14) — Nuage thématique des amdt commission.
+
+    Tokenize les `extract` (issus de _build_extract) en mots ≥4 chars,
+    filtre par stopwords FR (+ bruits procéduraux + mots trop génériques
+    type 'sport', 'amendement', 'article'), compte les fréquences,
+    retourne les `top_n` les plus fréquents avec une classe de taille
+    (xl/lg/md/sm/xs) calculée par quintile.
+
+    Format de sortie consommé côté Hugo :
+      [{"word": "agrément", "count": 87, "size": "xl"}, ...]
+    """
+    if not amdt_rows_payload:
+        return []
+    counts: dict[str, int] = {}
+    for r in amdt_rows_payload:
+        text = (r.get("extract") or "")
+        if not text:
+            continue
+        for tok in _WC_TOKEN_RE.findall(text):
+            low = tok.lower()
+            if low in _WC_STOPWORDS:
+                continue
+            counts[low] = counts.get(low, 0) + 1
+    if not counts:
+        return []
+    # Top N par fréquence décroissante (tie-break alphabétique)
+    items = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:top_n]
+    # 5 tailles par quintile sur la fréquence
+    freqs = [c for _, c in items]
+    if not freqs:
+        return []
+    f_max = max(freqs)
+    f_min = min(freqs)
+    span = max(f_max - f_min, 1)
+    def _size(c: int) -> str:
+        # Position 0..1 dans la distribution
+        pos = (c - f_min) / span
+        if pos >= 0.80: return "xl"
+        if pos >= 0.55: return "lg"
+        if pos >= 0.30: return "md"
+        if pos >= 0.10: return "sm"
+        return "xs"
+    return [{"word": w, "count": c, "size": _size(c)} for w, c in items]
+
+
+def _build_sort_stats(amdt_rows_payload: list[dict]) -> dict:
+    """R42-BX (2026-05-14) — Agrège les sorts des amdt commission.
+
+    Retourne `{"total": N, "buckets": [{"label", "count", "pct", "class"}]}`
+    avec les buckets canoniques (Adopté / Rejeté / Retiré / Tombé /
+    En traitement / Autre). Le `class` est utilisé côté CSS pour le
+    code couleur cohérent (sort--adopte, sort--rejete, ...).
+    """
+    if not amdt_rows_payload:
+        return {"total": 0, "buckets": []}
+    # Mapping sort label brut → bucket canonique
+    def _bucket_of(sort_raw: str) -> tuple[str, str]:
+        s = (sort_raw or "").strip().lower()
+        if not s or s == "en traitement":
+            return ("En traitement", "traitement")
+        if "adopt" in s:
+            return ("Adopté", "adopte")
+        if "rejet" in s or "irrecev" in s:
+            return ("Rejeté", "rejete")
+        if "retir" in s:
+            return ("Retiré", "retire")
+        if "tomb" in s or "non examin" in s or "non soutenu" in s or "article 40" in s:
+            return ("Tombé", "tombe")
+        return ("Autre", "autre")
+    counter: dict[str, dict] = {}
+    for r in amdt_rows_payload:
+        label, cls = _bucket_of(r.get("sort"))
+        if label not in counter:
+            counter[label] = {"label": label, "class": cls, "count": 0}
+        counter[label]["count"] += 1
+    total = sum(b["count"] for b in counter.values())
+    # Ordre stable : adopté > rejeté > retiré > tombé > en traitement > autre
+    order = ["Adopté", "Rejeté", "Retiré", "Tombé", "En traitement", "Autre"]
+    buckets = []
+    for lbl in order:
+        if lbl in counter:
+            b = counter[lbl]
+            b["pct"] = round(100 * b["count"] / total) if total else 0
+            buckets.append(b)
+    return {"total": total, "buckets": buckets}
+
+
+def _build_groupe_stats(amdt_rows_payload: list[dict],
+                        top_n: int = 8) -> list[dict]:
+    """R42-BX (2026-05-14) — Top N groupes politiques (dépôts amdt).
+
+    Retourne `[{"groupe", "count", "pct_max"}]` trié par count desc.
+    `pct_max` = % par rapport au top groupe (pour bar charts).
+    """
+    if not amdt_rows_payload:
+        return []
+    counts: dict[str, int] = {}
+    for r in amdt_rows_payload:
+        g = (r.get("groupe") or "").strip()
+        if not g:
+            continue
+        counts[g] = counts.get(g, 0) + 1
+    if not counts:
+        return []
+    items = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:top_n]
+    top_count = items[0][1] if items else 1
+    return [
+        {"groupe": g, "count": c, "pct_max": round(100 * c / top_count)}
+        for g, c in items
+    ]
+
+
 def build_payload(buckets: dict) -> dict:
     """Construit le payload JSON exposé via site/data/special_ppl.json."""
     # Limit raisonnable par bucket (page peut afficher tous, sidebar ne
@@ -598,6 +764,19 @@ def build_payload(buckets: dict) -> dict:
     )
     payload["amdt_seance_by_article"] = _group_amdt_by_article(
         payload["amdt_seance"]
+    )
+    # R42-BX (2026-05-14) — Agrégats pour la page mockup v3 :
+    # - nuage de mots-clés (40 plus fréquents des extracts, 5 tailles)
+    # - stats de sort (donut)
+    # - top groupes politiques (barres horizontales)
+    payload["wordcloud_commission"] = _build_wordcloud(
+        payload["amdt_commission"]
+    )
+    payload["sort_stats_commission"] = _build_sort_stats(
+        payload["amdt_commission"]
+    )
+    payload["groupe_stats_commission"] = _build_groupe_stats(
+        payload["amdt_commission"]
     )
     return payload
 

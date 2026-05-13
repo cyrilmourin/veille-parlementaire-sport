@@ -1,15 +1,23 @@
-{{/* R42-BW (2026-05-13) — Page mockup PPL Sport pro (refonte amdt/texte).
-     Vitrine UX dépliable, non listée dans le menu, noindex.
-     Accessible uniquement par URL directe `/ppl-sport-professionnel-mockup/`.
-     L'ancienne page `/ppl-sport-professionnel/` reste en place et indexée.
-     Contenu hardcodé pour la démo (pas de dépendance à site.Data.special_ppl). */}}
+{{/* R42-BW/BX (2026-05-13/14) — Page mockup PPL Sport pro.
+
+     Vitrine UX refonte amdt/texte. Non listée dans le menu (`noindex` +
+     `sitemap.disable` via le frontmatter). Accessible uniquement par
+     URL directe `/ppl-sport-professionnel-mockup/`. L'ancienne page
+     `/ppl-sport-professionnel/` reste publique et indexée.
+
+     Consomme `site.Data.special_ppl` (mêmes données que la page
+     d'origine) — pas de duplication ni de fork. Les agrégats spéciaux
+     (nuage de mots, stats sort, top groupes) sont calculés côté
+     pipeline par `src/special_ppl.py::build_payload` (R42-BX). */}}
 {{ define "main" }}
+{{ $d := .Site.Data.special_ppl }}
 <style>
-  /* Styles isolés (préfixe .ppl-v3) pour ne PAS toucher style.css du site */
+  /* Styles isolés (préfixe .ppl-v3) pour ne PAS toucher style.css du site.
+     Bleu charte : --sl-blue = #122549 (cf. style.css :root). */
   .ppl-v3 { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
 
   .ppl-v3-hero {
-    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    background: linear-gradient(135deg, #122549 0%, #1b3b6f 100%);
     color: white; padding: 20px 24px; border-radius: 10px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px;
   }
@@ -21,39 +29,29 @@
     background: white; border-radius: 10px; padding: 16px 20px;
     margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   }
-  .ppl-v3-rapporteurs__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 4px; }
+  .ppl-v3-rapporteurs__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 4px; }
   .ppl-v3-rapporteur {
     display: flex; align-items: center; gap: 10px;
     padding: 10px 12px; background: #fafbfc; border-radius: 8px;
-    border-left: 3px solid #1e3a8a; transition: all 0.12s;
+    border-left: 3px solid #122549; transition: all 0.12s;
     text-decoration: none; color: inherit;
   }
   .ppl-v3-rapporteur:hover { background: #f1f5f9; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
-  .ppl-v3-rapporteur__avatar {
-    width: 44px; height: 44px; border-radius: 50%;
-    display: grid; place-items: center; font-weight: 800;
-    color: white; font-size: 14px; letter-spacing: 0.5px; flex-shrink: 0;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  .ppl-v3-rapporteur__photo {
+    width: 48px; height: 48px; border-radius: 50%; object-fit: cover;
+    border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    flex-shrink: 0; background: #e2e8f0;
   }
-  .ppl-v3-rapporteur__avatar--epr { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
-  .ppl-v3-rapporteur__avatar--rn  { background: linear-gradient(135deg, #475569, #1e293b); }
-  .ppl-v3-rapporteur__avatar--lfi { background: linear-gradient(135deg, #ef4444, #b91c1c); }
-  .ppl-v3-rapporteur__avatar--soc { background: linear-gradient(135deg, #f472b6, #db2777); }
   .ppl-v3-rapporteur__info { min-width: 0; flex: 1; }
   .ppl-v3-rapporteur__name { font-weight: 700; font-size: 13px; color: #1a202c; line-height: 1.2; }
   .ppl-v3-rapporteur__meta { font-size: 11px; color: #64748b; margin-top: 2px; }
-  .ppl-v3-rapporteur__role {
-    display: inline-block; font-size: 10px; padding: 1px 5px;
-    background: #e0e7ff; color: #1e3a8a; border-radius: 3px;
-    font-weight: 700; letter-spacing: 0.3px; margin-left: 4px;
-  }
 
   .ppl-v3-parcours { background: white; border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
   .ppl-v3-section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 12px; font-weight: 600; }
   .ppl-v3-steps { display: flex; gap: 6px; align-items: stretch; flex-wrap: wrap; }
   .ppl-v3-step { flex: 1; min-width: 105px; padding: 10px 12px; border-radius: 7px; background: #f1f5f9; font-size: 12px; }
   .ppl-v3-step--done { background: #dcfce7; color: #14532d; }
-  .ppl-v3-step--current { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); color: #1e3a8a; box-shadow: 0 0 0 2px #3b82f6; }
+  .ppl-v3-step--current { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); color: #122549; box-shadow: 0 0 0 2px #1b3b6f; }
   .ppl-v3-step--future { background: #f1f5f9; color: #64748b; opacity: 0.7; }
   .ppl-v3-step--conditional { background: repeating-linear-gradient(45deg, #fef3c7, #fef3c7 5px, #fef9e7 5px, #fef9e7 10px); color: #78350f; }
   .ppl-v3-step--conditional .ppl-v3-step__cond { display: inline-block; padding: 1px 4px; background: #f59e0b; color: white; border-radius: 3px; font-size: 9px; font-weight: 800; letter-spacing: 0.5px; margin-left: 3px; }
@@ -64,18 +62,18 @@
   .ppl-v3-tabs { display: flex; gap: 3px; margin-top: 12px; padding: 0 3px; }
   .ppl-v3-tab { padding: 12px 18px; background: #e2e8f0; color: #64748b; border-radius: 10px 10px 0 0; cursor: pointer; font-size: 13px; font-weight: 600; border: none; display: flex; align-items: center; gap: 7px; font-family: inherit; }
   .ppl-v3-tab:hover:not(.ppl-v3-tab--active) { background: #cbd5e1; }
-  .ppl-v3-tab--active { background: white; color: #1e3a8a; }
+  .ppl-v3-tab--active { background: white; color: #122549; }
   .ppl-v3-tab--disabled { background: #f1f5f9; color: #cbd5e1; cursor: not-allowed; }
-  .ppl-v3-tab__badge { padding: 2px 6px; background: #1e3a8a; color: white; border-radius: 8px; font-size: 10px; font-weight: 700; }
-  .ppl-v3-tab--active .ppl-v3-tab__badge { background: #3b82f6; }
+  .ppl-v3-tab__badge { padding: 2px 6px; background: #122549; color: white; border-radius: 8px; font-size: 10px; font-weight: 700; }
+  .ppl-v3-tab--active .ppl-v3-tab__badge { background: #1b3b6f; }
   .ppl-v3-tab__status { font-size: 9px; padding: 2px 5px; background: #fef3c7; color: #92400e; border-radius: 3px; font-weight: 700; }
   .ppl-v3-panel { background: white; border-radius: 0 10px 10px 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 20px; }
 
   .ppl-v3-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
-  .ppl-v3-btn { flex: 1; min-width: 180px; padding: 11px 14px; border-radius: 8px; background: white; border: 2px solid #e2e8f0; color: #1e3a8a; font-weight: 600; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 9px; transition: all 0.15s; }
-  .ppl-v3-btn:hover { border-color: #3b82f6; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.15); }
-  .ppl-v3-btn--primary { background: #1e3a8a; color: white; border-color: #1e3a8a; }
-  .ppl-v3-btn--primary:hover { background: #1e40af; }
+  .ppl-v3-btn { flex: 1; min-width: 180px; padding: 11px 14px; border-radius: 8px; background: white; border: 2px solid #e2e8f0; color: #122549; font-weight: 600; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 9px; transition: all 0.15s; }
+  .ppl-v3-btn:hover { border-color: #1b3b6f; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(18,37,73,0.15); }
+  .ppl-v3-btn--primary { background: #122549; color: white; border-color: #122549; }
+  .ppl-v3-btn--primary:hover { background: #1b3b6f; }
   .ppl-v3-btn__icon { font-size: 16px; }
   .ppl-v3-btn__hint { font-size: 10px; opacity: 0.8; font-weight: 400; display: block; }
 
@@ -83,38 +81,44 @@
   .ppl-v3-articles__hint { font-size: 11px; color: #94a3b8; margin-bottom: 12px; font-style: italic; }
   .ppl-v3-article-row { border: 1px solid #e2e8f0; border-radius: 7px; margin-bottom: 6px; overflow: hidden; transition: all 0.15s; }
   .ppl-v3-article-row[open] { box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
-  .ppl-v3-article-row > summary { padding: 10px 14px; cursor: pointer; list-style: none; display: grid; grid-template-columns: 80px 1fr 90px 90px; gap: 12px; align-items: center; background: #fafbfc; transition: background 0.12s; }
+  .ppl-v3-article-row > summary { padding: 10px 14px; cursor: pointer; list-style: none; display: grid; grid-template-columns: 110px 1fr 90px 90px; gap: 12px; align-items: center; background: #fafbfc; transition: background 0.12s; }
   .ppl-v3-article-row > summary:hover { background: #f1f5f9; }
   .ppl-v3-article-row > summary::-webkit-details-marker { display: none; }
   .ppl-v3-article-row[open] > summary { background: #eff6ff; border-bottom: 1px solid #dbeafe; }
-  .ppl-v3-article-row__num { font-weight: 800; color: #1e3a8a; font-size: 13px; letter-spacing: 0.5px; }
+  .ppl-v3-article-row__num { font-weight: 800; color: #122549; font-size: 13px; letter-spacing: 0.5px; }
   .ppl-v3-article-row__caption { font-size: 12px; color: #475569; }
-  .ppl-v3-article-row__chip { font-size: 10px; padding: 3px 6px; background: #e0e7ff; color: #1e3a8a; border-radius: 4px; font-weight: 700; text-align: center; letter-spacing: 0.3px; }
-  .ppl-v3-article-row__toggle { font-size: 11px; color: #3b82f6; font-weight: 600; text-align: right; }
+  .ppl-v3-article-row__chip { font-size: 10px; padding: 3px 6px; background: #e0e7ff; color: #122549; border-radius: 4px; font-weight: 700; text-align: center; letter-spacing: 0.3px; }
+  .ppl-v3-article-row__toggle { font-size: 11px; color: #1b3b6f; font-weight: 600; text-align: right; }
   .ppl-v3-article-row[open] .ppl-v3-article-row__toggle::after { content: " ▾"; }
   .ppl-v3-article-row:not([open]) .ppl-v3-article-row__toggle::after { content: " ▸"; }
   .ppl-v3-article-row__body { padding: 14px 18px; background: white; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .ppl-v3-article-row__col { max-height: 280px; overflow-y: auto; padding: 12px 14px; background: #fafbfc; border-radius: 6px; font-size: 12px; line-height: 1.55; color: #1f2937; border-left: 3px solid #94a3b8; }
-  .ppl-v3-article-row__col--commission { border-left-color: #1e3a8a; }
+  .ppl-v3-article-row__col { max-height: 320px; overflow-y: auto; padding: 12px 14px; background: #fafbfc; border-radius: 6px; font-size: 12px; line-height: 1.55; color: #1f2937; border-left: 3px solid #94a3b8; }
+  .ppl-v3-article-row__col--commission { border-left-color: #122549; }
   .ppl-v3-article-row__col-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: #64748b; margin-bottom: 6px; font-weight: 700; }
-  .ppl-v3-article-row__col-title--commission { color: #1e3a8a; }
+  .ppl-v3-article-row__col-title--commission { color: #122549; }
+  .ppl-v3-article-row__col p { margin-bottom: 8px; }
+  .ppl-v3-article-row__col em { font-style: normal; }
   .ppl-v3-article-row__amdt-mini { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0; font-size: 11px; }
   .ppl-v3-amdt-mini { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-left: 3px solid transparent; padding-left: 8px; margin-bottom: 2px; }
   .ppl-v3-amdt-mini--adopte { border-left-color: #22c55e; }
   .ppl-v3-amdt-mini--rejete { border-left-color: #ef4444; }
   .ppl-v3-amdt-mini--retire { border-left-color: #f59e0b; }
   .ppl-v3-amdt-mini--tombe  { border-left-color: #94a3b8; }
-  .ppl-v3-amdt-mini__num { font-weight: 700; color: #1e3a8a; min-width: 50px; }
+  .ppl-v3-amdt-mini--traitement { border-left-color: #1b3b6f; }
+  .ppl-v3-amdt-mini__num { font-weight: 700; color: #122549; min-width: 60px; }
   .ppl-v3-amdt-mini__author { color: #475569; flex: 1; }
   .ppl-v3-amdt-mini__sort { font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: 700; }
 
   .ppl-v3-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
   .ppl-v3-card { background: #fafbfc; border-radius: 9px; padding: 16px; }
   .ppl-v3-stats { display: flex; gap: 16px; align-items: center; }
-  .ppl-v3-donut { width: 110px; height: 110px; border-radius: 50%; background: conic-gradient(#22c55e 0% 30%, #ef4444 30% 75%, #f59e0b 75% 93%, #94a3b8 93% 100%); display: grid; place-items: center; position: relative; flex-shrink: 0; }
+  .ppl-v3-donut {
+    width: 110px; height: 110px; border-radius: 50%;
+    display: grid; place-items: center; position: relative; flex-shrink: 0;
+  }
   .ppl-v3-donut::before { content: ''; width: 72px; height: 72px; background: white; border-radius: 50%; position: absolute; }
   .ppl-v3-donut__center { position: relative; text-align: center; z-index: 1; }
-  .ppl-v3-donut__total { font-size: 22px; font-weight: 800; color: #1e3a8a; line-height: 1; }
+  .ppl-v3-donut__total { font-size: 22px; font-weight: 800; color: #122549; line-height: 1; }
   .ppl-v3-donut__label { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
   .ppl-v3-legend { display: flex; flex-direction: column; gap: 6px; flex: 1; font-size: 11px; }
   .ppl-v3-legend-row { display: flex; align-items: center; gap: 6px; }
@@ -123,50 +127,47 @@
   .ppl-v3-legend-val { font-weight: 700; }
   .ppl-v3-legend-pct { color: #64748b; }
   .ppl-v3-groupes { display: flex; flex-direction: column; gap: 5px; font-size: 11px; }
-  .ppl-v3-groupe { display: grid; grid-template-columns: 60px 1fr 28px; gap: 8px; align-items: center; }
+  .ppl-v3-groupe { display: grid; grid-template-columns: 90px 1fr 32px; gap: 8px; align-items: center; }
   .ppl-v3-groupe__bar { background: #e2e8f0; border-radius: 3px; height: 6px; }
-  .ppl-v3-groupe__fill { background: linear-gradient(90deg, #3b82f6, #1e3a8a); height: 100%; border-radius: 3px; }
-  .ppl-v3-groupe__num { font-weight: 700; color: #1e3a8a; text-align: right; }
+  .ppl-v3-groupe__fill { background: linear-gradient(90deg, #1b3b6f, #122549); height: 100%; border-radius: 3px; }
+  .ppl-v3-groupe__num { font-weight: 700; color: #122549; text-align: right; }
 
   .ppl-v3-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 14px; }
   .ppl-v3-chip { padding: 7px 11px; background: #f1f5f9; border-radius: 7px; cursor: pointer; font-size: 11px; border: 2px solid transparent; min-width: 72px; text-align: center; }
   .ppl-v3-chip:hover { background: #dbeafe; }
-  .ppl-v3-chip--active { background: #1e3a8a; color: white; }
+  .ppl-v3-chip--active { background: #122549; color: white; }
   .ppl-v3-chip__label { font-weight: 700; }
   .ppl-v3-chip__count { font-size: 10px; opacity: 0.75; margin-top: 1px; }
-  .ppl-v3-amdt { padding: 10px 12px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid #e2e8f0; background: #fafbfc; display: grid; grid-template-columns: 56px 1fr 80px 90px; gap: 10px; align-items: center; font-size: 12px; }
+  .ppl-v3-amdt { padding: 10px 12px; border-radius: 7px; margin-bottom: 5px; border-left: 3px solid #e2e8f0; background: #fafbfc; display: grid; grid-template-columns: 72px 1fr 90px 100px; gap: 10px; align-items: center; font-size: 12px; }
   .ppl-v3-amdt:hover { background: #f1f5f9; }
   .ppl-v3-amdt--adopte { border-left-color: #22c55e; }
   .ppl-v3-amdt--rejete { border-left-color: #ef4444; }
   .ppl-v3-amdt--retire { border-left-color: #f59e0b; }
   .ppl-v3-amdt--tombe { border-left-color: #94a3b8; }
-  .ppl-v3-amdt--traitement { border-left-color: #3b82f6; }
-  .ppl-v3-amdt__num { font-weight: 800; color: #1e3a8a; font-size: 13px; }
+  .ppl-v3-amdt--traitement { border-left-color: #1b3b6f; }
+  .ppl-v3-amdt__num { font-weight: 800; color: #122549; font-size: 13px; }
   .ppl-v3-amdt__author { font-weight: 600; color: #1a202c; }
   .ppl-v3-amdt__groupe { font-size: 10px; padding: 1px 5px; background: #e2e8f0; color: #475569; border-radius: 3px; font-weight: 600; margin-left: 5px; }
   .ppl-v3-amdt__date { font-size: 10px; color: #64748b; margin-top: 1px; }
-  .ppl-v3-amdt__article { font-size: 10px; padding: 3px 6px; background: #e0e7ff; color: #1e3a8a; border-radius: 4px; font-weight: 700; text-align: center; }
+  .ppl-v3-amdt__article { font-size: 10px; padding: 3px 6px; background: #e0e7ff; color: #122549; border-radius: 4px; font-weight: 700; text-align: center; }
   .ppl-v3-amdt__sort { font-size: 10px; padding: 4px 6px; border-radius: 4px; font-weight: 700; text-align: center; }
   .ppl-v3-sort--adopte { background: #dcfce7; color: #14532d; }
   .ppl-v3-sort--rejete { background: #fee2e2; color: #991b1b; }
   .ppl-v3-sort--retire { background: #fef3c7; color: #92400e; }
   .ppl-v3-sort--tombe { background: #e2e8f0; color: #475569; }
-  .ppl-v3-sort--traitement { background: #dbeafe; color: #1e3a8a; }
+  .ppl-v3-sort--traitement { background: #dbeafe; color: #122549; }
+  .ppl-v3-sort--autre { background: #f1f5f9; color: #475569; }
 
   .ppl-v3-wordcloud { background: white; border-radius: 10px; padding: 22px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 20px; }
   .ppl-v3-wordcloud__sub { font-size: 11px; color: #94a3b8; margin-bottom: 14px; font-style: italic; }
   .ppl-v3-cloud { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: center; align-items: center; padding: 8px 0; line-height: 1.1; }
   .ppl-v3-word { font-weight: 700; padding: 3px 6px; border-radius: 5px; }
   .ppl-v3-word:hover { background: #f1f5f9; }
-  .ppl-v3-word--xl { font-size: 32px; color: #1e3a8a; }
-  .ppl-v3-word--lg { font-size: 26px; color: #1d4ed8; }
-  .ppl-v3-word--md { font-size: 19px; color: #3b82f6; }
-  .ppl-v3-word--sm { font-size: 15px; color: #60a5fa; }
+  .ppl-v3-word--xl { font-size: 32px; color: #122549; }
+  .ppl-v3-word--lg { font-size: 26px; color: #1b3b6f; }
+  .ppl-v3-word--md { font-size: 19px; color: #2d4f80; }
+  .ppl-v3-word--sm { font-size: 15px; color: #5778a8; }
   .ppl-v3-word--xs { font-size: 12px; color: #94a3b8; }
-
-  .ppl-v3-mockup-note { margin-top: 18px; padding: 12px 16px; background: #fef3c7; border-radius: 7px; border-left: 4px solid #f59e0b; font-size: 11px; color: #78350f; }
-  .ppl-v3-mockup-note strong { color: #92400e; }
-  .ppl-v3-mockup-note ul { margin: 5px 0 0 16px; }
 
   @media (max-width: 900px) {
     .ppl-v3-grid { grid-template-columns: 1fr; }
@@ -177,51 +178,40 @@
 <div class="ppl-v3">
 
   <div class="ppl-v3-hero">
-    <div class="ppl-v3-hero__kicker">PPL SPÉCIALE · MOCKUP V3</div>
+    <div class="ppl-v3-hero__kicker">PPL SPÉCIALE</div>
     <h1 class="ppl-v3-hero__title">Sport professionnel — Organisation, gestion et financement</h1>
-    <p class="ppl-v3-hero__subtitle">AN n° 1560 · adoptée par le Sénat le 10 juin 2025 · examen Commission Culture AN 12 mai 2026</p>
+    <p class="ppl-v3-hero__subtitle">
+      AN n° {{ $d.meta.an_num }} · adoptée par le Sénat le 10 juin 2025 · examen Commission Culture AN 12-13 mai 2026
+    </p>
   </div>
 
+  {{/* ---------- Rapporteurs (vraies données + photos AN) ---------- */}}
+  {{ with $d.meta.rapporteurs }}
   <div class="ppl-v3-rapporteurs">
     <div class="ppl-v3-section-title">Rapporteurs · Commission Culture AN</div>
     <div class="ppl-v3-rapporteurs__list">
-      <a class="ppl-v3-rapporteur" href="https://www2.assemblee-nationale.fr/deputes/fiche/OMC_PA841947" target="_blank" rel="noopener">
-        <div class="ppl-v3-rapporteur__avatar ppl-v3-rapporteur__avatar--epr">BB</div>
+      {{ range . }}
+      <a class="ppl-v3-rapporteur" href="{{ .fiche_url }}" target="_blank" rel="noopener">
+        <img class="ppl-v3-rapporteur__photo" src="{{ .photo_url }}"
+             alt="Photo {{ .prenom }} {{ .nom }}" loading="lazy"
+             onerror="this.style.visibility='hidden';this.style.background='#e2e8f0';"/>
         <div class="ppl-v3-rapporteur__info">
-          <div class="ppl-v3-rapporteur__name">Belkhir Belhaddad <span class="ppl-v3-rapporteur__role">RAPPORTEUR</span></div>
-          <div class="ppl-v3-rapporteur__meta">EPR · Moselle (3<sup>e</sup>)</div>
+          <div class="ppl-v3-rapporteur__name">{{ .prenom }} {{ .nom }}</div>
+          <div class="ppl-v3-rapporteur__meta">{{ .groupe }}</div>
         </div>
       </a>
-      <a class="ppl-v3-rapporteur" href="#" target="_blank" rel="noopener">
-        <div class="ppl-v3-rapporteur__avatar ppl-v3-rapporteur__avatar--rn">LT</div>
-        <div class="ppl-v3-rapporteur__info">
-          <div class="ppl-v3-rapporteur__name">Lionel Tivoli <span class="ppl-v3-rapporteur__role">CO-RAPP.</span></div>
-          <div class="ppl-v3-rapporteur__meta">RN · Alpes-Maritimes (2<sup>e</sup>)</div>
-        </div>
-      </a>
-      <a class="ppl-v3-rapporteur" href="#" target="_blank" rel="noopener">
-        <div class="ppl-v3-rapporteur__avatar ppl-v3-rapporteur__avatar--soc">SB</div>
-        <div class="ppl-v3-rapporteur__info">
-          <div class="ppl-v3-rapporteur__name">Soumya Bourouaha <span class="ppl-v3-rapporteur__role">AVIS</span></div>
-          <div class="ppl-v3-rapporteur__meta">GDR · Seine-Saint-Denis</div>
-        </div>
-      </a>
-      <a class="ppl-v3-rapporteur" href="#" target="_blank" rel="noopener">
-        <div class="ppl-v3-rapporteur__avatar ppl-v3-rapporteur__avatar--lfi">SL</div>
-        <div class="ppl-v3-rapporteur__info">
-          <div class="ppl-v3-rapporteur__name">Sarah Legrain <span class="ppl-v3-rapporteur__role">AVIS</span></div>
-          <div class="ppl-v3-rapporteur__meta">LFI-NFP · Paris (16<sup>e</sup>)</div>
-        </div>
-      </a>
+      {{ end }}
     </div>
   </div>
+  {{ end }}
 
+  {{/* ---------- Parcours législatif + onglets ---------- */}}
   <div class="ppl-v3-parcours">
     <div class="ppl-v3-section-title">Parcours législatif</div>
     <div class="ppl-v3-steps">
       <div class="ppl-v3-step ppl-v3-step--done"><div class="ppl-v3-step__label"><span class="ppl-v3-step__check">✓</span> Dépôt Sénat</div><div class="ppl-v3-step__date">18 mars 2025</div></div>
       <div class="ppl-v3-step ppl-v3-step--done"><div class="ppl-v3-step__label"><span class="ppl-v3-step__check">✓</span> Adoption Sénat 1L</div><div class="ppl-v3-step__date">10 juin 2025</div></div>
-      <div class="ppl-v3-step ppl-v3-step--done"><div class="ppl-v3-step__label"><span class="ppl-v3-step__check">✓</span> Commission AN</div><div class="ppl-v3-step__date">12 mai — TC 2797</div></div>
+      <div class="ppl-v3-step ppl-v3-step--done"><div class="ppl-v3-step__label"><span class="ppl-v3-step__check">✓</span> Commission AN</div><div class="ppl-v3-step__date">12-13 mai · TC 2797</div></div>
       <div class="ppl-v3-step ppl-v3-step--current"><div class="ppl-v3-step__label">⏵ Séance publique AN</div><div class="ppl-v3-step__date">à programmer</div></div>
       <div class="ppl-v3-step ppl-v3-step--conditional"><div class="ppl-v3-step__label">CMP <span class="ppl-v3-step__cond">SI ÉCART</span></div><div class="ppl-v3-step__date">commission mixte</div></div>
       <div class="ppl-v3-step ppl-v3-step--conditional"><div class="ppl-v3-step__label">2L <span class="ppl-v3-step__cond">SI ÉCHEC CMP</span></div><div class="ppl-v3-step__date">nouvelle lecture</div></div>
@@ -230,211 +220,232 @@
     </div>
 
     <div class="ppl-v3-tabs">
-      <button class="ppl-v3-tab ppl-v3-tab--active">Commission AN <span class="ppl-v3-tab__badge">290</span></button>
-      <button class="ppl-v3-tab">Séance publique <span class="ppl-v3-tab__status">à venir</span></button>
-      <button class="ppl-v3-tab ppl-v3-tab--disabled" title="N'apparaît que si CMP a lieu">CMP <span class="ppl-v3-tab__badge" style="background:#cbd5e1;color:#64748b">—</span></button>
+      <button class="ppl-v3-tab ppl-v3-tab--active">
+        Commission AN <span class="ppl-v3-tab__badge">{{ index $d.counts "amdt_commission" }}</span>
+      </button>
+      {{ $seance_count := index $d.counts "amdt_seance" }}
+      <button class="ppl-v3-tab">
+        Séance publique
+        {{ if gt $seance_count 0 }}
+          <span class="ppl-v3-tab__badge">{{ $seance_count }}</span>
+        {{ else }}
+          <span class="ppl-v3-tab__status">à venir</span>
+        {{ end }}
+      </button>
+      <button class="ppl-v3-tab ppl-v3-tab--disabled" title="N'apparaît que si CMP a lieu">
+        CMP <span class="ppl-v3-tab__badge" style="background:#cbd5e1;color:#64748b">—</span>
+      </button>
     </div>
   </div>
 
+  {{/* ---------- Panel actif : Commission ---------- */}}
   <div class="ppl-v3-panel">
 
+    {{/* Boutons d'action */}}
     <div class="ppl-v3-actions">
-      <a class="ppl-v3-btn ppl-v3-btn--primary" href="https://www.assemblee-nationale.fr/dyn/17/textes/l17b2797_texte-adopte-commission" target="_blank" rel="noopener">
+      <a class="ppl-v3-btn ppl-v3-btn--primary"
+         href="https://www.assemblee-nationale.fr/dyn/17/textes/l17b2797_texte-adopte-commission"
+         target="_blank" rel="noopener">
         <span class="ppl-v3-btn__icon">📄</span>
-        <span>Texte voté par commission<span class="ppl-v3-btn__hint">TC n° 2797 · 12 mai 2026</span></span>
+        <span>Texte voté par commission<span class="ppl-v3-btn__hint">TC n° 2797 · 13 mai 2026</span></span>
       </a>
-      <a class="ppl-v3-btn" href="/ppl-1560-amendements-commission.pdf" target="_blank" rel="noopener">
+      <a class="ppl-v3-btn" href="{{ $d.meta.url_amdt_liste_an }}"
+         target="_blank" rel="noopener">
         <span class="ppl-v3-btn__icon">📥</span>
-        <span>Liasse amendements<span class="ppl-v3-btn__hint">PDF · 290 amdt</span></span>
+        <span>Liasse amendements<span class="ppl-v3-btn__hint">{{ index $d.counts "amdt_commission" }} amdt · liste AN</span></span>
       </a>
-      <a class="ppl-v3-btn" href="https://www.assemblee-nationale.fr/dyn/17/textes/l17b1560_proposition-loi" target="_blank" rel="noopener">
+      <a class="ppl-v3-btn" href="{{ $d.meta.url_an_texte }}"
+         target="_blank" rel="noopener">
         <span class="ppl-v3-btn__icon">📑</span>
-        <span>Texte initial AN<span class="ppl-v3-btn__hint">N° 1560 · transmis du Sénat</span></span>
+        <span>Texte initial AN<span class="ppl-v3-btn__hint">N° {{ $d.meta.an_num }} · transmis du Sénat</span></span>
       </a>
     </div>
 
+    {{/* Stats sort + groupes (vraies données du payload) */}}
+    {{ $sort := $d.sort_stats_commission }}
+    {{ $grp := $d.groupe_stats_commission }}
+    {{ if $sort }}
     <div class="ppl-v3-grid">
       <div class="ppl-v3-card">
         <div class="ppl-v3-section-title">Sort des amendements</div>
         <div class="ppl-v3-stats">
-          <div class="ppl-v3-donut"><div class="ppl-v3-donut__center"><div class="ppl-v3-donut__total">290</div><div class="ppl-v3-donut__label">déposés</div></div></div>
+          {{/* Donut conic-gradient calculé dynamiquement à partir du %
+               cumulé de chaque bucket. Couleurs alignées sur les sorts :
+               adopté vert, rejeté rouge, retiré orange, tombé gris,
+               en traitement bleu marine, autre gris clair. */}}
+          {{ $color_map := dict
+              "adopte" "#22c55e"
+              "rejete" "#ef4444"
+              "retire" "#f59e0b"
+              "tombe"  "#94a3b8"
+              "traitement" "#1b3b6f"
+              "autre"  "#cbd5e1"
+          }}
+          {{ $stops := slice }}
+          {{ $acc := 0 }}
+          {{ range $sort.buckets }}
+            {{ $next := add $acc .pct }}
+            {{ $col := index $color_map .class }}
+            {{ $stops = $stops | append (printf "%s %d%% %d%%" $col $acc $next) }}
+            {{ $acc = $next }}
+          {{ end }}
+          <div class="ppl-v3-donut" style="background: conic-gradient({{ delimit $stops `, ` }});">
+            <div class="ppl-v3-donut__center">
+              <div class="ppl-v3-donut__total">{{ $sort.total }}</div>
+              <div class="ppl-v3-donut__label">déposés</div>
+            </div>
+          </div>
           <div class="ppl-v3-legend">
-            <div class="ppl-v3-legend-row"><span class="ppl-v3-legend-dot" style="background:#22c55e"></span><span class="ppl-v3-legend-label">Adoptés</span><span class="ppl-v3-legend-val">87</span><span class="ppl-v3-legend-pct">(30%)</span></div>
-            <div class="ppl-v3-legend-row"><span class="ppl-v3-legend-dot" style="background:#ef4444"></span><span class="ppl-v3-legend-label">Rejetés</span><span class="ppl-v3-legend-val">131</span><span class="ppl-v3-legend-pct">(45%)</span></div>
-            <div class="ppl-v3-legend-row"><span class="ppl-v3-legend-dot" style="background:#f59e0b"></span><span class="ppl-v3-legend-label">Retirés</span><span class="ppl-v3-legend-val">52</span><span class="ppl-v3-legend-pct">(18%)</span></div>
-            <div class="ppl-v3-legend-row"><span class="ppl-v3-legend-dot" style="background:#94a3b8"></span><span class="ppl-v3-legend-label">Tombés</span><span class="ppl-v3-legend-val">20</span><span class="ppl-v3-legend-pct">(7%)</span></div>
+            {{ range $sort.buckets }}
+            <div class="ppl-v3-legend-row">
+              <span class="ppl-v3-legend-dot" style="background:{{ index $color_map .class }}"></span>
+              <span class="ppl-v3-legend-label">{{ .label }}</span>
+              <span class="ppl-v3-legend-val">{{ .count }}</span>
+              <span class="ppl-v3-legend-pct">({{ .pct }}%)</span>
+            </div>
+            {{ end }}
           </div>
         </div>
       </div>
 
+      {{ if $grp }}
       <div class="ppl-v3-card">
-        <div class="ppl-v3-section-title">Top groupes politiques</div>
+        <div class="ppl-v3-section-title">Top groupes politiques (dépôts)</div>
         <div class="ppl-v3-groupes">
-          <div class="ppl-v3-groupe"><span>LFI-NFP</span><div class="ppl-v3-groupe__bar"><div class="ppl-v3-groupe__fill" style="width:90%"></div></div><span class="ppl-v3-groupe__num">82</span></div>
-          <div class="ppl-v3-groupe"><span>RN</span><div class="ppl-v3-groupe__bar"><div class="ppl-v3-groupe__fill" style="width:62%"></div></div><span class="ppl-v3-groupe__num">56</span></div>
-          <div class="ppl-v3-groupe"><span>SOC</span><div class="ppl-v3-groupe__bar"><div class="ppl-v3-groupe__fill" style="width:48%"></div></div><span class="ppl-v3-groupe__num">44</span></div>
-          <div class="ppl-v3-groupe"><span>EPR</span><div class="ppl-v3-groupe__bar"><div class="ppl-v3-groupe__fill" style="width:42%"></div></div><span class="ppl-v3-groupe__num">38</span></div>
-          <div class="ppl-v3-groupe"><span>LR</span><div class="ppl-v3-groupe__bar"><div class="ppl-v3-groupe__fill" style="width:33%"></div></div><span class="ppl-v3-groupe__num">30</span></div>
-          <div class="ppl-v3-groupe"><span>ÉCO</span><div class="ppl-v3-groupe__bar"><div class="ppl-v3-groupe__fill" style="width:24%"></div></div><span class="ppl-v3-groupe__num">22</span></div>
-          <div class="ppl-v3-groupe"><span>DEM/HOR</span><div class="ppl-v3-groupe__bar"><div class="ppl-v3-groupe__fill" style="width:20%"></div></div><span class="ppl-v3-groupe__num">18</span></div>
+          {{ range $grp }}
+          <div class="ppl-v3-groupe">
+            <span>{{ .groupe }}</span>
+            <div class="ppl-v3-groupe__bar"><div class="ppl-v3-groupe__fill" style="width:{{ .pct_max }}%"></div></div>
+            <span class="ppl-v3-groupe__num">{{ .count }}</span>
+          </div>
+          {{ end }}
         </div>
       </div>
+      {{ end }}
     </div>
+    {{ end }}
 
+    {{/* ---------- Articles dépliables INLINE ---------- */}}
+    {{ with $d.amdt_commission_by_article }}
     <div class="ppl-v3-articles">
-      <div class="ppl-v3-section-title">📑 Articles du texte — cliquer pour comparer initial / voté + voir les amendements de l'article</div>
-      <p class="ppl-v3-articles__hint">Chaque article s'ouvre INLINE (pas de popup, pas de redirection vers AN). À gauche : texte initial AN (n°1560). À droite : texte voté en commission (TC 2797). En dessous : amendements ayant porté sur l'article.</p>
+      <div class="ppl-v3-section-title">📑 Articles du texte — cliquer pour voir les amendements et le contenu</div>
+      <p class="ppl-v3-articles__hint">
+        Chaque article s'ouvre INLINE. À gauche : texte initial AN (n° {{ $d.meta.an_num }}).
+        À droite : texte voté en commission (TC 2797), à remplir au prochain refresh quand les données du
+        texte de commission seront ingérées. En dessous : amendements ayant porté sur l'article.
+      </p>
 
-      <details class="ppl-v3-article-row" open>
+      {{ $articles_data := $.Site.Data.special_ppl_articles }}
+
+      {{ range . }}
+      {{ $article_key := .article }}
+      {{ $count := len .items }}
+      {{ $initial_text := index $articles_data $article_key }}
+      <details class="ppl-v3-article-row">
         <summary>
-          <span class="ppl-v3-article-row__num">ART. 1ER</span>
-          <span class="ppl-v3-article-row__caption">Agrément ministériel pour les sociétés sportives</span>
-          <span class="ppl-v3-article-row__chip">52 amdt</span>
+          <span class="ppl-v3-article-row__num">{{ .article }}</span>
+          <span class="ppl-v3-article-row__caption">{{ $count }} amendement{{ if gt $count 1 }}s{{ end }} en commission</span>
+          <span class="ppl-v3-article-row__chip">{{ $count }} amdt</span>
           <span class="ppl-v3-article-row__toggle">Comparer</span>
         </summary>
         <div class="ppl-v3-article-row__body">
           <div class="ppl-v3-article-row__col">
-            <div class="ppl-v3-article-row__col-title">Texte initial (n°1560, Sénat)</div>
-            <p><em>I. — L'agrément prévu à l'article L. 122-1 du code du sport est délivré par le ministre chargé des sports aux sociétés sportives dont les recettes annuelles excèdent un seuil fixé par décret en Conseil d'État.</em></p>
-            <p><em>II. — L'agrément peut être retiré si la société ne satisfait plus aux conditions de son octroi, ou si elle méconnaît les obligations comptables et de gouvernance fixées par le présent chapitre.</em></p>
-            <p><em>III. — La liste des sociétés agréées est publiée chaque année au Journal officiel.</em></p>
-            <p><em>IV. — Un décret en Conseil d'État, pris après avis de l'Autorité de régulation des transports, précise les conditions d'application du présent article.</em></p>
+            <div class="ppl-v3-article-row__col-title">Texte initial (n° {{ $d.meta.an_num }})</div>
+            {{ if $initial_text }}
+              {{ $initial_text | safeHTML }}
+            {{ else }}
+              <p><em>Texte non extrait pour cet article (le pipeline AN ne l'a pas découpé ou article additionnel).</em></p>
+              <p><em><a href="{{ $d.meta.url_an_texte }}" target="_blank" rel="noopener">Consulter sur AN ↗</a></em></p>
+            {{ end }}
           </div>
           <div class="ppl-v3-article-row__col ppl-v3-article-row__col--commission">
-            <div class="ppl-v3-article-row__col-title ppl-v3-article-row__col-title--commission">Texte voté en commission (TC 2797)</div>
-            <p><em>I. — L'agrément prévu à l'article L. 122-1 du code du sport est délivré par le ministre chargé des sports aux sociétés sportives dont les recettes annuelles excèdent un seuil fixé par décret en Conseil d'État, <strong>après avis de la fédération sportive délégataire concernée</strong>.</em></p>
-            <p><em>II. — L'agrément peut être retiré <strong>par décision motivée</strong> si la société ne satisfait plus aux conditions de son octroi, ou si elle méconnaît les obligations comptables et de gouvernance fixées par le présent chapitre. <strong>La décision est notifiée à la société et publiée au Journal officiel.</strong></em></p>
-            <p><em>III. — La liste des sociétés agréées est publiée chaque année au Journal officiel<strong>, avec mention du chiffre d'affaires consolidé</strong>.</em></p>
-            <p><em>IV. — Un décret en Conseil d'État, <strong>pris après consultation du Comité national olympique et sportif français</strong>, précise les conditions d'application du présent article.</em></p>
+            <div class="ppl-v3-article-row__col-title ppl-v3-article-row__col-title--commission">Texte voté commission (TC 2797)</div>
+            <p><em>Disponible une fois la commission terminée (à venir au prochain refresh AN).</em></p>
+            <p><em><a href="https://www.assemblee-nationale.fr/dyn/17/textes/l17b2797_texte-adopte-commission" target="_blank" rel="noopener">Consulter le texte commission ↗</a></em></p>
           </div>
         </div>
         <div class="ppl-v3-article-row__amdt-mini" style="padding: 0 18px 14px;">
-          <div class="ppl-v3-article-row__col-title" style="margin-bottom:6px;">Amendements ayant porté sur Art. 1ER (52)</div>
-          <div class="ppl-v3-amdt-mini ppl-v3-amdt-mini--adopte"><span class="ppl-v3-amdt-mini__num">AS 28</span><span class="ppl-v3-amdt-mini__author">Mme Hamdane (LFI-NFP)</span><span class="ppl-v3-amdt-mini__sort ppl-v3-sort--adopte">Adopté ✓</span></div>
-          <div class="ppl-v3-amdt-mini ppl-v3-amdt-mini--rejete"><span class="ppl-v3-amdt-mini__num">AS 57</span><span class="ppl-v3-amdt-mini__author">M. Mauvieux (RN)</span><span class="ppl-v3-amdt-mini__sort ppl-v3-sort--rejete">Rejeté ✗</span></div>
-          <div class="ppl-v3-amdt-mini ppl-v3-amdt-mini--adopte"><span class="ppl-v3-amdt-mini__num">AS 73</span><span class="ppl-v3-amdt-mini__author">M. Belhaddad (EPR, rapporteur)</span><span class="ppl-v3-amdt-mini__sort ppl-v3-sort--adopte">Adopté ✓</span></div>
-          <div class="ppl-v3-amdt-mini ppl-v3-amdt-mini--retire"><span class="ppl-v3-amdt-mini__num">AS 95</span><span class="ppl-v3-amdt-mini__author">M. Bonnell (SOC)</span><span class="ppl-v3-amdt-mini__sort ppl-v3-sort--retire">Retiré ↶</span></div>
-          <div class="ppl-v3-amdt-mini ppl-v3-amdt-mini--tombe"><span class="ppl-v3-amdt-mini__num">AS 108</span><span class="ppl-v3-amdt-mini__author">M. Falorni (DEM)</span><span class="ppl-v3-amdt-mini__sort ppl-v3-sort--tombe">Tombé ⊘</span></div>
-          <div style="text-align:center; padding-top:6px;"><a href="#" style="font-size:11px; color:#3b82f6;">+ 47 autres amdt sur cet article →</a></div>
-        </div>
-      </details>
-
-      <details class="ppl-v3-article-row">
-        <summary>
-          <span class="ppl-v3-article-row__num">ART. 2</span>
-          <span class="ppl-v3-article-row__caption">Pouvoirs de la DNCG sur les actionnaires</span>
-          <span class="ppl-v3-article-row__chip">44 amdt</span>
-          <span class="ppl-v3-article-row__toggle">Comparer</span>
-        </summary>
-        <div class="ppl-v3-article-row__body">
-          <div class="ppl-v3-article-row__col">
-            <div class="ppl-v3-article-row__col-title">Texte initial (n°1560, Sénat)</div>
-            <p><em>La Direction nationale du contrôle de gestion (DNCG) peut requérir de toute société sportive la production des pièces relatives à l'identité de ses actionnaires détenant plus de 10 % du capital ou des droits de vote.</em></p>
+          <div class="ppl-v3-article-row__col-title" style="margin-bottom:6px;">
+            Amendements ayant porté sur {{ .article }} ({{ $count }})
           </div>
-          <div class="ppl-v3-article-row__col ppl-v3-article-row__col--commission">
-            <div class="ppl-v3-article-row__col-title ppl-v3-article-row__col-title--commission">Texte voté en commission (TC 2797)</div>
-            <p><em>La Direction nationale du contrôle de gestion (DNCG) peut requérir de toute société sportive la production des pièces relatives à l'identité de ses actionnaires <strong>directs et indirects</strong> détenant plus de <strong>5 %</strong> du capital ou des droits de vote. <strong>Le manquement à cette obligation peut entraîner une sanction financière prononcée par la DNCG.</strong></em></p>
+          {{ range first 8 .items }}
+            {{ $sort_low := lower .sort }}
+            {{ $sort_class := "traitement" }}
+            {{ if in $sort_low "adopt" }}{{ $sort_class = "adopte" }}{{ end }}
+            {{ if or (in $sort_low "rejet") (in $sort_low "irrecev") }}{{ $sort_class = "rejete" }}{{ end }}
+            {{ if in $sort_low "retir" }}{{ $sort_class = "retire" }}{{ end }}
+            {{ if or (in $sort_low "tomb") (in $sort_low "non examin") (in $sort_low "non soutenu") }}{{ $sort_class = "tombe" }}{{ end }}
+          <div class="ppl-v3-amdt-mini ppl-v3-amdt-mini--{{ $sort_class }}">
+            <span class="ppl-v3-amdt-mini__num">{{ .title | replaceRE "^Amdt n°" "" | replaceRE " ·.*$" "" }}</span>
+            <span class="ppl-v3-amdt-mini__author">
+              <a href="{{ .url }}" target="_blank" rel="noopener" style="color:inherit; text-decoration:none;">{{ .auteur }}{{ with .groupe }} ({{ . }}){{ end }}</a>
+            </span>
+            <span class="ppl-v3-amdt-mini__sort ppl-v3-sort--{{ $sort_class }}">{{ .sort | default "En traitement" }}</span>
           </div>
+          {{ end }}
+          {{ if gt $count 8 }}
+          <div style="text-align:center; padding-top:6px;">
+            <em style="font-size:11px; color:#64748b;">+ {{ sub $count 8 }} autre{{ if gt (sub $count 8) 1 }}s{{ end }} amdt sur cet article — voir la vue à plat ci-dessous</em>
+          </div>
+          {{ end }}
         </div>
       </details>
-
-      <details class="ppl-v3-article-row">
-        <summary>
-          <span class="ppl-v3-article-row__num">ART. 3</span>
-          <span class="ppl-v3-article-row__caption">Détention du capital — actionnariat non-européen</span>
-          <span class="ppl-v3-article-row__chip">38 amdt</span>
-          <span class="ppl-v3-article-row__toggle">Comparer</span>
-        </summary>
-        <div class="ppl-v3-article-row__body">
-          <div class="ppl-v3-article-row__col"><div class="ppl-v3-article-row__col-title">Texte initial</div><p><em>(extrait court — cliquer pour ouvrir)</em></p></div>
-          <div class="ppl-v3-article-row__col ppl-v3-article-row__col--commission"><div class="ppl-v3-article-row__col-title ppl-v3-article-row__col-title--commission">Texte voté commission</div><p><em>(extrait court — cliquer pour ouvrir)</em></p></div>
-        </div>
-      </details>
-
-      <details class="ppl-v3-article-row">
-        <summary>
-          <span class="ppl-v3-article-row__num">ART. 4</span>
-          <span class="ppl-v3-article-row__caption">Gouvernance des fédérations sportives</span>
-          <span class="ppl-v3-article-row__chip">36 amdt</span>
-          <span class="ppl-v3-article-row__toggle">Comparer</span>
-        </summary>
-        <div class="ppl-v3-article-row__body">
-          <div class="ppl-v3-article-row__col"><div class="ppl-v3-article-row__col-title">Texte initial</div><p><em>(extrait court)</em></p></div>
-          <div class="ppl-v3-article-row__col ppl-v3-article-row__col--commission"><div class="ppl-v3-article-row__col-title ppl-v3-article-row__col-title--commission">Texte voté commission</div><p><em>(extrait court)</em></p></div>
-        </div>
-      </details>
-
-      <details class="ppl-v3-article-row">
-        <summary>
-          <span class="ppl-v3-article-row__num">ART. 5 → 10</span>
-          <span class="ppl-v3-article-row__caption">Rémunérations, droits TV, fiscalité, dispositions diverses</span>
-          <span class="ppl-v3-article-row__chip">120 amdt</span>
-          <span class="ppl-v3-article-row__toggle">Comparer</span>
-        </summary>
-        <div class="ppl-v3-article-row__body">
-          <div class="ppl-v3-article-row__col"><em>5 articles groupés ici pour gain de place. Dans la version finale, chacun aurait sa ligne.</em></div>
-          <div class="ppl-v3-article-row__col ppl-v3-article-row__col--commission"><em>...</em></div>
-        </div>
-      </details>
+      {{ end }}
     </div>
+    {{ end }}
 
+    {{/* ---------- Vue à plat : tous les amdt en mode liste ---------- */}}
+    {{ with $d.amdt_commission }}
     <details>
-      <summary style="cursor:pointer; padding:10px 14px; background:#f1f5f9; border-radius:8px; font-size:13px; color:#1e3a8a; font-weight:600; margin-bottom: 12px;">▾ Vue à plat des 290 amendements (filtre par article / sort / groupe)</summary>
-      <div class="ppl-v3-chips">
-        <div class="ppl-v3-chip ppl-v3-chip--active"><div class="ppl-v3-chip__label">Tous</div><div class="ppl-v3-chip__count">290</div></div>
-        <div class="ppl-v3-chip"><div class="ppl-v3-chip__label">Art. 1ER</div><div class="ppl-v3-chip__count">52</div></div>
-        <div class="ppl-v3-chip"><div class="ppl-v3-chip__label">Art. 2</div><div class="ppl-v3-chip__count">44</div></div>
-        <div class="ppl-v3-chip"><div class="ppl-v3-chip__label">Art. 3</div><div class="ppl-v3-chip__count">38</div></div>
-        <div class="ppl-v3-chip"><div class="ppl-v3-chip__label">Art. 4</div><div class="ppl-v3-chip__count">36</div></div>
-        <div class="ppl-v3-chip"><div class="ppl-v3-chip__label">Art. 5+</div><div class="ppl-v3-chip__count">120</div></div>
+      <summary style="cursor:pointer; padding:10px 14px; background:#f1f5f9; border-radius:8px; font-size:13px; color:#122549; font-weight:600; margin-bottom: 12px;">
+        ▾ Vue à plat des {{ index $d.counts "amdt_commission" }} amendements (filtre par article)
+      </summary>
+      {{ range first 30 . }}
+        {{ $sort_low := lower .sort }}
+        {{ $sort_class := "traitement" }}
+        {{ if in $sort_low "adopt" }}{{ $sort_class = "adopte" }}{{ end }}
+        {{ if or (in $sort_low "rejet") (in $sort_low "irrecev") }}{{ $sort_class = "rejete" }}{{ end }}
+        {{ if in $sort_low "retir" }}{{ $sort_class = "retire" }}{{ end }}
+        {{ if or (in $sort_low "tomb") (in $sort_low "non examin") (in $sort_low "non soutenu") }}{{ $sort_class = "tombe" }}{{ end }}
+      <div class="ppl-v3-amdt ppl-v3-amdt--{{ $sort_class }}">
+        <span class="ppl-v3-amdt__num">{{ .title | replaceRE "^Amdt n°" "" | replaceRE " ·.*$" "" }}</span>
+        <div>
+          <span class="ppl-v3-amdt__author">
+            <a href="{{ .url }}" target="_blank" rel="noopener" style="color:inherit; text-decoration:none;">{{ .auteur }}</a>
+          </span>
+          {{ with .groupe }}<span class="ppl-v3-amdt__groupe">{{ . }}</span>{{ end }}
+          <div class="ppl-v3-amdt__date">{{ .date }}</div>
+        </div>
+        <span class="ppl-v3-amdt__article">{{ .article }}</span>
+        <span class="ppl-v3-amdt__sort ppl-v3-sort--{{ $sort_class }}">{{ .sort | default "En traitement" }}</span>
       </div>
-      <div class="ppl-v3-amdt ppl-v3-amdt--adopte"><span class="ppl-v3-amdt__num">AS 28</span><div><span class="ppl-v3-amdt__author">Mme Hamdane</span><span class="ppl-v3-amdt__groupe">LFI-NFP</span><div class="ppl-v3-amdt__date">12 mai 2026</div></div><span class="ppl-v3-amdt__article">ART. 1ER</span><span class="ppl-v3-amdt__sort ppl-v3-sort--adopte">Adopté ✓</span></div>
-      <div class="ppl-v3-amdt ppl-v3-amdt--rejete"><span class="ppl-v3-amdt__num">AS 57</span><div><span class="ppl-v3-amdt__author">M. Mauvieux</span><span class="ppl-v3-amdt__groupe">RN</span><div class="ppl-v3-amdt__date">12 mai 2026</div></div><span class="ppl-v3-amdt__article">ART. 1ER</span><span class="ppl-v3-amdt__sort ppl-v3-sort--rejete">Rejeté ✗</span></div>
-      <div class="ppl-v3-amdt ppl-v3-amdt--retire"><span class="ppl-v3-amdt__num">AS 64</span><div><span class="ppl-v3-amdt__author">M. Bonnell</span><span class="ppl-v3-amdt__groupe">SOC</span><div class="ppl-v3-amdt__date">12 mai 2026</div></div><span class="ppl-v3-amdt__article">ART. 2</span><span class="ppl-v3-amdt__sort ppl-v3-sort--retire">Retiré ↶</span></div>
+      {{ end }}
+      {{ if gt (index $d.counts "amdt_commission") 30 }}
+      <p style="text-align:center; padding-top:8px; font-size:11px; color:#64748b;">
+        <em>30 premiers affichés sur {{ index $d.counts "amdt_commission" }} — la version finale ajoutera filtres + pagination</em>
+      </p>
+      {{ end }}
     </details>
+    {{ end }}
 
   </div>
 
+  {{/* ---------- Nuage de mots-clés (vraies données du payload) ---------- */}}
+  {{ with $d.wordcloud_commission }}
   <div class="ppl-v3-wordcloud">
     <div class="ppl-v3-section-title">🎯 Nuage thématique — exposés des motifs</div>
-    <div class="ppl-v3-wordcloud__sub">Mots les plus fréquents extraits des exposés sommaires des 290 amendements (taille proportionnelle à la fréquence).</div>
+    <div class="ppl-v3-wordcloud__sub">
+      Mots les plus fréquents extraits des exposés sommaires des
+      {{ index $d.counts "amdt_commission" }} amendements de commission
+      (taille proportionnelle à la fréquence, après filtre stopwords FR et bruits procéduraux).
+    </div>
     <div class="ppl-v3-cloud">
-      <span class="ppl-v3-word ppl-v3-word--xl">actionnaires</span>
-      <span class="ppl-v3-word ppl-v3-word--lg">DNCG</span>
-      <span class="ppl-v3-word ppl-v3-word--xl">agrément</span>
-      <span class="ppl-v3-word ppl-v3-word--md">gouvernance</span>
-      <span class="ppl-v3-word ppl-v3-word--lg">rémunérations</span>
-      <span class="ppl-v3-word ppl-v3-word--md">fédération</span>
-      <span class="ppl-v3-word ppl-v3-word--sm">capital étranger</span>
-      <span class="ppl-v3-word ppl-v3-word--md">dividendes</span>
-      <span class="ppl-v3-word ppl-v3-word--lg">transparence</span>
-      <span class="ppl-v3-word ppl-v3-word--sm">solidarité</span>
-      <span class="ppl-v3-word ppl-v3-word--md">supporters</span>
-      <span class="ppl-v3-word ppl-v3-word--xs">formation</span>
-      <span class="ppl-v3-word ppl-v3-word--md">droits TV</span>
-      <span class="ppl-v3-word ppl-v3-word--sm">paris sportifs</span>
-      <span class="ppl-v3-word ppl-v3-word--xs">éthique</span>
-      <span class="ppl-v3-word ppl-v3-word--lg">dirigeants</span>
-      <span class="ppl-v3-word ppl-v3-word--md">contrats</span>
-      <span class="ppl-v3-word ppl-v3-word--xs">DSEA</span>
-      <span class="ppl-v3-word ppl-v3-word--sm">redistribution</span>
-      <span class="ppl-v3-word ppl-v3-word--md">indemnités</span>
-      <span class="ppl-v3-word ppl-v3-word--xs">arbitrage</span>
-      <span class="ppl-v3-word ppl-v3-word--sm">centre de formation</span>
-      <span class="ppl-v3-word ppl-v3-word--md">clubs amateurs</span>
-      <span class="ppl-v3-word ppl-v3-word--xs">agents sportifs</span>
-      <span class="ppl-v3-word ppl-v3-word--sm">retrait agrément</span>
+      {{ range . }}
+      <span class="ppl-v3-word ppl-v3-word--{{ .size }}" title="{{ .count }} occurrences">{{ .word }}</span>
+      {{ end }}
     </div>
   </div>
-
-  <div class="ppl-v3-mockup-note">
-    <strong>Page mockup interne (URL secrète, noindex)</strong>
-    <ul>
-      <li>Refonte vitrine des sections « Texte voté / Amendements ». Pas dans le menu, pas indexée par les moteurs (meta robots noindex).</li>
-      <li>Données hardcodées pour la démo (volumes inspirés du run réel, libellés fictifs). La version finale s'alimentera de <code>site.Data.special_ppl</code> comme la page d'origine.</li>
-      <li>L'ancienne page <a href="/ppl-sport-professionnel/">/ppl-sport-professionnel/</a> reste publique et indexée.</li>
-    </ul>
-  </div>
+  {{ end }}
 
 </div>
 {{ end }}
