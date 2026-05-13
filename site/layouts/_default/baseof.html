@@ -6,7 +6,13 @@
   <title>{{ .Title }} — {{ .Site.Title }}</title>
   {{ $desc := cond (gt (len (.Description | default "")) 0) .Description .Site.Params.description }}
   <meta name="description" content="{{ $desc }}"/>
+  {{/* R42-BW (2026-05-13) — frontmatter `noindex: true` → noindex/nofollow.
+       Utilisé pour les pages cachées (mockup PPL spéciale, pages WIP). */}}
+  {{ if .Params.noindex }}
+  <meta name="robots" content="noindex,nofollow"/>
+  {{ else }}
   <meta name="robots" content="index,follow"/>
+  {{ end }}
   {{/* R42-AQ (2026-05-11) — Vérification de propriété Google Search Console.
        Méthode officielle balise HTML (préfixe d'URL `veille.sideline-conseil.fr`).
        La propriété était déjà validée implicitement via le compte GA4
