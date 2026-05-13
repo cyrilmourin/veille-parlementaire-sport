@@ -137,11 +137,22 @@
     {{ $pdfCommission := "/ppl-1560-amendements-commission.pdf" }}
     {{ $hasCommissionPDF := fileExists (printf "static%s" $pdfCommission) }}
 
+    {{/* R42-BV (2026-05-13) — Lien « Texte voté par commission » à côté
+         de la liasse, demande Cyril après examen commission Culture du
+         12/05/2026 (PPL Sport pro DLR5L17N51732, TC = b2797). L'URL
+         /dyn/17/textes/l17b<N>_texte-adopte-commission est le pattern
+         AN stable post-vote commission. */}}
+    {{ $texteCommissionUrl := "https://www.assemblee-nationale.fr/dyn/17/textes/l17b2797_texte-adopte-commission" }}
+
     {{ if $hasCommissionPDF }}
     <p class="ppl-amdt-liasse">
       <a class="ppl-page__btn ppl-page__btn--liasse" href="{{ $pdfCommission }}"
          target="_blank" rel="noopener">
         ⬇ Liasse PDF — Amendements de commission
+      </a>
+      <a class="ppl-page__btn ppl-page__btn--liasse" href="{{ $texteCommissionUrl }}"
+         target="_blank" rel="noopener">
+        📄 Texte voté par commission
       </a>
     </p>
     {{ else }}
@@ -153,6 +164,10 @@
       <a class="ppl-page__btn ppl-page__btn--liasse" href="{{ . }}"
          target="_blank" rel="noopener">
         ⬇ Télécharger l'ensemble des amendements (liasse PDF)
+      </a>
+      <a class="ppl-page__btn ppl-page__btn--liasse" href="{{ $texteCommissionUrl }}"
+         target="_blank" rel="noopener">
+        📄 Texte voté par commission
       </a>
       <span class="ppl-amdt-liasse__hint">
         (page AN — bouton « Créer une liasse »)
