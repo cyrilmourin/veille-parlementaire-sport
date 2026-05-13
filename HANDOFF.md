@@ -296,6 +296,28 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
   +19 tests R42-BI. 1149 → 1168 verts.
 
+- 2026-05-13 (matin, suite retours Cyril) : **R42-BT + R42-BU**.
+
+  **R42-BT — Migration nominal/full du côté INGESTION.** Cyril 2026-05-13 : « je veux un site exhaustif sur les fenêtres fixées, et dont l'actualisation est accélérée par le fait de ne pas étudier ce qui a déjà été étudié ». Audit en amont (analyse approfondie des open data AN + Sénat) : pas de voie d'allègement côté téléchargement pour les questions AN, débats/CRI/questions Sénat (zip complet obligatoire) ; flux daily AN `publication_j.csv` identifié comme voie possible pour les amendements/dosleg/CR/rapports AN (latence 1 min) mais déplace le problème (1 zip vs 750+ requêtes unitaires). Décision : on garde le mécanisme actuel (zip + filtre `unzip_members_since`) et on **harmonise la fenêtre nominale à 15j** côté ingestion.
+
+  Changements :
+  - `assemblee.py` (json_zip + xml_zip) : `since_days = window_days(nominal=15, full=max(YAML, 730))`
+  - `senat.py` _fetch_debats_zip : idem
+  - `senat.py` body fetch dosleg + rapports : `window_days(nominal=15, full=800)` (au lieu de 90/800)
+  - `senat_amendements.py` : idem nominal=15
+  - `dila_jorf.py` : `days_back = window_days(nominal=30, full=max(YAML, 60))` (~15j / ~30j d'éditions)
+  - `assemblee_rapports.py` : `max_pages = YAML if is_full_mode() else 1` (les rapports anciens restent en DB)
+  - `site_export.py` : vidage des `_DYNAMIC_WINDOWS_BY_CATEGORY` et `_DYNAMIC_WINDOWS_BY_SOURCE_ID` (la dyn d'affichage est remplacée par la dyn d'ingestion). L'export retombe sur les fenêtres statiques (180j CR, 90j JORF, 730j rapports parl) → site exhaustif sur la fenêtre fixée.
+
+  **Idée gardée en mémoire** : pour un `/refresh-amendements` rapide à la demande, le flux `publication_j.csv` AN expose les amendements en latence 1 min sur 90j. Voie technique identifiée mais pas implémentée (cf. mémoire `project_fast_amendments_refresh.md`).
+
+  **R42-BU — 4 fixes Cyril 2026-05-13.**
+  - Blocklist : ajout `DLR5L17N51939` (Football) et `DLR5L17N52055` (Associations sportives), hors scope sport-institutionnel.
+  - **Chamber mutable** dans `store.upsert_many` : R42-BS avait basculé `min_sports_igesr` `chamber: MinSports` → `IGESR` mais les ~28 rapports déjà en DB conservaient l'ancien chamber (champ documenté immuable). Mutable désormais : `chamber = excluded.chamber` si non-vide, sinon préserve l'existant. Fix valable aussi pour le badge « ⊕ Source institutionnelle (flux complet) » : `min_sports_igesr` retiré du `BYPASS_KEYWORDS_SOURCES` en R42-BS, mais les items en DB conservaient `matched_keywords=["(flux complet)"]` — au prochain matching ils seront soit re-tagués avec un keyword sport (sport-santé / olympique / etc.), soit retirés de l'export si aucun match.
+  - **Normalisation article 1er = article premier** : helper `_normalize_article_designation` dans `assemblee.py`. « premier / 1 / 1er / PREMIER » → « 1ER ». « Article premier » → « ARTICLE 1ER ». Variantes avec suffixe préservées (« 1er bis » → « 1ER bis »). Cohérent pour le tri lexicographique au sein d'un même dossier.
+
+  +12 tests R42-BU + 14 tests R42-BT, ajustement -6 R42-AE/AD. 1255 → 1267 verts.
+
 - 2026-05-13 (matin, retours Cyril Publications) : **R42-BS**. 4 fixes.
 
   1. **Chamber IGESR** : `min_sports_igesr` sortait en `chamber: MinSports`. Cyril : « le cartouche pour l'IGESR est MIN SPORT, je souhaite que ce soit IGESR ». Bascule sur `chamber: IGESR` (config YAML + défaut handler).

@@ -97,11 +97,12 @@ def test_assemblee_normalize_dosleg_uses_window_days():
 
 # --------------------------- senat.py intégration
 def test_senat_body_window_dynamique():
-    """Le code source senat.py doit utiliser window_days pour body_window_days."""
+    """Le code source senat.py doit utiliser window_days pour body_window_days
+    et rap_window_days. R42-BT (2026-05-13) : nominal aligné à 15j."""
     from src.sources import senat as senat_mod
     code = Path(senat_mod.__file__).read_text(encoding="utf-8")
     # 2 usages : senat_dosleg body_window_days + senat_rapports rap_window_days
-    assert code.count("window_days(nominal=90, full=800)") >= 2
+    assert code.count("window_days(nominal=15, full=800)") >= 2
 
 
 # --------------------------- Workflow daily.yml

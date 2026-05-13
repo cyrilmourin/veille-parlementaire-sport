@@ -35,6 +35,43 @@ def _utcnow_naive() -> datetime:
 _Q_UID_RE = re.compile(r"L(\d+)(QE|QG|QOSD|QST|QM)(\d+)", re.IGNORECASE)
 
 
+# R42-BU (2026-05-13) — Normalisation des désignations d'article :
+# « ARTICLE PREMIER » et variantes ↔ « ARTICLE 1ER ». L'AN expose les
+# deux formes selon les textes (forme canonique constitutionnelle
+# vs forme abrégée). Pour le tri par article dans la liste des
+# amendements d'un dossier, on regroupe les deux sur « 1ER » :
+# - cohérent avec les autres articles numériques (« 2 », « 3 », …)
+# - le tri lexicographique sur "1ER" / "2" / "3" / "10" donne le bon
+#   ordre car les amendements affichés relèvent toujours d'un même
+#   dossier (cardinal raisonnable < 200 articles).
+_ARTICLE_PREMIER_RE = re.compile(
+    r"^\s*(?P<prefix>article\s+)?(?P<num>premier|1\s*er|1)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _normalize_article_designation(article: str) -> str:
+    """Normalise « Article premier / 1 / 1er » → « 1ER ».
+
+    Garde la casse d'origine pour les autres articles (« 2 », « 3 BIS », …)
+    et passe à travers les désignations multi-mots (« 2 quater »,
+    « 1er bis », « 1 A », …) que l'AN expose telles quelles dans les
+    amendements de séance.
+    """
+    if not article:
+        return article
+    s = article.strip()
+    # Cas exact « premier / 1er / 1 » (avec ou sans préfixe « article »)
+    m = _ARTICLE_PREMIER_RE.match(s)
+    if m:
+        prefix = m.group("prefix") or ""
+        return f"{prefix.upper()}1ER".strip() if prefix else "1ER"
+    # Cas « 1er bis », « 1er A » etc. — on normalise juste la partie « 1er »
+    s2 = re.sub(r"\b(premier|1\s*er|1)\b(?=\s+\S)", "1ER", s, count=1,
+                flags=re.IGNORECASE)
+    return s2
+
+
 def _first_sentence(text: str, max_len: int = 140) -> str:
     """Renvoie la 1re phrase du texte, tronquée à max_len."""
     if not text:
@@ -438,17 +475,23 @@ def _fetch_xml_zip(src: dict) -> list[Item]:
     # Syceron AN ~ XML zip 80+ Mo : retry lourd + read 120s.
     data = fetch_bytes_heavy(src["url"])
 
-    # Fenêtre date : src["since_days"] > env AN_SINCE_DAYS > 30 (défaut)
-    since_days_raw = src.get("since_days") or os.environ.get("AN_SINCE_DAYS") or 30
+    # R42-BT (2026-05-13) — Fenêtre dynamique nominal/full appliquée à
+    # l'INGESTION (pas seulement à l'affichage) : on filtre les entrées
+    # du zip dès la décompression pour ne pas refaire le travail sur les
+    # items déjà ingérés. nominal=15j (cron quotidien), full=max(YAML, 730j)
+    # (sur reset / workflow_dispatch RUN_MODE=full).
+    from ..run_mode import window_days
+    yaml_value = src.get("since_days") or os.environ.get("AN_SINCE_DAYS") or 0
     try:
-        since = _utcnow_naive() - timedelta(days=int(since_days_raw))
-        log.info(
-            "%s : filtre date >= %s (fenêtre %s jours)",
-            sid, since.date().isoformat(), since_days_raw,
-        )
+        yaml_full = int(yaml_value)
     except (ValueError, TypeError):
-        since = _utcnow_naive() - timedelta(days=30)
-        log.warning("%s : since_days invalide (%r), défaut 30j", sid, since_days_raw)
+        yaml_full = 0
+    since_days_raw = window_days(nominal=15, full=max(yaml_full, 730))
+    since = _utcnow_naive() - timedelta(days=since_days_raw)
+    log.info(
+        "%s : filtre date >= %s (fenêtre %s jours, R42-BT)",
+        sid, since.date().isoformat(), since_days_raw,
+    )
 
     items: list[Item] = []
     file_count = 0
@@ -627,19 +670,21 @@ def fetch_source(src: dict) -> list[Item]:
     items: list[Item] = []
     file_count = 0
 
-    # Fenêtre date optionnelle : src["since_days"] > env AN_SINCE_DAYS > None
-    since_days_raw = src.get("since_days") or os.environ.get("AN_SINCE_DAYS")
-    since: datetime | None = None
-    if since_days_raw:
-        try:
-            since = _utcnow_naive() - timedelta(days=int(since_days_raw))
-            log.info(
-                "%s : filtre date >= %s (fenêtre %s jours)",
-                src["id"], since.date().isoformat(), since_days_raw,
-            )
-        except (ValueError, TypeError):
-            log.warning("%s : since_days invalide (%r), pas de filtre",
-                        src["id"], since_days_raw)
+    # R42-BT (2026-05-13) — Fenêtre dynamique INGESTION nominal=15j /
+    # full=max(YAML, 730j). Évite de re-parser les items déjà ingérés à
+    # chaque cron. YAML override possible (cap inférieur du full).
+    from ..run_mode import window_days
+    yaml_value = src.get("since_days") or os.environ.get("AN_SINCE_DAYS") or 0
+    try:
+        yaml_full = int(yaml_value)
+    except (ValueError, TypeError):
+        yaml_full = 0
+    since_days_raw = window_days(nominal=15, full=max(yaml_full, 730))
+    since: datetime | None = _utcnow_naive() - timedelta(days=since_days_raw)
+    log.info(
+        "%s : filtre date >= %s (fenêtre %s jours, R42-BT)",
+        src["id"], since.date().isoformat(), since_days_raw,
+    )
 
     # 1er filtre (cheap) sur ZipInfo.date_time. Peut être sans effet si le
     # dump AN régénère les mtimes à chaque build — auquel cas on filtrera
@@ -909,6 +954,12 @@ def _normalize_amendement(obj, src, cat):
     article = _text_of(_first(root, "pointeurFragmentTexte.division.articleDesignation",
                                "pointeurFragmentTexte.article.numeroCorrection",
                                default=""))
+    # R42-BU (2026-05-13) — Normalisation « article premier » → « article 1er ».
+    # L'AN expose tantôt « ARTICLE PREMIER » (forme canonique constitutionnelle)
+    # tantôt « ARTICLE 1ER ». Pour le tri/classement, Cyril veut que les
+    # deux soient regroupés. On unifie sur « 1ER » (forme courte, identique
+    # à « 2 »/« 3 »/... pour le tri lexicographique cohérent).
+    article = _normalize_article_designation(article)
     # Référence au texte législatif parent (ex : "PIONANR5L17BTC2335").
     # Le titre humain du dossier est résolu via le cache an_texte_to_dossier
     # (construit en pré-pass par _normalize_dosleg, voir R11b) — essentiel

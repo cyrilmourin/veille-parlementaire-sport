@@ -309,7 +309,12 @@ def fetch_source(src: dict) -> list[Item]:
       - index_url     : override facultatif (défaut depots.xml officiel)
     """
     sid = src["id"]
-    since_days = int(src.get("since_days") or 90)
+    # R42-BT (2026-05-13) — Fenêtre INGESTION nominal=15j / full=max(YAML, 730j).
+    # En nominal, on ne refetche que les textes modifiés < 15j, ce qui
+    # ramène ~5-15 CSV/texte au lieu de ~50-100 sur fenêtre 90j.
+    from ..run_mode import window_days
+    yaml_full = int(src.get("since_days") or 0)
+    since_days = window_days(nominal=15, full=max(yaml_full, 730))
     cutoff = datetime.now() - timedelta(days=since_days)
 
     idx_url = src.get("index_url") or "https://www.senat.fr/akomantoso/depots.xml"

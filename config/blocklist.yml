@@ -314,3 +314,11 @@ blocklist:
   # reste visible — à blacklister séparément si confirmation.
   - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N53296
     reason: "PPL Lutter contre l'entrisme islamiste dans les communes — hors scope sport (R42-BE)"
+
+  # R42-BU (2026-05-13) — 2 dossiers AN écartés par Cyril :
+  # - DLR5L17N51939 : matche keyword « Football » mais hors scope sport-institutionnel
+  # - DLR5L17N52055 : matche keyword « Associations sportives » idem
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N51939
+    reason: "Hors scope sport-institutionnel — match « Football » (R42-BU, demande Cyril)"
+  - url: https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N52055
+    reason: "Hors scope sport-institutionnel — match « Associations sportives » (R42-BU, demande Cyril)"

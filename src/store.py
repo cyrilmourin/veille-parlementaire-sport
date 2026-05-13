@@ -161,7 +161,13 @@ class Store:
           (refléter la vocab actuelle du matcher, notamment quand de
           nouveaux termes sont ajoutés à `keywords.yml`).
         - `raw` : toujours remplacé (contient des fixups incrementaux).
-        - `url`, `source_id`, `uid`, `category`, `chamber` : immuables.
+        - `chamber` : remplacé si le nouveau est non-vide (R42-BU
+          2026-05-13 : suite à la bascule MinSports → IGESR pour
+          `min_sports_igesr` en R42-BS, les ~28 rapports déjà en DB
+          gardaient leur ancien chamber faute de refresh, et le site
+          continuait à afficher « MinSports » sur les cards IGESR.
+          Mutable désormais).
+        - `url`, `source_id`, `uid`, `category` : immuables.
         - `inserted_at` : **jamais touché** — c'est la date de 1re
           détection, utilisée par `fetch_matched_since` pour le digest
           quotidien. La modifier casserait la fenêtre glissante.
@@ -214,6 +220,11 @@ class Store:
                     matched_keywords = excluded.matched_keywords,
                     keyword_families = excluded.keyword_families,
                     raw = excluded.raw,
+                    chamber = CASE
+                        WHEN excluded.chamber IS NOT NULL AND excluded.chamber != ''
+                        THEN excluded.chamber
+                        ELSE items.chamber
+                    END,
                     snippet = COALESCE(NULLIF(excluded.snippet, ''), items.snippet),
                     dossier_id = COALESCE(excluded.dossier_id, items.dossier_id),
                     canonical_url = COALESCE(excluded.canonical_url, items.canonical_url),

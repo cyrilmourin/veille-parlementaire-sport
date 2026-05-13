@@ -527,12 +527,20 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
     """
     sid = src["id"]
     cat = src["category"]
-    # Fenêtre : config source > env var > défaut 30j
-    since_days = int(
+    # R42-BT (2026-05-13) — Fenêtre INGESTION nominal=15j / full=max(YAML, 730j).
+    # Cap nominal à 15j en cron normal pour ne pas re-décompresser les
+    # milliers de fichiers déjà en DB ; rouvre tout en RUN_MODE=full.
+    from ..run_mode import window_days
+    yaml_value = (
         src.get("since_days")
         or os.environ.get("SENAT_DEBATS_SINCE_DAYS")
-        or _DEFAULT_DEBATS_SINCE_DAYS
+        or 0
     )
+    try:
+        yaml_full = int(yaml_value)
+    except (ValueError, TypeError):
+        yaml_full = 0
+    since_days = window_days(nominal=15, full=max(yaml_full, 730))
     since = datetime.utcnow() - timedelta(days=since_days)
     log.info(
         "Sénat %s : fetch zip + filtre date >= %s (fenêtre %d jours)",
@@ -776,15 +784,16 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
         # rapports volumineux où le keyword sport tombe après cette
         # position (cf. r24-710 où « Jeux olympiques » est à pos 62449).
         body_max = int(src.get("body_max_chars", 200000))
-        # R42-AD (2026-05-11) — fenêtre dynamique pour les fetches /leg/ :
-        # `nominal` → 90j (skip dosleg dormants), `full` → 800j (R42-L
-        # historique complet). Les dosleg dormants restent en DB et
-        # exposés ; quand un nouvel acte arrive, leur date se met à
-        # jour côté CSV Sénat → ils rentrent dans la fenêtre 90j.
+        # R42-AD → R42-BT (2026-05-13) — Fenêtre INGESTION nominal=15j /
+        # full=800j pour les fetches /leg/. Aligné avec R42-BT
+        # (harmonisation tous les types de publications à 15j nominal).
+        # Les dosleg dormants restent en DB et exposés ; quand un nouvel
+        # acte arrive, leur date se met à jour côté CSV Sénat → ils
+        # rentrent dans la fenêtre nominale au run suivant.
         from ..run_mode import window_days
         body_window_days = int(
             src.get("body_window_days")
-            or window_days(nominal=90, full=800)
+            or window_days(nominal=15, full=800)
         )
         body_cutoff = datetime.utcnow() - timedelta(days=body_window_days)
         for r in rows:
@@ -886,12 +895,14 @@ def _normalize_rows(src: dict, rows: list[dict], csv_name: str = "") -> Iterable
         # rapports volumineux où le keyword sport tombe après cette
         # position (cf. r24-710 où « Jeux olympiques » est à pos 62449).
         body_max = int(src.get("body_max_chars", 200000))
-        # R42-AD (2026-05-11) — fenêtre dynamique : `nominal` → 90j,
-        # `full` → 800j (R42-B historique).
+        # R42-AD → R42-BT (2026-05-13) — Fenêtre INGESTION nominal=15j /
+        # full=800j (harmonisation R42-BT). Les rapports anciens hors
+        # fenêtre nominale restent en DB et exposés via la fenêtre
+        # statique d'affichage 730j (cf. WINDOW_DAYS_BY_SOURCE_ID).
         from ..run_mode import window_days
         rap_window_days = int(
             src.get("rap_haystack_window_days")
-            or window_days(nominal=90, full=800)
+            or window_days(nominal=15, full=800)
         )
         cutoff = datetime.utcnow() - timedelta(days=rap_window_days)
         for r in rows:

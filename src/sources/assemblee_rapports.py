@@ -292,9 +292,14 @@ def fetch_source(src: dict) -> list[Item]:
     url = src["url"]
     cat = src.get("category", "communiques")
     body_max = int(src.get("body_max_chars", 200000))  # R42-B + R42-Q
-    # R42-AK : pagination. max_pages=1 (par défaut prudent côté tests
-    # qui mocke 1 fetch) ; les sources YAML actives en prod posent 8.
-    max_pages = int(src.get("max_pages", 1))
+    # R42-AK → R42-BT (2026-05-13) — Pagination dynamique.
+    # Nominal (cron quotidien) : 1 page (150 items récents) — les
+    # rapports plus anciens sont déjà en DB et restent exposés via la
+    # fenêtre statique d'affichage 730j (WINDOW_DAYS_BY_SOURCE_ID).
+    # Full (RUN_MODE=full / reset) : prend le `max_pages` YAML (typique 8).
+    from ..run_mode import is_full_mode
+    yaml_max_pages = int(src.get("max_pages", 1))
+    max_pages = yaml_max_pages if is_full_mode() else 1
     page_size = int(src.get("page_size", 150))
 
     # R42-AK : boucle de pagination. Stop sur :

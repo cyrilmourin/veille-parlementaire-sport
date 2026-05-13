@@ -1320,20 +1320,15 @@ def _fix_agenda_row(r: dict) -> None:
 # Override : si la clé matche source_id, prime sur category. Le mapping
 # `WINDOW_DAYS_BY_CATEGORY` et `WINDOW_DAYS_BY_SOURCE_ID` statiques
 # restent fallback si on n'est pas en mode dynamique.
-_DYNAMIC_WINDOWS_BY_CATEGORY: dict[str, tuple[int, int]] = {
-    "comptes_rendus": (15, 60),
-    "jorf": (7, 90),
-}
-_DYNAMIC_WINDOWS_BY_SOURCE_ID: dict[str, tuple[int, int]] = {
-    # R42-BS (2026-05-13) — Les rapports parlementaires ont été RETIRÉS
-    # de la dynamique nominale 15j : volume trop faible (1-3/mois côté
-    # scope sport) pour justifier un cutoff aussi serré, et Cyril a
-    # constaté la disparition quasi totale des publications parlementaires
-    # de la page Publications. Ils repassent désormais sur la fenêtre
-    # statique 730j (cf. `WINDOW_DAYS_BY_SOURCE_ID`) en permanence.
-    # Le mapping reste vide mais conservé pour pouvoir y rajouter
-    # ultérieurement des sources si besoin sans modifier la signature.
-}
+# R42-BT (2026-05-13) — Mappings vidés. La logique dynamique nominal/full
+# a été déplacée du côté EXPORT (filtre d'affichage) au côté INGESTION
+# (filtre de parsing). Cyril 2026-05-13 : « je veux un site exhaustif sur
+# les fenêtres fixées, et dont l'actualisation est accélérée par le fait
+# de ne pas étudier ce qui a déjà été étudié ». Conséquence : ces deux
+# dicts ne sont plus consommés en pratique mais conservés pour permettre
+# un override ponctuel via PR si un cas spécifique le justifiait.
+_DYNAMIC_WINDOWS_BY_CATEGORY: dict[str, tuple[int, int]] = {}
+_DYNAMIC_WINDOWS_BY_SOURCE_ID: dict[str, tuple[int, int]] = {}
 
 
 def _window_for(category: str | None, source_id: str | None = None) -> int:

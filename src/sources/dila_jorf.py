@@ -279,7 +279,13 @@ def _index_articles_by_cid(tarball_bytes: bytes) -> dict[str, str]:
 
 
 def fetch_source(src: dict) -> list[Item]:
-    days_back = int(src.get("days_back", 8))
+    # R42-BT (2026-05-13) — Fenêtre INGESTION nominal vs full pour les
+    # dumps quotidiens JORF. `days_back` compte le nombre d'éditions
+    # (2/jour typiquement, donc 30 éd = ~15 jours). Nominal=30 (15j),
+    # full=YAML ou défaut 60 (~30j) pour reset profond.
+    from ..run_mode import window_days
+    yaml_full = int(src.get("days_back") or 0)
+    days_back = window_days(nominal=30, full=max(yaml_full, 60))
     dumps = _list_recent_dumps(n=days_back)
     if not dumps:
         log.warning("DILA JORF : aucun dump récent trouvé")
