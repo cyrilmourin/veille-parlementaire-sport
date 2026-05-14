@@ -885,14 +885,94 @@ def fetch_an_text_articles(timeout: float = 20.0) -> dict[str, str]:
     return out
 
 
+def fetch_an_commission_text_articles(
+    texte_ref: str = "PIONANR5L17BTC2797",
+    timeout: float = 20.0,
+) -> dict[str, str]:
+    """R42-BY (2026-05-14) — Variante de `fetch_an_text_articles` pour le
+    texte VOTÉ EN COMMISSION (TC). Symétrique au fetch du texte initial.
+
+    Tente le path `/dyn/docs/<TEXTE_REF>.raw`. Si l'AN n'a pas encore
+    publié le `.raw` du TC (cas observé pour TC2797 le 2026-05-14
+    immédiatement après l'adoption), retourne `{}` et le layout
+    affichera la colonne « texte initial » seule (pas de colonne
+    fantôme avec un message d'excuse). Le pipeline re-tente à chaque
+    daily run — dès que AN publie, ça remontera automatiquement.
+
+    Note : on n'utilise PAS le PDF (`.pdf` est dispo, mais l'extraction
+    pypdf est lourde et perd la structure d'articles). On reste sur
+    le HTML `.raw` qui expose les `<p class="assnat9ArticleNum">`.
+    """
+    raw_url = f"https://www.assemblee-nationale.fr/dyn/docs/{texte_ref}.raw"
+    try:
+        import httpx
+        from bs4 import BeautifulSoup
+        with httpx.Client(timeout=timeout, follow_redirects=True) as cli:
+            resp = cli.get(raw_url)
+            if resp.status_code == 404:
+                import logging
+                logging.getLogger(__name__).info(
+                    "R42-BY : texte commission %s pas encore publié sur AN (.raw 404)",
+                    texte_ref,
+                )
+                return {}
+            resp.raise_for_status()
+            html = resp.text
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            "R42-BY : fetch texte commission échoué (%s)", e
+        )
+        return {}
+
+    soup = BeautifulSoup(html, "lxml")
+    out: dict[str, str] = {}
+    headers = soup.find_all("p", class_="assnat9ArticleNum")
+    for hdr in headers:
+        label_raw = hdr.get_text(" ", strip=True)
+        label_clean = re.sub(r"\([^)]*\)", "", label_raw).strip()
+        label_clean = re.sub(
+            r"(\d+)\s+(ER|ERE|ÈRE)\b", r"\1\2",
+            label_clean, flags=re.IGNORECASE,
+        )
+        label_clean = re.sub(r"\s+", " ", label_clean).strip()
+        label_norm = label_clean.upper()
+        if not label_norm.startswith("ARTICLE"):
+            continue
+        body_parts: list[str] = []
+        for sib in hdr.find_next_siblings():
+            cls = sib.get("class") or []
+            if "assnat9ArticleNum" in cls:
+                break
+            if "assnatLoiTexte" in cls:
+                txt = sib.get_text(" ", strip=True)
+                if txt:
+                    body_parts.append(f"<p>{txt}</p>")
+        if body_parts:
+            out[label_norm] = "\n".join(body_parts)
+    return out
+
+
 def write_articles_data_file(site_data_dir: Path,
-                              articles: dict[str, str]) -> None:
+                              articles_initial: dict[str, str],
+                              articles_commission: dict[str, str] | None = None) -> None:
     """Écrit `site/data/special_ppl_articles.json` consommé par le layout
-    Hugo via `site.Data.special_ppl_articles`."""
+    Hugo via `site.Data.special_ppl_articles`.
+
+    R42-BY (2026-05-14) — Format étendu :
+      {
+        "fetched_at": "...",
+        "articles": {"ARTICLE 1ER": "<html>", ...},          # rétrocompat (= initial)
+        "initial":   {"ARTICLE 1ER": "<html>", ...},
+        "commission": {"ARTICLE 1ER": "<html>", ...} | {}
+      }
+    """
     site_data_dir.mkdir(parents=True, exist_ok=True)
     payload = {
         "fetched_at": datetime.utcnow().isoformat(timespec="seconds"),
-        "articles": articles,
+        "articles": articles_initial,  # rétrocompat layout d'origine
+        "initial": articles_initial,
+        "commission": articles_commission or {},
     }
     (site_data_dir / "special_ppl_articles.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
@@ -908,10 +988,13 @@ def export(rows: list[dict], site_root: Path) -> dict:
     site_root = Path(site_root)
     write_data_file(site_root / "data", payload)
     write_page_stub(site_root / "content")
-    # R41-X : fetch + découpage du texte de la PPL en articles. Best-effort
-    # (réseau, timeout 20s). Si échec, le fichier articles n'est pas écrit
-    # et le layout retombe sur l'absence d'articles → boutons inactifs.
-    articles = fetch_an_text_articles()
-    if articles:
-        write_articles_data_file(site_root / "data", articles)
+    # R41-X + R42-BY : fetch + découpage du texte de la PPL (initial +
+    # commission). Best-effort (réseau, timeout 20s). Le fichier est
+    # toujours écrit si au moins le texte initial est dispo.
+    articles_initial = fetch_an_text_articles()
+    articles_commission = fetch_an_commission_text_articles()
+    if articles_initial or articles_commission:
+        write_articles_data_file(
+            site_root / "data", articles_initial, articles_commission,
+        )
     return payload

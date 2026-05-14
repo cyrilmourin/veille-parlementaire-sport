@@ -92,6 +92,7 @@
   .ppl-v3-article-row[open] .ppl-v3-article-row__toggle::after { content: " ▾"; }
   .ppl-v3-article-row:not([open]) .ppl-v3-article-row__toggle::after { content: " ▸"; }
   .ppl-v3-article-row__body { padding: 14px 18px; background: white; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .ppl-v3-article-row__body--single { grid-template-columns: 1fr; }
   .ppl-v3-article-row__col { max-height: 320px; overflow-y: auto; padding: 12px 14px; background: #fafbfc; border-radius: 6px; font-size: 12px; line-height: 1.55; color: #1f2937; border-left: 3px solid #94a3b8; }
   .ppl-v3-article-row__col--commission { border-left-color: #122549; }
   .ppl-v3-article-row__col-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: #64748b; margin-bottom: 6px; font-weight: 700; }
@@ -330,45 +331,53 @@
     <div class="ppl-v3-articles">
       <div class="ppl-v3-section-title">📑 Articles du texte — cliquer pour voir les amendements et le contenu</div>
       <p class="ppl-v3-articles__hint">
-        Chaque article s'ouvre INLINE. À gauche : texte initial AN (n° {{ $d.meta.an_num }}).
-        À droite : texte voté en commission (TC 2797), à remplir au prochain refresh quand les données du
-        texte de commission seront ingérées. En dessous : amendements ayant porté sur l'article.
+        Chaque article s'ouvre INLINE. À gauche le texte initial AN (n° {{ $d.meta.an_num }}),
+        à droite le texte voté en commission (TC 2797) quand l'AN l'a publié.
+        En dessous : tous les amendements ayant porté sur l'article.
       </p>
 
       {{ $articles_data := $.Site.Data.special_ppl_articles }}
+      {{ $initial := dict }}
+      {{ $commission := dict }}
+      {{ if $articles_data }}
+        {{ $initial = or $articles_data.initial $articles_data.articles dict }}
+        {{ $commission = $articles_data.commission | default dict }}
+      {{ end }}
 
       {{ range . }}
       {{ $article_key := .article }}
       {{ $count := len .items }}
-      {{ $initial_text := index $articles_data $article_key }}
+      {{ $initial_text := index $initial $article_key }}
+      {{ $commission_text := index $commission $article_key }}
+      {{ $has_both := and $initial_text $commission_text }}
       <details class="ppl-v3-article-row">
         <summary>
           <span class="ppl-v3-article-row__num">{{ .article }}</span>
           <span class="ppl-v3-article-row__caption">{{ $count }} amendement{{ if gt $count 1 }}s{{ end }} en commission</span>
           <span class="ppl-v3-article-row__chip">{{ $count }} amdt</span>
-          <span class="ppl-v3-article-row__toggle">Comparer</span>
+          <span class="ppl-v3-article-row__toggle">Ouvrir</span>
         </summary>
-        <div class="ppl-v3-article-row__body">
+        {{ if or $initial_text $commission_text }}
+        <div class="ppl-v3-article-row__body{{ if not $has_both }} ppl-v3-article-row__body--single{{ end }}">
+          {{ if $initial_text }}
           <div class="ppl-v3-article-row__col">
             <div class="ppl-v3-article-row__col-title">Texte initial (n° {{ $d.meta.an_num }})</div>
-            {{ if $initial_text }}
-              {{ $initial_text | safeHTML }}
-            {{ else }}
-              <p><em>Texte non extrait pour cet article (le pipeline AN ne l'a pas découpé ou article additionnel).</em></p>
-              <p><em><a href="{{ $d.meta.url_an_texte }}" target="_blank" rel="noopener">Consulter sur AN ↗</a></em></p>
-            {{ end }}
+            {{ $initial_text | safeHTML }}
           </div>
+          {{ end }}
+          {{ if $commission_text }}
           <div class="ppl-v3-article-row__col ppl-v3-article-row__col--commission">
             <div class="ppl-v3-article-row__col-title ppl-v3-article-row__col-title--commission">Texte voté commission (TC 2797)</div>
-            <p><em>Disponible une fois la commission terminée (à venir au prochain refresh AN).</em></p>
-            <p><em><a href="https://www.assemblee-nationale.fr/dyn/17/textes/l17b2797_texte-adopte-commission" target="_blank" rel="noopener">Consulter le texte commission ↗</a></em></p>
+            {{ $commission_text | safeHTML }}
           </div>
+          {{ end }}
         </div>
-        <div class="ppl-v3-article-row__amdt-mini" style="padding: 0 18px 14px;">
-          <div class="ppl-v3-article-row__col-title" style="margin-bottom:6px;">
+        {{ end }}
+        <div class="ppl-v3-article-row__amdt-mini" style="padding: 14px 18px;">
+          <div class="ppl-v3-article-row__col-title" style="margin-bottom:8px;">
             Amendements ayant porté sur {{ .article }} ({{ $count }})
           </div>
-          {{ range first 8 .items }}
+          {{ range .items }}
             {{ $sort_low := lower .sort }}
             {{ $sort_class := "traitement" }}
             {{ if in $sort_low "adopt" }}{{ $sort_class = "adopte" }}{{ end }}
@@ -383,49 +392,109 @@
             <span class="ppl-v3-amdt-mini__sort ppl-v3-sort--{{ $sort_class }}">{{ .sort | default "En traitement" }}</span>
           </div>
           {{ end }}
-          {{ if gt $count 8 }}
-          <div style="text-align:center; padding-top:6px;">
-            <em style="font-size:11px; color:#64748b;">+ {{ sub $count 8 }} autre{{ if gt (sub $count 8) 1 }}s{{ end }} amdt sur cet article — voir la vue à plat ci-dessous</em>
-          </div>
-          {{ end }}
         </div>
       </details>
       {{ end }}
     </div>
     {{ end }}
 
-    {{/* ---------- Vue à plat : tous les amdt en mode liste ---------- */}}
+    {{/* ---------- Vue à plat : tous les amdt avec filtre JS ---------- */}}
     {{ with $d.amdt_commission }}
-    <details>
+    {{ $total := index $d.counts "amdt_commission" }}
+    {{/* Articles disponibles pour le filtre (déduits du payload by_article) */}}
+    {{ $article_keys := slice }}
+    {{ range $d.amdt_commission_by_article }}
+      {{ $article_keys = $article_keys | append .article }}
+    {{ end }}
+    <details data-ppl-flat>
       <summary style="cursor:pointer; padding:10px 14px; background:#f1f5f9; border-radius:8px; font-size:13px; color:#122549; font-weight:600; margin-bottom: 12px;">
-        ▾ Vue à plat des {{ index $d.counts "amdt_commission" }} amendements (filtre par article)
+        ▾ Vue à plat des {{ $total }} amendements (filtres article + sort)
       </summary>
-      {{ range first 30 . }}
-        {{ $sort_low := lower .sort }}
-        {{ $sort_class := "traitement" }}
-        {{ if in $sort_low "adopt" }}{{ $sort_class = "adopte" }}{{ end }}
-        {{ if or (in $sort_low "rejet") (in $sort_low "irrecev") }}{{ $sort_class = "rejete" }}{{ end }}
-        {{ if in $sort_low "retir" }}{{ $sort_class = "retire" }}{{ end }}
-        {{ if or (in $sort_low "tomb") (in $sort_low "non examin") (in $sort_low "non soutenu") }}{{ $sort_class = "tombe" }}{{ end }}
-      <div class="ppl-v3-amdt ppl-v3-amdt--{{ $sort_class }}">
-        <span class="ppl-v3-amdt__num">{{ .title | replaceRE "^Amdt n°" "" | replaceRE " ·.*$" "" }}</span>
-        <div>
-          <span class="ppl-v3-amdt__author">
-            <a href="{{ .url }}" target="_blank" rel="noopener" style="color:inherit; text-decoration:none;">{{ .auteur }}</a>
-          </span>
-          {{ with .groupe }}<span class="ppl-v3-amdt__groupe">{{ . }}</span>{{ end }}
-          <div class="ppl-v3-amdt__date">{{ .date }}</div>
-        </div>
-        <span class="ppl-v3-amdt__article">{{ .article }}</span>
-        <span class="ppl-v3-amdt__sort ppl-v3-sort--{{ $sort_class }}">{{ .sort | default "En traitement" }}</span>
+      <div class="ppl-v3-flat-filters" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; align-items:center;">
+        <span style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#64748b; font-weight:600; margin-right:4px;">Article</span>
+        <button class="ppl-v3-chip ppl-v3-chip--active" data-filter-article="" type="button"><span class="ppl-v3-chip__label">Tous</span><span class="ppl-v3-chip__count">{{ $total }}</span></button>
+        {{ range $d.amdt_commission_by_article }}
+        <button class="ppl-v3-chip" data-filter-article="{{ .article }}" type="button"><span class="ppl-v3-chip__label">{{ .article }}</span><span class="ppl-v3-chip__count">{{ len .items }}</span></button>
+        {{ end }}
       </div>
-      {{ end }}
-      {{ if gt (index $d.counts "amdt_commission") 30 }}
-      <p style="text-align:center; padding-top:8px; font-size:11px; color:#64748b;">
-        <em>30 premiers affichés sur {{ index $d.counts "amdt_commission" }} — la version finale ajoutera filtres + pagination</em>
-      </p>
-      {{ end }}
+      <div class="ppl-v3-flat-filters" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; align-items:center;">
+        <span style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#64748b; font-weight:600; margin-right:4px;">Sort</span>
+        <button class="ppl-v3-chip ppl-v3-chip--active" data-filter-sort="" type="button"><span class="ppl-v3-chip__label">Tous</span></button>
+        <button class="ppl-v3-chip" data-filter-sort="adopte" type="button"><span class="ppl-v3-chip__label">Adoptés</span></button>
+        <button class="ppl-v3-chip" data-filter-sort="rejete" type="button"><span class="ppl-v3-chip__label">Rejetés</span></button>
+        <button class="ppl-v3-chip" data-filter-sort="retire" type="button"><span class="ppl-v3-chip__label">Retirés</span></button>
+        <button class="ppl-v3-chip" data-filter-sort="tombe" type="button"><span class="ppl-v3-chip__label">Tombés</span></button>
+        <button class="ppl-v3-chip" data-filter-sort="traitement" type="button"><span class="ppl-v3-chip__label">En traitement</span></button>
+      </div>
+      <div data-ppl-flat-count style="font-size:12px; color:#64748b; margin-bottom:8px;"></div>
+      <div data-ppl-flat-list>
+        {{ range . }}
+          {{ $sort_low := lower .sort }}
+          {{ $sort_class := "traitement" }}
+          {{ if in $sort_low "adopt" }}{{ $sort_class = "adopte" }}{{ end }}
+          {{ if or (in $sort_low "rejet") (in $sort_low "irrecev") }}{{ $sort_class = "rejete" }}{{ end }}
+          {{ if in $sort_low "retir" }}{{ $sort_class = "retire" }}{{ end }}
+          {{ if or (in $sort_low "tomb") (in $sort_low "non examin") (in $sort_low "non soutenu") }}{{ $sort_class = "tombe" }}{{ end }}
+        <div class="ppl-v3-amdt ppl-v3-amdt--{{ $sort_class }}"
+             data-article="{{ .article }}" data-sort-class="{{ $sort_class }}">
+          <span class="ppl-v3-amdt__num">{{ .title | replaceRE "^Amdt n°" "" | replaceRE " ·.*$" "" }}</span>
+          <div>
+            <span class="ppl-v3-amdt__author">
+              <a href="{{ .url }}" target="_blank" rel="noopener" style="color:inherit; text-decoration:none;">{{ .auteur }}</a>
+            </span>
+            {{ with .groupe }}<span class="ppl-v3-amdt__groupe">{{ . }}</span>{{ end }}
+            <div class="ppl-v3-amdt__date">{{ .date }}</div>
+          </div>
+          <span class="ppl-v3-amdt__article">{{ .article }}</span>
+          <span class="ppl-v3-amdt__sort ppl-v3-sort--{{ $sort_class }}">{{ .sort | default "En traitement" }}</span>
+        </div>
+        {{ end }}
+      </div>
     </details>
+
+    {{/* Mini JS de filtre vue à plat (article × sort, AND) — pas de dépendance externe. */}}
+    <script>
+    (function(){
+      var root = document.querySelector('details[data-ppl-flat]');
+      if (!root) return;
+      var state = { article: '', sort: '' };
+      var list = root.querySelector('[data-ppl-flat-list]');
+      var counter = root.querySelector('[data-ppl-flat-count]');
+      var totalItems = list.querySelectorAll('.ppl-v3-amdt').length;
+
+      function setActive(group, value){
+        root.querySelectorAll('[data-filter-' + group + ']').forEach(function(btn){
+          btn.classList.toggle('ppl-v3-chip--active', btn.getAttribute('data-filter-' + group) === value);
+        });
+      }
+      function apply(){
+        var shown = 0;
+        list.querySelectorAll('.ppl-v3-amdt').forEach(function(card){
+          var artOk = !state.article || card.getAttribute('data-article') === state.article;
+          var srtOk = !state.sort || card.getAttribute('data-sort-class') === state.sort;
+          var visible = artOk && srtOk;
+          card.style.display = visible ? '' : 'none';
+          if (visible) shown++;
+        });
+        counter.textContent = shown + ' amendement' + (shown > 1 ? 's' : '') +
+          ' affiché' + (shown > 1 ? 's' : '') + ' sur ' + totalItems + '.';
+      }
+      root.addEventListener('click', function(ev){
+        var btn = ev.target.closest('[data-filter-article],[data-filter-sort]');
+        if (!btn) return;
+        ev.preventDefault();
+        if (btn.hasAttribute('data-filter-article')) {
+          state.article = btn.getAttribute('data-filter-article');
+          setActive('article', state.article);
+        } else {
+          state.sort = btn.getAttribute('data-filter-sort');
+          setActive('sort', state.sort);
+        }
+        apply();
+      });
+      apply();
+    })();
+    </script>
     {{ end }}
 
   </div>
