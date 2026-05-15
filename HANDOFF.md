@@ -266,6 +266,14 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-15 (matin, retour Cyril) : **R42-BZ — Limite 3 keywords étendue aux dropdowns thématiques de l'accueil**.
+
+  Cyril 2026-05-15 : « la règle limitant l'affichage des mots-clés à 3 ne marche pas sur les occurrences présentes dans les menus dépliables de la page d'accueil ». Diagnostic : R42-BN avait patché les **templates Hugo** (`_default/list.html`, `agenda/list.html`, `dossiers_legislatifs/*`, `comptes_rendus/list.html`, `recherche/list.html`) mais la page d'accueil n'est pas rendue par un template Hugo — son contenu central est produit en Markdown par `src/site_export.py::_fmt_item_line` puis injecté dans `.Content`. Cette fonction conservait sa propre limite `kws[:12]` héritée de R36-pré-BN.
+
+  Fix : `kws[:12]` → `kws[:3]` à `src/site_export.py:3895`, commentaire R42-BZ. Concerne aussi le bloc « Actualité des dernières 24 h » par cohérence — mais ce dernier appelle `_fmt_item_line(..., with_tags=False)` donc aucun changement visible. Seul impact : les <details class="cat-fold"> de la home affichent désormais au max 3 tags par item, alignés sur le reste du site.
+
+  +4 tests `test_r42bz_home_keywords_limit_3.py` (limite à 3, ≤3 inchangé, exactement 3, with_tags=False court-circuite).
+
 - 2026-05-11 (fin de journée, Cyril remet en cause l'architecture après R42-BH) : **R42-BI — Filtre architectural famille `nomination_event` par whitelist de sources**. **Commit local, NON pushé**.
 
   Cyril a posé une question logique simple :

@@ -3889,10 +3889,14 @@ def _fmt_item_line(it: dict, with_tags: bool = True,
 
     tags_html = ""
     if kws and with_tags:
+        # R42-BZ (2026-05-15) : 12 → 3. R42-BN avait patché les templates
+        # Hugo (pages catégories, agenda, dosleg, recherche…) mais pas cette
+        # fonction qui rend les items dans les <details> dépliables de la
+        # page d'accueil (la home est générée en Markdown ici, pas par Hugo).
         tags_html = " ".join(
             f'<span class="kw-tag" data-family="{_escape(dominant_fam)}">'
             f'{_escape(k)}</span>'
-            for k in kws[:12]
+            for k in kws[:3]
         )
 
     meta_html = ""
