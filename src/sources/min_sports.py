@@ -37,9 +37,12 @@ Régressions possibles (à surveiller) :
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
+import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -48,6 +51,35 @@ from ..models import Item
 from ._common import fetch_text
 
 log = logging.getLogger(__name__)
+
+
+# R42-CB (2026-05-15) — Snapshot diag écrit sur disque à chaque échec.
+# Persistant entre runs via la liste de fichiers commités par
+# .github/workflows/daily.yml (snapshot step). Permet de diagnostiquer
+# « 0 items sans erreur » depuis main, sans accès aux logs GHA (gatés).
+_DEBUG_PATH = Path("data/min_sports_debug.json")
+
+
+def _write_debug(stage: str, **kwargs) -> None:
+    """Persiste un snapshot diagnostic sur disque. Écrit best-effort
+    (`OSError` ignoré pour ne jamais casser un run sur le diag lui-même).
+
+    `stage` : marqueur d'étape (`fetch_home_ko`, `no_link`, `no_h2_match`,
+    `zero_items`, `ok`). `kwargs` : champs additionnels typés JSON.
+    """
+    payload = {
+        "stage": stage,
+        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        **kwargs,
+    }
+    try:
+        _DEBUG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _DEBUG_PATH.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except OSError as e:
+        log.warning("min_sports : impossible d'écrire %s : %s", _DEBUG_PATH, e)
 
 
 # Mois français (minuscules, sans accent de fin) — pour parser le libellé
@@ -147,6 +179,7 @@ def _resolve_agenda_url(landing_url: str, impersonate: bool = False) -> str | No
         html = fetch_text(landing_url, impersonate=impersonate)
     except Exception as e:
         log.warning("min_sports : home KO (%s) : %s", landing_url, e)
+        _write_debug("fetch_home_ko", landing_url=landing_url, error=str(e))
         return None
 
     # BS4 suffirait mais une regex est plus rapide et plus robuste ici
@@ -161,6 +194,18 @@ def _resolve_agenda_url(landing_url: str, impersonate: bool = False) -> str | No
         log.warning(
             "min_sports : aucun lien /agenda-previsionnel-de-* trouvé sur %s",
             landing_url,
+        )
+        # R42-CB : on cherche aussi des liens « agenda » ou hrefs proches
+        # pour aider à pinpointer un nouveau pattern.
+        other_hrefs = re.findall(
+            r'href="(/[^"]*agenda[^"]*)"', html, re.IGNORECASE
+        )[:10]
+        _write_debug(
+            "no_link",
+            landing_url=landing_url,
+            html_length=len(html),
+            html_head=html[:500],
+            other_agenda_hrefs=other_hrefs,
         )
         return None
     return urljoin(landing_url, m.group(1))
@@ -309,6 +354,13 @@ def _parse_agenda_html(
             "min_sports %s : aucun <h2> avec 'semaine du …' sur %s "
             "— H2 vus : %r",
             sid, agenda_url, seen_h2_texts[:10],
+        )
+        _write_debug(
+            "no_h2_match",
+            agenda_url=agenda_url,
+            html_length=len(html),
+            seen_h2_texts=seen_h2_texts[:20],
+            html_head=html[:500],
         )
         return []
 
@@ -509,9 +561,35 @@ def _parse_agenda_html(
             "Inspecter %s.",
             sid, week_start.date().isoformat(), len(children), agenda_url,
         )
+        # R42-CB : snapshot diag — quels jours détectés ? combien de p ?
+        h5_texts = [el.get_text(" ", strip=True)[:120]
+                    for el in children if el.name == "h5"][:15]
+        p_count = sum(1 for el in children if el.name == "p")
+        p_strong_count = sum(
+            1 for el in children
+            if el.name == "p" and el.find("strong") is not None
+        )
+        _write_debug(
+            "zero_items",
+            agenda_url=agenda_url,
+            week_start=week_start.date().isoformat(),
+            children_scanned=len(children),
+            h5_count=sum(1 for el in children if el.name == "h5"),
+            h5_texts=h5_texts,
+            p_count=p_count,
+            p_strong_count=p_strong_count,
+            html_length=len(html),
+            seen_h2_texts=seen_h2_texts[:5],
+        )
     else:
         log.info(
             "min_sports %s : %d items normalisés (semaine du %s)",
             sid, len(items), week_start.date().isoformat(),
+        )
+        _write_debug(
+            "ok",
+            agenda_url=agenda_url,
+            week_start=week_start.date().isoformat(),
+            items_count=len(items),
         )
     return items
