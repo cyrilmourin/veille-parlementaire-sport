@@ -1,0 +1,6 @@
+{
+  "stage": "fetch_home_ko",
+  "ts": "2026-05-15T09:29:49+00:00",
+  "landing_url": "https://www.sports.gouv.fr/",
+  "error": "Failed to perform, curl: (28) Connection timed out after 30001 milliseconds. See https://curl.se/libcurl/c/libcurl-errors.html first for more details."
+}
