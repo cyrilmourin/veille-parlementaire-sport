@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-14T17:42:33+00:00",
+  "last_run_at": "2026-05-15T07:10:14+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419604B1560P0D1N000001",
@@ -511,6 +511,7 @@
       "an_syceron::54cd7ac4b77cfa16",
       "an_syceron::5643368ff75e4c57",
       "an_syceron::56643fafc50172f9",
+      "an_syceron::579f63952a40010d",
       "an_syceron::57ad0f7c44624427",
       "an_syceron::59df7568d95a6712",
       "an_syceron::5ab259bd45867691",
@@ -1574,6 +1575,7 @@
       "senat_cri::d492ef873a65e110",
       "senat_cri::d49487176ae4a332",
       "senat_cri::d4dfcc4d236059e2",
+      "senat_cri::d4e78c33844a28e8",
       "senat_cri::d522218c1fd36f3c",
       "senat_cri::d54857a11b99a61a",
       "senat_cri::d650b1ca6ef00321",
