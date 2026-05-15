@@ -550,6 +550,13 @@ def _row_to_payload(r: dict, max_title: int = 220) -> dict:
         "step": raw.get("step") or "",
         # R41-P : extrait du corps (max 400 chars), sans le titre.
         "extract": _build_extract(r, raw),
+        # R42-CQ (2026-05-15) — Mockup V4 : texte intégral du dispositif
+        # + exposé sommaire pour permettre le dépliage cliquable sur
+        # chaque amdt dans /ppl-sport-professionnel-mockup/. Cap 5000
+        # chars (largement suffisant pour 99% des amdt sport) pour ne
+        # pas exploser la taille du JSON special_ppl. Si haystack_body
+        # absent, fallback sur extract étendu (400 chars).
+        "texte_complet": _build_extract(r, raw, max_chars=5000),
         # R41-Q : article ciblé par l'amdt (« ARTICLE 5 », « ARTICLE 1ER A »,
         # « ARTICLE 2 BIS »...). Vide pour les autres types d'items.
         "article": _extract_article_label(r.get("title") or ""),

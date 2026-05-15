@@ -100,15 +100,88 @@
   .ppl-v3-article-row__col p { margin-bottom: 8px; }
   .ppl-v3-article-row__col em { font-style: normal; }
   .ppl-v3-article-row__amdt-mini { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0; font-size: 11px; }
-  .ppl-v3-amdt-mini { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-left: 3px solid transparent; padding-left: 8px; margin-bottom: 2px; }
-  .ppl-v3-amdt-mini--adopte { border-left-color: #22c55e; }
-  .ppl-v3-amdt-mini--rejete { border-left-color: #ef4444; }
-  .ppl-v3-amdt-mini--retire { border-left-color: #f59e0b; }
-  .ppl-v3-amdt-mini--tombe  { border-left-color: #94a3b8; }
-  .ppl-v3-amdt-mini--traitement { border-left-color: #1b3b6f; }
+  /* R42-CQ (V4) — chaque amdt mini est désormais un <details> cliquable.
+     Le summary = ce qu'on avait avant (num, auteur, sort). Au clic →
+     déplie un panel avec le texte intégral + lien externe AN/Sénat. */
+  .ppl-v3-amdt-mini { padding: 0; margin-bottom: 3px; border-radius: 4px; }
+  .ppl-v3-amdt-mini[open] { box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .ppl-v3-amdt-mini > summary {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 8px; cursor: pointer; list-style: none;
+    border-left: 3px solid transparent; border-radius: 4px;
+    transition: background 0.12s;
+  }
+  .ppl-v3-amdt-mini > summary::-webkit-details-marker { display: none; }
+  .ppl-v3-amdt-mini > summary:hover { background: #f8fafc; }
+  .ppl-v3-amdt-mini[open] > summary { background: #eff6ff; }
+  .ppl-v3-amdt-mini--adopte > summary { border-left-color: #22c55e; }
+  .ppl-v3-amdt-mini--rejete > summary { border-left-color: #ef4444; }
+  .ppl-v3-amdt-mini--retire > summary { border-left-color: #f59e0b; }
+  .ppl-v3-amdt-mini--tombe > summary  { border-left-color: #94a3b8; }
+  .ppl-v3-amdt-mini--traitement > summary { border-left-color: #1b3b6f; }
   .ppl-v3-amdt-mini__num { font-weight: 700; color: #122549; min-width: 60px; }
   .ppl-v3-amdt-mini__author { color: #475569; flex: 1; }
   .ppl-v3-amdt-mini__sort { font-size: 10px; padding: 2px 5px; border-radius: 3px; font-weight: 700; }
+  .ppl-v3-amdt-mini__toggle { font-size: 10px; color: #94a3b8; }
+  .ppl-v3-amdt-mini[open] .ppl-v3-amdt-mini__toggle::before { content: "▴"; }
+  .ppl-v3-amdt-mini:not([open]) .ppl-v3-amdt-mini__toggle::before { content: "▾"; }
+  .ppl-v3-amdt-mini__body {
+    padding: 10px 14px 12px 24px;
+    background: #fafbfc;
+    font-size: 12px; line-height: 1.5; color: #1f2937;
+    border-radius: 0 0 4px 4px;
+  }
+  .ppl-v3-amdt-mini__body p { margin: 0 0 8px; }
+  .ppl-v3-amdt-mini__body p:last-child { margin-bottom: 0; }
+  .ppl-v3-amdt-mini__link {
+    display: inline-block; margin-top: 6px;
+    padding: 3px 9px; font-size: 11px; font-weight: 700;
+    background: white; color: #122549;
+    border: 1.5px solid #122549; border-radius: 12px;
+    text-decoration: none;
+  }
+  .ppl-v3-amdt-mini__link:hover { background: #122549; color: white; }
+
+  /* R42-CQ (V4) — Dropdown article (remplace les chips horizontaux) */
+  .ppl-v3-article-select-wrap {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+  }
+  .ppl-v3-article-select-wrap label {
+    font-size: 12px; color: #64748b; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .ppl-v3-article-select {
+    flex: 1; max-width: 360px;
+    padding: 8px 12px; font-size: 13px; font-weight: 600;
+    color: #122549; background: white;
+    border: 1.5px solid #cbd5e1; border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .ppl-v3-article-select:hover { border-color: #122549; }
+  .ppl-v3-article-select:focus { outline: 2px solid #1b3b6f; outline-offset: 1px; }
+
+  /* R42-CQ (V4) — Vue à plat amdt cliquables (<details> wrappant le
+     summary qui était le row grid 4-col). On garde le summary stylisé
+     comme avant (.ppl-v3-amdt) et on ajoute un body en dessous. */
+  .ppl-v3-amdt-flat { margin-bottom: 5px; }
+  .ppl-v3-amdt-flat[open] { box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-radius: 7px; }
+  .ppl-v3-amdt-flat > summary {
+    cursor: pointer; list-style: none;
+  }
+  .ppl-v3-amdt-flat > summary::-webkit-details-marker { display: none; }
+  .ppl-v3-amdt-flat[open] > summary {
+    background: #eff6ff;
+  }
+  .ppl-v3-amdt-flat__body {
+    padding: 12px 16px 14px 24px;
+    background: #fafbfc;
+    font-size: 12px; line-height: 1.55; color: #1f2937;
+    border-radius: 0 0 7px 7px;
+    border-top: 1px dashed #e2e8f0;
+  }
+  .ppl-v3-amdt-flat__body p { margin: 0 0 10px; }
+  .ppl-v3-amdt-flat__body p:last-child { margin-bottom: 6px; }
 
   .ppl-v3-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
   .ppl-v3-card { background: #fafbfc; border-radius: 9px; padding: 16px; }
@@ -375,7 +448,7 @@
         {{ end }}
         <div class="ppl-v3-article-row__amdt-mini" style="padding: 14px 18px;">
           <div class="ppl-v3-article-row__col-title" style="margin-bottom:8px;">
-            Amendements ayant porté sur {{ .article }} ({{ $count }})
+            Amendements ayant porté sur {{ .article }} ({{ $count }}) — cliquer pour déplier
           </div>
           {{ range .items }}
             {{ $sort_low := lower .sort }}
@@ -384,13 +457,26 @@
             {{ if or (in $sort_low "rejet") (in $sort_low "irrecev") }}{{ $sort_class = "rejete" }}{{ end }}
             {{ if in $sort_low "retir" }}{{ $sort_class = "retire" }}{{ end }}
             {{ if or (in $sort_low "tomb") (in $sort_low "non examin") (in $sort_low "non soutenu") }}{{ $sort_class = "tombe" }}{{ end }}
-          <div class="ppl-v3-amdt-mini ppl-v3-amdt-mini--{{ $sort_class }}">
-            <span class="ppl-v3-amdt-mini__num">{{ .title | replaceRE "^Amdt n°" "" | replaceRE " ·.*$" "" }}</span>
-            <span class="ppl-v3-amdt-mini__author">
-              <a href="{{ .url }}" target="_blank" rel="noopener" style="color:inherit; text-decoration:none;">{{ .auteur }}{{ with .groupe }} ({{ . }}){{ end }}</a>
-            </span>
-            <span class="ppl-v3-amdt-mini__sort ppl-v3-sort--{{ $sort_class }}">{{ .sort | default "En traitement" }}</span>
-          </div>
+            {{ $is_senat := in (lower .url) "senat.fr" }}
+            {{ $source_label := cond $is_senat "Sénat" "Assemblée nationale" }}
+          <details class="ppl-v3-amdt-mini ppl-v3-amdt-mini--{{ $sort_class }}">
+            <summary>
+              <span class="ppl-v3-amdt-mini__num">{{ .title | replaceRE "^Amdt n°" "" | replaceRE " ·.*$" "" }}</span>
+              <span class="ppl-v3-amdt-mini__author">{{ .auteur }}{{ with .groupe }} ({{ . }}){{ end }}</span>
+              <span class="ppl-v3-amdt-mini__sort ppl-v3-sort--{{ $sort_class }}">{{ .sort | default "En traitement" }}</span>
+              <span class="ppl-v3-amdt-mini__toggle" aria-hidden="true"></span>
+            </summary>
+            <div class="ppl-v3-amdt-mini__body">
+              {{ with .texte_complet }}
+                <p>{{ . }}</p>
+              {{ else }}
+                <p><em>Texte intégral non disponible dans le dump open data (extrait possible côté source).</em></p>
+              {{ end }}
+              <a class="ppl-v3-amdt-mini__link" href="{{ .url }}" target="_blank" rel="noopener noreferrer">
+                Voir l'amendement sur {{ $source_label }} ↗
+              </a>
+            </div>
+          </details>
           {{ end }}
         </div>
       </details>
@@ -410,12 +496,20 @@
       <summary style="cursor:pointer; padding:10px 14px; background:#f1f5f9; border-radius:8px; font-size:13px; color:#122549; font-weight:600; margin-bottom: 12px;">
         ▾ Vue à plat des {{ $total }} amendements (filtres article + sort)
       </summary>
-      <div class="ppl-v3-flat-filters" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; align-items:center;">
-        <span style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#64748b; font-weight:600; margin-right:4px;">Article</span>
-        <button class="ppl-v3-chip ppl-v3-chip--active" data-filter-article="" type="button"><span class="ppl-v3-chip__label">Tous</span><span class="ppl-v3-chip__count">{{ $total }}</span></button>
-        {{ range $d.amdt_commission_by_article }}
-        <button class="ppl-v3-chip" data-filter-article="{{ .article }}" type="button"><span class="ppl-v3-chip__label">{{ .article }}</span><span class="ppl-v3-chip__count">{{ len .items }}</span></button>
-        {{ end }}
+      {{/* R42-CQ (V4) — Dropdown article (remplace les chips horizontaux
+           qui prenaient trop de place avec 10+ articles juxtaposés).
+           Cyril 2026-05-15 : « les articles doivent être sélectionnables
+           via une sorte de menu déroulant ». Sort reste en chips
+           (3-6 valeurs canoniques, moins encombrant). */}}
+      <div class="ppl-v3-article-select-wrap">
+        <label for="ppl-v3-article-select">Article</label>
+        <select id="ppl-v3-article-select" class="ppl-v3-article-select"
+                data-filter-article-select>
+          <option value="">Tous les articles ({{ $total }})</option>
+          {{ range $d.amdt_commission_by_article }}
+          <option value="{{ .article }}">{{ .article }} ({{ len .items }})</option>
+          {{ end }}
+        </select>
       </div>
       <div class="ppl-v3-flat-filters" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; align-items:center;">
         <span style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#64748b; font-weight:600; margin-right:4px;">Sort</span>
@@ -435,24 +529,44 @@
           {{ if or (in $sort_low "rejet") (in $sort_low "irrecev") }}{{ $sort_class = "rejete" }}{{ end }}
           {{ if in $sort_low "retir" }}{{ $sort_class = "retire" }}{{ end }}
           {{ if or (in $sort_low "tomb") (in $sort_low "non examin") (in $sort_low "non soutenu") }}{{ $sort_class = "tombe" }}{{ end }}
-        <div class="ppl-v3-amdt ppl-v3-amdt--{{ $sort_class }}"
-             data-article="{{ .article }}" data-sort-class="{{ $sort_class }}">
-          <span class="ppl-v3-amdt__num">{{ .title | replaceRE "^Amdt n°" "" | replaceRE " ·.*$" "" }}</span>
-          <div>
-            <span class="ppl-v3-amdt__author">
-              <a href="{{ .url }}" target="_blank" rel="noopener" style="color:inherit; text-decoration:none;">{{ .auteur }}</a>
-            </span>
-            {{ with .groupe }}<span class="ppl-v3-amdt__groupe">{{ . }}</span>{{ end }}
-            <div class="ppl-v3-amdt__date">{{ .date }}</div>
+          {{ $is_senat := in (lower .url) "senat.fr" }}
+          {{ $source_label := cond $is_senat "Sénat" "Assemblée nationale" }}
+        {{/* R42-CQ (V4) — amdt cliquable en vue à plat aussi, déplie le
+             contenu intégral + lien externe. Class .ppl-v3-amdt-flat
+             (variante de .ppl-v3-amdt) pour ne pas casser le layout grid
+             4-col existant : on garde le bandeau résumé en summary et on
+             ajoute un panel sous. */}}
+        <details class="ppl-v3-amdt-flat ppl-v3-amdt--{{ $sort_class }}"
+                 data-article="{{ .article }}" data-sort-class="{{ $sort_class }}">
+          <summary class="ppl-v3-amdt">
+            <span class="ppl-v3-amdt__num">{{ .title | replaceRE "^Amdt n°" "" | replaceRE " ·.*$" "" }}</span>
+            <div>
+              <span class="ppl-v3-amdt__author">{{ .auteur }}</span>
+              {{ with .groupe }}<span class="ppl-v3-amdt__groupe">{{ . }}</span>{{ end }}
+              <div class="ppl-v3-amdt__date">{{ .date }}</div>
+            </div>
+            <span class="ppl-v3-amdt__article">{{ .article }}</span>
+            <span class="ppl-v3-amdt__sort ppl-v3-sort--{{ $sort_class }}">{{ .sort | default "En traitement" }}</span>
+          </summary>
+          <div class="ppl-v3-amdt-flat__body">
+            {{ with .texte_complet }}
+              <p>{{ . }}</p>
+            {{ else }}
+              <p><em>Texte intégral non disponible dans le dump open data.</em></p>
+            {{ end }}
+            <a class="ppl-v3-amdt-mini__link" href="{{ .url }}" target="_blank" rel="noopener noreferrer">
+              Voir l'amendement sur {{ $source_label }} ↗
+            </a>
           </div>
-          <span class="ppl-v3-amdt__article">{{ .article }}</span>
-          <span class="ppl-v3-amdt__sort ppl-v3-sort--{{ $sort_class }}">{{ .sort | default "En traitement" }}</span>
-        </div>
+        </details>
         {{ end }}
       </div>
     </details>
 
-    {{/* Mini JS de filtre vue à plat (article × sort, AND) — pas de dépendance externe. */}}
+    {{/* R42-CQ (V4) — Filtre vue à plat : dropdown article + chips sort.
+         Cible `.ppl-v3-amdt-flat` (les <details> wrappants) pour le
+         show/hide ; attributs data-article et data-sort-class portés
+         par le <details> directement. */}}
     <script>
     (function(){
       var root = document.querySelector('details[data-ppl-flat]');
@@ -460,16 +574,17 @@
       var state = { article: '', sort: '' };
       var list = root.querySelector('[data-ppl-flat-list]');
       var counter = root.querySelector('[data-ppl-flat-count]');
-      var totalItems = list.querySelectorAll('.ppl-v3-amdt').length;
+      var amdts = list.querySelectorAll('.ppl-v3-amdt-flat');
+      var totalItems = amdts.length;
 
-      function setActive(group, value){
+      function setActiveChip(group, value){
         root.querySelectorAll('[data-filter-' + group + ']').forEach(function(btn){
           btn.classList.toggle('ppl-v3-chip--active', btn.getAttribute('data-filter-' + group) === value);
         });
       }
       function apply(){
         var shown = 0;
-        list.querySelectorAll('.ppl-v3-amdt').forEach(function(card){
+        amdts.forEach(function(card){
           var artOk = !state.article || card.getAttribute('data-article') === state.article;
           var srtOk = !state.sort || card.getAttribute('data-sort-class') === state.sort;
           var visible = artOk && srtOk;
@@ -479,17 +594,21 @@
         counter.textContent = shown + ' amendement' + (shown > 1 ? 's' : '') +
           ' affiché' + (shown > 1 ? 's' : '') + ' sur ' + totalItems + '.';
       }
+      // Dropdown article (R42-CQ V4 : remplace les chips article)
+      var sel = root.querySelector('[data-filter-article-select]');
+      if (sel) {
+        sel.addEventListener('change', function(){
+          state.article = sel.value || '';
+          apply();
+        });
+      }
+      // Chips sort (inchangé)
       root.addEventListener('click', function(ev){
-        var btn = ev.target.closest('[data-filter-article],[data-filter-sort]');
+        var btn = ev.target.closest('[data-filter-sort]');
         if (!btn) return;
         ev.preventDefault();
-        if (btn.hasAttribute('data-filter-article')) {
-          state.article = btn.getAttribute('data-filter-article');
-          setActive('article', state.article);
-        } else {
-          state.sort = btn.getAttribute('data-filter-sort');
-          setActive('sort', state.sort);
-        }
+        state.sort = btn.getAttribute('data-filter-sort') || '';
+        setActiveChip('sort', state.sort);
         apply();
       });
       apply();
