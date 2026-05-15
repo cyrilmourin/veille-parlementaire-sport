@@ -237,6 +237,31 @@
   .ppl-v3-sort--traitement { background: #dbeafe; color: #122549; }
   .ppl-v3-sort--autre { background: #f1f5f9; color: #475569; }
 
+  /* R42-CV (2026-05-15) — Cartouche « analyse manuelle » (commission /
+     séance). Texte rédigé à la main dans config/special_ppl_analysis.yml,
+     pas d'IA en pipeline. Mis en avant visuellement (bordure bleue,
+     titre marqué) pour signaler que c'est une lecture rédactionnelle
+     et non un agrégat automatique. */
+  .ppl-v3-analysis {
+    background: #f8fafc; border: 1px solid #cbd5e1;
+    border-left: 4px solid #1b3b6f;
+    border-radius: 10px; padding: 16px 20px; margin-bottom: 16px;
+  }
+  .ppl-v3-analysis__title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+    color: #1b3b6f; font-weight: 700; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ppl-v3-analysis__meta {
+    font-size: 11px; color: #64748b; margin-bottom: 10px;
+  }
+  .ppl-v3-analysis__body {
+    font-size: 13px; line-height: 1.55; color: #1f2937;
+  }
+  .ppl-v3-analysis__body p { margin: 0 0 10px; }
+  .ppl-v3-analysis__body p:last-child { margin-bottom: 0; }
+  .ppl-v3-analysis__body em { color: #475569; }
+
   .ppl-v3-wordcloud { background: white; border-radius: 10px; padding: 22px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 20px; }
   .ppl-v3-wordcloud__sub { font-size: 11px; color: #94a3b8; margin-bottom: 14px; font-style: italic; }
   .ppl-v3-cloud { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: center; align-items: center; padding: 8px 0; line-height: 1.1; }
@@ -319,6 +344,40 @@
 
   {{/* ---------- Panel actif : Commission ---------- */}}
   <div class="ppl-v3-panel">
+
+    {{/* R42-CV (2026-05-15) — Cartouche analyse manuelle Commission.
+         Affichée uniquement si `analysis.commission.texte` non vide
+         (config/special_ppl_analysis.yml). */}}
+    {{ with $d.analysis }}
+      {{ with .commission }}
+        {{ if .texte }}
+        <div class="ppl-v3-analysis">
+          <div class="ppl-v3-analysis__title">
+            <span>📝</span>
+            <span>Synthèse — Commission Culture AN</span>
+          </div>
+          {{ if or .date_examen .auteur }}
+          <div class="ppl-v3-analysis__meta">
+            {{ with .date_examen }}Examen {{ . }}{{ end }}
+            {{ if and .date_examen .auteur }} · {{ end }}{{ if not .date_examen }}{{ if .auteur }}{{ end }}{{ end }}{{ with .auteur }}{{ . }}{{ end }}
+          </div>
+          {{ end }}
+          <div class="ppl-v3-analysis__body">
+            {{/* Markdown light : on remplace les doubles retours par
+                 une nouvelle balise <p> (les paragraphes YAML pipe-style
+                 sont séparés par des lignes vides). */}}
+            {{ $paragraphs := split .texte "\n\n" }}
+            {{ range $paragraphs }}
+              {{ $cleaned := trim . " \n\t" }}
+              {{ if $cleaned }}
+                <p>{{ $cleaned | markdownify }}</p>
+              {{ end }}
+            {{ end }}
+          </div>
+        </div>
+        {{ end }}
+      {{ end }}
+    {{ end }}
 
     {{/* Boutons d'action */}}
     <div class="ppl-v3-actions">
@@ -437,9 +496,14 @@
       {{ $commission_text := index $commission $article_key }}
       {{ $has_both := and $initial_text $commission_text }}
       <details class="ppl-v3-article-row">
+        {{/* R42-CW (2026-05-15) — Cyril : la chip « N amdt » suffit, on
+             retire le doublon « N amendements en commission » qui
+             affichait la même info en clair juste à côté. La 2e
+             colonne de la grid devient un spacer (1fr) qui pousse
+             chip + toggle à droite. */}}
         <summary>
           <span class="ppl-v3-article-row__num">{{ .article }}</span>
-          <span class="ppl-v3-article-row__caption">{{ $count }} amendement{{ if gt $count 1 }}s{{ end }} en commission</span>
+          <span></span>
           <span class="ppl-v3-article-row__chip">{{ $count }} amdt</span>
           <span class="ppl-v3-article-row__toggle">Ouvrir</span>
         </summary>
@@ -630,6 +694,38 @@
     {{ end }}
 
   </div>
+
+  {{/* R42-CV (2026-05-15) — Cartouche analyse manuelle Séance publique.
+       Affichée uniquement si `analysis.seance.texte` non vide. Tant que
+       la séance publique n'a pas eu lieu, le bloc reste invisible
+       (config/special_ppl_analysis.yml.special_ppl.seance.texte = ""). */}}
+  {{ with $d.analysis }}
+    {{ with .seance }}
+      {{ if .texte }}
+      <div class="ppl-v3-analysis">
+        <div class="ppl-v3-analysis__title">
+          <span>📝</span>
+          <span>Synthèse — Séance publique AN</span>
+        </div>
+        {{ if or .date_examen .auteur }}
+        <div class="ppl-v3-analysis__meta">
+          {{ with .date_examen }}Examen {{ . }}{{ end }}
+          {{ if and .date_examen .auteur }} · {{ end }}{{ with .auteur }}{{ . }}{{ end }}
+        </div>
+        {{ end }}
+        <div class="ppl-v3-analysis__body">
+          {{ $paragraphs := split .texte "\n\n" }}
+          {{ range $paragraphs }}
+            {{ $cleaned := trim . " \n\t" }}
+            {{ if $cleaned }}
+              <p>{{ $cleaned | markdownify }}</p>
+            {{ end }}
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+    {{ end }}
+  {{ end }}
 
   {{/* ---------- Nuage de mots-clés (vraies données du payload) ---------- */}}
   {{ with $d.wordcloud_commission }}

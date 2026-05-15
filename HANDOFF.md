@@ -122,7 +122,8 @@ Environ **45 000 items ingérés** / run reset_db. Matchés sport : questions ~1
 
 ### Priorité haute
 
-_(Vide — toutes les priorités hautes du cycle R39 ont été closes par R40-A/B/C. Surveiller la prod 7-14 jours puis ré-évaluer.)_
+- **Pruning des items disparus du dump (agenda surtout)** — R42-CI (today) écrase `published_at` quand AN repose `timeStampDebut=NULL`, R42-CX skippe les réunions avec `raw.etat ∈ {reportée, annulée}`. Reste le cas où AN supprime carrément l'item du dump zip — la DB conserve la réunion morte indéfiniment et `_boost_dosleg_with_agenda` continue de tirer la date périmée. Solution : `store.prune_missing(source_id, seen_uids)` appelé après chaque ingestion AN agenda (et possiblement Sénat agenda). Garde-fou : ne purger QUE si le fetch a renvoyé un volume « plausible » (≥ 50% du dernier count) pour éviter de wiper la base sur un fetch dégradé.
+
 
 ### Priorité moyenne
 
@@ -265,6 +266,31 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 ---
 
 ## Historique
+
+- 2026-05-15 (après-midi, retours Cyril sur la page spéciale PPL Sport pro + dosleg) : **R42-CV + R42-CW + R42-CX**. Branche `claude/fix-ppl-sport-pro-page-jERwN`.
+
+  **R42-CV — Page spéciale PPL Sport pro : titre exact, plus de cap 200, analyse manuelle, stopwords nuage**.
+  - **Titre** : `meta.hero_title` posé dans `build_payload` avec l'intitulé exact (« Proposition de loi relative à l'organisation, à la gestion et au financement du sport professionnel »). Avant : tombait sur le default Hugo « Proposition de loi » générique. Idem `hero_subtitle` (« AN n° 1560 · Sénat n° 456 · Examinée en commission Culture les 12-13 mai 2026 (TC 2797) »). Symétrique pour PPL Équipements.
+  - **Cap 200 → 5000** sur `amdt_commission` / `amdt_seance` dans `LIMITS` (`special_ppl.py` + `special_equipements.py`). Cyril 2026-05-15 : « on énumère 300 amendements pour ensuite afficher 200 amendements déposés ». Cause : badge onglet utilise `counts` (total réel) tandis que le donut sort_stats opérait sur la liste tronquée à 200. Le donut camembert par sort fonctionne déjà via conic-gradient ; à 300/300 il reflète maintenant la totalité.
+  - **Analyse manuelle** : nouveau `config/special_ppl_analysis.yml`, lu par `special_ppl.load_analysis(payload_key)`. Mapping `payload_key → section YAML` (`special_ppl` / `special_ppl_equip`). Bloc `commission` + bloc `seance`, chacun avec `date_examen`, `auteur`, `texte` (Markdown light, paragraphes séparés par lignes vides). Cyril rédige la synthèse à la main (option : copier une analyse Claude faite à part) — pas d'IA dans le pipeline. Le bloc `commission` se rend au-dessus des amendements ; le bloc `seance` après le nuage. Les blocs vides ne s'affichent pas.
+  - **Stopwords nuage** : ajout de `mots`, `mot`, `senat`, `sénat`, `dédié(e)(s)`, `dedie(e)(s)`, `effet(s)` aux `_WC_STOPWORDS`.
+
+  **R42-CW — Dosleg PPL Équipements pointe enfin vers la page spéciale**.
+  Cyril 2026-05-15 : « Dans dosleg `Encourager les partenariats…` ne fait pas de lien vers la page spéciale. Et il y a un lien `consulter le dossier législatif` plutôt que `Consulter la page dédiée à la PPL` ». Avant : `dossiers_legislatifs/list.html` testait `in .Params.source_url "DLR5L17N51732"` (hardcodé Sport pro). Après : `_write_item_pages` (site_export.py) détecte les deux PPL via `row_matches_special_ppl` / `row_matches_special_equipements` et expose 2 nouveaux champs frontmatter :
+  - `special_page_url: "/ppl-..."`
+  - `special_page_label: "Consulter la page dédiée à la PPL"`
+
+  Les layouts `dossiers_legislatifs/list.html` et `dossiers_legislatifs/single.html` consomment ces champs. Le single ajoute un 2e bouton secondaire « Consulter le dossier officiel » pour ne pas perdre le lien externe. La caption « N amendements en commission » est aussi retirée du summary article (Cyril : « la chip suffit »).
+
+  **R42-CX — Filtre des réunions reportées/annulées (partial fix au piège structurel agenda)**.
+  Cyril 2026-05-15 : « Le problème structurel de maintien des dates pourtant reportées de l'agenda parlementaire n'est pas réglé puisque la date du 18 mai apparaît encore pour la séance publique de la PPL sport pro ». R42-CI (déployé ce matin, store.upsert_many) gère le cas où AN met `timeStampDebut=NULL` au moment du report. R42-CX ajoute le cas symétrique : AN expose un champ statut explicite (`etat`/`confirmation`/`statutReunion`).
+  - `assemblee._normalize_agenda` extrait `raw.etat` (best-effort sur 5 paths candidats : `confirmation`, `statutReunion`, `etat`, `etatReunion`, `cycleDeVie.etat`) avec fallback `_deep_find`.
+  - `_boost_dosleg_with_agenda` skippe les agendas dont `raw.etat` contient « report » ou « annul » → ne booste plus `published_at` du dosleg via une réunion morte.
+  - `collect_special_ppl` / `collect_special_equipements` skippent ces mêmes agendas du bucket `agenda` de la page PPL spéciale.
+
+  **Limitation connue** : si l'AN supprime carrément la réunion du dump zip (vs maj du champ etat ou de timeStampDebut), notre DB la conserve indéfiniment. Pour le résoudre, ajouter un mécanisme de pruning « items absents du dernier fetch » (`store.prune_missing(source_id, seen_uids)` appelé après ingestion AN agenda). À faire dans un prochain R-tag dédié (cf. TODO priorité haute).
+
+  +14 tests R42-CV (`test_r42cv_special_ppl_fixes.py`), +4 tests R42-CW (`test_r42cw_dosleg_special_link.py`), +7 tests R42-CX (`test_r42cx_agenda_etat_filter.py`), ajustement -1 R41-M (cap 200 → 5000). Suite locale en sandbox : 1324 tests verts (1 échec live HTTP 403 anj.fr sans rapport). `SYSTEM_VERSION_LABEL` : pas bumpé (cycle R42 toujours en cours).
 
 - 2026-05-15 (~10h, validation R42-CC) : **R42-CD — Push de validation `min_sports_agenda` via worker Cloudflare**. Run déclenché pour matérialiser sur le site la résolution de la chaîne MinSports (`fetch_home_ko` → `proxy: cloudflare` activé en R42-CC). Vérification post-run via `data/min_sports_debug.json::stage == "ok"` et `data/pipeline_health.json::min_sports_agenda::last_fetched > 0`. Email digest sortira (1 seul, push trigger), pas de retrigger ultérieur de mon côté.
 

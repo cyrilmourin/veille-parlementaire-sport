@@ -3355,8 +3355,22 @@ def _boost_dosleg_with_agenda(rows: list[dict]) -> None:
         return
 
     # Pré-calcul des word sets + dates + chambre + titre agenda
+    # R42-CX (2026-05-15) — Cyril : « le problème structurel de maintien
+    # des dates pourtant reportées de l'agenda parlementaire n'est pas
+    # réglé puisque la date du 18 mai apparaît encore pour la séance
+    # publique de la PPL sport pro ». R42-CI (today, store.upsert_many)
+    # gère le cas où AN écrit timeStampDebut=NULL au moment du report.
+    # Ce filtre additionnel couvre le cas où AN expose un champ statut
+    # explicite (`etat`/`confirmation`/`statutReunion`) — extrait par
+    # `assemblee._normalize_agenda` dans `raw.etat`. Si le statut
+    # contient « report » ou « annul », on n'utilise PAS cet item pour
+    # booster un dosleg (la date n'est plus opérationnelle).
     agenda_data: list[tuple[set[str], str, str, str]] = []
     for a in agenda:
+        raw = a.get("raw") if isinstance(a.get("raw"), dict) else {}
+        etat = (raw.get("etat") or "").lower() if isinstance(raw, dict) else ""
+        if etat and ("report" in etat or "annul" in etat):
+            continue
         words = _dosleg_word_set(a.get("title", "") or "")
         if len(words) < 4:
             continue
@@ -4753,6 +4767,33 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
             elif bypass_kws:
                 # fallback générique : on affiche le label nettoyé
                 match_reason = f"Matché via {bypass_kws[0].strip('()')}"
+        # R42-CW (2026-05-15) — Detection « page spéciale PPL » pour
+        # rerouter le lien des cards/single dosleg vers la page Hugo
+        # dédiée. Avant : seule la PPL Sport pro était redirigée
+        # (hardcodé `DLR5L17N51732` dans list.html), et la fiche détail
+        # affichait « Consulter le dossier officiel ». Cyril 2026-05-15 :
+        # « Dans dosleg `Encourager les partenariats…` ne fait pas de
+        # lien vers la page spéciale. Et il y a un lien `consulter le
+        # dossier législatif` plutôt que `Consulter la page dédiée à
+        # la PPL` ».
+        # Approche : on expose `special_page_url` + `special_page_label`
+        # dans le frontmatter dès qu'un item match l'une des deux PPL
+        # (Sport pro / Équipements). Les layouts Hugo préfèrent ces
+        # champs au `source_url` quand ils sont posés.
+        special_page_url = ""
+        special_page_label = ""
+        try:
+            from . import special_ppl as _spp_match
+            from . import special_equipements as _spe_match
+            if _spp_match.row_matches_special_ppl(r):
+                special_page_url = _spp_match.PPL_SLUG_PATH
+                special_page_label = "Consulter la page dédiée à la PPL"
+            elif _spe_match.row_matches_special_equipements(r):
+                special_page_url = _spe_match.PPL_SLUG_PATH
+                special_page_label = "Consulter la page dédiée à la PPL"
+        except Exception:
+            pass
+
         fm += [
             f"category: {cat}",
             f'chamber: "{r.get("chamber") or ""}"',
@@ -4765,6 +4806,9 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
             f'status_label: "{status_label}"',
             f"is_promulgated: {str(is_promulgated).lower()}",
         ]
+        if special_page_url:
+            fm.append(f'special_page_url: "{special_page_url}"')
+            fm.append(f'special_page_label: "{special_page_label}"')
         if match_reason:
             fm.append(f'match_reason: "{match_reason}"')
         if auteur_label:

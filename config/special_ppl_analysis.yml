@@ -1,0 +1,60 @@
+# R42-CV (2026-05-15) — Analyses manuelles affichées sur les pages
+# spéciales PPL. Édition manuelle : Cyril (ou Claude « hors ligne ») rédige
+# une synthèse des principales modifications opérées par les amendements
+# adoptés. Pas d'IA dans le pipeline : le texte est figé jusqu'à la
+# prochaine édition.
+#
+# Format :
+#   <data_key>:                # ex. special_ppl, special_ppl_equip
+#     commission:              # bloc rendu en haut de la section commission
+#       date_examen: "..."     # affiché en sous-titre (optionnel)
+#       auteur: "..."          # crédit affiché (optionnel)
+#       texte: |
+#         Texte libre Markdown. Plusieurs paragraphes possibles.
+#         Les sauts de ligne simples sont préservés.
+#     seance:                  # bloc rendu en haut de la section séance pub
+#       date_examen: "..."
+#       auteur: "..."
+#       texte: |
+#         (Vide tant que la séance publique n'a pas eu lieu.)
+#
+# Effet visuel :
+#   - `texte` non vide → la cartouche « Synthèse Commission Culture » (ou
+#     « Synthèse Séance publique ») s'affiche au-dessus des amendements.
+#   - `texte` vide ou absent → rien n'est affiché.
+#
+# Pour rafraîchir : éditer ce fichier puis pousser sur main, le pipeline
+# daily.yml régénère le site dans la foulée. Pas besoin de reset_category.
+
+special_ppl:
+  commission:
+    date_examen: "12-13 mai 2026"
+    auteur: "Synthèse manuelle (analyse Claude relue par la rédaction)"
+    texte: |
+      _À compléter manuellement après examen des amendements adoptés en
+      commission Culture. Mode opératoire : copier-coller dans cette
+      section une analyse rédigée par Claude (chat ou Console
+      Anthropic) à partir de la liste des amendements ayant pour sort
+      « Adopté ». Le texte ci-dessous est un placeholder._
+
+      Les principales modifications opérées par la commission Culture
+      sur la PPL Sport pro (n° 1560) seront résumées ici une fois que
+      le compte rendu et le texte voté en commission (TC 2797) auront
+      été lus en détail. Suggestions de plan : (i) gouvernance des
+      ligues professionnelles, (ii) financement et solidarité
+      financière entre clubs, (iii) statut du sportif professionnel,
+      (iv) régulation des paris sportifs et droits TV.
+  seance:
+    date_examen: ""
+    auteur: ""
+    texte: ""
+
+special_ppl_equip:
+  commission:
+    date_examen: ""
+    auteur: ""
+    texte: ""
+  seance:
+    date_examen: ""
+    auteur: ""
+    texte: ""
