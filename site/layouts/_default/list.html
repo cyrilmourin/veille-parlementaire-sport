@@ -23,8 +23,19 @@
     <button type="button" class="sff-btn" data-sff="mouvement_sportif" aria-pressed="false">Mouvement sportif</button>
   </nav>
   {{ end }}
+  {{/* R42-CJ (2026-05-15) — Pour les pages avec filtre famille
+       (`/items/communiques/` à ce jour), on désactive la pagination
+       Hugo SERVEUR et on met tous les items dans le DOM. La pagination
+       est ensuite reprise CÔTÉ CLIENT en JS pour rester synchronisée
+       avec le filtre actif. Cyril a constaté que la pagination Hugo
+       (figée à la génération) restait affichée même quand un filtre
+       réduit à 0 ou 1 page, et inversement qu'un filtre depuis la
+       page 2 pouvait vider l'affichage si la famille n'a aucun item
+       sur cette page-là. */}}
+  {{ $has_family_filter := eq .Type "communiques" }}
+  {{ $pages := cond $has_family_filter .Pages.ByDate.Reverse (.Paginate .Pages.ByDate.Reverse).Pages }}
   <ul class="items">
-    {{ range (.Paginate .Pages.ByDate.Reverse).Pages }}
+    {{ range $pages }}
       {{/* R23-C4 (2026-04-23) : le <li> devient flex horizontal avec, si
            .Params.auteur_photo_url est défini, une colonne gauche dédiée
            à la photo portrait au même format visuel que les logos chambre
@@ -82,29 +93,128 @@
       </li>
     {{ end }}
   </ul>
-  {{ partial "pagination-inline.html" . }}
+  {{/* R42-CJ — Pour les pages avec filtre famille, la pagination est
+       rendue côté JS (cf. script ci-dessous) ; sinon pagination Hugo. */}}
+  {{ if $has_family_filter }}
+    <nav class="pagination-inline pagination-js" aria-label="Pagination"></nav>
+  {{ else }}
+    {{ partial "pagination-inline.html" . }}
+  {{ end }}
 </section>
 
-{{/* R23-H : JS vanilla pour le filtre par famille de source sur
-     /items/communiques/. Le `<script>` est inclus sur toutes les
-     pages _default mais no-op en l'absence de `.source-family-filter`. */}}
+{{/* R23-H + R42-CJ (2026-05-15) — Filtre famille + pagination JS
+     dynamique. Tous les items sont dans le DOM (cf. désactivation de
+     .Paginate plus haut pour `communiques`). Au clic sur un filtre :
+     on filtre, on RESET la page à 1, on RECOMPUTE la pagination en
+     fonction du nombre d'items filtrés. Au clic sur un n° de page :
+     on affiche le slice correspondant des items filtrés.
+
+     Si la page n'a pas de filtre famille (`.source-family-filter`
+     absent), le script est no-op et c'est la pagination Hugo standard
+     qui est rendue (cf. partial "pagination-inline.html"). */}}
 <script>
 (function() {
-  var btns = document.querySelectorAll('.source-family-filter .sff-btn');
-  if (!btns.length) return;
-  var items = document.querySelectorAll('section.listing ul.items > li');
-  function applyFilter(family) {
-    items.forEach(function(li) {
+  var filterContainer = document.querySelector('.source-family-filter');
+  if (!filterContainer) return;
+  var btns = filterContainer.querySelectorAll('.sff-btn');
+  var listEl = document.querySelector('section.listing ul.items');
+  var paginationEl = document.querySelector('nav.pagination-inline.pagination-js');
+  if (!btns.length || !listEl || !paginationEl) return;
+
+  var PAGE_SIZE = 25;
+  var allItems = Array.prototype.slice.call(listEl.querySelectorAll(':scope > li'));
+  var state = { filter: 'all', page: 1 };
+
+  function getFiltered() {
+    return allItems.filter(function(li) {
       var f = li.getAttribute('data-family-source') || 'autres';
-      li.style.display = (family === 'all' || f === family) ? '' : 'none';
-    });
-    btns.forEach(function(b) {
-      b.setAttribute('aria-pressed', b.getAttribute('data-sff') === family ? 'true' : 'false');
+      return state.filter === 'all' || f === state.filter;
     });
   }
+
+  function renderPagination(filtered, totalPages) {
+    if (totalPages <= 1) {
+      paginationEl.innerHTML = '<span class="pg-info">' +
+        filtered.length + ' entrée' + (filtered.length > 1 ? 's' : '') +
+        '</span>';
+      return;
+    }
+    var html = '';
+    if (state.page > 1) {
+      html += '<a class="pg-prev" href="#" data-page="' + (state.page - 1) + '">‹ Préc.</a>';
+    } else {
+      html += '<span class="pg-prev pg-disabled">‹ Préc.</span>';
+    }
+    // Liste des n° de pages — limite raisonnable à ±2 autour du courant
+    var minP = Math.max(1, state.page - 2);
+    var maxP = Math.min(totalPages, state.page + 2);
+    if (minP > 1) {
+      html += '<a class="pg-num" href="#" data-page="1">1</a>';
+      if (minP > 2) html += '<span class="pg-gap">…</span>';
+    }
+    for (var i = minP; i <= maxP; i++) {
+      if (i === state.page) {
+        html += '<span class="pg-num pg-current" aria-current="page">' + i + '</span>';
+      } else {
+        html += '<a class="pg-num" href="#" data-page="' + i + '">' + i + '</a>';
+      }
+    }
+    if (maxP < totalPages) {
+      if (maxP < totalPages - 1) html += '<span class="pg-gap">…</span>';
+      html += '<a class="pg-num" href="#" data-page="' + totalPages + '">' + totalPages + '</a>';
+    }
+    if (state.page < totalPages) {
+      html += '<a class="pg-next" href="#" data-page="' + (state.page + 1) + '">Suiv. ›</a>';
+    } else {
+      html += '<span class="pg-next pg-disabled">Suiv. ›</span>';
+    }
+    html += '<span class="pg-info">Page ' + state.page + ' / ' + totalPages +
+            ' · ' + filtered.length + ' entrée' + (filtered.length > 1 ? 's' : '') +
+            '</span>';
+    paginationEl.innerHTML = html;
+    paginationEl.querySelectorAll('a[data-page]').forEach(function(a) {
+      a.addEventListener('click', function(e) {
+        e.preventDefault();
+        state.page = parseInt(a.getAttribute('data-page'), 10) || 1;
+        render();
+        // scroll douce vers le top de la liste
+        var lst = document.querySelector('section.listing ul.items');
+        if (lst && lst.scrollIntoView) {
+          lst.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  }
+
+  function render() {
+    var filtered = getFiltered();
+    var totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    // Clamp page si on a dépassé (ex. on filtre vers une famille qui
+    // tient sur 1 page alors qu'on était en page 2).
+    if (state.page > totalPages) state.page = totalPages;
+    // Toggle aria-pressed sur les boutons filtre
+    btns.forEach(function(b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-sff') === state.filter ? 'true' : 'false');
+    });
+    // Hide tout puis afficher le slice
+    allItems.forEach(function(li) { li.style.display = 'none'; });
+    var start = (state.page - 1) * PAGE_SIZE;
+    var end = start + PAGE_SIZE;
+    filtered.slice(start, end).forEach(function(li) { li.style.display = ''; });
+    renderPagination(filtered, totalPages);
+  }
+
   btns.forEach(function(b) {
-    b.addEventListener('click', function() { applyFilter(b.getAttribute('data-sff')); });
+    b.addEventListener('click', function() {
+      state.filter = b.getAttribute('data-sff') || 'all';
+      // Reset page=1 à chaque changement de filtre — évite l'état
+      // "page 2 d'un filtre qui n'a qu'une page d'items".
+      state.page = 1;
+      render();
+    });
   });
+
+  render();
 })();
 </script>
 {{ end }}
