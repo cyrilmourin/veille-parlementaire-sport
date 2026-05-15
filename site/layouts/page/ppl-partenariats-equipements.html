@@ -1,0 +1,124 @@
+{{/* R42-CS (2026-05-15) — Page spéciale PPL Équipements sportifs
+     (dossier AN DLR5L17N54138, n° 2667). Cyril 2026-05-15 : « on
+     l'applique sur le dossier DLR5L17N54138 ».
+
+     Version simplifiée du layout Sport pro : le dossier est au stade
+     DÉPÔT (pas encore d'examen en commission), donc pas de TC, pas
+     de rapporteurs nommés, pas d'amendements commission. La page se
+     contente d'un hero + parcours + liens vers la fiche officielle.
+
+     Consomme `site.Data.special_ppl_equip` (payload généré par
+     `src/special_equipements.py`). Réutilise les classes CSS
+     `.ppl-v3-*` du layout PPL Sport pro pour rester visuellement
+     cohérent. */}}
+{{ define "main" }}
+{{ $d := .Site.Data.special_ppl_equip }}
+<style>
+  /* Réutilisation des classes .ppl-v3-* du layout sport pro
+     (préfixées pour ne pas casser style.css). Hot-import simplifié :
+     on duplique juste les blocs minimum nécessaires. */
+  .ppl-v3 { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+
+  .ppl-v3-hero {
+    background: linear-gradient(135deg, #122549 0%, #1b3b6f 100%);
+    color: white; padding: 20px 24px; border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px;
+  }
+  .ppl-v3-hero__kicker { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.85; margin-bottom: 4px; }
+  .ppl-v3-hero__title { font-size: 22px; font-weight: 800; margin-bottom: 4px; line-height: 1.15; }
+  .ppl-v3-hero__subtitle { font-size: 13px; opacity: 0.85; }
+
+  .ppl-v3-parcours { background: white; border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .ppl-v3-section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 12px; font-weight: 600; }
+  .ppl-v3-steps { display: flex; gap: 6px; align-items: stretch; flex-wrap: wrap; }
+  .ppl-v3-step { flex: 1; min-width: 105px; padding: 10px 12px; border-radius: 7px; background: #f1f5f9; font-size: 12px; }
+  .ppl-v3-step--done { background: #dcfce7; color: #14532d; }
+  .ppl-v3-step--current { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); color: #122549; box-shadow: 0 0 0 2px #1b3b6f; }
+  .ppl-v3-step--future { background: #f1f5f9; color: #64748b; opacity: 0.7; }
+  .ppl-v3-step--conditional { background: repeating-linear-gradient(45deg, #fef3c7, #fef3c7 5px, #fef9e7 5px, #fef9e7 10px); color: #78350f; }
+  .ppl-v3-step--conditional .ppl-v3-step__cond { display: inline-block; padding: 1px 4px; background: #f59e0b; color: white; border-radius: 3px; font-size: 9px; font-weight: 800; letter-spacing: 0.5px; margin-left: 3px; }
+  .ppl-v3-step__label { font-weight: 600; font-size: 11px; }
+  .ppl-v3-step__date { font-size: 10px; opacity: 0.8; margin-top: 2px; }
+  .ppl-v3-step__check { display: inline-block; margin-right: 3px; }
+
+  .ppl-v3-panel { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 20px; }
+  .ppl-v3-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .ppl-v3-btn { flex: 1; min-width: 180px; padding: 11px 14px; border-radius: 8px; background: white; border: 2px solid #e2e8f0; color: #122549; font-weight: 600; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 9px; transition: all 0.15s; }
+  .ppl-v3-btn:hover { border-color: #1b3b6f; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(18,37,73,0.15); }
+  .ppl-v3-btn--primary { background: #122549; color: white; border-color: #122549; }
+  .ppl-v3-btn--primary:hover { background: #1b3b6f; }
+  .ppl-v3-btn__icon { font-size: 16px; }
+  .ppl-v3-btn__hint { font-size: 10px; opacity: 0.8; font-weight: 400; display: block; }
+
+  .ppl-v3-stage-info {
+    background: #fef3c7; border-left: 4px solid #f59e0b;
+    padding: 14px 18px; border-radius: 8px; margin-bottom: 20px;
+    font-size: 13px; color: #78350f;
+  }
+  .ppl-v3-stage-info strong { color: #92400e; }
+  .ppl-v3-stage-info ul { margin: 6px 0 0 18px; }
+</style>
+
+<div class="ppl-v3">
+
+  <div class="ppl-v3-hero">
+    <div class="ppl-v3-hero__kicker">PAGE SPÉCIALE</div>
+    <h1 class="ppl-v3-hero__title">Proposition de loi visant à encourager les partenariats entre les collectivités territoriales et les personnes morales de droit privé en matière d'acquisition, de réalisation ou de rénovation d'équipements sportifs</h1>
+    <p class="ppl-v3-hero__subtitle">
+      AN n° {{ $d.meta.an_num | default "2667" }} · proposition de loi déposée à l'Assemblée nationale · stade dépôt — examen commission à programmer
+    </p>
+  </div>
+
+  <div class="ppl-v3-parcours">
+    <div class="ppl-v3-section-title">Parcours législatif</div>
+    <div class="ppl-v3-steps">
+      <div class="ppl-v3-step ppl-v3-step--done"><div class="ppl-v3-step__label"><span class="ppl-v3-step__check">✓</span> Dépôt AN</div><div class="ppl-v3-step__date">14 avril 2026</div></div>
+      <div class="ppl-v3-step ppl-v3-step--current"><div class="ppl-v3-step__label">⏵ Commission AN</div><div class="ppl-v3-step__date">à programmer</div></div>
+      <div class="ppl-v3-step ppl-v3-step--future"><div class="ppl-v3-step__label">Séance publique AN</div><div class="ppl-v3-step__date">à venir</div></div>
+      <div class="ppl-v3-step ppl-v3-step--future"><div class="ppl-v3-step__label">Sénat 1L</div><div class="ppl-v3-step__date">si transmission</div></div>
+      <div class="ppl-v3-step ppl-v3-step--conditional"><div class="ppl-v3-step__label">CMP <span class="ppl-v3-step__cond">SI ÉCART</span></div><div class="ppl-v3-step__date">commission mixte</div></div>
+      <div class="ppl-v3-step ppl-v3-step--future"><div class="ppl-v3-step__label">Promulgation</div><div class="ppl-v3-step__date">—</div></div>
+    </div>
+  </div>
+
+  <div class="ppl-v3-stage-info">
+    <strong>Stade actuel : dépôt</strong>
+    <ul>
+      <li>Texte enregistré à la Présidence de l'AN le 14 avril 2026.</li>
+      <li>Renvoyée à la commission des affaires culturelles et de l'éducation, à défaut de constitution d'une commission spéciale.</li>
+      <li>L'examen en commission n'est pas encore programmé. Les amendements, rapporteurs et stats interviendront une fois la commission saisie.</li>
+    </ul>
+  </div>
+
+  <div class="ppl-v3-panel">
+    <div class="ppl-v3-section-title">Ressources officielles</div>
+    <div class="ppl-v3-actions">
+      <a class="ppl-v3-btn ppl-v3-btn--primary"
+         href="{{ $d.meta.url_an_texte | default "https://www.assemblee-nationale.fr/dyn/17/textes/l17b2667_proposition-loi" }}"
+         target="_blank" rel="noopener">
+        <span class="ppl-v3-btn__icon">📑</span>
+        <span>Texte initial AN<span class="ppl-v3-btn__hint">N° {{ $d.meta.an_num | default "2667" }}</span></span>
+      </a>
+      <a class="ppl-v3-btn"
+         href="{{ $d.meta.url_an_dossier | default "https://www.assemblee-nationale.fr/dyn/17/dossiers/DLR5L17N54138" }}"
+         target="_blank" rel="noopener">
+        <span class="ppl-v3-btn__icon">🗂</span>
+        <span>Dossier législatif AN<span class="ppl-v3-btn__hint">parcours + actes</span></span>
+      </a>
+      <a class="ppl-v3-btn"
+         href="{{ $d.meta.url_amdt_liste_an | default "https://www.assemblee-nationale.fr/dyn/17/amendements?dossier_legislatif=DLR5L17N54138" }}"
+         target="_blank" rel="noopener">
+        <span class="ppl-v3-btn__icon">📥</span>
+        <span>Amendements (vide pour l'instant)<span class="ppl-v3-btn__hint">liste AN — à venir après commission</span></span>
+      </a>
+    </div>
+  </div>
+
+  {{/* Sections amdt commission / vue à plat / nuage masquées pour l'instant
+       (pas d'amdt côté dossier 54138). Elles apparaîtront automatiquement
+       quand les amdt seront ingérés (le code template est commun avec le
+       layout Sport pro ; on copie ici la mécanique au besoin futur, mais
+       on s'épargne la duplication tant que ce n'est pas pertinent). */}}
+
+</div>
+{{ end }}

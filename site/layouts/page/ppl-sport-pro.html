@@ -6,8 +6,16 @@
      URL publique : `/ppl-sport-professionnel/` (l'ancienne URL mockup
      `/ppl-sport-professionnel-mockup/` est supprimée).
      Consomme `site.Data.special_ppl`. */}}
+{{/* R42-CS (2026-05-15) — Layout rendu générique pour supporter
+     plusieurs « pages spéciales » (1 dossier législatif chacune).
+     Le data file est sélectionné via le frontmatter `data_key` :
+     - data_key: "special_ppl" → /ppl-sport-professionnel/ (default)
+     - data_key: "special_ppl_equip" → /ppl-partenariats-equipements-sportifs/
+     Les titres et URLs spécifiques au dossier viennent du payload
+     (`$d.meta.title`, `$d.meta.url_an_texte` etc.). */}}
 {{ define "main" }}
-{{ $d := .Site.Data.special_ppl }}
+{{ $data_key := .Params.data_key | default "special_ppl" }}
+{{ $d := index .Site.Data $data_key }}
 <style>
   /* Styles isolés (préfixe .ppl-v3) pour ne PAS toucher style.css du site.
      Bleu charte : --sl-blue = #122549 (cf. style.css :root). */
@@ -250,9 +258,9 @@
 
   <div class="ppl-v3-hero">
     <div class="ppl-v3-hero__kicker">PAGE SPÉCIALE</div>
-    <h1 class="ppl-v3-hero__title">Proposition de loi relative à l'organisation, à la gestion et au financement du sport professionnel</h1>
+    <h1 class="ppl-v3-hero__title">{{ $d.meta.hero_title | default "Proposition de loi" }}</h1>
     <p class="ppl-v3-hero__subtitle">
-      AN n° {{ $d.meta.an_num }} · adoptée par le Sénat le 10 juin 2025 · examen Commission Culture AN 12-13 mai 2026
+      {{ $d.meta.hero_subtitle | default (printf "AN n° %s" $d.meta.an_num) | safeHTML }}
     </p>
   </div>
 

@@ -3714,6 +3714,14 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     #   - la page dédiée /ppl-sport-professionnel/ (layout ppl-sport-pro)
     #   - le bloc sidebar « 5 derniers amendements » sur accueil + dosleg + amdt
     special_ppl.export(rows, root)
+    # R42-CS (2026-05-15) — Page spéciale PPL Équipements sportifs
+    # (dossier AN DLR5L17N54138, PPL n° 2667). Génère :
+    #   - site/data/special_ppl_equip.json
+    #   - site/content/ppl-partenariats-equipements-sportifs.md
+    # Cf. layout `ppl-partenariats-equipements.html`. URL publique :
+    # /ppl-partenariats-equipements-sportifs/.
+    from . import special_equipements as _sp_equip
+    _sp_equip.export(rows, root)
 
     # R13-G : méta sidebar — date de mise à jour + version système (label
     # cumulé + hash commit court). Consommé par layouts/partials/sidebar.html.
@@ -3839,18 +3847,17 @@ def _fmt_item_line(it: dict, with_tags: bool = True,
     # R42-CM (2026-05-15) — Items liés à la PPL Sport pro (DLR5L17N51732 /
     # n° 1560 AN / S459 Sénat) : le lien renvoie vers la page spéciale
     # /ppl-sport-professionnel/ plutôt que vers la fiche externe AN/Sénat.
-    # Cyril 2026-05-15 : « quand il y a le dossier de la PPL Sport pro
-    # dans les actu 24h, il faut que ça renvoie vers la page spéciale PPL ».
-    # On applique aussi aux items connexes (agenda commission, amendements,
-    # CR) liés au même dossier pour cohérence éditoriale — l'utilisateur
-    # qui clique sur n'importe quelle occurrence PPL Sport pro retombe sur
-    # la page consolidée.
+    # R42-CS (2026-05-15) — Idem pour les items liés au dossier
+    # DLR5L17N54138 (PPL Équipements sportifs, n° 2667) → lien interne
+    # vers /ppl-partenariats-equipements-sportifs/.
     try:
         from . import special_ppl as _spp
+        from . import special_equipements as _sp_equip
         if _spp.row_matches_special_ppl(it):
-            url = _spp.PPL_SLUG_PATH  # "/ppl-sport-professionnel/"
-            # Lien interne → même onglet (override d'un éventuel target_blank
-            # passé par l'appelant).
+            url = _spp.PPL_SLUG_PATH
+            target_blank = False
+        elif _sp_equip.row_matches_special_equipements(it):
+            url = _sp_equip.PPL_SLUG_PATH
             target_blank = False
     except Exception:
         # Soft-fail : si l'import échoue ou que la détection lève, on
