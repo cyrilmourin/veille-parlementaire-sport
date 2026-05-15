@@ -368,7 +368,15 @@
             {{ $stops = $stops | append (printf "%s %d%% %d%%" $col $acc $next) }}
             {{ $acc = $next }}
           {{ end }}
-          <div class="ppl-v3-donut" style="background: conic-gradient({{ delimit $stops `, ` }});">
+          {{/* R42-CT (2026-05-15) — `safeCSS` obligatoire : Hugo
+               (via Go html/template) bloque par défaut les valeurs
+               CSS contenant virgules + pourcentages dans un attribut
+               `style="..."`, et remplace tout par le sentinel
+               `ZgotmplZ`. Résultat : le conic-gradient ne s'appliquait
+               plus → donut blanc/cassé. Le contenu de $stops est
+               construit côté pipeline (sûr), donc safeCSS valide. */}}
+          {{ $gradient := printf "background: conic-gradient(%s);" (delimit $stops ", ") }}
+          <div class="ppl-v3-donut" style="{{ $gradient | safeCSS }}">
             <div class="ppl-v3-donut__center">
               <div class="ppl-v3-donut__total">{{ $sort.total }}</div>
               <div class="ppl-v3-donut__label">déposés</div>
