@@ -204,7 +204,20 @@ class Store:
                     snippet, dossier_id, canonical_url, status_label, content_hash
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(hash_key) DO UPDATE SET
-                    published_at = COALESCE(excluded.published_at, items.published_at),
+                    -- R42-CI (2026-05-15) — Pour les items `agenda`, on
+                    -- ÉCRASE TOUJOURS `published_at` par la version source
+                    -- (même si NULL). Cas concret : une séance plénière
+                    -- programmée le JJ/MM est reportée sans nouvelle date
+                    -- → AN expose timeStampDebut=NULL côté Agenda.json.zip
+                    -- → sans cette règle, COALESCE garderait l'ancienne
+                    -- date périmée. Pour les autres catégories on garde
+                    -- COALESCE (protège contre un scraper buggy qui
+                    -- effacerait une date déjà correcte).
+                    published_at = CASE
+                        WHEN items.category = 'agenda'
+                        THEN excluded.published_at
+                        ELSE COALESCE(excluded.published_at, items.published_at)
+                    END,
                     title = CASE
                         WHEN excluded.title IS NOT NULL AND excluded.title != ''
                         THEN excluded.title

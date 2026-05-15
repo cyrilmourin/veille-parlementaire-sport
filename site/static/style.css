@@ -499,6 +499,21 @@ a:hover { text-decoration: underline; }
   font-variant-numeric: tabular-nums;
 }
 
+/* R42-CI (2026-05-15) — Badge « 📅 À reprogrammer » affiché en lieu et
+   place de la date pour un item agenda dont la séance a été reportée
+   par l'AN sans nouvelle date communiquée. Couleur orange charte
+   (cohérent avec les états "conditionnels" du parcours législatif) +
+   léger fond pour distinguer de la date rouge des séances confirmées. */
+.item-meta .date--reporte {
+  color: #92400e;
+  background: #fef3c7;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+}
+
 /* ---------- Tags mots-clés (home + listing + détail) -------------------- */
 /* UX-C (2026-04-21) — refonte : retrait de la couleur de fond et de la
    couleur de police (réservées aux dates). Les mots-clés conservent juste

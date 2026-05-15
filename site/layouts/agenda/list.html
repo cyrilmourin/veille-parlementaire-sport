@@ -17,11 +17,22 @@
 {{ $upcoming := slice }}
 {{ $past := slice }}
 {{ range .Pages }}
-  {{ $d := .Date.Format "2006-01-02" }}
-  {{ if ge $d $today }}
+  {{/* R42-CI (2026-05-15) — Items sans date = séance reportée par
+       l'AN sans nouvelle date (timeStampDebut=NULL côté Agenda.json.zip).
+       On les place dans `À venir` en tête (les plus actuels du point
+       de vue éditorial : un événement programmé puis reporté est plus
+       intéressant à voir qu'un événement passé). Le bucket "Passé"
+       reçoit uniquement les items dont la date est strictement avant
+       aujourd'hui. */}}
+  {{ if .Date.IsZero }}
     {{ $upcoming = $upcoming | append . }}
   {{ else }}
-    {{ $past = $past | append . }}
+    {{ $d := .Date.Format "2006-01-02" }}
+    {{ if ge $d $today }}
+      {{ $upcoming = $upcoming | append . }}
+    {{ else }}
+      {{ $past = $past | append . }}
+    {{ end }}
   {{ end }}
 {{ end }}
 
@@ -85,7 +96,7 @@
         </div>
         <div class="item-meta">
           <span class="meta-main">
-            {{ if not .Date.IsZero }}<time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006 à 15h04" }}</time>{{ end }}
+            {{ if not .Date.IsZero }}<time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006 à 15h04" }}</time>{{ else }}<span class="date date--reporte" title="Date non communiquée par l'AN à ce jour (R42-CI)">📅 À reprogrammer</span>{{ end }}
           </span>
           {{ with .Params.keywords }}
             <span class="meta-tags">
@@ -130,7 +141,7 @@
         </div>
         <div class="item-meta">
           <span class="meta-main">
-            {{ if not .Date.IsZero }}<time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006 à 15h04" }}</time>{{ end }}
+            {{ if not .Date.IsZero }}<time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "02/01/2006 à 15h04" }}</time>{{ else }}<span class="date date--reporte" title="Date non communiquée par l'AN à ce jour (R42-CI)">📅 À reprogrammer</span>{{ end }}
           </span>
           {{ with .Params.keywords }}
             <span class="meta-tags">

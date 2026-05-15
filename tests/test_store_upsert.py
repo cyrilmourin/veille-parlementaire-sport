@@ -30,13 +30,16 @@ def _mk(
     matched: list[str] | None = None,
     families: list[str] | None = None,
     raw: dict | None = None,
+    category: str = "agenda",
 ) -> Item:
     # `hash_key` est une @property dérivée de f"{source_id}::{uid}"
     # → pour créer un nouvel item, on change uid.
+    # R42-CI : `category` param permet de tester les comportements
+    # spécifiques par catégorie (notamment le refresh agenda).
     return Item(
         source_id="src",
         uid=uid,
-        category="agenda",
+        category=category,
         chamber="AN",
         title=title,
         url="https://example.com/1",
@@ -98,14 +101,22 @@ def test_upsert_preserves_inserted_at(tmp_path):
 def test_upsert_does_not_blank_existing_date(tmp_path):
     """Un nouveau fetch qui remonte published_at=NULL ne doit PAS
     écraser une date déjà correcte (évite régression temporaire
-    si un parser rate une date sur un record existant)."""
+    si un parser rate une date sur un record existant).
+
+    R42-CI (2026-05-15) : cette protection s'applique aux catégories
+    « stables » (questions / dossiers / amendements / communiqués…).
+    Pour la catégorie `agenda`, c'est l'inverse — une séance reportée
+    sans date doit propager le NULL. Cf. test_r42ci_agenda_date_refresh.py.
+    Ici on bascule la catégorie en `amendements` pour conserver
+    l'intention initiale du test (protection scraper buggy).
+    """
     store = Store(tmp_path / "db.sqlite3")
     try:
         dt = datetime(2026, 4, 22, 14, 30, 0)
-        store.upsert_many([_mk(published_at=dt)])
+        store.upsert_many([_mk(category="amendements", published_at=dt)])
         assert _row(store, _hk())["published_at"] == dt.isoformat()
 
-        store.upsert_many([_mk(published_at=None)])
+        store.upsert_many([_mk(category="amendements", published_at=None)])
         assert _row(store, _hk())["published_at"] == dt.isoformat()
     finally:
         store.close()
