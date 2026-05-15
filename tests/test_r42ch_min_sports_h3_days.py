@@ -129,3 +129,55 @@ def test_no_phantom_day_from_parasite_h3(real_html):
         f"Trop d'items extraits ({len(items)}) — probable h3 parasite "
         "interprété comme jour. Filtre _parse_day_header insuffisant."
     )
+
+
+# ---------------------------------------------------------------------------
+# Rétrocompat : si sports.gouv.fr rebascule sur <h5>, on doit toujours parser.
+# Cyril 2026-05-15 : « je veux qu'il parse H3 ou H5 ».
+# ---------------------------------------------------------------------------
+
+_LEGACY_H5_HTML = """
+<html><body>
+  <div class="sports-gouv-container">
+    <h2>Agenda prévisionnel de la ministre pour la semaine du 11 mai 2026</h2>
+    <h5>Lundi 11 mai</h5>
+    <p><strong>10h00</strong>  Conseil des ministres de la Jeunesse de l'UE</p>
+    <p><em>Bruxelles (Belgique)</em></p>
+    <h5>Mardi 12 mai</h5>
+    <p><strong>15h00</strong>  Conseil des ministres des Sports de l'UE</p>
+    <p><em>Bruxelles (Belgique)</em></p>
+  </div>
+</body></html>
+"""
+
+
+def test_parses_legacy_h5_format():
+    """Le parseur accepte toujours le format <h5> historique (au cas où
+    sports.gouv.fr rebascule, ou pour parser d'anciennes pages cachées)."""
+    items = _call(_LEGACY_H5_HTML)
+    assert len(items) == 2, f"Attendu 2 events H5, obtenu {len(items)}"
+    titles = [it.title for it in items]
+    assert any("Conseil des ministres de la Jeunesse" in t for t in titles)
+    assert any("Conseil des ministres des Sports" in t for t in titles)
+
+
+def test_parses_mixed_h3_and_h5():
+    """Edge case : page avec mélange de <h3> et <h5> (improbable mais
+    le parser doit tenir). Garde-fou pour ne pas régresser sur un seul
+    des deux formats."""
+    mixed = """
+    <html><body>
+      <div class="sports-gouv-container">
+        <h2>Agenda prévisionnel pour la semaine du 11 mai 2026</h2>
+        <h3>Lundi 11 mai</h3>
+        <p><strong>10h00</strong>  Event A</p>
+        <h5>Mardi 12 mai</h5>
+        <p><strong>15h00</strong>  Event B</p>
+      </div>
+    </body></html>
+    """
+    items = _call(mixed)
+    assert len(items) == 2, f"Mélange H3+H5 doit produire 2 items, obtenu {len(items)}"
+    by_title = {it.title for it in items}
+    assert any("Event A" in t for t in by_title)
+    assert any("Event B" in t for t in by_title)
