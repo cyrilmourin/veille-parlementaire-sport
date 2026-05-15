@@ -639,6 +639,33 @@ def _parse_agenda_html(
             1 for el in children
             if el.name == "p" and el.find("strong") is not None
         )
+        # R42-CG (2026-05-15) : R42-CF n'a pas réglé le 0 items. Hypothèse
+        # « jours en <p><strong> » invalidée. Enrichissement diag :
+        #   - all_strong_texts : contenu des 10 <strong> (pour voir si ce
+        #     sont des slots OU des jours OU autre chose)
+        #   - all_p_first_200 : premiers 200c des p (pour voir où vivent
+        #     les jours et la structure réelle)
+        #   - other_headings : <h3>/<h4>/<h6> dans tout le document avec
+        #     leur texte — les jours sont peut-être encodés en h3/h4
+        #   - container_tag_classes : balise/classe du container (pour
+        #     diagnostiquer un repackage Drupal)
+        all_strong_texts = [
+            s.get_text(" ", strip=True)[:120]
+            for el in children if el.name == "p"
+            for s in el.find_all("strong")
+        ][:20]
+        all_p_first_200 = [
+            el.get_text(" ", strip=True)[:200]
+            for el in children if el.name == "p"
+        ][:30]
+        other_headings = [
+            (h.name, h.get_text(" ", strip=True)[:120])
+            for h in soup.find_all(["h1", "h3", "h4", "h6"])
+        ][:30]
+        container_info = (
+            f"{getattr(container, 'name', '?')}"
+            f".{'.'.join(container.get('class', []) or [])}"
+        )
         _write_debug(
             "zero_items",
             agenda_url=agenda_url,
@@ -650,6 +677,10 @@ def _parse_agenda_html(
             p_strong_count=p_strong_count,
             html_length=len(html),
             seen_h2_texts=seen_h2_texts[:5],
+            all_strong_texts=all_strong_texts,
+            all_p_first_200=all_p_first_200,
+            other_headings=other_headings,
+            container_info=container_info,
         )
     else:
         log.info(
