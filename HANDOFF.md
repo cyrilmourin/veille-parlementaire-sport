@@ -266,6 +266,22 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-15 (~10h, validation R42-CC) : **R42-CD — Push de validation `min_sports_agenda` via worker Cloudflare**. Run déclenché pour matérialiser sur le site la résolution de la chaîne MinSports (`fetch_home_ko` → `proxy: cloudflare` activé en R42-CC). Vérification post-run via `data/min_sports_debug.json::stage == "ok"` et `data/pipeline_health.json::min_sports_agenda::last_fetched > 0`. Email digest sortira (1 seul, push trigger), pas de retrigger ultérieur de mon côté.
+
+- 2026-05-15 (matin, suite diag R42-CB) : **R42-CC — MinSports passe par le worker Cloudflare**.
+
+  `data/min_sports_debug.json` posé en R42-CB révèle un ConnectTimeout pur sur `https://www.sports.gouv.fr/` depuis les IPs GHA (stage `fetch_home_ko`, erreur `curl: (28) Connection timed out after 30001 ms`). Le WAF coupe en couche TCP/connect avant le TLS handshake, donc `impersonate: true` (curl_cffi + TLS Chrome 120) est inopérant — la fingerprint n'est jamais jouée.
+
+  Fix structurel : bascule sur le worker Cloudflare configuré en R42-BO (qui sort depuis une IP non-GHA). 3 sources MinSports passent en `proxy: cloudflare` côté YAML (`min_sports_presse`, `min_sports_actualites`, `min_sports_agenda`). Le handler dédié `min_sports.py` est patché pour lire `proxy: cloudflare` depuis le YAML et propager le flag `via_proxy` à `_resolve_agenda_url` + au fetch de la page agenda (alignement sur `html_generic.py`). `_write_debug("fetch_agenda_ko", ...)` ajouté sur l'échec fetch agenda (chemin non couvert par R42-CB qui ne couvrait que l'échec home).
+
+  Validation indirecte : `min_sports_igesr` (même worker depuis R42-BO) avait rebondi de 0 à 28 items dans le run R42-CB. La même mécanique doit fonctionner pour `min_sports_agenda`.
+
+- 2026-05-15 (matin, post-R42-CA) : **R42-CB — Snapshot diag `min_sports_agenda` commité sur main**.
+
+  R42-CA n'a pas suffi : run post-merge montre `min_sports_agenda: last_fetched: 0` toujours. Les WARNINGs ajoutés en R42-CA sont dans les logs GHA mais ceux-ci sont gatés derrière auth — impossible à lire depuis main. R42-CB introduit une nouvelle fonction `_write_debug(stage, **kwargs)` dans `min_sports.py` qui sérialise un snapshot diagnostic dans `data/min_sports_debug.json` (fichier ajouté à la liste de la step « Commit last digest » de daily.yml). 4 points de défaillance instrumentés (`fetch_home_ko`, `no_link`, `no_h2_match`, `zero_items`) + 1 cas nominal (`ok`). Le diag est lisible directement depuis le repo, sans dépendre des logs GHA.
+
+  Cas réel observé : stage `fetch_home_ko` (ConnectTimeout 30s) → confirme une couche TCP bloquée par le WAF, donc impersonate inefficace. Action déduite : R42-CC ci-dessus.
+
 - 2026-05-15 (matin, retour Cyril) : **R42-CA — Robustesse parser `min_sports_agenda`**.
 
   Cyril 2026-05-15 : « je ne vois pas dans agenda les occurrences récentes du ministère des sports » alors qu'il confirme « il y a un agenda publié » côté ministère. Diagnostic : `data/pipeline_health.json::min_sports_agenda` = `last_fetched: 0` au run de 7h00, sans erreur ; dernier item daté du 2026-05-08 (semaine du 4 mai). Le scraper retourne silencieusement [] alors que la page existe et est publiée. URL confirmée par Cyril : `https://www.sports.gouv.fr/agenda-previsionnel-de-marina-ferrari-1787`.

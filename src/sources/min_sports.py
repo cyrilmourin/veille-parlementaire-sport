@@ -33,6 +33,9 @@ Régressions possibles (à surveiller) :
 - Changement de ministre → le `<h2>` contient un autre nom. On NE
   filtre PAS sur le nom — on parse tout ce qui matche le pattern
   « semaine du … ».
+- WAF GHA coupe en TCP (R42-CC, 2026-05-15) → `proxy: cloudflare`
+  obligatoire dans le YAML. `impersonate: true` seul ne suffit plus.
+  Le diag exact se lit dans `data/min_sports_debug.json` (R42-CB).
 """
 from __future__ import annotations
 
