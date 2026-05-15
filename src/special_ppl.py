@@ -612,6 +612,12 @@ _WC_STOPWORDS: frozenset[str] = frozenset({
     "afin", "objet", "objets", "objectif", "objectifs",
     "fait", "faite", "faits", "faites",
     "tout", "toute", "tous", "toutes",
+    # R42-CU (2026-05-15) — Cyril : « bannir rédactionnel et déjà ».
+    # Mots procéduraux qui dominaient le nuage sans valeur thématique
+    # (un amdt « rédactionnel » signifie juste reformulation cosmétique).
+    "rédactionnel", "rédactionnels", "rédactionnelle", "rédactionnelles",
+    "redactionnel", "redactionnels", "redactionnelle", "redactionnelles",
+    "déjà", "deja",
 })
 
 
@@ -644,7 +650,8 @@ def _build_wordcloud(amdt_rows_payload: list[dict],
         return []
     # Top N par fréquence décroissante (tie-break alphabétique)
     items = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:top_n]
-    # 5 tailles par quintile sur la fréquence
+    # 5 tailles par quintile sur la fréquence — calculées AVANT shuffle
+    # pour que les tailles restent corrélées à la fréquence.
     freqs = [c for _, c in items]
     if not freqs:
         return []
@@ -659,7 +666,17 @@ def _build_wordcloud(amdt_rows_payload: list[dict],
         if pos >= 0.30: return "md"
         if pos >= 0.10: return "sm"
         return "xs"
-    return [{"word": w, "count": c, "size": _size(c)} for w, c in items]
+    out = [{"word": w, "count": c, "size": _size(c)} for w, c in items]
+    # R42-CU (2026-05-15) — Cyril : « classer les mots clés aléatoirement,
+    # pas par taille/récurrence ». La taille reste proportionnelle à la
+    # fréquence (xl pour les + fréquents, xs pour les - fréquents), mais
+    # l'ORDRE D'AFFICHAGE est mélangé pour casser le tri prévisible
+    # gauche-droite par taille. Effet visuel « nuage » plus authentique.
+    # Pas de seed → l'ordre change à chaque pipeline run (acceptable :
+    # le contenu sémantique est identique, seul le placement varie).
+    import random
+    random.shuffle(out)
+    return out
 
 
 def _build_sort_stats(amdt_rows_payload: list[dict]) -> dict:
