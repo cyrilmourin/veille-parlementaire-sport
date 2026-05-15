@@ -69,10 +69,20 @@
 </div>
 
 {{/* R41-M (2026-05-07) — Bloc « Spécial PPL Sport pro » : 5 derniers
-     amendements + lien vers la page dédiée. Visible sur accueil + dosleg
-     + amendements (toutes les pages non-fullwidth). Le partial gère son
-     propre guard sur site.Data.special_ppl. */}}
-{{ partial "special_ppl_sidebar.html" . }}
+     amendements + lien vers la page dédiée. Le partial gère son propre
+     guard sur site.Data.special_ppl.
+
+     R42-CE (2026-05-15) — Cyril : « je ne veux le voir que sur la page
+     dossier législatifs uniquement ». Restreint à .Type ==
+     "dossiers_legislatifs" (page de listing, posée via le frontmatter
+     `type:` de _index.md) OU .Params.category == "dossiers_legislatifs"
+     (page détail d'un dossier individuel, posée via frontmatter
+     `category:`). Le module spécial PPL de la HOME — rendu dans le
+     main content via `_render_special_ppl_card` côté site_export.py
+     — n'est PAS affecté par cette condition (il vit ailleurs). */}}
+{{ if or (eq .Type "dossiers_legislatifs") (eq .Params.category "dossiers_legislatifs") }}
+  {{ partial "special_ppl_sidebar.html" . }}
+{{ end }}
 
 <div class="side-card side-card--agenda">
   <h3 class="side-title">Agenda</h3>
