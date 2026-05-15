@@ -1,6 +1,6 @@
 {
   "source_url": "https://www.senat.fr/senateurs/senatl.html",
-  "count": 348,
+  "count": 349,
   "entries": [
     {
       "slug": "aeschlimann_marie_do21071f",
@@ -2785,6 +2785,15 @@
       "key": "adel ziane",
       "photo_url": "https://www.senat.fr/senimg/ziane_adel21077m_carre.jpg",
       "fiche_url": "https://www.senat.fr/senateur/ziane_adel21077m.html"
+    },
+    {
+      "slug": "guillotin_veronique19553y",
+      "nom_usuel": "GUILLOTIN",
+      "prenom_usuel": "Véronique",
+      "key": "guillotin veronique",
+      "photo_url": "https://www.senat.fr/senimg/guillotin_veronique19553y_carre.jpg",
+      "fiche_url": "https://www.senat.fr/senateur/guillotin_veronique19553y.html",
+      "_ancien": true
     }
   ]
 }

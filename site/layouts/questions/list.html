@@ -94,45 +94,50 @@
           {{ $chamber_label := cond $is_senat "Sénat" "AN" }}
 
           <div class="qa-tabs" role="tablist" aria-label="Texte de la question ou de la réponse">
-            {{ if and $is_qg (eq $tq "") }}
-              {{/* QG sans texte question → lien direct externe */}}
+            {{/* R42-CN (2026-05-15) — Si on n'a pas le texte de la question
+                 (QG, ou question Sénat sans corps dans le CSV léger), la
+                 chip Question devient un lien direct externe ↗ plutôt
+                 qu'un bouton désactivé grisé (visuellement plus propre +
+                 cohérent avec le pattern QG). */}}
+            {{ if eq $tq "" }}
               {{ with .Params.source_url }}
               <a class="qa-chip qa-chip--question qa-chip--external" href="{{ . }}"
                  target="_blank" rel="noopener noreferrer"
-                 title="Consulter la question sur le site officiel">
+                 title="Texte non disponible côté open data — consulter sur le site officiel">
                 Question ↗
               </a>
               {{ end }}
             {{ else }}
               <button type="button" class="qa-chip qa-chip--question"
-                      data-qa-target="question" aria-pressed="false"
-                      {{ if eq $tq "" }}aria-disabled="true" title="Texte non disponible (consulter sur la source)"{{ end }}>
+                      data-qa-target="question" aria-pressed="false">
                 Question ▾
               </button>
             {{ end }}
 
-            {{ if $is_qg }}
-              {{/* QG : réponse = vidéo/CR sur AN/Sénat, pas de texte propre.
-                   Chip directe vers la source — pas d'onglet déployable. */}}
+            {{/* R42-CN : pour la chip Réponse, même logique :
+                 - QG → lien direct externe (réponse = vidéo/CR sur AN/Sénat)
+                 - Autres : si texte_reponse vide → lien externe direct
+                 - Texte présent → bouton déployable */}}
+            {{ if and (eq $tr "") (or $is_qg .Params.source_url) }}
               {{ with .Params.source_url }}
               <a class="qa-chip qa-chip--reponse qa-chip--external" href="{{ . }}"
                  target="_blank" rel="noopener noreferrer"
-                 title="Voir la réponse en séance sur le site officiel">
+                 title="Voir la réponse sur le site officiel (vidéo / JO / texte intégral)">
                 Réponse ↗
               </a>
               {{ end }}
-            {{ else }}
+            {{ else if (ne $tr "") }}
               <button type="button" class="qa-chip qa-chip--reponse"
                       data-qa-target="reponse" aria-pressed="false">
                 Réponse ▾
               </button>
             {{ end }}
 
-            {{/* Chip externe « Voir sur AN/Sénat » : conservée pour les
-                 QE/QOSD (utile : ouvre la fiche officielle complète avec
-                 historique des publications JO). Pour les QG, redondante
-                 avec les 2 chips externes ci-dessus → on la masque. */}}
-            {{ if and (not $is_qg) .Params.source_url }}
+            {{/* Chip externe « Voir sur AN/Sénat » : conservée UNIQUEMENT
+                 quand on a au moins un texte déployable (sinon les chips
+                 Question ↗ et Réponse ↗ ci-dessus mènent déjà à la même
+                 source — redondance évitée). */}}
+            {{ if and (or (ne $tq "") (ne $tr "")) .Params.source_url }}
             <a class="qa-chip qa-chip--source" href="{{ .Params.source_url }}"
                target="_blank" rel="noopener noreferrer"
                title="Ouvrir la fiche officielle">
@@ -141,38 +146,23 @@
             {{ end }}
           </div>
 
-          {{ if not $is_qg }}
+          {{/* R42-CN : panel rendu UNIQUEMENT si au moins un texte
+               (question OU réponse) est dispo. Sinon les chips ↗ ci-dessus
+               mènent déjà directement à la source — pas de panel vide. */}}
+          {{ if or (ne $tq "") (ne $tr "") }}
           <div class="qa-panel" hidden>
+            {{ if ne $tq "" }}
             <div class="qa-panel__content qa-panel__content--question"
                  data-qa-content="question" hidden>
-              {{ if $tq }}
-                {{/* `safeHTML` car le texte AN peut contenir des entités HTML
-                     déjà décodées par le scraper (cf. _strip_html_text /
-                     _text_of dans assemblee.py) ; on n'attend pas de balises
-                     malicieuses ici. */}}
-                <p>{{ $tq | safeHTML }}</p>
-              {{ else }}
-                <p class="qa-empty">
-                  Texte de la question non disponible dans le dump open data.
-                  {{ with .Params.source_url }}
-                    <a href="{{ . }}" target="_blank" rel="noopener noreferrer">Consulter sur la source officielle ↗</a>
-                  {{ end }}
-                </p>
-              {{ end }}
+              <p>{{ $tq | safeHTML }}</p>
             </div>
+            {{ end }}
+            {{ if ne $tr "" }}
             <div class="qa-panel__content qa-panel__content--reponse"
                  data-qa-content="reponse" hidden>
-              {{ if $tr }}
-                <p>{{ $tr | safeHTML }}</p>
-              {{ else }}
-                <p class="qa-empty qa-empty--reponse">
-                  ⏳ Réponse non publiée à ce jour.
-                  {{ with .Params.source_url }}
-                    <a href="{{ . }}" target="_blank" rel="noopener noreferrer">Surveiller sur la source officielle ↗</a>
-                  {{ end }}
-                </p>
-              {{ end }}
+              <p>{{ $tr | safeHTML }}</p>
             </div>
+            {{ end }}
           </div>
           {{ end }}
 
