@@ -481,12 +481,13 @@ def _parse_agenda_html(
 
     # Collecte : on part du <h2> et on avance dans les siblings. Les
     # événements sont structurés comme :
-    #   <h5>Lundi 20 avril</h5>
+    #   <h5>Lundi 20 avril</h5>           ← jour (forme historique)
+    #   <p><strong>Lundi 11 mai</strong></p> ← jour (forme R42-CF, ~14 mai 2026)
     #   <p><strong>Après-midi</strong>   Description ...</p>
     #   <p><em>Lieu</em></p>         ← optionnel
     #   <p><strong>08h45</strong>   Description suivante...</p>
     #   <p><em>Lieu</em></p>
-    # Sur la page Drupal actuelle, les <h5> et <p> sont siblings du <h2>
+    # Sur la page Drupal actuelle, les <h5>/<p> sont siblings du <h2>
     # dans un conteneur `<div class="sports-gouv-container">`. On
     # itère donc sur `h2.next_siblings` filtrés.
     # R42-CA (2026-05-15) : si un repackage Drupal wrappe les h5/p dans
@@ -494,6 +495,11 @@ def _parse_agenda_html(
     # tout silencieusement. On compte les h5 et on bascule en
     # `recursive=True` (sur l'arbre entier du container) si aucun jour
     # n'a été détecté en passe 1.
+    # R42-CF (2026-05-15) : `data/min_sports_debug.json` post-R42-CC
+    # révèle `h5_count: 0` avec H2 valide → Drupal a remplacé les <h5>
+    # par des <p><strong>Lundi 11 mai</strong></p>. Détection ajoutée
+    # en boucle : si un <p> a un <strong> dont le texte match `_DAY_RE`
+    # ET pas de contenu trailing significatif, c'est un day header.
     container = h2.parent
     children = container.find_all(["h5", "p"], recursive=False)
     h5_count = sum(1 for el in children if el.name == "h5")
@@ -505,6 +511,36 @@ def _parse_agenda_html(
         )
         children = container.find_all(["h5", "p"], recursive=True)
     pending_event: dict | None = None
+
+    def _is_p_day_header(p_el) -> tuple[str, int, int] | None:
+        """R42-CF — Le <p> est-il un day header déguisé ?
+
+        Forme attendue : `<p><strong>Lundi 11 mai</strong></p>` (avec
+        éventuellement quelques espaces / NBSP autour). On considère
+        que c'est un day header si :
+          - il contient un <strong>
+          - le texte du <strong> matche `_DAY_RE`
+          - le reste du <p> (texte hors du strong) est vide ou ne
+            contient que des whitespace
+        Retourne le triplet (day_name, day_num, month) comme
+        `_parse_day_header`, ou None.
+        """
+        s = p_el.find("strong")
+        if s is None:
+            return None
+        strong_text = s.get_text(" ", strip=True)
+        parsed = _parse_day_header(strong_text)
+        if not parsed:
+            return None
+        # Texte du <p> moins le strong : si non vide après strip,
+        # c'est probablement un slot horaire avec description, pas
+        # un day header (ex. <p><strong>Lundi 11 mai</strong> 10h ...</p>
+        # — improbable mais on protège).
+        full = p_el.get_text(" ", strip=True).replace(" ", " ")
+        trailing = full.replace(strong_text, "", 1).strip(" -—:")
+        if trailing:
+            return None
+        return parsed
 
     for el in children:
         # Skip tout ce qui précède le H2 (cas improbable — le H2 est en
@@ -520,9 +556,21 @@ def _parse_agenda_html(
             current_day = _parse_day_header(el.get_text(" ", strip=True))
             continue
 
+        # R42-CF — <p><strong>Lundi 11 mai</strong></p> est aussi un day header
+        if el.name == "p":
+            p_day = _is_p_day_header(el)
+            if p_day is not None:
+                if pending_event is not None:
+                    day_events.append(pending_event)
+                    pending_event = None
+                _flush_day()
+                day_events = []
+                current_day = p_day
+                continue
+
         # <p> — deux cas : event (contient <strong>) ou lieu (contient <em>)
         if current_day is None:
-            # <p> avant tout <h5> : probablement du texte d'intro, skip
+            # <p> avant tout <h5>/p-day : probablement texte d'intro, skip
             continue
 
         text = el.get_text(" ", strip=True)
