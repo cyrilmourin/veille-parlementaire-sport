@@ -598,7 +598,12 @@ ministeres:
       # antérieurs : `RetryError[ConnectTimeout]`). `impersonate: true`
       # passe par curl_cffi (TLS fingerprint Chrome 120) pour contourner.
       # Vérifié en local : 18 items extraits par le scraper actuel.
+      # R42-CC (2026-05-15) : impersonate ne suffit plus (vérifié via
+      # `data/min_sports_debug.json` R42-CB : ConnectTimeout pur, WAF
+      # coupe en TCP avant le TLS handshake). Bascule sur le worker
+      # Cloudflare (R42-BO) qui sort depuis une IP non-GHA.
       impersonate: true
+      proxy: cloudflare
       poids: 3           # priorité maximale (ministère cœur de cible)
       fetch_meta: true
       fetch_meta_limit: 60
@@ -608,6 +613,7 @@ ministeres:
       url: https://www.sports.gouv.fr/actualites-et-evenements
       format: html
       impersonate: true  # R42-BA — idem min_sports_presse (ConnectTimeout GHA).
+      proxy: cloudflare  # R42-CC — voir min_sports_presse.
       poids: 3
       fetch_meta: true
       fetch_meta_limit: 60
@@ -633,7 +639,13 @@ ministeres:
       # R42-BA (2026-05-11) — sports.gouv.fr bloque les IPs GHA en
       # ConnectTimeout. impersonate=true propagé jusqu'au handler dédié
       # `min_sports._fetch_agenda_hebdo` (cf. patch même tag).
+      # R42-CC (2026-05-15) — impersonate ne suffit plus depuis ~14 mai,
+      # `data/min_sports_debug.json` R42-CB indique `fetch_home_ko` avec
+      # ConnectTimeout 30s. Le WAF coupe en TCP avant le TLS handshake.
+      # Bascule sur le worker Cloudflare (R42-BO) ; handler dédié patché
+      # pour honorer `proxy: cloudflare`.
       impersonate: true
+      proxy: cloudflare
       poids: 3
 
     # R42-BJ (2026-05-11) — Rapports IGESR dans le champ du sport.

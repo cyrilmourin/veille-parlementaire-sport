@@ -163,7 +163,8 @@ def fetch_source(src: dict) -> list[Item]:
     return []
 
 
-def _resolve_agenda_url(landing_url: str, impersonate: bool = False) -> str | None:
+def _resolve_agenda_url(landing_url: str, impersonate: bool = False,
+                        via_proxy: bool = False) -> str | None:
     """Cherche le lien courant vers l'agenda hebdo depuis une page de
     navigation (typiquement la home sports.gouv.fr).
 
@@ -174,9 +175,17 @@ def _resolve_agenda_url(landing_url: str, impersonate: bool = False) -> str | No
     R42-BA (2026-05-11) : param `impersonate` propagé. sports.gouv.fr
     bloque les IPs GHA en ConnectTimeout depuis ~mai 2026 — curl_cffi
     (TLS Chrome 120) débloque.
+
+    R42-CC (2026-05-15) : param `via_proxy` ajouté. Le diag
+    `data/min_sports_debug.json` post-R42-CB a révélé un ConnectTimeout
+    pur sur sports.gouv.fr depuis les IPs GHA — le WAF coupe en couche
+    TCP/connect, donc `impersonate` (TLS) n'aide pas. Le worker
+    Cloudflare configuré en R42-BO contourne en sortant depuis une IP
+    non-GHA. Idem pour le fetch de la page agenda elle-même.
     """
     try:
-        html = fetch_text(landing_url, impersonate=impersonate)
+        html = fetch_text(landing_url, impersonate=impersonate,
+                          via_proxy=via_proxy)
     except Exception as e:
         log.warning("min_sports : home KO (%s) : %s", landing_url, e)
         _write_debug("fetch_home_ko", landing_url=landing_url, error=str(e))
@@ -298,6 +307,12 @@ def _fetch_agenda_hebdo(src: dict) -> list[Item]:
     # R42-BA (2026-05-11) : impersonate propagé depuis YAML pour passer le
     # ConnectTimeout côté GHA (sports.gouv.fr bloque les IPs GitHub Actions).
     impersonate = bool(src.get("impersonate", False))
+    # R42-CC (2026-05-15) : `proxy: cloudflare` lu depuis YAML. Diag
+    # `data/min_sports_debug.json` post-R42-CB : `fetch_home_ko` avec
+    # ConnectTimeout 30s sur sports.gouv.fr — le WAF coupe en TCP, donc
+    # impersonate (TLS) ne suffit pas. Le worker Cloudflare (R42-BO)
+    # contourne en sortant depuis une IP non-GHA.
+    via_proxy = (src.get("proxy") or "").lower() == "cloudflare"
 
     # Si l'URL pointe déjà vers une page agenda (cas des tests, du diag
     # manuel, ou d'un snapshot archivé), pas besoin de passer par la
@@ -305,14 +320,18 @@ def _fetch_agenda_hebdo(src: dict) -> list[Item]:
     if "/agenda-previsionnel-de-" in landing_url:
         agenda_url = landing_url
     else:
-        agenda_url = _resolve_agenda_url(landing_url, impersonate=impersonate)
+        agenda_url = _resolve_agenda_url(
+            landing_url, impersonate=impersonate, via_proxy=via_proxy,
+        )
         if not agenda_url:
             return []
 
     try:
-        html = fetch_text(agenda_url, impersonate=impersonate)
+        html = fetch_text(agenda_url, impersonate=impersonate,
+                          via_proxy=via_proxy)
     except Exception as e:
         log.warning("min_sports %s : fetch KO %s : %s", sid, agenda_url, e)
+        _write_debug("fetch_agenda_ko", agenda_url=agenda_url, error=str(e))
         return []
 
     return _parse_agenda_html(html, src=src, agenda_url=agenda_url,
