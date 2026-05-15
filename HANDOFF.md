@@ -266,6 +266,20 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-15 (matin, retour Cyril) : **R42-CA — Robustesse parser `min_sports_agenda`**.
+
+  Cyril 2026-05-15 : « je ne vois pas dans agenda les occurrences récentes du ministère des sports » alors qu'il confirme « il y a un agenda publié » côté ministère. Diagnostic : `data/pipeline_health.json::min_sports_agenda` = `last_fetched: 0` au run de 7h00, sans erreur ; dernier item daté du 2026-05-08 (semaine du 4 mai). Le scraper retourne silencieusement [] alors que la page existe et est publiée. URL confirmée par Cyril : `https://www.sports.gouv.fr/agenda-previsionnel-de-marina-ferrari-1787`.
+
+  Ne pouvant pas inspecter la page en live depuis l'environnement (WAF 403 sur sports.gouv.fr depuis IP container), 3 axes de robustesse appliqués pour couvrir les cas les plus probables :
+
+  1. **Regex `_WEEK_RE` plus permissive** : accepte désormais l'intervalle « semaine du 11 au 15 mai 2026 » en plus de la forme historique « semaine du 11 mai 2026 ». Le groupe optionnel `(?:\s+au\s+\d{1,2})?` n'altère pas le capture du jour de début, donc rétrocompat totale.
+  2. **Fallback `recursive=True`** : si `h2.parent.find_all(["h5","p"], recursive=False)` ne trouve aucun `<h5>` (cas où Drupal aurait wrappé les jours dans un sous-`<div class="paragraph">`), bascule en `recursive=True` au lieu de retourner [] silencieusement. WARNING émis pour traçabilité.
+  3. **Logging diagnostic** : en cas d'échec (H2 non matché OU 0 items malgré H2 valide), les WARNINGs incluent désormais les H2 vus / le nombre d'enfants scannés / le compteur de h5 — pour qu'un opérateur puisse pinpointer le mode de défaillance sans avoir à reproduire en local.
+
+  +5 tests R42-CA (`test_r42ca_min_sports_robustness.py`) : intervalle, format historique, fallback recursive, logging H2 vus, logging zero items.
+
+  À surveiller : le prochain run GHA doit soit produire des items pour la semaine du 11 mai 2026, soit logguer un WARNING explicite pointant le format inattendu — auquel cas un fix ciblé sur la base du log permettra de finaliser.
+
 - 2026-05-15 (matin, retour Cyril) : **R42-BZ — Limite 3 keywords étendue aux dropdowns thématiques de l'accueil**.
 
   Cyril 2026-05-15 : « la règle limitant l'affichage des mots-clés à 3 ne marche pas sur les occurrences présentes dans les menus dépliables de la page d'accueil ». Diagnostic : R42-BN avait patché les **templates Hugo** (`_default/list.html`, `agenda/list.html`, `dossiers_legislatifs/*`, `comptes_rendus/list.html`, `recherche/list.html`) mais la page d'accueil n'est pas rendue par un template Hugo — son contenu central est produit en Markdown par `src/site_export.py::_fmt_item_line` puis injecté dans `.Content`. Cette fonction conservait sa propre limite `kws[:12]` héritée de R36-pré-BN.
