@@ -334,6 +334,20 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
   +19 tests R42-BI. 1149 → 1168 verts.
 
+- 2026-05-15 (matin, fix structurel agenda MinSports) : **R42-CH**. Cause racine identifiée.
+
+  Diagnostic en chaîne (R42-CA → CG) avait permis de réduire la cause sans la trouver : `min_sports_agenda` à `last_fetched: 0` depuis 2026-05-08. R42-CG (PR #12) prévoyait d'enrichir le snapshot diag, R42-CF avait fait l'hypothèse `<p><strong>Lundi…</strong></p>` (invalidée).
+
+  Cyril a sauvegardé la page agenda 2026-05-11 sur son poste (`tests/fixture_min_sports_agenda_2026-05-11.html`) — analyse structurelle directe possible sans toucher au site (WAF AN/sports.gouv.fr bloque tout fetch GHA/sandbox). Cause racine trouvée : **sports.gouv.fr a refondu le markup, les en-têtes jour sont passés de `<h5>` à `<h3>`** (triple `<span>` imbriqué en plus, géré naturellement par BeautifulSoup `get_text(strip=True)`).
+
+  Fix `src/sources/min_sports.py::_parse_agenda_html` :
+  - `find_all(["h5", "p"], recursive=False)` → `find_all(["h3", "h4", "h5", "p"], recursive=False)` (tolérance forward-compatible).
+  - Validation du header via `_parse_day_header()` AVANT le flush : un `<h3>` parasite (navigation, autre section) retourne `None` et est ignoré sans détruire `day_events`. Garde-fou critique vu qu'on accepte un tag fréquent.
+
+  Validation locale : 10 events extraits sur la semaine 11-17 mai (Conseil ministres Jeunesse UE, Trophées UNFP Football, Conseil ministres Sports UE, etc.). 6 tests `test_r42ch_min_sports_h3_days.py` verts. Suite 1273 tests verts.
+
+  PR #12 (R42-CG diag) fermée — devenue inutile vu qu'on a la cause racine. Fixture HTML 116 Ko commitée (`tests/fixture_min_sports_agenda_2026-05-11.html`), dossier `_files/` (assets 2.8 Mo) gitignored.
+
 - 2026-05-13 (matin, suite retours Cyril) : **R42-BT + R42-BU**.
 
   **R42-BT — Migration nominal/full du côté INGESTION.** Cyril 2026-05-13 : « je veux un site exhaustif sur les fenêtres fixées, et dont l'actualisation est accélérée par le fait de ne pas étudier ce qui a déjà été étudié ». Audit en amont (analyse approfondie des open data AN + Sénat) : pas de voie d'allègement côté téléchargement pour les questions AN, débats/CRI/questions Sénat (zip complet obligatoire) ; flux daily AN `publication_j.csv` identifié comme voie possible pour les amendements/dosleg/CR/rapports AN (latence 1 min) mais déplace le problème (1 zip vs 750+ requêtes unitaires). Décision : on garde le mécanisme actuel (zip + filtre `unzip_members_since`) et on **harmonise la fenêtre nominale à 15j** côté ingestion.

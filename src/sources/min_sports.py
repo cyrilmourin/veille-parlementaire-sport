@@ -391,9 +391,15 @@ def _parse_agenda_html(
         log.warning("min_sports %s : week_start non parsé", sid)
         return []
 
-    # 2. Parcourir les <h5> (jours) et collecter les <p> suivants jusqu'au
-    #    prochain <h5> (ou fin de bloc). On reste dans le même parent que
-    #    le <h2> — toutes les balises jour sont siblings.
+    # 2. Parcourir les en-têtes jour (<h3>, <h4>, <h5>) et collecter les
+    #    <p> suivants jusqu'au prochain header. On reste dans le même
+    #    parent que le <h2> — toutes les balises jour sont siblings.
+    #    R42-CH (2026-05-15) : sports.gouv.fr a refondu le markup pour la
+    #    semaine du 11 mai 2026 : les jours sont en <h3> (et non plus
+    #    en <h5>). On élargit aux 3 niveaux par tolérance forward-
+    #    compatible. Les <h3> parasites (titres de section autres que
+    #    « Lundi NN mois ») sont filtrés via `_parse_day_header` qui
+    #    retourne None — ils ne réinitialisent pas le bucket events.
     # Défense : on limite la fenêtre à 50 éléments pour éviter d'ingérer
     # un éventuel bloc de contenu parasite en fin de page.
     items: list[Item] = []
@@ -500,30 +506,32 @@ def _parse_agenda_html(
     # par des <p><strong>Lundi 11 mai</strong></p>. Détection ajoutée
     # en boucle : si un <p> a un <strong> dont le texte match `_DAY_RE`
     # ET pas de contenu trailing significatif, c'est un day header.
+    # R42-CH (2026-05-15) : élargissement aux tags h3/h4/h5 — la
+    # page agenda du 11 mai 2026 utilise <h3> pour les jours.
     container = h2.parent
-    children = container.find_all(["h5", "p"], recursive=False)
-    h5_count = sum(1 for el in children if el.name == "h5")
-    if h5_count == 0:
+    _DAY_TAGS = ("h3", "h4", "h5")
+    children = container.find_all([*_DAY_TAGS, "p"], recursive=False)
+    day_header_count = sum(
+        1 for el in children
+        if el.name in _DAY_TAGS
+        and _parse_day_header(el.get_text(" ", strip=True)) is not None
+    )
+    if day_header_count == 0:
         log.warning(
-            "min_sports %s : aucun <h5> en enfants directs de %s "
-            "— fallback recursive=True (structure DOM probablement modifiée)",
+            "min_sports %s : aucun en-tête jour (h3/h4/h5) détecté en "
+            "enfants directs de %s — fallback recursive=True",
             sid, type(container).__name__,
         )
-        children = container.find_all(["h5", "p"], recursive=True)
+        children = container.find_all([*_DAY_TAGS, "p"], recursive=True)
     pending_event: dict | None = None
 
     def _is_p_day_header(p_el) -> tuple[str, int, int] | None:
         """R42-CF — Le <p> est-il un day header déguisé ?
 
-        Forme attendue : `<p><strong>Lundi 11 mai</strong></p>` (avec
-        éventuellement quelques espaces / NBSP autour). On considère
-        que c'est un day header si :
-          - il contient un <strong>
-          - le texte du <strong> matche `_DAY_RE`
-          - le reste du <p> (texte hors du strong) est vide ou ne
-            contient que des whitespace
-        Retourne le triplet (day_name, day_num, month) comme
-        `_parse_day_header`, ou None.
+        Fallback défensif (hypothèse R42-CF invalidée par R42-CH mais
+        kept comme filet si Drupal rebascule sur ce format).
+        Forme attendue : `<p><strong>Lundi 11 mai</strong></p>`.
+        Retourne (day_name, day_num, month) ou None.
         """
         s = p_el.find("strong")
         if s is None:
@@ -532,11 +540,7 @@ def _parse_agenda_html(
         parsed = _parse_day_header(strong_text)
         if not parsed:
             return None
-        # Texte du <p> moins le strong : si non vide après strip,
-        # c'est probablement un slot horaire avec description, pas
-        # un day header (ex. <p><strong>Lundi 11 mai</strong> 10h ...</p>
-        # — improbable mais on protège).
-        full = p_el.get_text(" ", strip=True).replace(" ", " ")
+        full = p_el.get_text(" ", strip=True).replace("\u00a0", " ")
         trailing = full.replace(strong_text, "", 1).strip(" -—:")
         if trailing:
             return None
@@ -545,15 +549,22 @@ def _parse_agenda_html(
     for el in children:
         # Skip tout ce qui précède le H2 (cas improbable — le H2 est en
         # premier). On utilise l'ordre du document : si on a vu au moins
-        # un h5 ou si on est après le h2 dans sourceline.
-        if el.name == "h5":
+        # un en-tête jour ou si on est après le h2 dans sourceline.
+        if el.name in ("h3", "h4", "h5"):
+            # R42-CH : valider que c'est BIEN un en-tête jour avant de
+            # flush. Les <h3> parasites (navigation, autres sections,
+            # heading décoratif) ne doivent PAS réinitialiser day_events
+            # — sinon on perd tous les events déjà accumulés.
+            new_day = _parse_day_header(el.get_text(" ", strip=True))
+            if new_day is None:
+                continue
             # Nouveau jour → flush l'event en attente, puis flush le jour
             if pending_event is not None:
                 day_events.append(pending_event)
                 pending_event = None
             _flush_day()
             day_events = []
-            current_day = _parse_day_header(el.get_text(" ", strip=True))
+            current_day = new_day
             continue
 
         # R42-CF — <p><strong>Lundi 11 mai</strong></p> est aussi un day header

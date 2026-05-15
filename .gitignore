@@ -56,3 +56,7 @@ reset_*.command
 # est aussi exclu (état de session Claude Code, branches éphémères).
 .claude/settings.local.json
 .claude/worktrees/
+
+# R42-CH : dossiers d'assets téléchargés avec les fixtures HTML
+# ("Save Page As" complete) — pas nécessaires aux tests, lourds (3 Mo+).
+tests/*_files/
