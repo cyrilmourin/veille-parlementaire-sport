@@ -1,6 +1,16 @@
 {
-  "stage": "fetch_home_ko",
-  "ts": "2026-05-15T09:29:49+00:00",
-  "landing_url": "https://www.sports.gouv.fr/",
-  "error": "Failed to perform, curl: (28) Connection timed out after 30001 milliseconds. See https://curl.se/libcurl/c/libcurl-errors.html first for more details."
+  "stage": "zero_items",
+  "ts": "2026-05-15T10:11:33+00:00",
+  "agenda_url": "https://www.sports.gouv.fr/agenda-previsionnel-de-marina-ferrari-1787",
+  "week_start": "2026-05-11",
+  "children_scanned": 26,
+  "h5_count": 0,
+  "h5_texts": [],
+  "p_count": 26,
+  "p_strong_count": 10,
+  "html_length": 77813,
+  "seen_h2_texts": [
+    "Navigation principale",
+    "Agenda prévisionnel de Marina FERRARI, ministre des Sports, de la Jeunesse et de la Vie associative, pour la semaine du 11 mai 2026"
+  ]
 }
