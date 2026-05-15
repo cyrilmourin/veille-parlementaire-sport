@@ -3836,6 +3836,27 @@ def _fmt_item_line(it: dict, with_tags: bool = True,
     url = (it.get("url") or "").strip()
     chamber = it.get("chamber") or ""
 
+    # R42-CM (2026-05-15) — Items liés à la PPL Sport pro (DLR5L17N51732 /
+    # n° 1560 AN / S459 Sénat) : le lien renvoie vers la page spéciale
+    # /ppl-sport-professionnel/ plutôt que vers la fiche externe AN/Sénat.
+    # Cyril 2026-05-15 : « quand il y a le dossier de la PPL Sport pro
+    # dans les actu 24h, il faut que ça renvoie vers la page spéciale PPL ».
+    # On applique aussi aux items connexes (agenda commission, amendements,
+    # CR) liés au même dossier pour cohérence éditoriale — l'utilisateur
+    # qui clique sur n'importe quelle occurrence PPL Sport pro retombe sur
+    # la page consolidée.
+    try:
+        from . import special_ppl as _spp
+        if _spp.row_matches_special_ppl(it):
+            url = _spp.PPL_SLUG_PATH  # "/ppl-sport-professionnel/"
+            # Lien interne → même onglet (override d'un éventuel target_blank
+            # passé par l'appelant).
+            target_blank = False
+    except Exception:
+        # Soft-fail : si l'import échoue ou que la détection lève, on
+        # garde le lien externe d'origine (pas de régression).
+        pass
+
     # R42-CK (2026-05-15) — Pour les items category=questions, le lien
     # principal pointe désormais vers la page interne /items/questions/
     # avec une ancre `#q-<uid>` (déplie automatiquement le texte de la
