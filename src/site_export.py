@@ -69,14 +69,17 @@ WINDOW_DAYS_BY_CATEGORY: dict[str, int] = {
     # nombreux et restent référents longtemps : 180j est un meilleur
     # compromis.
     "comptes_rendus": 180,
-    # R22h (2026-04-23) : questions → 3 mois (au lieu de 30j par défaut).
-    # Cyril veut aligner la fenêtre sur l'attente utilisateur ("un dépôt ou
-    # une réponse depuis moins de 3 mois"). Le volume de questions reste
-    # maîtrisé et 90j permet de capter celles dont la réponse JO est
-    # publiée bien après le dépôt. Couplé à l'ajout de `questions` dans
+    # R22h (2026-04-23) : questions → 3 mois.
+    # R42-CL (2026-05-15) : questions 90 → 365j. Cyril veut élargir car
+    # une réponse ministérielle peut arriver plusieurs mois après le
+    # dépôt de la question — et il veut voir les réponses récentes même
+    # si la question est ancienne. Coupé avec R42-CM côté pipeline qui
+    # pose `published_at = max(date_question, date_reponse)` : les items
+    # avec une réponse récente sont automatiquement rebumped dans la
+    # fenêtre 1 an. Couplé à l'ajout de `questions` dans
     # STRICT_DATED_CATEGORIES ci-dessous, ça garantit qu'aucun item sans
     # `published_at` valide ne passe via le fallback `inserted_at`.
-    "questions": 90,
+    "questions": 365,
     # R36-G (2026-04-24) : amendements 30 → 90j. Cyril veut la même fenêtre
     # que les questions — un amendement déposé en commission il y a 2 mois
     # peut encore être utile au suivi, et certaines navettes durent > 30j.
@@ -3832,6 +3835,34 @@ def _fmt_item_line(it: dict, with_tags: bool = True,
     title = (it.get("title") or "").replace("\n", " ").strip()
     url = (it.get("url") or "").strip()
     chamber = it.get("chamber") or ""
+
+    # R42-CK (2026-05-15) — Pour les items category=questions, le lien
+    # principal pointe désormais vers la page interne /items/questions/
+    # avec une ancre `#q-<uid>` (déplie automatiquement le texte de la
+    # question grâce au JS de questions/list.html). Le lien officiel
+    # AN/Sénat n'est pas perdu : une chip mini-action est rendue dans
+    # la meta inline pour ouvrir la fiche source dans un nouvel onglet.
+    cat_for_link = (it.get("category") or "").strip()
+    external_chip_html = ""
+    if cat_for_link == "questions":
+        uid_q = (it.get("uid") or "").strip()
+        if uid_q:
+            anchor_q = _slugify(uid_q)[:80] or "q"
+            internal_q_url = f"/items/questions/#q-{anchor_q}"
+        else:
+            internal_q_url = "/items/questions/"
+        if url:
+            # Étiquette chip basée sur le domaine du lien officiel.
+            chamber_for_chip = "Sénat" if "senat.fr" in url.lower() else "AN"
+            external_chip_html = (
+                f' <a class="qa-chip qa-chip--source qa-chip--mini" '
+                f'href="{_escape(url)}" target="_blank" rel="noopener" '
+                f'title="Ouvrir la fiche officielle">'
+                f'Voir sur {_escape(chamber_for_chip)} ↗</a>'
+            )
+        url = internal_q_url
+        # Le lien interne ouvre dans le même onglet (navigation site).
+        target_blank = False
     kws = it.get("matched_keywords") or []
     fams = it.get("keyword_families") or []
     # Pair chaque mot-clé avec sa famille (même ordre que matched_keywords).
@@ -3928,6 +3959,10 @@ def _fmt_item_line(it: dict, with_tags: bool = True,
     else:
         line = f"- {chamber_prefix}**{title}**{meta_html}"
 
+    # R42-CK : chip externe ajoutée juste après la meta (avant l'éventuel
+    # snippet sur ligne suivante). Sert pour les items questions.
+    if external_chip_html:
+        line += external_chip_html
     if snippet and with_snippet:
         line += f"  \n  <div class=\"snippet-inline\">« {_escape(snippet)} »</div>"
     return line
@@ -4255,8 +4290,13 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
         # type dosleg avec logo 56 à gauche). Sans `type:` dans le
         # frontmatter, Hugo tombait sur `_default/list.html` qui rend une
         # liste plate et R36-N était invisible en prod.
+        # R42-CK (2026-05-15) : `questions` ajouté pour que Hugo route vers
+        # `layouts/questions/list.html` (système onglets Question/Réponse).
+        # Sans `type:` dans le frontmatter, Hugo dérive .Type = "items"
+        # depuis le 1er segment sous content/ et retombe sur _default.
         SPECIFIC_LAYOUT_CATS = {"agenda", "dossiers_legislatifs",
-                                 "communiques", "comptes_rendus"}
+                                 "communiques", "comptes_rendus",
+                                 "questions"}
         lines = [
             "---",
             f'title: "{label}"',
@@ -4364,16 +4404,13 @@ def _amendement_chip(raw: dict) -> tuple[str, str]:
 def _write_item_pages(items_dir: Path, rows: list[dict]):
     # On évite l'explosion du nombre de fichiers : on garde les N plus récents.
     # R42-AB (2026-05-11) — cap 500 → 1500 puis 2000 (sur demande Cyril
-    # pour anticiper un futur texte avec beaucoup d'amendements). Cyril
-    # a remonté que la page /items/dossiers_legislatifs/ annonçait
-    # « 109 dossiers » dans l'intro mais n'en affichait que ~16. Cause :
-    # cap 500 .md max toutes catégories confondues, mais ~700 items
-    # globaux après R42-N/R/W/X/Y/Z. Les dosleg anciens (2024) étaient
-    # écartés au profit des items plus récents. 2000 couvre la fenêtre
-    # complète avec une marge confortable (ex. PPL hyper amendée comme
-    # 1560 sport pro avec 200+ amendements).
+    # pour anticiper un futur texte avec beaucoup d'amendements).
+    # R42-CL (2026-05-15) — cap 2000 → 3000 sur demande Cyril (élargit
+    # la fenêtre questions à 1 an et permet d'absorber des PPL hyper
+    # amendées + plus de rapports parlementaires sur 2 ans). Le coût
+    # build Hugo reste raisonnable (~5-7 s additionnels).
     rows_sorted = _sort_by_date_desc(rows)
-    for r in rows_sorted[:2000]:
+    for r in rows_sorted[:3000]:
         cat = r.get("category") or "autre"
         d = items_dir / cat
         d.mkdir(parents=True, exist_ok=True)
@@ -4738,6 +4775,53 @@ def _write_item_pages(items_dir: Path, rows: list[dict]):
                 fm.append(
                     f'sort_label: "{chip_label.replace(chr(34), chr(39))}"')
                 fm.append(f'sort_slug: "{chip_slug}"')
+        # R42-CK (2026-05-15) — Frontmatter étendu pour les questions :
+        # texte intégral de la question + texte de la réponse (si publiée).
+        # Permet à `layouts/questions/list.html` de proposer un système
+        # onglets « Question / Réponse » sans sortir du site. Quand
+        # `texte_reponse` est vide → affichage « Réponse non publiée ».
+        # Encodage JSON pour gérer les retours ligne / guillemets / accents
+        # (YAML literal block fragile sur des textes longs et imbriqués).
+        # `item_uid` exposé pour permettre l'ancre HTML `#q-<uid>` (lien
+        # depuis home et autres listings vers la question dans /items/questions/).
+        if cat == "questions":
+            uid_raw = (r.get("uid") or "").strip()
+            if uid_raw:
+                # Slugify pour rester URL-safe (les UID AN type "QANR5L17QE..."
+                # passent déjà, les UID Sénat type "1054S" aussi ; on
+                # normalise quand même au cas où).
+                anchor = _slugify(uid_raw)[:80] or "q"
+                fm.append(f'item_uid: "{anchor}"')
+            if isinstance(raw, dict):
+                texte_question = (raw.get("texte_question") or "").strip()
+                texte_reponse = (raw.get("texte_reponse") or "").strip()
+                # Fallback Sénat : colonnes CSV `Texte` / `Réponse` (capitales)
+                if not texte_question:
+                    texte_question = (raw.get("Texte") or raw.get("texte") or "").strip()
+                if not texte_reponse:
+                    texte_reponse = (raw.get("Réponse") or raw.get("reponse") or "").strip()
+                if texte_question:
+                    fm.append(
+                        f"texte_question: {json.dumps(texte_question, ensure_ascii=False)}"
+                    )
+                if texte_reponse:
+                    fm.append(
+                        f"texte_reponse: {json.dumps(texte_reponse, ensure_ascii=False)}"
+                    )
+                # R42-CL (2026-05-15) — Dates séparées question / réponse
+                # (cf. raw posé par assemblee._normalize_question). Le
+                # template les affiche en double si elles diffèrent, ou
+                # comme date unique si seule la question est publiée.
+                # Fallback Sénat : `Date de publication JO` du CSV pour la
+                # question, pas de colonne réponse dispo dans les CSV.
+                date_q = (raw.get("date_question") or "").strip()
+                date_r = (raw.get("date_reponse") or "").strip()
+                if not date_q:
+                    date_q = (raw.get("Date de publication JO") or "").strip()
+                if date_q:
+                    fm.append(f'date_question: "{date_q[:10]}"')
+                if date_r:
+                    fm.append(f'date_reponse: "{date_r[:10]}"')
         # Frontmatter étendu pour les dossiers législatifs (timeline).
         if cat == "dossiers_legislatifs" and actes_timeline:
             fm.append(f"nb_actes_utiles: {nb_actes_utiles}")

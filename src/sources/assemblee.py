@@ -1796,16 +1796,36 @@ def _normalize_question(obj, src, cat):
                    or _first(root, "reponse", default="")
     reponse = _text_of(reponse_node)
 
-    # Date publication : XSD place la date dans InfoJO (texteQuestion.infoJO)
-    # via un champ généralement nommé `dateJO` / `dateParution` / `date`.
-    # On tape d'abord ces champs via _deep_find (traverse la liste textesQuestion).
-    date_raw = _deep_find(root.get("textesQuestion"),
-                           "dateJO", "dateParution", "dateJORF", "date") \
-               or _first(root,
-                          "cloture.dateCloture",
-                          "questionDate", "dateQuestion", "dateDepot",
-                          default=None)
-    date_pub = parse_iso(_text_of(date_raw) if date_raw else None)
+    # Date publication QUESTION : XSD place la date dans InfoJO
+    # (texteQuestion.infoJO) via `dateJO` / `dateParution` / `date`.
+    date_q_raw = _deep_find(root.get("textesQuestion"),
+                             "dateJO", "dateParution", "dateJORF", "date") \
+                 or _first(root,
+                            "cloture.dateCloture",
+                            "questionDate", "dateQuestion", "dateDepot",
+                            default=None)
+    date_question = parse_iso(_text_of(date_q_raw) if date_q_raw else None)
+
+    # R42-CL (2026-05-15) — Date publication RÉPONSE depuis textesReponse.
+    # Permet d'identifier les questions dont la réponse arrive bien après
+    # le dépôt (parfois plusieurs mois). Le `published_at` final =
+    # max(date_question, date_reponse) → l'item est rebumped dans la
+    # fenêtre récente quand la réponse JO est publiée, même si la
+    # question est ancienne. Cyril veut voir ces réponses-éclair.
+    date_r_raw = _deep_find(
+        root.get("textesReponse") or root.get("textesReponses"),
+        "dateJO", "dateParution", "dateJORF", "date",
+    )
+    date_reponse = parse_iso(_text_of(date_r_raw) if date_r_raw else None)
+
+    # published_at = la plus récente des 2 dates. Si seulement question
+    # → published_at = date_question. Si réponse arrivée → published_at
+    # = date_reponse. Garde les 2 dates en raw pour l'affichage côté
+    # template (« Question 10 jan 2025 — Réponse 15 mai 2026 »).
+    if date_question and date_reponse:
+        date_pub = max(date_question, date_reponse)
+    else:
+        date_pub = date_reponse or date_question
 
     # Auteur — XSD : question.auteur n'expose QUE acteurRef + mandatRef (+ groupe).
     # Les champs nom/prénom/civ existent dans le dump AMO Acteurs, pas ici.
@@ -1943,6 +1963,20 @@ def _normalize_question(obj, src, cat):
              # métadonnées « Destinataire : X — Rubrique : sports — … »
              # qui polluaient le début du summary).
              "texte_question": texte,
+             # R42-CK (2026-05-15) — Texte intégral de la réponse
+             # ministérielle (vide tant que la réponse n'est pas publiée
+             # par le ministère). Exposé côté Hugo pour permettre l'onglet
+             # « Question / Réponse » sur /items/questions/.
+             "texte_reponse": reponse,
+             # R42-CL (2026-05-15) — Dates séparées exposées pour
+             # l'affichage côté template (« Question : JJ/MM/AAAA —
+             # Réponse : JJ/MM/AAAA »). `published_at` = max des 2.
+             "date_question": (
+                 date_question.isoformat() if date_question else ""
+             ),
+             "date_reponse": (
+                 date_reponse.isoformat() if date_reponse else ""
+             ),
              "path": "assemblee:question"},
     )
 

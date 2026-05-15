@@ -1,0 +1,264 @@
+{{ define "main" }}
+{{/* R42-CK (2026-05-15) — Page questions avec onglets « Question /
+     Réponse ». Système :
+     - Card classique (auteur photo, badge chambre, date, titre, snippet)
+     - 3 chips d'action sous chaque card :
+         [Question ▾]  [Réponse ▾]  [Voir sur AN/Sénat ↗]
+     - Click sur Question → déplie un panel sous la card avec le texte
+       de la question. Click Réponse → bascule le panel sur le texte
+       de la réponse (ou « Réponse non publiée »).
+     - Chip externe préservée pour ouvrir la fiche officielle dans
+       un nouvel onglet (lien historique préservé pour les utilisateurs
+       qui voulaient sortir vers AN/Sénat).
+     - Ancre HTML `id="q-<uid>"` sur chaque card pour permettre les
+       liens depuis home / autres listings : `/items/questions/#q-<uid>`.
+
+     Layout dérivé de `_default/list.html` (R23-C4 photo auteur etc.)
+     avec l'ajout des onglets. */}}
+{{ $monthsFR := slice "" "janvier" "février" "mars" "avril" "mai" "juin" "juillet" "août" "septembre" "octobre" "novembre" "décembre" }}
+<section class="listing listing--questions">
+  <nav class="breadcrumb"><a href="/">Accueil</a> &rsaquo; {{ .Title }}</nav>
+  <h1>{{ .Title }}</h1>
+  {{ with .Content }}<div class="intro">{{ . }}</div>{{ end }}
+
+  <ul class="items">
+    {{ range (.Paginate .Pages.ByDate.Reverse).Pages }}
+      {{ $uid := .Params.item_uid | default "" }}
+      {{ $anchor := cond (ne $uid "") (printf "q-%s" $uid) "" }}
+      <li class="listing-item"{{ with $anchor }} id="{{ . }}"{{ end }}{{ with .Params.family_source }} data-family-source="{{ . }}"{{ end }}>
+        {{ with .Params.auteur_photo_url }}
+          <div class="listing-item__photo" aria-hidden="true">
+            <img class="auteur-photo" src="{{ . }}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.style.display='none'" width="56" height="56">
+          </div>
+        {{ end }}
+        <div class="listing-item__body">
+          {{ if .Params.auteur_url }}<a class="auteur-inline" href="{{ .Params.auteur_url }}" target="_blank" rel="noopener noreferrer" title="Fiche {{ .Params.auteur }}">{{ .Params.auteur }}</a>{{ with .Params.auteur_groupe }} <span class="auteur-groupe"{{ with $.Params.auteur_groupe_long }} title="{{ . }}"{{ end }}>({{ . }})</span>{{ end }}<span class="auteur-sep"> | </span>{{ else if .Params.auteur }}<span class="auteur-inline">{{ .Params.auteur }}</span>{{ with .Params.auteur_groupe }} <span class="auteur-groupe"{{ with $.Params.auteur_groupe_long }} title="{{ . }}"{{ end }}>({{ . }})</span>{{ end }}<span class="auteur-sep"> | </span>{{ end }}
+          {{/* R42-CK : le titre n'est PLUS un lien externe (l'utilisateur
+               clique sur la chip dédiée pour ça). On garde le titre en
+               span pour rester lisible. */}}
+          <span class="title no-link">{{ .Title }}</span>
+          <div class="item-meta">
+            <span class="meta-main">
+              {{ with .Params.chamber }}{{ partial "chamber-badge.html" . }}{{ end }}
+              {{ with .Params.status_label }} · <span class="status">{{ . }}</span>{{ end }}
+              {{/* R42-CL : si la réponse est publiée (date_reponse posée
+                   et != date_question), on affiche les 2 dates pour
+                   distinguer le dépôt question et la publication réponse.
+                   Sinon on n'affiche que la date principale (= question). */}}
+              {{ $dq := .Params.date_question | default "" }}
+              {{ $dr := .Params.date_reponse | default "" }}
+              {{ if and $dq $dr (ne $dq $dr) }}
+                · <span class="date-pair">
+                    <span class="date-pair__q">Q&nbsp;: <time datetime="{{ $dq }}">{{ dateFormat "02/01/2006" $dq }}</time></span>
+                    <span class="date-pair__sep">→</span>
+                    <span class="date-pair__r">R&nbsp;: <time class="date date--reponse-publiee" datetime="{{ $dr }}">{{ dateFormat "02/01/2006" $dr }}</time></span>
+                  </span>
+              {{ else if not .Date.IsZero }}
+                · <time class="date" datetime="{{ .Date.Format "2006-01-02" }}">{{ printf "%d %s %d" .Date.Day (index $monthsFR (int .Date.Month)) .Date.Year }}</time>
+              {{ end }}
+            </span>
+            {{ with .Params.keywords }}
+              <span class="meta-tags">
+                {{ $fam := "" }}{{ with $.Params.families }}{{ $fam = index . 0 }}{{ end }}
+                {{ range first 3 . }}<span class="kw-tag"{{ with $fam }} data-family="{{ . }}"{{ end }}>{{ . }}</span>{{ end }}
+              </span>
+            {{ end }}
+          </div>
+          {{ with .Params.match_reason }}<div class="match-reason-inline">⊕ {{ . }}</div>{{ end }}
+          {{ with .Params.snippet }}<div class="snippet-inline">« {{ . }} »</div>{{ end }}
+
+          {{/* R42-CK + R42-CL (2026-05-15) — Onglets Question / Réponse,
+               adaptés selon le type de question :
+               - QE (questions écrites) / QOSD : onglets déployables ; on
+                 a le texte et la réponse côté open data AN/Sénat.
+               - QG (questions au gouvernement) : pas de réponse texte
+                 propre (la réponse est une vidéo/CR publié sur AN/Sénat)
+                 → la chip Réponse devient un lien direct externe ↗.
+                 Si le texte de la question n'est pas dispo non plus
+                 (rare), la chip Question devient aussi un lien direct.
+
+               Détection QG : source contient « qg » ou « gouvernement ».
+               Cohérent avec les source_id du pipeline :
+               an_questions_gouvernement, senat_qg, et la nature `QG`
+               capturée dans senat_questions_1an. */}}
+          {{ $tq := .Params.texte_question | default "" }}
+          {{ $tr := .Params.texte_reponse  | default "" }}
+          {{ $src := .Params.source | default "" }}
+          {{ $is_qg := or (in $src "qg") (in $src "gouvernement") }}
+          {{/* Étiquette chambre pour la chip externe : « Sénat » si la
+               chambre frontmatter est Senat, ou si l'URL pointe sur
+               senat.fr (double sécurité au cas où chamber est vide). */}}
+          {{ $cham := .Params.chamber | default "" }}
+          {{ $surl := .Params.source_url | default "" }}
+          {{ $is_senat := or (eq $cham "Senat") (in (lower $surl) "senat.fr") }}
+          {{ $chamber_label := cond $is_senat "Sénat" "AN" }}
+
+          <div class="qa-tabs" role="tablist" aria-label="Texte de la question ou de la réponse">
+            {{ if and $is_qg (eq $tq "") }}
+              {{/* QG sans texte question → lien direct externe */}}
+              {{ with .Params.source_url }}
+              <a class="qa-chip qa-chip--question qa-chip--external" href="{{ . }}"
+                 target="_blank" rel="noopener noreferrer"
+                 title="Consulter la question sur le site officiel">
+                Question ↗
+              </a>
+              {{ end }}
+            {{ else }}
+              <button type="button" class="qa-chip qa-chip--question"
+                      data-qa-target="question" aria-pressed="false"
+                      {{ if eq $tq "" }}aria-disabled="true" title="Texte non disponible (consulter sur la source)"{{ end }}>
+                Question ▾
+              </button>
+            {{ end }}
+
+            {{ if $is_qg }}
+              {{/* QG : réponse = vidéo/CR sur AN/Sénat, pas de texte propre.
+                   Chip directe vers la source — pas d'onglet déployable. */}}
+              {{ with .Params.source_url }}
+              <a class="qa-chip qa-chip--reponse qa-chip--external" href="{{ . }}"
+                 target="_blank" rel="noopener noreferrer"
+                 title="Voir la réponse en séance sur le site officiel">
+                Réponse ↗
+              </a>
+              {{ end }}
+            {{ else }}
+              <button type="button" class="qa-chip qa-chip--reponse"
+                      data-qa-target="reponse" aria-pressed="false">
+                Réponse ▾
+              </button>
+            {{ end }}
+
+            {{/* Chip externe « Voir sur AN/Sénat » : conservée pour les
+                 QE/QOSD (utile : ouvre la fiche officielle complète avec
+                 historique des publications JO). Pour les QG, redondante
+                 avec les 2 chips externes ci-dessus → on la masque. */}}
+            {{ if and (not $is_qg) .Params.source_url }}
+            <a class="qa-chip qa-chip--source" href="{{ .Params.source_url }}"
+               target="_blank" rel="noopener noreferrer"
+               title="Ouvrir la fiche officielle">
+              Voir sur {{ $chamber_label }} ↗
+            </a>
+            {{ end }}
+          </div>
+
+          {{ if not $is_qg }}
+          <div class="qa-panel" hidden>
+            <div class="qa-panel__content qa-panel__content--question"
+                 data-qa-content="question" hidden>
+              {{ if $tq }}
+                {{/* `safeHTML` car le texte AN peut contenir des entités HTML
+                     déjà décodées par le scraper (cf. _strip_html_text /
+                     _text_of dans assemblee.py) ; on n'attend pas de balises
+                     malicieuses ici. */}}
+                <p>{{ $tq | safeHTML }}</p>
+              {{ else }}
+                <p class="qa-empty">
+                  Texte de la question non disponible dans le dump open data.
+                  {{ with .Params.source_url }}
+                    <a href="{{ . }}" target="_blank" rel="noopener noreferrer">Consulter sur la source officielle ↗</a>
+                  {{ end }}
+                </p>
+              {{ end }}
+            </div>
+            <div class="qa-panel__content qa-panel__content--reponse"
+                 data-qa-content="reponse" hidden>
+              {{ if $tr }}
+                <p>{{ $tr | safeHTML }}</p>
+              {{ else }}
+                <p class="qa-empty qa-empty--reponse">
+                  ⏳ Réponse non publiée à ce jour.
+                  {{ with .Params.source_url }}
+                    <a href="{{ . }}" target="_blank" rel="noopener noreferrer">Surveiller sur la source officielle ↗</a>
+                  {{ end }}
+                </p>
+              {{ end }}
+            </div>
+          </div>
+          {{ end }}
+
+        </div>
+      </li>
+    {{ end }}
+  </ul>
+  {{ partial "pagination-inline.html" . }}
+</section>
+
+{{/* R42-CK : JS vanilla pour les onglets Question / Réponse.
+     - Click sur une chip : ouvre/ferme le panel, switch entre Q et R.
+     - Si on clique sur la chip déjà active : on ferme (toggle).
+     - Si on arrive avec un anchor #q-<uid> dans l'URL : auto-ouverture
+       du panel Question (déplie le texte si présent). */}}
+<script>
+(function() {
+  var cards = document.querySelectorAll('.listing--questions .listing-item');
+  if (!cards.length) return;
+
+  function setupCard(card) {
+    var tabs = card.querySelectorAll('.qa-chip[data-qa-target]');
+    var panel = card.querySelector('.qa-panel');
+    var contents = card.querySelectorAll('.qa-panel__content');
+    if (!tabs.length || !panel) return;
+
+    function showTab(target) {
+      var anyShown = false;
+      contents.forEach(function(c) {
+        var match = c.getAttribute('data-qa-content') === target;
+        c.hidden = !match;
+        if (match) anyShown = true;
+      });
+      tabs.forEach(function(t) {
+        var on = t.getAttribute('data-qa-target') === target;
+        t.setAttribute('aria-pressed', on ? 'true' : 'false');
+        // Inverser le caret ▾/▴ pour signaler ouvert/fermé
+        var label = t.textContent.replace(/[▾▴]/g, '').trim();
+        t.textContent = label + ' ' + (on ? '▴' : '▾');
+      });
+      panel.hidden = !anyShown;
+    }
+
+    function closeAll() {
+      contents.forEach(function(c) { c.hidden = true; });
+      tabs.forEach(function(t) {
+        t.setAttribute('aria-pressed', 'false');
+        var label = t.textContent.replace(/[▾▴]/g, '').trim();
+        t.textContent = label + ' ▾';
+      });
+      panel.hidden = true;
+    }
+
+    tabs.forEach(function(t) {
+      t.addEventListener('click', function() {
+        if (t.getAttribute('aria-disabled') === 'true') return;
+        var target = t.getAttribute('data-qa-target');
+        var current = t.getAttribute('aria-pressed') === 'true';
+        if (current) {
+          closeAll();
+        } else {
+          showTab(target);
+        }
+      });
+    });
+  }
+
+  cards.forEach(setupCard);
+
+  // Si on arrive avec une ancre #q-<uid>, scroll vers la card et
+  // ouvrir le panel Question par défaut.
+  if (window.location.hash && window.location.hash.indexOf('#q-') === 0) {
+    var target = document.querySelector(window.location.hash);
+    if (target && target.classList.contains('listing-item')) {
+      // Auto-ouverture sur le panel Question
+      var qbtn = target.querySelector('.qa-chip[data-qa-target="question"]');
+      if (qbtn && qbtn.getAttribute('aria-disabled') !== 'true') {
+        qbtn.click();
+      }
+      // Scroll après un petit délai pour laisser le panel se déplier
+      setTimeout(function() {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        target.classList.add('listing-item--highlighted');
+      }, 100);
+    }
+  }
+})();
+</script>
+{{ end }}

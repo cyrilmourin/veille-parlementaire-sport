@@ -499,6 +499,128 @@ a:hover { text-decoration: underline; }
   font-variant-numeric: tabular-nums;
 }
 
+/* R42-CK (2026-05-15) — Onglets Question / Réponse sur /items/questions/.
+   3 chips d'action sous chaque card : Question / Réponse / Voir sur AN ou Sénat.
+   Click sur une chip déplie le panel correspondant ; chip déjà active = ferme.
+   Si le texte de la question n'est pas disponible (cas CSV Sénat léger
+   sans corps), la chip Question est en aria-disabled et inerte. */
+.qa-tabs {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px;
+}
+.qa-chip {
+  background: #f1f5f9; color: var(--sl-blue, #122549);
+  border: 1.5px solid #cbd5e1;
+  padding: 5px 12px; border-radius: 14px;
+  font: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+  display: inline-flex; align-items: center; gap: 4px;
+  text-decoration: none;
+  font-family: var(--font, inherit);
+}
+.qa-chip:hover { background: #dbeafe; border-color: var(--sl-blue, #122549); }
+.qa-chip[aria-pressed="true"] {
+  background: var(--sl-blue, #122549); color: white;
+  border-color: var(--sl-blue, #122549);
+}
+.qa-chip[aria-disabled="true"] {
+  opacity: 0.5; cursor: not-allowed; background: #f8fafc;
+}
+.qa-chip[aria-disabled="true"]:hover { background: #f8fafc; border-color: #cbd5e1; }
+.qa-chip--source {
+  background: white; border-color: var(--sl-red, #DA4431);
+  color: var(--sl-red, #DA4431);
+}
+.qa-chip--source:hover {
+  background: var(--sl-red, #DA4431); color: white;
+  border-color: var(--sl-red, #DA4431);
+}
+/* R42-CK : variante mini de la chip source — utilisée en inline dans la
+   home Markdown (à côté du lien titre interne pour permettre la sortie
+   vers AN/Sénat). Plus discrète que la chip pleine taille du listing. */
+.qa-chip--mini {
+  font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  margin-left: 6px; vertical-align: middle;
+  border-width: 1px;
+}
+
+/* R42-CL (2026-05-15) — Variante « external » : utilisée pour les
+   questions au gouvernement où la chip Question/Réponse ne déplie
+   PAS un panel mais ouvre directement la fiche AN/Sénat (la réponse
+   est une vidéo/CR sur le site officiel, sans texte propre côté
+   open data). Visuellement neutre (bleu charte) mais signale le
+   départ externe via le caret ↗ dans le label. */
+.qa-chip--external {
+  background: white; border-color: var(--sl-blue, #122549);
+  color: var(--sl-blue, #122549);
+}
+.qa-chip--external:hover {
+  background: var(--sl-blue, #122549); color: white;
+}
+
+/* R42-CL (2026-05-15) — Hover très léger sur la card question entière.
+   Teinte grisée neutre (Cyril 2026-05-15 : « pas de couleur tape-à-l'œil
+   — juste un changement de teinte »). On utilise un gris très clair
+   #f1f5f9 (slate-100) qui ne concurrence pas la chambre / la chip
+   couleur. Transition douce 0.18s. Le padding/margin négatif élargit
+   la zone visible du hover pour englober toute la card (au lieu du
+   strict <li> qui se limitait au content). */
+.listing--questions .listing-item {
+  transition: background-color 0.18s ease-out;
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin: 2px -8px;
+}
+.listing--questions .listing-item:hover {
+  background-color: #f1f5f9;
+}
+
+/* R42-CL : double date question→réponse pour les items dont la réponse
+   est publiée (date_reponse != date_question). Permet de voir d'un
+   coup d'œil le délai de réponse + signale que l'item ressurgit dans
+   la fenêtre 1 an parce que la réponse est récente. */
+.date-pair {
+  display: inline-flex; gap: 5px; align-items: center;
+  font-size: 12px;
+}
+.date-pair__q { color: var(--muted, #5c6577); }
+.date-pair__q time { color: inherit; font-weight: 600; }
+.date-pair__sep { color: #cbd5e1; font-weight: 700; }
+.date-pair__r { color: var(--sl-red, #DA4431); font-weight: 700; }
+.date-pair__r .date {
+  /* On hérite déjà du rouge — on force juste le poids et un léger
+     fond pour signaler « actualité récente : réponse publiée ». */
+  background: #fff5f5;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.qa-panel {
+  margin-top: 10px; padding: 14px 16px;
+  background: #fafbfc; border-radius: 8px;
+  border-left: 3px solid var(--sl-blue, #122549);
+  font-size: 13px; line-height: 1.55; color: #1f2937;
+}
+.qa-panel__content p { margin: 0 0 8px; }
+.qa-panel__content p:last-child { margin-bottom: 0; }
+.qa-empty {
+  color: #64748b; font-style: italic; padding: 4px 0;
+}
+.qa-empty--reponse {
+  color: #92400e; background: #fef3c7;
+  padding: 8px 12px; border-radius: 6px; font-style: normal;
+}
+.qa-empty a { color: var(--sl-blue, #122549); }
+/* R42-CK : highlight de la card ciblée par anchor #q-<uid> depuis un
+   lien interne (home / autres listings). Subtil pour signaler la
+   navigation sans bloquer la lecture. */
+.listing-item--highlighted {
+  animation: qa-highlight 1.6s ease-out;
+}
+@keyframes qa-highlight {
+  0%   { background: #fef3c7; }
+  100% { background: transparent; }
+}
+
 /* R42-CI (2026-05-15) — Badge « 📅 À reprogrammer » affiché en lieu et
    place de la date pour un item agenda dont la séance a été reportée
    par l'AN sans nouvelle date communiquée. Couleur orange charte

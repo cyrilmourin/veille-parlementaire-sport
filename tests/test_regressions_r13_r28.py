@@ -349,18 +349,36 @@ def test_r22h_filter_window_accepts_question_in_window():
 
 
 def test_r22h_filter_window_rejects_question_outside_window():
-    """Une question publiée il y a > 90 j est exclue (WINDOW_DAYS_BY_CATEGORY
-    questions = 90)."""
+    """R42-CL (2026-05-15) : fenêtre questions élargie de 90 → 365j.
+    Une question publiée il y a > 365j reste exclue. Items entre 90 et
+    365j passent désormais (cf. test R42-CL juste après)."""
     now = datetime.utcnow()
     rows = [
         {
             "category": "questions",
-            "published_at": (now - timedelta(days=120)).isoformat(),
-            "title": "Question vieille",
+            "published_at": (now - timedelta(days=400)).isoformat(),
+            "title": "Question très vieille",
         },
     ]
     kept = site_export._filter_window(rows)
     assert kept == []
+
+
+def test_r42cl_filter_window_accepts_question_within_one_year():
+    """R42-CL : un item à 200j passe désormais (fenêtre questions=365j).
+    Permet de capter les réponses ministérielles publiées tardivement
+    sur des questions anciennes — `published_at` = max(date_question,
+    date_reponse) côté pipeline."""
+    now = datetime.utcnow()
+    rows = [
+        {
+            "category": "questions",
+            "published_at": (now - timedelta(days=200)).isoformat(),
+            "title": "Question avec réponse tardive",
+        },
+    ]
+    kept = site_export._filter_window(rows)
+    assert len(kept) == 1
 
 
 # ---------------------------------------------------------------------------
