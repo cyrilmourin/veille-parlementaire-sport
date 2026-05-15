@@ -32,11 +32,21 @@
           </div>
         {{ end }}
         <div class="listing-item__body">
-          {{ if .Params.auteur_url }}<a class="auteur-inline" href="{{ .Params.auteur_url }}" target="_blank" rel="noopener noreferrer" title="Fiche {{ .Params.auteur }}">{{ .Params.auteur }}</a>{{ with .Params.auteur_groupe }} <span class="auteur-groupe"{{ with $.Params.auteur_groupe_long }} title="{{ . }}"{{ end }}>({{ . }})</span>{{ end }}<span class="auteur-sep"> | </span>{{ else if .Params.auteur }}<span class="auteur-inline">{{ .Params.auteur }}</span>{{ with .Params.auteur_groupe }} <span class="auteur-groupe"{{ with $.Params.auteur_groupe_long }} title="{{ . }}"{{ end }}>({{ . }})</span>{{ end }}<span class="auteur-sep"> | </span>{{ end }}
-          {{/* R42-CK : le titre n'est PLUS un lien externe (l'utilisateur
-               clique sur la chip dédiée pour ça). On garde le titre en
-               span pour rester lisible. */}}
-          <span class="title no-link">{{ .Title }}</span>
+          {{/* R42-CO (2026-05-15) — Grid 2 colonnes auteur | titre :
+               auteur+groupe+| en colonne gauche (largeur naturelle),
+               titre en colonne droite (1fr). Garantit que TOUS les
+               titres sont alignés à la même position verticale, peu
+               importe la longueur de l'auteur. Avant : auteur+titre
+               sur même ligne en flow inline → wrap incohérent (long
+               titre passe sous le « | »). */}}
+          <div class="qq-row-title">
+            <span class="qq-row-title__auteur">
+              {{ if .Params.auteur_url }}<a class="auteur-inline" href="{{ .Params.auteur_url }}" target="_blank" rel="noopener noreferrer" title="Fiche {{ .Params.auteur }}">{{ .Params.auteur }}</a>{{ with .Params.auteur_groupe }} <span class="auteur-groupe"{{ with $.Params.auteur_groupe_long }} title="{{ . }}"{{ end }}>({{ . }})</span>{{ end }}<span class="auteur-sep"> | </span>{{ else if .Params.auteur }}<span class="auteur-inline">{{ .Params.auteur }}</span>{{ with .Params.auteur_groupe }} <span class="auteur-groupe"{{ with $.Params.auteur_groupe_long }} title="{{ . }}"{{ end }}>({{ . }})</span>{{ end }}<span class="auteur-sep"> | </span>{{ end }}
+            </span>
+            {{/* R42-CK : titre non-lien (l'utilisateur clique sur la
+                 chip dédiée pour la source officielle). */}}
+            <span class="title no-link qq-row-title__titre">{{ .Title }}</span>
+          </div>
           <div class="item-meta">
             <span class="meta-main">
               {{ with .Params.chamber }}{{ partial "chamber-badge.html" . }}{{ end }}

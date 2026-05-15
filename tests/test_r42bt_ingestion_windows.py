@@ -47,11 +47,16 @@ def test_window_days_full(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_assemblee_uses_nominal_15_full_730():
-    """Le code source assemblee.py doit appliquer window_days(nominal=15, full=...)
-    dans `fetch_source` (json_zip) ET `_fetch_xml_zip`."""
+    """Le code source assemblee.py doit appliquer window_days dans
+    `fetch_source` (json_zip) ET `_fetch_xml_zip`. R42-CP (2026-05-15) :
+    `fetch_source` utilise désormais un `nominal_days` dynamique selon
+    la catégorie (365 pour les questions, 15 sinon)."""
     code = (_ROOT / "src/sources/assemblee.py").read_text(encoding="utf-8")
-    # 2 emplacements : json_zip (fetch_source) + xml_zip (_fetch_xml_zip)
-    assert code.count("window_days(nominal=15, full=max(yaml_full, 730))") >= 2
+    # _fetch_xml_zip (compte rendus) garde nominal=15 fixe.
+    assert code.count("window_days(nominal=15, full=max(yaml_full, 730))") >= 1
+    # fetch_source (json_zip) utilise nominal_days variable (R42-CP).
+    assert "window_days(nominal=nominal_days, full=max(yaml_full, 730))" in code
+    assert 'nominal_days = 365 if cat_for_window == "questions" else 15' in code
 
 
 def test_assemblee_nominal_appliqué(monkeypatch):

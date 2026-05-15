@@ -671,18 +671,31 @@ def fetch_source(src: dict) -> list[Item]:
     file_count = 0
 
     # R42-BT (2026-05-13) — Fenêtre dynamique INGESTION nominal=15j /
-    # full=max(YAML, 730j). Évite de re-parser les items déjà ingérés à
-    # chaque cron. YAML override possible (cap inférieur du full).
+    # full=max(YAML, 730j).
+    # R42-CP (2026-05-15) — Exception : catégorie `questions` → nominal=365j.
+    # Cyril 2026-05-15 : « il n'y a aucune réponse depuis un an, je pense
+    # que les réponses publiées sur questions déposées hors fenêtre
+    # n'apparaissent pas ». Cause : avec nominal=15j, seules les
+    # questions dont la question OU la réponse est publiée dans les 15
+    # derniers jours étaient ingérées. Or les réponses ministérielles
+    # arrivent souvent plusieurs mois après le dépôt. Échantillon dump
+    # 2026-05-15 : 39/2000 questions avec réponse < 15j vs 931 < 365j.
+    # En passant nominal=365j pour les questions, on capte 24× plus de
+    # réponses. published_at = max(date_question, date_reponse) garantit
+    # un tri éditorial cohérent. Coût CPU : ~50% des 15k fichiers parsés
+    # par run au lieu de 2% (toujours < 10 s sur GHA).
     from ..run_mode import window_days
+    cat_for_window = (src.get("category") or "").strip()
+    nominal_days = 365 if cat_for_window == "questions" else 15
     yaml_value = src.get("since_days") or os.environ.get("AN_SINCE_DAYS") or 0
     try:
         yaml_full = int(yaml_value)
     except (ValueError, TypeError):
         yaml_full = 0
-    since_days_raw = window_days(nominal=15, full=max(yaml_full, 730))
+    since_days_raw = window_days(nominal=nominal_days, full=max(yaml_full, 730))
     since: datetime | None = _utcnow_naive() - timedelta(days=since_days_raw)
     log.info(
-        "%s : filtre date >= %s (fenêtre %s jours, R42-BT)",
+        "%s : filtre date >= %s (fenêtre %s jours, R42-BT/CP)",
         src["id"], since.date().isoformat(), since_days_raw,
     )
 

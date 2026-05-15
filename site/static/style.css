@@ -575,6 +575,32 @@ a:hover { text-decoration: underline; }
   background-color: #f1f5f9;
 }
 
+/* R42-CO (2026-05-15) — Grid 2 colonnes auteur | titre : auteur fixe
+   en colonne gauche (largeur naturelle = `auto`), titre en colonne
+   droite (`1fr` = prend tout l'espace restant). Garantit l'alignement
+   vertical du titre quel que soit l'auteur. Cyril a remonté qu'avant
+   le titre wrappait sous le séparateur « | » sur certains items et
+   restait à droite sur d'autres (incohérent). */
+.qq-row-title {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0;
+  align-items: baseline;
+}
+.qq-row-title__auteur {
+  white-space: nowrap;
+}
+.qq-row-title__titre {
+  /* Le titre prend la colonne droite ; wrap interne si trop long. */
+}
+/* Sur mobile très étroit : on bascule en colonne unique (auteur ligne 1,
+   titre ligne 2) pour éviter que la grid ne tasse l'auteur. */
+@media (max-width: 540px) {
+  .qq-row-title {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* R42-CL : double date question→réponse pour les items dont la réponse
    est publiée (date_reponse != date_question). Permet de voir d'un
    coup d'œil le délai de réponse + signale que l'item ressurgit dans
