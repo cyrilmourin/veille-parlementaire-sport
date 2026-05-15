@@ -95,8 +95,15 @@ _TIME_RE = re.compile(
 )
 
 # "semaine du 20 avril 2026" (tolère espaces multiples, NBSP, fin d'œil)
+# R42-CA (2026-05-15) : accepte aussi la forme intervalle « semaine du 11
+# au 15 mai 2026 ». Cyril 2026-05-15 : « il y a un agenda publié » alors
+# que `last_fetched: 0` côté pipeline_health ; hypothèse principale = le
+# H2 a basculé sur le format intervalle (vu côté min_educ_agenda en
+# parallèle). Le groupe `au DD` est optionnel pour préserver le format
+# historique.
 _WEEK_RE = re.compile(
-    r"semaine\s+du\s+(\d{1,2})\s+([A-Za-zéûôâîÉÛÔÂÎ]+)\s+(\d{4})",
+    r"semaine\s+du\s+(\d{1,2})(?:\s+au\s+\d{1,2})?\s+"
+    r"([A-Za-zéûôâîÉÛÔÂÎ]+)\s+(\d{4})",
     re.IGNORECASE | re.UNICODE,
 )
 
@@ -286,15 +293,22 @@ def _parse_agenda_html(
     soup = BeautifulSoup(html, "lxml")
 
     # 1. Trouver le <h2> contenant « semaine du … »
+    # R42-CA (2026-05-15) : si aucun H2 ne matche, on logge TOUS les H2 vus
+    # (premiers 200 chars chacun) pour faciliter le diag. Sans ça l'opérateur
+    # voit juste « 0 items » et doit faire un fetch manuel.
     h2 = None
+    seen_h2_texts: list[str] = []
     for h in soup.find_all("h2"):
-        if _WEEK_RE.search(h.get_text(" ", strip=True)):
+        txt = h.get_text(" ", strip=True)
+        seen_h2_texts.append(txt[:200])
+        if _WEEK_RE.search(txt):
             h2 = h
             break
     if h2 is None:
         log.warning(
-            "min_sports %s : aucun <h2> avec 'semaine du …' sur %s",
-            sid, agenda_url,
+            "min_sports %s : aucun <h2> avec 'semaine du …' sur %s "
+            "— H2 vus : %r",
+            sid, agenda_url, seen_h2_texts[:10],
         )
         return []
 
@@ -401,10 +415,24 @@ def _parse_agenda_html(
     # Sur la page Drupal actuelle, les <h5> et <p> sont siblings du <h2>
     # dans un conteneur `<div class="sports-gouv-container">`. On
     # itère donc sur `h2.next_siblings` filtrés.
+    # R42-CA (2026-05-15) : si un repackage Drupal wrappe les h5/p dans
+    # un sous-div (ex. `<div class="paragraph">`), `recursive=False` rate
+    # tout silencieusement. On compte les h5 et on bascule en
+    # `recursive=True` (sur l'arbre entier du container) si aucun jour
+    # n'a été détecté en passe 1.
     container = h2.parent
+    children = container.find_all(["h5", "p"], recursive=False)
+    h5_count = sum(1 for el in children if el.name == "h5")
+    if h5_count == 0:
+        log.warning(
+            "min_sports %s : aucun <h5> en enfants directs de %s "
+            "— fallback recursive=True (structure DOM probablement modifiée)",
+            sid, type(container).__name__,
+        )
+        children = container.find_all(["h5", "p"], recursive=True)
     pending_event: dict | None = None
 
-    for el in container.find_all(["h5", "p"], recursive=False):
+    for el in children:
         # Skip tout ce qui précède le H2 (cas improbable — le H2 est en
         # premier). On utilise l'ordre du document : si on a vu au moins
         # un h5 ou si on est après le h2 dans sourceline.
@@ -470,8 +498,20 @@ def _parse_agenda_html(
         day_events.append(pending_event)
     _flush_day()
 
-    log.info(
-        "min_sports %s : %d items normalisés (semaine du %s)",
-        sid, len(items), week_start.date().isoformat(),
-    )
+    # R42-CA (2026-05-15) : si le parse a abouti à 0 items malgré un H2
+    # valide, c'est un signal fort que la structure interne (h5/p) a
+    # changé — on logge WARNING avec compteurs pour pinpointer.
+    if not items:
+        log.warning(
+            "min_sports %s : 0 items malgré H2 valide (semaine du %s) "
+            "— %d enfants scannés. Soit aucun <h5> jour reconnu, "
+            "soit aucun <p><strong>horaire</strong>...</p> détecté. "
+            "Inspecter %s.",
+            sid, week_start.date().isoformat(), len(children), agenda_url,
+        )
+    else:
+        log.info(
+            "min_sports %s : %d items normalisés (semaine du %s)",
+            sid, len(items), week_start.date().isoformat(),
+        )
     return items
