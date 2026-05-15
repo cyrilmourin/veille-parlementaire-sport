@@ -1,6 +1,6 @@
 {
   "stage": "zero_items",
-  "ts": "2026-05-15T10:11:33+00:00",
+  "ts": "2026-05-15T10:48:26+00:00",
   "agenda_url": "https://www.sports.gouv.fr/agenda-previsionnel-de-marina-ferrari-1787",
   "week_start": "2026-05-11",
   "children_scanned": 26,
@@ -8,7 +8,7 @@
   "h5_texts": [],
   "p_count": 26,
   "p_strong_count": 10,
-  "html_length": 77813,
+  "html_length": 77807,
   "seen_h2_texts": [
     "Navigation principale",
     "Agenda prévisionnel de Marina FERRARI, ministre des Sports, de la Jeunesse et de la Vie associative, pour la semaine du 11 mai 2026"
