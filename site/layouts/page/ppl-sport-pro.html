@@ -455,12 +455,17 @@
               "traitement" "#1b3b6f"
               "autre"  "#cbd5e1"
           }}
+          {{/* R42-CZD (2026-05-16) — Cast `int` obligatoire sur les
+               bornes du conic-gradient : `pct` arrive en float64 (JSON
+               Python), donc `printf "%d"` produisait `%!d(float64=45)`
+               → CSS invalide → camembert blanc. `int` force la
+               conversion sans toucher au payload. */}}
           {{ $stops := slice }}
-          {{ $acc := 0 }}
+          {{ $acc := 0.0 }}
           {{ range $sort.buckets }}
             {{ $next := add $acc .pct }}
             {{ $col := index $color_map .class }}
-            {{ $stops = $stops | append (printf "%s %d%% %d%%" $col $acc $next) }}
+            {{ $stops = $stops | append (printf "%s %d%% %d%%" $col (int $acc) (int $next)) }}
             {{ $acc = $next }}
           {{ end }}
           {{/* R42-CT (2026-05-15) — `safeCSS` obligatoire : Hugo
