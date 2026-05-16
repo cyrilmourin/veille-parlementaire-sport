@@ -177,18 +177,19 @@ def _parse_texte_version(xml_bytes: bytes) -> dict | None:
     # Le conteneur <TEXTE> regroupe <VISAS> + <ARTICLE>+ (+ parfois <NOTA>,
     # <SIGNATAIRES>). itertext() préserve l'ordre visuel.
     #
-    # R42-CY (2026-05-15) — Cape 3000 → 8000 chars. Cas remonté par Cyril :
-    # décret « Ordre national du Mérite » avec contingent sport. Les
-    # contingents ministériels sont énumérés par ordre alphabétique des
-    # ministères ; le ministère des Sports apparaît typiquement après la
-    # 2000-3000e position dans le décret (Affaires étrangères → Agriculture
-    # → Armées → … → Sports). Avec un cap à 3000 chars, le matcher ne voyait
-    # JAMAIS la section « Au titre du ministère des sports » et le décret
-    # tombait dans R41-I (`nomination_event` seul → filtré). Cape alignée
-    # sur celle de `_index_articles_by_cid` (8000 chars).
+    # R42-CY (2026-05-15) — Cape 3000 → 8000 chars.
+    # R42-CZ (2026-05-16) — Cape uniforme 8000 → 300 000 chars pour JORF.
+    # Cas confirmé sur JORFTEXT000054103548 (« Décret du 15 mai 2026
+    # portant promotion et nomination dans l'ordre national du Mérite »)
+    # où le « Ministère des sports » apparaît à la position ~208 000c
+    # (26× la cape R42-CY). Décision Cyril : approche simple et globale
+    # plutôt que détection conditionnelle par titre — cape uniforme à
+    # 300 000c (équivalent CR plénier AN), compensée par une fenêtre
+    # d'ingestion JORF réduite à 48h (cf. `fetch_source` plus bas) pour
+    # garder le coût matching et le poids DB stables.
     texte_el = _find(root, ".//TEXTE", ".//CORPS")
-    body_full = _collect_inner_text(texte_el, max_len=10000)
-    body_head = body_full[:8000]
+    body_full = _collect_inner_text(texte_el, max_len=302_000)
+    body_head = body_full[:300_000]
 
     # URL Legifrance publique
     url = f"https://www.legifrance.gouv.fr/jorf/id/{id_text}"
@@ -273,27 +274,41 @@ def _index_articles_by_cid(tarball_bytes: bytes) -> dict[str, str]:
                 continue
             # Corps : <BLOC_TEXTUEL><CONTENU> — contient des <p>, <br/> et
             # parfois des listes <ul>/<li>. itertext() aplatit en texte brut.
+            # R42-CZ (2026-05-16) — Cape individuelle 8000 → 300 000c pour
+            # absorber les décrets « Ordre national du Mérite » / « Légion
+            # d'honneur » dont l'article 1 énumère plusieurs centaines de
+            # récipiendaires (corps ~200 Ko, cf. JORFTEXT000054103548 du
+            # 15 mai 2026). Les arrêtés courts gardent leur taille
+            # naturelle bien inférieure → coût RAM marginal.
             bloc = root.find(".//BLOC_TEXTUEL/CONTENU")
-            body_txt = _collect_inner_text(bloc, max_len=8000)
+            body_txt = _collect_inner_text(bloc, max_len=300_000)
             if not body_txt:
                 continue
             by_cid.setdefault(cid, []).append(body_txt)
-    # Concatène par cid et cape à 8000 c
+    # R42-CZ : concatène par cid et cape à 300 000c (vs 8000c en R42-CY).
+    # Le consommateur dans `fetch_source` arbitre ensuite si le décret a
+    # besoin de toute la longueur (décret de promotion identifié par le
+    # titre) ou si on retombe à 8000c pour les arrêtés courants.
     out: dict[str, str] = {}
     for cid, parts in by_cid.items():
         merged = " ".join(parts)
-        out[cid] = merged[:8000]
+        out[cid] = merged[:300_000]
     return out
 
 
 def fetch_source(src: dict) -> list[Item]:
     # R42-BT (2026-05-13) — Fenêtre INGESTION nominal vs full pour les
     # dumps quotidiens JORF. `days_back` compte le nombre d'éditions
-    # (2/jour typiquement, donc 30 éd = ~15 jours). Nominal=30 (15j),
-    # full=YAML ou défaut 60 (~30j) pour reset profond.
+    # (2/jour typiquement, donc 4 éd ≈ 48h, 60 éd ≈ 30j).
+    # R42-CZ (2026-05-16) — Cyril : fenêtre nominale 15j → 48h, en
+    # contrepartie de la cape body 8000c → 300 000c (cf. parse). Décrets
+    # JORF publiés quotidiennement, le daily.yml tourne 1×/jour : 48h
+    # offre une marge d'1 jour si un run saute. Le coût matching/DB
+    # reste stable (~4 éditions × cape large = comparable à 30 éditions
+    # × cape étroite).
     from ..run_mode import window_days
     yaml_full = int(src.get("days_back") or 0)
-    days_back = window_days(nominal=30, full=max(yaml_full, 60))
+    days_back = window_days(nominal=4, full=max(yaml_full, 60))
     dumps = _list_recent_dumps(n=days_back)
     if not dumps:
         log.warning("DILA JORF : aucun dump récent trouvé")
@@ -324,13 +339,14 @@ def fetch_source(src: dict) -> list[Item]:
             # (cas ultra-majoritaire : le TEXTE_VERSION ne contient que
             # des <CONTENU/> vides), on prend le corps des fichiers
             # ARTICLE rattachés via le cid.
-            # R42-CY (2026-05-15) — Cape 3000 → 8000 chars (cf. cas
-            # « Ordre national du Mérite » contingent sport en milieu
-            # de décret).
+            # R42-CY (2026-05-15) — Cape 3000 → 8000 chars.
+            # R42-CZ (2026-05-16) — Cape uniforme 300 000c (idem
+            # `_parse_texte_version` ci-dessus). Compensé par la fenêtre
+            # d'ingestion JORF réduite à 48h (~4 éditions DILA).
             if not info.get("body_head"):
                 article_body = articles_by_cid.get(info["id"], "")
                 if article_body:
-                    info["body_head"] = article_body[:8000]
+                    info["body_head"] = article_body[:300_000]
 
             # Catégorisation : nomination si le titre OU le corps le suggère.
             # On élargit le pattern pour capter aussi : "portant nomination",
