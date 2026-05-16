@@ -149,17 +149,20 @@ def test_an_rapports_max_pages_full_yaml(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_dila_jorf_days_back_dynamic():
+    # R42-CZ (2026-05-16) — Fenêtre nominale JORF passée de 30 à 4
+    # éditions (15j → 48h) en contrepartie de la cape body 8000c →
+    # 300 000c. Cf. test_r42cz_jorf_promotion_decret.
     code = (_ROOT / "src/sources/dila_jorf.py").read_text(encoding="utf-8")
-    assert "window_days(nominal=30, full=max(yaml_full, 60))" in code
+    assert "window_days(nominal=4, full=max(yaml_full, 60))" in code
 
 
-def test_dila_nominal_30_eq_15_jours(monkeypatch):
-    """30 éditions JORF ≈ 15 jours (2 éditions/jour). Aligné avec la
-    règle R42-BT pour les autres sources."""
+def test_dila_nominal_4_eq_48h(monkeypatch):
+    """R42-CZ : 4 éditions JORF ≈ 48h (2 éditions/jour). Marge d'un
+    jour si un daily.yml saute."""
     monkeypatch.delenv("RUN_MODE", raising=False)
     from src.run_mode import window_days
-    yaml_full = 16  # ancienne valeur YAML
-    assert window_days(nominal=30, full=max(yaml_full, 60)) == 30
+    yaml_full = 16
+    assert window_days(nominal=4, full=max(yaml_full, 60)) == 4
 
 
 def test_dila_full_rouvre_60(monkeypatch):
@@ -167,4 +170,4 @@ def test_dila_full_rouvre_60(monkeypatch):
     from src.run_mode import window_days
     yaml_full = 16
     # full → max(16, 60) = 60 éditions ≈ 30 jours
-    assert window_days(nominal=30, full=max(yaml_full, 60)) == 60
+    assert window_days(nominal=4, full=max(yaml_full, 60)) == 60
