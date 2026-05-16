@@ -15,6 +15,27 @@ acteur:
   - Ministère des sports
   - Ministere des sports
   - Ministère des sport        # variante observée dans le doc utilisateur
+  # R42-CY (2026-05-15) — Variantes JORF des contingents et signatures de
+  # décrets de nomination / promotion (Ordre national du Mérite, Légion
+  # d'honneur). Cas remonté par Cyril : décret Ordre national du Mérite
+  # avec contingent sport invisible parce que le corps mentionne « Au
+  # titre du ministère des sports » dans une formulation que les keywords
+  # historiques ne capturaient pas (en plus du cap haystack à 3000 chars).
+  - Au titre du ministère des sports
+  - Au titre du ministère des Sports
+  - Au titre du ministre des sports
+  - Contingent du ministère des sports
+  - Contingent du ministre des sports
+  - Contingent du ministère chargé des sports
+  - Ministère chargé des sports
+  - Ministre chargé des sports
+  - Ministre déléguée chargée des sports
+  - Ministre délégué chargé des sports
+  - Secrétaire d'État chargé des sports
+  - Secrétaire d'État chargée des sports
+  - Secrétariat d'État chargé des sports
+  - Secrétariat d'État aux sports
+  - Secrétaire d'État aux sports
   - Mouvement sportif
   - CNOSF
   - Comité national olympique
