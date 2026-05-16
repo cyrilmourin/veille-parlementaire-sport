@@ -89,9 +89,15 @@
              item matche une des PPL spéciales (Sport pro DLR5L17N51732
              OU Équipements DLR5L17N54138). Évite le hardcode par
              dossier_id côté template. */}}
-        {{ $specialUrl := .Params.special_page_url }}
+        {{/* R42-CZH (2026-05-16) — Fix bug `ne $specialUrl ""` retournait
+             `true` quand .Params.special_page_url était nil (clé absente
+             du frontmatter), faisant basculer TOUS les dosleg
+             non-spéciaux sur $linkUrl=nil → titre rendu en <span> sans
+             lien vers AN/Sénat. Fix : `| default ""` force le type
+             string pour la comparaison. */}}
+        {{ $specialUrl := .Params.special_page_url | default "" }}
         {{ $isSpecialPpl := ne $specialUrl "" }}
-        {{ $linkUrl := .Params.source_url }}
+        {{ $linkUrl := .Params.source_url | default "" }}
         {{ $linkAttrs := `rel="noopener" target="_blank"` }}
         {{ if $isSpecialPpl }}
           {{ $linkUrl = $specialUrl }}
