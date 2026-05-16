@@ -29,31 +29,10 @@
 </a>
 
 {{/* R42-D-ter (2026-05-10) — Bloc « Suivre sur LinkedIn ».
-     Tentative initiale via le widget officiel `IN/FollowCompany`
-     ABANDONNÉE : LinkedIn a retiré l'endpoint widget en 2018-2020,
-     le script `in.js` est servi mais peuple un iframe vide (HTTP 404
-     vérifié sur /cws/company/profile?id=112297133 le 2026-05-10).
-     On bascule sur un bouton custom INLINE après les ":" — le clic
-     ouvre la page entreprise en nouvel onglet ; le bouton « Suivre »
-     LinkedIn est immédiatement visible en haut à droite de la page
-     entreprise (1 clic supplémentaire vs widget natif, mais résultat
-     fonctionnel garanti).
-     Charte : texte d'accroche en crème + Montserrat 900 (cf. card
-     Recherche), bouton bleu LinkedIn officiel `#0A66C2` pour la
-     reconnaissance visuelle. */}}
-<div class="side-card side-card--follow">
-  <p class="side-follow-text">
-    Si vous appréciez cette veille,<br/>suivez-nous&nbsp;:
-    <a class="side-follow-btn" href="https://www.linkedin.com/company/sideline-conseil/"
-       target="_blank" rel="noopener"
-       aria-label="Suivre Sideline Conseil sur LinkedIn (nouvel onglet)">
-      <svg class="side-follow-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path fill="currentColor" d="M20.45 20.45h-3.55v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.36V9h3.41v1.56h.05c.47-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zm1.78 13.02H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/>
-      </svg>
-      <span class="side-follow-label">Suivre</span>
-    </a>
-  </p>
-</div>
+     R42-CZC (2026-05-16) : retiré de l'affichage temporairement à la
+     demande de Cyril (« on ne l'affiche plus nulle part »). Le code
+     historique avec le bouton LinkedIn `#0A66C2` est conservé dans
+     git (commit pré-R42-CZC) pour une éventuelle réactivation. */}}
 
 {{/* R41-AJ (2026-05-09) : Recherche AVANT Spécial PPL Sport pro
      (demande Cyril). Ordre final sidebar : Sideline → Recherche →
@@ -84,6 +63,10 @@
   {{ partial "special_ppl_sidebar.html" . }}
 {{ end }}
 
+{{/* R42-CZC (2026-05-16) — Module Agenda : limité à 4 items (vs 8
+     historique) et masqué sur la page Agenda elle-même (doublon avec
+     la liste centrale). Détection via `.Type == "agenda"`. */}}
+{{ if ne .Type "agenda" }}
 <div class="side-card side-card--agenda">
   <h3 class="side-title">Agenda</h3>
   <p class="side-caption">Prochains rendez-vous institutionnels</p>
@@ -122,3 +105,56 @@
     <p class="side-empty">Pas de rendez-vous institutionnel à venir.</p>
   {{ end }}
 </div>
+{{ end }}
+
+{{/* R42-CZC (2026-05-16) — Module « Dernières publications » :
+     5 plus récents items, contextuel à la page.
+     - home / pages spéciales (PPL Sport pro, Équipements) → bucket « all »
+       (toutes catégories mélangées).
+     - page de listing d'une catégorie (.Type ∈ catégories veille) → bucket
+       de la catégorie correspondante.
+     - page « publications » (.Type == "communiques") → MASQUÉ (doublon
+       avec la liste principale).
+     Le data file `sidebar_pub_<cat>.json` est produit par
+     `src/site_export.py` (R42-CZC). */}}
+{{ $pubKey := "" }}
+{{ $pubLink := "" }}
+{{ $pubLabel := "Dernières publications" }}
+{{ if .IsHome }}
+  {{ $pubKey = "all" }}
+  {{ $pubLink = "/" }}
+{{ else if in (slice "dossiers_legislatifs" "amendements" "questions" "comptes_rendus" "agenda" "jorf" "nominations") .Type }}
+  {{ $pubKey = .Type }}
+  {{ $pubLink = printf "/items/%s/" .Type }}
+{{ else if or (eq .Layout "ppl-sport-pro") (eq .Layout "ppl-partenariats-equipements") }}
+  {{ $pubKey = "all" }}
+  {{ $pubLink = "/" }}
+{{ end }}
+{{ with $pubKey }}
+  {{ $data := index site.Data (printf "sidebar_pub_%s" .) }}
+  {{ if $data }}
+  <div class="side-card side-card--pub">
+    <h3 class="side-title">{{ $pubLabel }}</h3>
+    <p class="side-caption">5 dernières entrées</p>
+    <ul class="side-list">
+      {{ range $data }}
+        <li class="side-item" data-chamber="{{ .chamber }}">
+          <div class="side-date">
+            {{ if .published_at }}
+              <time datetime="{{ substr .published_at 0 10 }}">
+                {{ dateFormat "02/01" (time.AsTime (substr .published_at 0 10)) }}
+              </time>
+            {{ end }}
+          </div>
+          <div class="side-body">
+            {{ with .chamber }}<span class="chamber side-chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }} <a href="{{ .url }}" class="side-title-link" title="{{ .title }}" target="_blank" rel="noopener">{{ .title }}</a>
+          </div>
+        </li>
+      {{ end }}
+    </ul>
+    {{ with $pubLink }}
+      <p class="side-more"><a href="{{ . }}">Voir plus &rarr;</a></p>
+    {{ end }}
+  </div>
+  {{ end }}
+{{ end }}

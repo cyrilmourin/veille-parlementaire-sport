@@ -3744,11 +3744,14 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
         encoding="utf-8",
     )
 
-    # Sidebar agenda : 8 prochains rendez-vous (futurs ou du jour),
+    # Sidebar agenda : 4 prochains rendez-vous (futurs ou du jour),
     # consommés par layouts/index.html pour afficher un module latéral.
     # On repart de by_cat["agenda"] déjà constitué et on filtre sur les
     # dates à venir. Si rien dans le futur (collecte en retard), on retombe
-    # sur les 8 items les plus récents pour garder le module alimenté.
+    # sur les 4 items les plus récents pour garder le module alimenté.
+    # R42-CZC (2026-05-16) — limite ramenée de 8 à 4 (demande Cyril :
+    # le module agenda partage désormais l'espace avec « Dernières
+    # publications » sur la sidebar).
     today_iso = datetime.utcnow().date().isoformat()
     agenda_rows = by_cat.get("agenda", [])
     upcoming = sorted(
@@ -3756,10 +3759,10 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
         key=lambda r: (r.get("published_at") or ""),
     )
     if not upcoming:
-        # Fallback : 8 plus récents (tous dans le passé mais mieux que vide).
-        upcoming = _sort_by_date_desc(agenda_rows)[:8]
+        # Fallback : 4 plus récents (tous dans le passé mais mieux que vide).
+        upcoming = _sort_by_date_desc(agenda_rows)[:4]
     else:
-        upcoming = upcoming[:8]
+        upcoming = upcoming[:4]
     # R17 (2026-04-22) : le cartouche chamber (badge "MINSPORTS") est affiché
     # à côté du titre dans la sidebar — pas besoin de répéter « MinSports — »
     # en tête du titre. Idem pour toute autre chambre qui se retrouverait
@@ -3780,6 +3783,59 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     upcoming = [_strip_chamber_prefix_tit(r) for r in upcoming]
     (data / "sidebar_agenda.json").write_text(
         json.dumps(upcoming, ensure_ascii=False, indent=2, default=str),
+        encoding="utf-8",
+    )
+
+    # R42-CZC (2026-05-16) — Module sidebar « Dernières publications ».
+    # Pour chaque catégorie pertinente, on génère `sidebar_pub_<cat>.json`
+    # avec les 5 items les plus récents (tri date publication desc, avec
+    # fallback inserted_at via _sort_by_date_desc). Plus un fichier `all`
+    # qui rassemble les 5 plus récents toutes catégories confondues —
+    # consommé par la home et les pages spéciales (PPL Sport pro,
+    # Équipements). La page « publications » (= communiques) est
+    # volontairement absente du module : pas de doublon avec la liste
+    # principale.
+    _SIDEBAR_PUB_CATS = (
+        "dossiers_legislatifs",
+        "amendements",
+        "questions",
+        "comptes_rendus",
+        "agenda",
+        "jorf",
+        "nominations",
+    )
+    _SIDEBAR_PUB_LIMIT = 5
+
+    def _strip_for_sidebar(rows_in: list[dict]) -> list[dict]:
+        out_rows = []
+        for r in rows_in:
+            r2 = _strip_chamber_prefix_tit(r)
+            out_rows.append({
+                "title": r2.get("title") or "",
+                "url": r2.get("url") or "",
+                "published_at": r2.get("published_at") or "",
+                "chamber": r2.get("chamber") or "",
+                "category": r2.get("category") or "",
+            })
+        return out_rows
+
+    for _cat in _SIDEBAR_PUB_CATS:
+        _items = _sort_by_date_desc(by_cat.get(_cat, []))[:_SIDEBAR_PUB_LIMIT]
+        (data / f"sidebar_pub_{_cat}.json").write_text(
+            json.dumps(_strip_for_sidebar(_items), ensure_ascii=False,
+                       indent=2, default=str),
+            encoding="utf-8",
+        )
+
+    # Mix toutes catégories (sauf `communiques` qui est précisément la
+    # page « Publications » sur laquelle on ne veut pas afficher le module)
+    _mix_pool = []
+    for _cat in _SIDEBAR_PUB_CATS:
+        _mix_pool.extend(by_cat.get(_cat, []))
+    _mix_top = _sort_by_date_desc(_mix_pool)[:_SIDEBAR_PUB_LIMIT]
+    (data / "sidebar_pub_all.json").write_text(
+        json.dumps(_strip_for_sidebar(_mix_top), ensure_ascii=False,
+                   indent=2, default=str),
         encoding="utf-8",
     )
 
