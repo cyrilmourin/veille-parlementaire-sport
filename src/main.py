@@ -232,7 +232,18 @@ def run(since_days: int = 1, send: bool = True, verbose: bool = False) -> int:
         if ok:
             log.info("Email envoyé à %s", DEFAULT_TO)
         else:
-            log.warning("SMTP non configuré, email non envoyé (html dispo : %s)", DIGEST_OUT)
+            # R42-DA (2026-05-16) — log plus parlant : on indique quels
+            # secrets sont absents pour faciliter le diag GHA. Le fichier
+            # `data/email_status.json` (écrit par `send_email`) liste
+            # aussi cette info pour inspection depuis le repo.
+            import os as _os
+            missing = [n for n in ("SMTP_HOST", "SMTP_USER", "SMTP_PASS")
+                       if not _os.environ.get(n)]
+            log.warning(
+                "SMTP non configuré (manquants : %s), email non envoyé "
+                "(html dispo : %s, diag : data/email_status.json)",
+                ",".join(missing) if missing else "?", DIGEST_OUT,
+            )
     else:
         log.info("Envoi désactivé (--no-email)")
 
