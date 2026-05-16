@@ -182,24 +182,91 @@ def send_email(html: str, subject: str, to: str) -> bool:
     """Envoie via SMTP (variables d'environnement SMTP_HOST/PORT/USER/PASS/FROM).
 
     Retourne False si les credentials ne sont pas configurés.
+
+    R42-DA (2026-05-16) — Écrit aussi un fichier `data/email_status.json`
+    pour diagnostiquer depuis le repo (sans accès aux logs GHA gatés
+    derrière auth). Cyril 2026-05-16 : « depuis des semaines je ne
+    reçois de mail qu'en cas d'échec d'un run, jamais sinon ». Symptôme :
+    le digest tombe silencieusement parce que `send_email` retourne
+    False (credentials manquants) ou lève une exception non capturée.
+    Pattern de diag inspiré de R42-CB (`min_sports_debug.json`).
     """
     host = os.environ.get("SMTP_HOST")
     port = int(os.environ.get("SMTP_PORT", "587"))
     user = os.environ.get("SMTP_USER")
     pwd = os.environ.get("SMTP_PASS")
     sender = os.environ.get("SMTP_FROM", user or "veille@sideline-conseil.fr")
-    if not host or not user or not pwd:
+    # Bool de présence par secret — diag ciblé sans jamais exposer la valeur.
+    missing = [
+        name for name, val in (
+            ("SMTP_HOST", host),
+            ("SMTP_USER", user),
+            ("SMTP_PASS", pwd),
+        ) if not val
+    ]
+    if missing:
+        _write_email_status(
+            stage="not_configured",
+            missing=missing,
+            to=to or "",
+            host=host or "",
+            sender=sender or "",
+        )
         return False
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = sender
-    msg["To"] = to
-    msg.attach(MIMEText(html, "html", "utf-8"))
-    with smtplib.SMTP(host, port) as s:
-        s.starttls()
-        s.login(user, pwd)
-        s.sendmail(sender, [to], msg.as_string())
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = sender
+        msg["To"] = to
+        msg.attach(MIMEText(html, "html", "utf-8"))
+        with smtplib.SMTP(host, port) as s:
+            s.starttls()
+            s.login(user, pwd)
+            s.sendmail(sender, [to], msg.as_string())
+    except Exception as e:
+        # On capture, on diagnostique, on relève — le run échoue, GHA notifie
+        # « workflow failed » et Cyril sait qu'il y a un problème SMTP.
+        # Sans cette branche, l'exception passait inchangée mais aucun fichier
+        # diag ne traçait l'erreur dans le repo (cf. R42-DA).
+        _write_email_status(
+            stage="send_failed",
+            error_type=type(e).__name__,
+            error_msg=str(e)[:300],
+            to=to or "",
+            host=host or "",
+            sender=sender or "",
+        )
+        raise
+    _write_email_status(
+        stage="ok",
+        to=to or "",
+        host=host or "",
+        sender=sender or "",
+        subject_len=len(subject or ""),
+        html_len=len(html or ""),
+    )
     return True
+
+
+def _write_email_status(**kwargs) -> None:
+    """R42-DA (2026-05-16) — Snapshot diagnostic d'envoi mail dans
+    `data/email_status.json`. Permet à Cyril de vérifier depuis le
+    repo (post-push veille-bot) si le digest est bien parti. Stages :
+    `ok` (envoyé), `not_configured` (secrets manquants),
+    `send_failed` (SMTP a levé). N'expose JAMAIS de valeurs sensibles
+    (password, contenu du mail) — uniquement les noms de secrets
+    manquants et le type d'erreur."""
+    from datetime import datetime as _dt
+    import json as _json
+    from pathlib import Path as _Path
+    payload = {
+        "ts": _dt.utcnow().isoformat(timespec="seconds") + "Z",
+        **kwargs,
+    }
+    out = _Path("data/email_status.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(_json.dumps(payload, ensure_ascii=False, indent=2),
+                   encoding="utf-8")
 
 
 def save_html(html: str, path: str | Path):
