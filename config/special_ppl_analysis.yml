@@ -28,9 +28,22 @@
 
 special_ppl:
   commission:
-    date_examen: ""
+    date_examen: "12-13 mai 2026"
     auteur: ""
-    texte: ""
+    texte: |
+      La commission Culture a examiné la PPL Sport pro les 12 et 13 mai 2026 et adopté le texte sous la forme TC 2797. Une cinquantaine d'amendements ont été retenus, dominés par un effort de clarification rédactionnelle (rapporteurs) et complétés par une série d'apports substantiels sur quatre axes.
+
+      **Gouvernance des ligues professionnelles (article 1er).** AC271 (Riotton, EPR) ouvre explicitement deux options aux fédérations : une ligue unique gérant concomitamment les secteurs masculin et féminin, ou deux ligues distinctes. AC297 (Belhaddad, SOC) encadre les ligues sans personnalité juridique distincte via un règlement spécifique défini par décret. AC275 (Riotton, EPR) précise les incompatibilités liées aux paris sportifs avec références législatives explicites.
+
+      **Gouvernance démocratique des fédérations (article 1er A).** Les sportifs et entraîneurs professionnels obtiennent une voix délibérative dans les instances fédérales — convergence transpartisane (AC125 Bodart LIOT, AC58 Duby-Muller DR, AC29 Courbon SOC). AC178 (Duparay, DR) étend ces règles de gouvernance démocratique à toutes les fédérations agréées tout en maintenant le plafond de 25 % des voix pour les clubs professionnels. AC177 (Duparay, DR) déplace le veto financier de l'assemblée générale vers la DNCG. AC94 (Bodart, LIOT) introduit une représentation équilibrée femmes-hommes dans les organes dirigeants.
+
+      **Honorabilité et contrôle (articles 1er AA et 1er TER).** AC234 et AC240 (Duparay, DR) instaurent un contrôle annuel des incapacités des dirigeants au titre de l'article L. 212-9. AC235 et AC242 (Duparay, DR) — amendements d'appel — étendent l'obligation d'honorabilité aux salariés des fédérations et des ligues. AC236 réintroduit l'obligation de déclaration pour les exploitants d'établissements d'activités physiques et sportives.
+
+      **Solidarité financière sport pro / sport amateur (article 1er C).** AC298 (Belhaddad, SOC) affirme le principe de solidarité entre sport professionnel et amateur au sein même de la convention de subdélégation. AC293 (Belhaddad, SOC) impose aux fédérations de veiller à la solidarité entre secteurs masculin et féminin, avec contrôle des conditions financières.
+
+      **Subdélégation et dissolution des ligues (article 2).** AC60 (Duby-Muller, DR) durcit le critère de retrait de subdélégation, qui doit désormais « mettre en péril l'exécution de la mission de service public ». AC135 (Lingemann, DEM) impose au ministre une approbation motivée et une phase contradictoire avant tout retrait. AC249 supprime le pouvoir ministériel de donner force exécutoire à une convention propre ; AC248 soumet le projet de convention aux conseils d'administration plutôt qu'aux assemblées générales ; AC251 fixe à trois mois après la fin de la médiation le délai de dissolution d'une ligue ; AC266 garantit la neutralité juridique, comptable et fiscale du transfert de patrimoine d'une ligue dissoute.
+
+      **Coordination JO 2030 (article 1er B).** AC179 (Duparay, DR) coordonne le texte avec la loi 2026-201 sur la mise à disposition des joueurs pour les Jeux olympiques et paralympiques.
   seance:
     date_examen: ""
     auteur: ""

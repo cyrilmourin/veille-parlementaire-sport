@@ -261,6 +261,20 @@
   .ppl-v3-analysis__body p { margin: 0 0 10px; }
   .ppl-v3-analysis__body p:last-child { margin-bottom: 0; }
   .ppl-v3-analysis__body em { color: #475569; }
+  /* R42-CZA (2026-05-16) — Fold dépliable de la synthèse commission. */
+  .ppl-v3-analysis__more { margin-top: 4px; }
+  .ppl-v3-analysis__more > summary {
+    cursor: pointer; font-size: 12px; font-weight: 600;
+    color: #1b3b6f; padding: 6px 0; list-style: none;
+    user-select: none;
+  }
+  .ppl-v3-analysis__more > summary::-webkit-details-marker { display: none; }
+  .ppl-v3-analysis__more > summary::before {
+    content: "▸ "; display: inline-block; transition: transform 0.15s;
+  }
+  .ppl-v3-analysis__more[open] > summary::before { content: "▾ "; }
+  .ppl-v3-analysis__more > summary:hover { color: #122549; text-decoration: underline; }
+  .ppl-v3-analysis__more > p { margin-top: 8px; }
 
   .ppl-v3-wordcloud { background: white; border-radius: 10px; padding: 22px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 20px; }
   .ppl-v3-wordcloud__sub { font-size: 11px; color: #94a3b8; margin-bottom: 14px; font-style: italic; }
@@ -365,13 +379,27 @@
           <div class="ppl-v3-analysis__body">
             {{/* Markdown light : on remplace les doubles retours par
                  une nouvelle balise <p> (les paragraphes YAML pipe-style
-                 sont séparés par des lignes vides). */}}
+                 sont séparés par des lignes vides). R42-CZA (2026-05-16) :
+                 fold après les 2 premiers paragraphes — le reste dans un
+                 <details> dépliable « Lire la suite ». */}}
             {{ $paragraphs := split .texte "\n\n" }}
+            {{ $clean := slice }}
             {{ range $paragraphs }}
-              {{ $cleaned := trim . " \n\t" }}
-              {{ if $cleaned }}
-                <p>{{ $cleaned | markdownify }}</p>
+              {{ $c := trim . " \n\t" }}
+              {{ if $c }}{{ $clean = $clean | append $c }}{{ end }}
+            {{ end }}
+            {{ $head := first 2 $clean }}
+            {{ $tail := after 2 $clean }}
+            {{ range $head }}
+              <p>{{ . | markdownify }}</p>
+            {{ end }}
+            {{ if $tail }}
+            <details class="ppl-v3-analysis__more">
+              <summary>Lire la suite ({{ len $tail }} paragraphe{{ if gt (len $tail) 1 }}s{{ end }})</summary>
+              {{ range $tail }}
+                <p>{{ . | markdownify }}</p>
               {{ end }}
+            </details>
             {{ end }}
           </div>
         </div>
