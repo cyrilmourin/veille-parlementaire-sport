@@ -98,7 +98,27 @@ def migrate_items(conn: sqlite3.Connection) -> list[str]:
             added.append(name)
     for idx_sql in MIGRATION_INDEXES:
         conn.execute(idx_sql)
+    # R42-CZB (2026-05-16) — Backfill `last_seen_at` pour les items
+    # legacy (NULL). Le filtre `_filter_stale_agenda_items` (R42-CY)
+    # ne fonctionne pas tant que les items ont `last_seen_at IS NULL`
+    # parce que la branche « safe legacy » les conserve. Ici on impose
+    # un timestamp fondé sur `inserted_at` : les items réellement vivants
+    # seront refreshés à `now()` au prochain `upsert_many`, mais les
+    # orphelins garderont la valeur ancienne d'inserted_at → tomberont
+    # immédiatement sous la fenêtre 2j. Idempotent : no-op s'il n'y a
+    # plus de NULL.
+    if "last_seen_at" in _existing_columns(conn, "items"):
+        conn.execute(
+            "UPDATE items SET last_seen_at = COALESCE(inserted_at, "
+            "datetime('now', '-7 days')) "
+            "WHERE last_seen_at IS NULL OR last_seen_at = ''"
+        )
     if added:
+        conn.commit()
+    else:
+        # Le backfill peut avoir modifié des rows sans qu'un ALTER soit
+        # survenu : commit aussi dans ce cas (sinon les changements
+        # restent en mémoire jusqu'au prochain commit explicite).
         conn.commit()
     return added
 
