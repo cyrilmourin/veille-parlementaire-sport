@@ -47,6 +47,10 @@ Concurrence : `concurrency: group: veille-daily, cancel-in-progress: false` — 
 
 Auto-deploy Pages via `actions/deploy-pages@v4`. Le workflow commit en fin de job les caches `data/amo_resolved.json`, `data/an_texte_to_dossier.json` et `data/last_digest.html`.
 
+**Protections repo (R42-DB, 2026-05-16)** :
+- Settings → General → Pull Requests → **Automatically delete head branches** : ON. Les branches `claude/...` sont supprimées automatiquement à chaque merge de PR.
+- Settings → Rules → ruleset **`Protect main`** (Active, target = default branch, bypass vide) avec 3 règles : `Restrict deletions`, `Block force pushes`, `Require linear history`. **PAS** de `Require pull request before merging` — sinon le `veille-bot` ne pourrait plus pusher ses `chore: snapshot digest` quotidiens. Ne JAMAIS cocher cette case sans avoir ajouté `veille-bot` (ou `github-actions[bot]`) à la bypass list.
+
 ### Ce qui tourne en prod (2026-04-26 après R39-A → R39-M poussés)
 
 - **Titre du site** : `Veille Institutionnelle Sport` (majuscule à « Institutionnelle » depuis R22g+h bis). Aligné sur `site/hugo.toml` (title HEAD / onglet navigateur), `site/layouts/partials/header.html` (brand-title) et `site_export.py` (frontmatter home).
@@ -266,6 +270,26 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 ---
 
 ## Historique
+
+- 2026-05-16 (matin, retour Cyril) : **R42-DB — Protection de `main` + auto-delete head branches** (opération GitHub, pas de code modifié).
+
+  Cyril 2026-05-16 : « ok supprime toutes les branches obsolètes et prévoit leur suppression automatique. D'ailleurs faut-il protéger main d'une quelconque manière ? ».
+
+  **Auto-delete head branches** activé (Settings → General → Pull Requests). À chaque merge de PR, GitHub supprime la branche source. Sans effet de bord pour `veille-bot` (qui push direct sur `main`, jamais via PR). Évite l'accumulation de branches `claude/...` mortes après merge.
+
+  **Branch ruleset `Protect main`** créé (Settings → Rules → New branch ruleset) :
+  - Enforcement status : **Active**
+  - Target branches : **Include default branch** (suit `main` même renommé)
+  - Bypass list : **vide** (pas d'exception)
+  - Rules cochées :
+    - ✅ **Restrict deletions** — empêche `git push --delete origin main` et la suppression via UI.
+    - ✅ **Block force pushes** — empêche `git push --force origin main` qui réécrirait l'historique.
+    - ✅ **Require linear history** — refuse les merge commits, force squash ou rebase (sans effet pratique vu qu'on squash déjà via PR, mais protège contre une dérive).
+  - Rules **NON cochées** : « Require a pull request before merging » (laissée OFF pour ne pas casser les push direct du `veille-bot` `chore: snapshot digest YYYY-MM-DD` à chaque run daily.yml — c'est une condition opérationnelle critique du pipeline).
+
+  **Branches obsolètes supprimées** : `claude/fix-ppl-sport-pro-page-jERwN`, `claude/jorf-promotion-decret-cap-r42cz`, `claude/jorf-r42cz-rebased`, `claude/email-status-diag-r42da` (toutes mergées ou fermées).
+
+  Test de validation conseillé : `git push --force origin main` doit retourner `remote: Cannot force-push to this branch`.
 
 - 2026-05-16 (matin, retour Cyril) : **R42-CY — Détection items agenda orphelins (`last_seen_at`)**.
 
