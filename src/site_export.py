@@ -2118,6 +2118,55 @@ def _filter_stale_agenda_items(rows: list[dict]) -> list[dict]:
     return kept
 
 
+# R42-CZG (2026-05-16) — États de réunion AN considérés comme non
+# confirmés. Ces items existent dans le dump Agenda.json.zip mais ne
+# représentent pas des rendez-vous fermes :
+#   - "Eventuel" : convocation prévisionnelle, AN n'a pas confirmé la
+#     tenue. C'est le cas observé sur RUANR5L17S2026IDC460094 (séance
+#     18/05/2026 PPL Sport pro, `cycleDeVie.etat = "Eventuel"`).
+#   - "Reportée" / "Annulée" : déjà filtrés en aval pour la page PPL
+#     (R42-CX dans `special_ppl.collect_special_ppl`), mais doivent
+#     aussi disparaître de l'agenda public général.
+_AGENDA_NON_CONFIRMED_ETATS = ("eventuel", "report", "annul")
+
+
+def _filter_provisional_agenda_items(rows: list[dict]) -> list[dict]:
+    """R42-CZG (2026-05-16) — Masque les items agenda dont l'AN ne
+    confirme pas la tenue (`raw.etat ∈ {Eventuel, Reportée, Annulée}`).
+
+    Cyril 2026-05-16 : « je vois encore la séance plénière le 18 mai
+    alors qu'elle n'est pas à l'agenda, pourquoi ce problème n'est pas
+    réglé ? ». Diagnostic : l'item est encore dans le dump AN mais
+    avec `cycleDeVie.etat = "Eventuel"`. R42-CY (last_seen_at) ne le
+    masque pas car AN re-publie l'item à chaque dump, donc
+    last_seen_at reste frais.
+
+    Le filtre se base sur le champ `raw.etat` posé par
+    `assemblee._normalize_agenda` (R42-CX) et complète orthogonale de
+    `_filter_stale_agenda_items` (R42-CY) : l'un se base sur le
+    timing, l'autre sur l'état déclaré.
+    """
+    kept: list[dict] = []
+    dropped = 0
+    for r in rows:
+        if (r.get("category") or "").strip() != "agenda":
+            kept.append(r)
+            continue
+        raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
+        etat = (raw.get("etat") or "").strip().lower() if isinstance(raw, dict) else ""
+        if etat and any(s in etat for s in _AGENDA_NON_CONFIRMED_ETATS):
+            dropped += 1
+            continue
+        kept.append(r)
+    if dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "R42-CZG : %d items agenda non confirmés masqués (etat ∈ "
+            "{Eventuel, Reportée, Annulée})", dropped,
+        )
+    return kept
+
+
 # R39-O (2026-04-26) — Liste rouge d'items à exclure du site (faux positifs
 # keyword qu'on ne veut pas faire disparaître via une réécriture du
 # dictionnaire keywords, parce que celle-ci élargirait le retrait à
@@ -3583,6 +3632,11 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # où AN supprime totalement l'item (vs juste mettre date à NULL,
     # déjà traité par R42-CI).
     rows = _filter_stale_agenda_items(rows)
+    # R42-CZG (2026-05-16) : masque les items agenda non confirmés par AN
+    # (raw.etat ∈ {Eventuel, Reportée, Annulée}). Complète orthogonale du
+    # filtre stale R42-CY pour le cas où AN garde l'item dans le dump
+    # mais avec un statut non confirmé (ex. PPL Sport pro 18/05/2026).
+    rows = _filter_provisional_agenda_items(rows)
     # R42-BS (2026-05-13) : applique rétroactivement les patterns
     # `url_filter_exclude` du YAML aux items déjà en DB (un ajout de
     # pattern post-ingestion ne purgeait pas les anciens items — Cyril a
