@@ -28,22 +28,9 @@
 
 special_ppl:
   commission:
-    date_examen: "12-13 mai 2026"
-    auteur: "Synthèse manuelle (analyse Claude relue par la rédaction)"
-    texte: |
-      _À compléter manuellement après examen des amendements adoptés en
-      commission Culture. Mode opératoire : copier-coller dans cette
-      section une analyse rédigée par Claude (chat ou Console
-      Anthropic) à partir de la liste des amendements ayant pour sort
-      « Adopté ». Le texte ci-dessous est un placeholder._
-
-      Les principales modifications opérées par la commission Culture
-      sur la PPL Sport pro (n° 1560) seront résumées ici une fois que
-      le compte rendu et le texte voté en commission (TC 2797) auront
-      été lus en détail. Suggestions de plan : (i) gouvernance des
-      ligues professionnelles, (ii) financement et solidarité
-      financière entre clubs, (iii) statut du sportif professionnel,
-      (iv) régulation des paris sportifs et droits TV.
+    date_examen: ""
+    auteur: ""
+    texte: ""
   seance:
     date_examen: ""
     auteur: ""
