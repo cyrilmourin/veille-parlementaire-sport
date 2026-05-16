@@ -175,12 +175,20 @@ def _parse_texte_version(xml_bytes: bytes) -> dict | None:
 
     # R26 — corps du texte pour haystack keywords + fallback summary.
     # Le conteneur <TEXTE> regroupe <VISAS> + <ARTICLE>+ (+ parfois <NOTA>,
-    # <SIGNATAIRES>). itertext() préserve l'ordre visuel. On cape à 3000c
-    # pour la recherche keywords (suffisant pour les visas ministériels
-    # et le premier article) et on reserve 400c pour le summary fallback.
+    # <SIGNATAIRES>). itertext() préserve l'ordre visuel.
+    #
+    # R42-CY (2026-05-15) — Cape 3000 → 8000 chars. Cas remonté par Cyril :
+    # décret « Ordre national du Mérite » avec contingent sport. Les
+    # contingents ministériels sont énumérés par ordre alphabétique des
+    # ministères ; le ministère des Sports apparaît typiquement après la
+    # 2000-3000e position dans le décret (Affaires étrangères → Agriculture
+    # → Armées → … → Sports). Avec un cap à 3000 chars, le matcher ne voyait
+    # JAMAIS la section « Au titre du ministère des sports » et le décret
+    # tombait dans R41-I (`nomination_event` seul → filtré). Cape alignée
+    # sur celle de `_index_articles_by_cid` (8000 chars).
     texte_el = _find(root, ".//TEXTE", ".//CORPS")
-    body_full = _collect_inner_text(texte_el, max_len=6000)
-    body_head = body_full[:3000]
+    body_full = _collect_inner_text(texte_el, max_len=10000)
+    body_head = body_full[:8000]
 
     # URL Legifrance publique
     url = f"https://www.legifrance.gouv.fr/jorf/id/{id_text}"
@@ -316,10 +324,13 @@ def fetch_source(src: dict) -> list[Item]:
             # (cas ultra-majoritaire : le TEXTE_VERSION ne contient que
             # des <CONTENU/> vides), on prend le corps des fichiers
             # ARTICLE rattachés via le cid.
+            # R42-CY (2026-05-15) — Cape 3000 → 8000 chars (cf. cas
+            # « Ordre national du Mérite » contingent sport en milieu
+            # de décret).
             if not info.get("body_head"):
                 article_body = articles_by_cid.get(info["id"], "")
                 if article_body:
-                    info["body_head"] = article_body[:3000]
+                    info["body_head"] = article_body[:8000]
 
             # Catégorisation : nomination si le titre OU le corps le suggère.
             # On élargit le pattern pour capter aussi : "portant nomination",

@@ -74,6 +74,19 @@ PPL_KEY = "ppl-sport-professionnel"
 PPL_TITLE = "Spécial PPL Sport professionnel"
 PPL_SLUG_PATH = "/ppl-sport-professionnel/"
 
+# R42-CV (2026-05-15) — Intitulé exact de la PPL pour le titre de la
+# page dédiée (avant : « Proposition de loi » générique). Repris du
+# titre officiel déposé au Sénat le 18 mars 2025 puis transmis à l'AN
+# sous le n° 1560.
+HERO_TITLE = (
+    "Proposition de loi relative à l'organisation, à la gestion et au "
+    "financement du sport professionnel"
+)
+HERO_SUBTITLE = (
+    "AN n° 1560 · Sénat n° 456 · Examinée en commission Culture les "
+    "12-13 mai 2026 (TC 2797)"
+)
+
 # Identifiants techniques des textes (AN n° 1560 + Sénat S459 B0456 / BTC0670 / BTA0137)
 AN_TEXTE_REF = "PIONANR5L17B1560"
 SENAT_TEXTE_REFS = frozenset({
@@ -261,6 +274,15 @@ def collect_special_ppl(rows: list[dict]) -> dict:
         if cat == "dossiers_legislatifs":
             out["dosleg"].append(r)
         elif cat == "agenda":
+            # R42-CX (2026-05-15) — Skip réunions reportées/annulées dans
+            # le bucket agenda de la page PPL spéciale. Sans ce filtre la
+            # date d'une séance reportée (ex. PPL Sport pro 18/05/2026)
+            # restait visible alors que l'événement n'a plus lieu.
+            # `raw.etat` posé par `assemblee._normalize_agenda` (R42-CX).
+            _raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
+            _etat = (_raw.get("etat") or "").lower() if isinstance(_raw, dict) else ""
+            if _etat and ("report" in _etat or "annul" in _etat):
+                continue
             out["agenda"].append(r)
         elif cat == "amendements":
             # R41-P (2026-05-08) : distinction commission / séance fiable
@@ -618,6 +640,15 @@ _WC_STOPWORDS: frozenset[str] = frozenset({
     "rédactionnel", "rédactionnels", "rédactionnelle", "rédactionnelles",
     "redactionnel", "redactionnels", "redactionnelle", "redactionnelles",
     "déjà", "deja",
+    # R42-CV (2026-05-15) — Cyril : « Enlève du nuage de mots clés
+    # mots, sénat, dédiée, effet ». Tous quatre étaient remontés
+    # comme termes fréquents mais sans valeur thématique (méta
+    # rédactionnelle ou nom de l'institution co-auteur).
+    "mot", "mots",
+    "senat", "sénat",
+    "dédié", "dedie", "dédiée", "dediee",
+    "dédiés", "dedies", "dédiées", "dediees",
+    "effet", "effets",
 })
 
 
@@ -748,13 +779,18 @@ def _build_groupe_stats(amdt_rows_payload: list[dict],
 
 def build_payload(buckets: dict) -> dict:
     """Construit le payload JSON exposé via site/data/special_ppl.json."""
-    # Limit raisonnable par bucket (page peut afficher tous, sidebar ne
-    # prend que les 5 premiers — Hugo gère le slice).
+    # R42-CV (2026-05-15) — Avant : `amdt_commission` / `amdt_seance` capés
+    # à 200. Cyril a remonté que la page « énumérait 300 amendements pour
+    # ensuite afficher 200 amendements déposés » : le badge onglet utilise
+    # `counts` (total réel, ex. 300) tandis que le donut sort_stats
+    # opérait sur la liste tronquée à 200 → écart visible. Cap remonté à
+    # 5000 (pas de risque de débordement réaliste, max observé < 500 amdt
+    # par PPL Sport).
     LIMITS = {
         "dosleg": 5,
         "agenda": 30,
-        "amdt_commission": 200,
-        "amdt_seance": 200,
+        "amdt_commission": 5000,
+        "amdt_seance": 5000,
         "comptes_rendus": 30,
         "communiques": 30,
         "questions": 30,
@@ -764,6 +800,10 @@ def build_payload(buckets: dict) -> dict:
             "key": PPL_KEY,
             "title": PPL_TITLE,
             "slug_path": PPL_SLUG_PATH,
+            # R42-CV (2026-05-15) — Intitulé exact du texte (au lieu du
+            # « Proposition de loi » générique tombé sur le default Hugo).
+            "hero_title": HERO_TITLE,
+            "hero_subtitle": HERO_SUBTITLE,
             "url_an_texte": URL_AN_TEXTE,
             "url_an_dossier": URL_AN_DOSSIER,
             "url_senat_dossier": URL_SENAT_DOSSIER,
@@ -802,7 +842,65 @@ def build_payload(buckets: dict) -> dict:
     payload["groupe_stats_commission"] = _build_groupe_stats(
         payload["amdt_commission"]
     )
+    # R42-CV (2026-05-15) — Bloc « analyse manuelle » lu depuis
+    # config/special_ppl_analysis.yml. Cyril rédige (ou copie depuis
+    # Claude) la synthèse des principales modifications apportées par
+    # les amendements adoptés en commission puis en séance. Pas d'IA
+    # dans le pipeline — texte figé jusqu'à édition manuelle.
+    payload["analysis"] = load_analysis(payload["meta"]["key"])
     return payload
+
+
+def load_analysis(
+    payload_key: str,
+    config_path: str = "config/special_ppl_analysis.yml",
+) -> dict:
+    """R42-CV (2026-05-15) — Charge l'analyse manuelle pour `payload_key`.
+
+    Le fichier YAML est indexé par data_key (`special_ppl`,
+    `special_ppl_equip`). Pour `payload_key="ppl-sport-professionnel"`
+    on lit la section `special_ppl`.
+
+    Retourne `{"commission": {...}, "seance": {...}}`. Chaque sous-bloc
+    a `date_examen`, `auteur`, `texte`. Bloc absent / fichier absent /
+    texte vide → bloc retourné vide (le layout n'affiche rien).
+    """
+    # Mapping payload_key (slug) → section YAML (data_key)
+    SECTION_BY_KEY = {
+        PPL_KEY: "special_ppl",
+        "ppl-partenariats-equipements-sportifs": "special_ppl_equip",
+    }
+    section = SECTION_BY_KEY.get(payload_key, payload_key)
+    empty = {
+        "commission": {"date_examen": "", "auteur": "", "texte": ""},
+        "seance": {"date_examen": "", "auteur": "", "texte": ""},
+    }
+    try:
+        import yaml
+        with open(config_path, "r", encoding="utf-8") as fp:
+            cfg = yaml.safe_load(fp) or {}
+    except FileNotFoundError:
+        return empty
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            "R42-CV : analyse manuelle illisible (%s)", e
+        )
+        return empty
+    block = cfg.get(section) or {}
+    if not isinstance(block, dict):
+        return empty
+    out = {}
+    for stage in ("commission", "seance"):
+        sub = block.get(stage) or {}
+        if not isinstance(sub, dict):
+            sub = {}
+        out[stage] = {
+            "date_examen": (sub.get("date_examen") or "").strip(),
+            "auteur": (sub.get("auteur") or "").strip(),
+            "texte": (sub.get("texte") or "").strip(),
+        }
+    return out
 
 
 def write_data_file(site_data_dir: Path, payload: dict) -> None:

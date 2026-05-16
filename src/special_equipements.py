@@ -33,6 +33,16 @@ PPL_SLUG_PATH = "/ppl-partenariats-equipements-sportifs/"
 DATA_KEY = "special_ppl_equip"  # site.Data.special_ppl_equip
 DATA_FILENAME = "special_ppl_equip.json"
 
+# R42-CV (2026-05-15) — Intitulé exact de la PPL pour le titre de la
+# page (avant : « Proposition de loi » générique).
+HERO_TITLE = (
+    "Proposition de loi visant à encourager les partenariats entre les "
+    "collectivités territoriales et les personnes morales de droit privé "
+    "en matière d'acquisition, de réalisation ou de rénovation "
+    "d'équipements sportifs"
+)
+HERO_SUBTITLE = "AN n° 2667 · dossier DLR5L17N54138"
+
 # Identifiants techniques AN. Dossier DLR5L17N54138 = PPL n° 2667.
 # Texte de référence : PIONANR5L17B2667 (dépôt initial AN).
 # Pas de texte commission à ce jour (dossier au stade « dépôt »).
@@ -115,6 +125,12 @@ def collect_special_equipements(rows: list[dict]) -> dict:
         if cat == "dossiers_legislatifs":
             out["dosleg"].append(r)
         elif cat == "agenda":
+            # R42-CX (2026-05-15) — Skip réunions reportées/annulées
+            # (cf. special_ppl.collect_special_ppl).
+            _raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
+            _etat = (_raw.get("etat") or "").lower() if isinstance(_raw, dict) else ""
+            if _etat and ("report" in _etat or "annul" in _etat):
+                continue
             out["agenda"].append(r)
         elif cat == "amendements":
             title = r.get("title") or ""
@@ -146,9 +162,10 @@ def build_payload(buckets: dict) -> dict:
     build_sort_stats, build_groupe_stats, _row_to_payload,
     _group_amdt_by_article) — la seule chose qui change est la méta.
     """
+    # R42-CV (2026-05-15) — Cap 200 → 5000, idem special_ppl.
     LIMITS = {
         "dosleg": 5, "agenda": 30,
-        "amdt_commission": 200, "amdt_seance": 200,
+        "amdt_commission": 5000, "amdt_seance": 5000,
         "comptes_rendus": 30, "communiques": 30, "questions": 30,
     }
     payload = {
@@ -156,6 +173,8 @@ def build_payload(buckets: dict) -> dict:
             "key": PPL_KEY,
             "title": PPL_TITLE,
             "slug_path": PPL_SLUG_PATH,
+            "hero_title": HERO_TITLE,
+            "hero_subtitle": HERO_SUBTITLE,
             "url_an_texte": URL_AN_TEXTE,
             "url_an_dossier": URL_AN_DOSSIER,
             "url_senat_dossier": URL_SENAT_DOSSIER,
@@ -184,6 +203,8 @@ def build_payload(buckets: dict) -> dict:
     payload["groupe_stats_commission"] = _spp._build_groupe_stats(
         payload["amdt_commission"]
     )
+    # R42-CV (2026-05-15) — Bloc analyse manuelle (idem special_ppl).
+    payload["analysis"] = _spp.load_analysis(payload["meta"]["key"])
     return payload
 
 

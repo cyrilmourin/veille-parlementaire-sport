@@ -66,8 +66,24 @@
 
   <div class="content">{{ .Content }}</div>
 
-  {{ with .Params.source_url }}
-    <p><a class="btn" href="{{ . }}" rel="noopener" target="_blank">Consulter le dossier officiel &rarr;</a></p>
+  {{/* R42-CW (2026-05-15) — Pour les PPL spéciales, on préfère le lien
+       vers la page Hugo dédiée et on change le libellé en « Consulter
+       la page dédiée à la PPL ». Le `special_page_url` est posé en
+       frontmatter par `site_export._write_item_pages` quand l'item
+       matche une PPL spéciale. */}}
+  {{ if .Params.special_page_url }}
+    <p>
+      <a class="btn" href="{{ .Params.special_page_url }}">
+        {{ .Params.special_page_label | default "Consulter la page dédiée à la PPL" }} &rarr;
+      </a>
+    </p>
+    {{ with .Params.source_url }}
+      <p><a class="btn btn--secondary" href="{{ . }}" rel="noopener" target="_blank">Consulter le dossier officiel &rarr;</a></p>
+    {{ end }}
+  {{ else }}
+    {{ with .Params.source_url }}
+      <p><a class="btn" href="{{ . }}" rel="noopener" target="_blank">Consulter le dossier officiel &rarr;</a></p>
+    {{ end }}
   {{ end }}
 </article>
 {{ end }}

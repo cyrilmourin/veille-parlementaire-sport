@@ -189,15 +189,22 @@ def test_build_payload_meta():
 
 
 def test_build_payload_counts_avant_slice():
-    """counts reflète le total réel, pas le total slice."""
+    """counts reflète le total réel.
+
+    R42-CV (2026-05-15) : avant, `amdt_seance` était capé à 200 et le
+    test vérifiait `len(payload["amdt_seance"]) == 200`. Cap remonté à
+    5000 pour aligner badge onglet et donut total (cf. test
+    `test_amdt_commission_pas_tronque_a_200` dans
+    `test_r42cv_special_ppl_fixes.py`). 250 amdt → 250 dans le payload.
+    """
     huge = [_row(category="amendements",
                  raw={"texte_ref": AN_TEXTE_REF})
             for _ in range(250)]
     buckets = collect_special_ppl(huge)
     payload = build_payload(buckets)
     assert payload["counts"]["amdt_seance"] == 250
-    # Mais le bucket payload est slicé à la limite
-    assert len(payload["amdt_seance"]) == 200
+    # R42-CV : plus de slice à 200, tous les amdt remontent
+    assert len(payload["amdt_seance"]) == 250
 
 
 def test_build_payload_row_field_subset():

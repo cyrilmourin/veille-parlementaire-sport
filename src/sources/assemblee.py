@@ -2356,6 +2356,31 @@ def _normalize_agenda(obj, src, cat):
         log.debug("Agenda %s : skip réunion sans titre ni organe", uid)
         return
 
+    # R42-CX (2026-05-15) — Extraction défensive de l'état de la réunion
+    # (confirmé / reporté / annulé) sur de multiples paths candidats. AN
+    # n'a pas un schéma stable pour ce champ ; on tente les noms les
+    # plus courants observés dans les XSD agenda :
+    #   - confirmation, statutReunion, etat, etatReunion
+    #   - cycleDeVie.etat
+    # Le contenu peut être un dict {libelle: "Reportée"} ou une string
+    # directement. On normalise en lower-case sans accent pour pouvoir
+    # comparer ailleurs (`_boost_dosleg_dates`, `collect_special_ppl`).
+    _etat_raw = _text_of(_first(
+        root,
+        "confirmation", "confirmation.libelle",
+        "statutReunion", "statutReunion.libelle",
+        "etat", "etat.libelle",
+        "etatReunion", "etatReunion.libelle",
+        "cycleDeVie.etat", "cycleDeVie.etat.libelle",
+        default="",
+    ))
+    if not _etat_raw:
+        # Fallback deep_find (l'XSD AN niche parfois ces champs profondément)
+        _etat_raw = _text_of(_deep_find(
+            root, "confirmation", "statutReunion", "etatReunion",
+        ) or "")
+    etat_label = (_etat_raw or "").strip()
+
     yield Item(
         source_id=src["id"],
         uid=uid,
@@ -2371,6 +2396,13 @@ def _normalize_agenda(obj, src, cat):
             "organe_label": organe_label,
             "lieu": lieu,
             "xsi_type": xsi_type,
+            # R42-CX (2026-05-15) — Statut de la réunion (confirmée /
+            # reportée / annulée), best-effort sur paths multiples.
+            # Consommé par `_boost_dosleg_dates` et par
+            # `special_ppl.collect_special_ppl` pour exclure les
+            # réunions qui ne devraient plus tirer la date d'un dosleg
+            # ou apparaître dans le bucket agenda d'une PPL spéciale.
+            "etat": etat_label,
             # R40-T (2026-04-27) — items ODJ structurés (titres + résumés
             # ODJ collectés depuis convocationODJ + resumeODJ). Consommés
             # par site_export pour réécrire le titre de la réunion avec
