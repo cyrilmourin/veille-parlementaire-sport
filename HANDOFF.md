@@ -267,6 +267,16 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-16 (matin, retour Cyril) : **R42-CY — Détection items agenda orphelins (`last_seen_at`)**.
+
+  Cyril 2026-05-16 : « sur https://veille.sideline-conseil.fr/items/agenda/ il y a toujours le problème des dates qui ne sont plus à l'agenda AN (18 mai) ». 3 items 2026-05-18 (Examen art. 88 / Discussion PPL Sport pro / Suite discussion) persistent sur le site malgré R42-CI + R42-CX. Cas résiduel — explicitement déclaré comme « limitation connue » en R42-CX : AN supprime parfois l'item **totalement** d'`Agenda.json.zip` (vs juste `timeStampDebut=NULL` traité par R42-CI ou `etat=reporté` traité par R42-CX). Dans ce cas, l'upsert n'est jamais appelé sur cet uid → la DB conserve indéfiniment la version périmée.
+
+  Fix architectural : nouvelle colonne `last_seen_at` (TEXT) ajoutée à `items` via le mécanisme `MIGRATION_COLUMNS`. `Store.upsert_many` la pose à `datetime.utcnow().isoformat()` sur INSERT **et** UPDATE (`excluded.last_seen_at`). Côté export, nouvelle fonction `_filter_stale_agenda_items(rows)` dans `src/site_export.py` qui masque les items `category='agenda'` dont `published_at > now()` ET `last_seen_at < now - 2j` (= non revus dans les 2 derniers runs daily). Filtre ciblé : items passés conservés (historique normal), items non-agenda inchangés, items legacy sans `last_seen_at` conservés (safe legacy).
+
+  Le filtre s'insère dans la chaîne `_clean_rows_for_export` juste après `_filter_blocklist` et avant `_filter_excluded_sitemap_urls`. Constante `_AGENDA_ORPHAN_DAYS = 2` ajustable.
+
+  +8 tests R42-CY (`test_r42cy_agenda_orphan_detection.py`) : colonne créée, upsert pose `last_seen_at` à l'INSERT, UPDATE le rafraîchit, filtre drop stale future, keep fresh future, keep past stale (historique), ignore non-agenda, safe legacy (None + chaîne vide). Le test pré-existant `test_existing_columns_preserved_if_partial_r33` mis à jour pour inclure `last_seen_at` dans le set des colonnes ajoutées par la migration. 1301 tests verts.
+
 - 2026-05-15 (après-midi, retours Cyril sur la page spéciale PPL Sport pro + dosleg) : **R42-CV + R42-CW + R42-CX**. Branche `claude/fix-ppl-sport-pro-page-jERwN`.
 
   **R42-CV — Page spéciale PPL Sport pro : titre exact, plus de cap 200, analyse manuelle, stopwords nuage**.

@@ -151,8 +151,12 @@ class TestMigrateItems:
         conn.commit()
 
         added = migrate_items(conn)
-        # Seules canonical_url, status_label, content_hash doivent être ajoutées
-        assert set(added) == {"canonical_url", "status_label", "content_hash"}
+        # R42-CY (2026-05-16) : last_seen_at ajouté au registre migration
+        # → la liste attendue inclut désormais cette colonne en plus
+        # des 3 R33 historiques.
+        assert set(added) == {
+            "canonical_url", "status_label", "content_hash", "last_seen_at",
+        }
 
         # Toutes les colonnes R33 sont maintenant présentes
         cols = _existing_columns(conn, "items")

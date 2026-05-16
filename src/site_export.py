@@ -2061,6 +2061,63 @@ def _filter_disabled_sources(rows: list[dict]) -> list[dict]:
     return [r for r in rows if (r.get("source_id") or "").strip() not in disabled]
 
 
+# R42-CY (2026-05-16) — Délai d'orphelinat agenda. Un item agenda dont
+# `last_seen_at` est plus ancien que ce seuil ET dont la date est dans
+# le futur proche est considéré comme « plus présent dans le dump AN/
+# Sénat » (la séance a été reportée ou supprimée côté source). Seuil
+# défensif : 2 jours pour absorber 1 daily run raté (timeout AN, parsing
+# KO) sans masquer à tort un item encore valide.
+_AGENDA_ORPHAN_DAYS = 2
+
+
+def _filter_stale_agenda_items(rows: list[dict]) -> list[dict]:
+    """R42-CY (2026-05-16) — Masque les items agenda futurs qui n'ont
+    pas été revus dans le dump source depuis `_AGENDA_ORPHAN_DAYS` jours.
+
+    Cyril 2026-05-16 : « il y a toujours le problème des dates qui ne
+    sont plus à l'agenda AN (18 mai) ». Cas que R42-CI ne traitait pas :
+    AN supprime totalement l'item du dump Agenda.json.zip (vs juste
+    mettre `timeStampDebut=NULL`). Sans cet item dans le batch
+    d'ingestion, `upsert_many` n'est jamais appelé pour lui →
+    `last_seen_at` ne se met plus à jour → on peut le masquer.
+
+    Filtre limité aux items futurs (`published_at > now`) car :
+    - Les items passés sont attendus à disparaître naturellement de
+      l'agenda (cycle normal AN : agenda glissant J-30 → J+90).
+    - L'utilisateur a besoin de voir l'historique récent même si la
+      source n'expose plus les items passés.
+    """
+    now = datetime.now()
+    cutoff = now - timedelta(days=_AGENDA_ORPHAN_DAYS)
+    cutoff_iso = cutoff.isoformat(timespec="seconds")
+    now_iso = now.isoformat(timespec="seconds")
+    kept: list[dict] = []
+    dropped = 0
+    for r in rows:
+        if (r.get("category") or "").strip() != "agenda":
+            kept.append(r)
+            continue
+        last_seen = (r.get("last_seen_at") or "").strip()
+        published = (r.get("published_at") or "").strip()
+        # Items sans last_seen_at (pré-R42-CY) ou sans date → laisse passer
+        # (compatible legacy + safe-fallback).
+        if not last_seen or not published:
+            kept.append(r)
+            continue
+        # Items futurs ET non revus récemment → orphelins probables
+        if published > now_iso and last_seen < cutoff_iso:
+            dropped += 1
+            continue
+        kept.append(r)
+    if dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "R42-CY : %d items agenda orphelins masqués (last_seen_at < %s, futurs)",
+            dropped, cutoff.date().isoformat(),
+        )
+    return kept
+
+
 # R39-O (2026-04-26) — Liste rouge d'items à exclure du site (faux positifs
 # keyword qu'on ne veut pas faire disparaître via une réécriture du
 # dictionnaire keywords, parce que celle-ci élargirait le retrait à
@@ -3521,6 +3578,11 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # depuis config/blocklist.yml. Filtre à l'export uniquement, items
     # restent en DB → retirer une entrée les fait réapparaître au build.
     rows = _filter_blocklist(rows)
+    # R42-CY (2026-05-16) : masque les items agenda futurs qui n'ont
+    # pas été revus dans le dump source depuis 2 jours. Couvre le cas
+    # où AN supprime totalement l'item (vs juste mettre date à NULL,
+    # déjà traité par R42-CI).
+    rows = _filter_stale_agenda_items(rows)
     # R42-BS (2026-05-13) : applique rétroactivement les patterns
     # `url_filter_exclude` du YAML aux items déjà en DB (un ajout de
     # pattern post-ingestion ne purgeait pas les anciens items — Cyril a

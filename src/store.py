@@ -59,6 +59,13 @@ MIGRATION_COLUMNS: tuple[tuple[str, str], ...] = (
     ("canonical_url", "TEXT"),
     ("status_label", "TEXT"),
     ("content_hash", "TEXT"),
+    # R42-CY (2026-05-16) — Timestamp de dernier upsert. Permet de
+    # détecter les items « orphelins » : un item agenda qui n'est plus
+    # dans le dump AN/Sénat (séance reportée et item supprimé côté
+    # source, vs simple date NULL traitée par R42-CI) → son
+    # `last_seen_at` ne se met plus à jour → on peut le masquer côté
+    # export après N jours.
+    ("last_seen_at", "TEXT"),
 )
 MIGRATION_INDEXES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_items_dossier_id ON items(dossier_id)",
@@ -201,9 +208,18 @@ class Store:
                     hash_key, source_id, uid, category, chamber, title, url,
                     published_at, summary, matched_keywords, keyword_families,
                     raw, inserted_at,
-                    snippet, dossier_id, canonical_url, status_label, content_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    snippet, dossier_id, canonical_url, status_label, content_hash,
+                    last_seen_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(hash_key) DO UPDATE SET
+                    -- R42-CY (2026-05-16) — `last_seen_at` toujours
+                    -- mis à jour à chaque upsert. Permet de détecter les
+                    -- items « orphelins » : items agenda qui n'apparaissent
+                    -- plus dans le dump AN/Sénat (séance reportée et
+                    -- l'item est supprimé de la source, pas juste sa date
+                    -- mise à NULL). Côté export, on filtre les items
+                    -- agenda dont last_seen_at est ancien (cf. R42-CY).
+                    last_seen_at = excluded.last_seen_at,
                     -- R42-CI (2026-05-15) — Pour les items `agenda`, on
                     -- ÉCRASE TOUJOURS `published_at` par la version source
                     -- (même si NULL). Cas concret : une séance plénière
@@ -258,6 +274,9 @@ class Store:
                     it.canonical_url,
                     it.status_label,
                     ch,
+                    now,  # last_seen_at (R42-CY) — même valeur que inserted_at
+                          # à l'INSERT initial ; mis à jour au UPDATE via
+                          # `excluded.last_seen_at`.
                 ),
             )
             if not existed:
