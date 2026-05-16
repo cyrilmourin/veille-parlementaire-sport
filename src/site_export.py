@@ -3786,24 +3786,12 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
         encoding="utf-8",
     )
 
-    # R42-CZC (2026-05-16) — Module sidebar « Dernières publications ».
-    # Pour chaque catégorie pertinente, on génère `sidebar_pub_<cat>.json`
-    # avec les 5 items les plus récents (tri date publication desc, avec
-    # fallback inserted_at via _sort_by_date_desc). Plus un fichier `all`
-    # qui rassemble les 5 plus récents toutes catégories confondues —
-    # consommé par la home et les pages spéciales (PPL Sport pro,
-    # Équipements). La page « publications » (= communiques) est
-    # volontairement absente du module : pas de doublon avec la liste
-    # principale.
-    _SIDEBAR_PUB_CATS = (
-        "dossiers_legislatifs",
-        "amendements",
-        "questions",
-        "comptes_rendus",
-        "agenda",
-        "jorf",
-        "nominations",
-    )
+    # R42-CZF (2026-05-16) — Module sidebar « Dernières publications ».
+    # Cyril : « le module publications = les 5 dernières entrées de la
+    # catégorie communiques (= rubrique Publications), et cette catégorie
+    # uniquement ». Visible sur toutes les pages SAUF /items/communiques/
+    # (logique côté template Hugo). Un seul fichier data, pas une matrice
+    # par catégorie comme le proto R42-CZC abandonné.
     _SIDEBAR_PUB_LIMIT = 5
 
     def _strip_for_sidebar(rows_in: list[dict]) -> list[dict]:
@@ -3819,22 +3807,11 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
             })
         return out_rows
 
-    for _cat in _SIDEBAR_PUB_CATS:
-        _items = _sort_by_date_desc(by_cat.get(_cat, []))[:_SIDEBAR_PUB_LIMIT]
-        (data / f"sidebar_pub_{_cat}.json").write_text(
-            json.dumps(_strip_for_sidebar(_items), ensure_ascii=False,
-                       indent=2, default=str),
-            encoding="utf-8",
-        )
-
-    # Mix toutes catégories (sauf `communiques` qui est précisément la
-    # page « Publications » sur laquelle on ne veut pas afficher le module)
-    _mix_pool = []
-    for _cat in _SIDEBAR_PUB_CATS:
-        _mix_pool.extend(by_cat.get(_cat, []))
-    _mix_top = _sort_by_date_desc(_mix_pool)[:_SIDEBAR_PUB_LIMIT]
-    (data / "sidebar_pub_all.json").write_text(
-        json.dumps(_strip_for_sidebar(_mix_top), ensure_ascii=False,
+    _pub_top = _sort_by_date_desc(
+        by_cat.get("communiques", [])
+    )[:_SIDEBAR_PUB_LIMIT]
+    (data / "sidebar_publications.json").write_text(
+        json.dumps(_strip_for_sidebar(_pub_top), ensure_ascii=False,
                    indent=2, default=str),
         encoding="utf-8",
     )

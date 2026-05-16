@@ -47,21 +47,12 @@
   </form>
 </div>
 
-{{/* R41-M (2026-05-07) — Bloc « Spécial PPL Sport pro » : 5 derniers
-     amendements + lien vers la page dédiée. Le partial gère son propre
-     guard sur site.Data.special_ppl.
-
-     R42-CE (2026-05-15) — Cyril : « je ne veux le voir que sur la page
-     dossier législatifs uniquement ». Restreint à .Type ==
-     "dossiers_legislatifs" (page de listing, posée via le frontmatter
-     `type:` de _index.md) OU .Params.category == "dossiers_legislatifs"
-     (page détail d'un dossier individuel, posée via frontmatter
-     `category:`). Le module spécial PPL de la HOME — rendu dans le
-     main content via `_render_special_ppl_card` côté site_export.py
-     — n'est PAS affecté par cette condition (il vit ailleurs). */}}
-{{ if or (eq .Type "dossiers_legislatifs") (eq .Params.category "dossiers_legislatifs") }}
-  {{ partial "special_ppl_sidebar.html" . }}
-{{ end }}
+{{/* R42-CZF (2026-05-16) — L'ancien bloc sidebar « Spécial PPL Sport
+     Pro » (5 derniers amendements, partial special_ppl_sidebar.html)
+     est supprimé du site sur demande Cyril. La carte « Spécial PPL »
+     du MAIN de la page d'accueil (rendue par
+     site_export._render_special_ppl_card) RESTE intacte — elle vit
+     ailleurs que la sidebar. */}}
 
 {{/* R42-CZC (2026-05-16) — Module Agenda : limité à 4 items (vs 8
      historique) et masqué sur la page Agenda elle-même (doublon avec
@@ -107,54 +98,38 @@
 </div>
 {{ end }}
 
-{{/* R42-CZC (2026-05-16) — Module « Dernières publications » :
-     5 plus récents items, contextuel à la page.
-     - home / pages spéciales (PPL Sport pro, Équipements) → bucket « all »
-       (toutes catégories mélangées).
-     - page de listing d'une catégorie (.Type ∈ catégories veille) → bucket
-       de la catégorie correspondante.
-     - page « publications » (.Type == "communiques") → MASQUÉ (doublon
-       avec la liste principale).
-     Le data file `sidebar_pub_<cat>.json` est produit par
-     `src/site_export.py` (R42-CZC). */}}
-{{ $pubKey := "" }}
-{{ $pubLink := "" }}
-{{ $pubLabel := "Dernières publications" }}
-{{ if .IsHome }}
-  {{ $pubKey = "all" }}
-  {{ $pubLink = "/" }}
-{{ else if in (slice "dossiers_legislatifs" "amendements" "questions" "comptes_rendus" "agenda" "jorf" "nominations") .Type }}
-  {{ $pubKey = .Type }}
-  {{ $pubLink = printf "/items/%s/" .Type }}
-{{ else if or (eq .Layout "ppl-sport-pro") (eq .Layout "ppl-partenariats-equipements") }}
-  {{ $pubKey = "all" }}
-  {{ $pubLink = "/" }}
-{{ end }}
-{{ with $pubKey }}
-  {{ $data := index site.Data (printf "sidebar_pub_%s" .) }}
-  {{ if $data }}
-  <div class="side-card side-card--pub">
-    <h3 class="side-title">{{ $pubLabel }}</h3>
-    <p class="side-caption">5 dernières entrées</p>
+{{/* R42-CZF (2026-05-16) — Module « Dernières publications ».
+     Toujours les 5 derniers items category=communiques (= rubrique
+     "Publications"), et lui uniquement (pas contextuel à la page).
+     Visible partout SAUF sur la page Publications elle-même
+     (.Type == "communiques") : doublon avec la liste centrale.
+     Visuel repris de l'ex-special_ppl_sidebar.html : fond bleu marine,
+     kicker rouge "VEILLE", items en cartes blanches. */}}
+{{ if ne .Type "communiques" }}
+  {{ with site.Data.sidebar_publications }}
+  <div class="side-card side-card--ppl side-card--pub">
+    <div class="side-card--ppl__head">
+      <span class="side-card--ppl__kicker">VEILLE</span>
+      <h3 class="side-title">Dernières publications</h3>
+    </div>
+    <p class="side-caption">5 dernières entrées de la rubrique</p>
     <ul class="side-list">
-      {{ range $data }}
-        <li class="side-item" data-chamber="{{ .chamber }}">
-          <div class="side-date">
-            {{ if .published_at }}
-              <time datetime="{{ substr .published_at 0 10 }}">
-                {{ dateFormat "02/01" (time.AsTime (substr .published_at 0 10)) }}
-              </time>
-            {{ end }}
-          </div>
-          <div class="side-body">
-            {{ with .chamber }}<span class="chamber side-chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }} <a href="{{ .url }}" class="side-title-link" title="{{ .title }}" target="_blank" rel="noopener">{{ .title }}</a>
-          </div>
-        </li>
+      {{ range . }}
+      <li class="side-item">
+        <div class="side-date">
+          {{ if .published_at }}
+            <time datetime="{{ substr .published_at 0 10 }}">{{ dateFormat "02/01" (time.AsTime (substr .published_at 0 10)) }}</time>
+          {{ end }}
+        </div>
+        <div class="side-body">
+          {{ with .chamber }}<span class="chamber side-chamber" data-chamber="{{ . }}">{{ . }}</span>{{ end }} <a href="{{ .url }}" class="side-title-link" title="{{ .title }}" target="_blank" rel="noopener">{{ .title }}</a>
+        </div>
+      </li>
       {{ end }}
     </ul>
-    {{ with $pubLink }}
-      <p class="side-more"><a href="{{ . }}">Voir plus &rarr;</a></p>
-    {{ end }}
+    <p class="side-more">
+      <a href="/items/communiques/">Voir toutes les publications &rarr;</a>
+    </p>
   </div>
   {{ end }}
 {{ end }}
