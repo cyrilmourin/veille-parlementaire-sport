@@ -708,7 +708,13 @@ def _normalize_name(s: str) -> str:
 
 
 def _senat_id(prenom: str, nom: str) -> str:
-    return "SENAT::" + _normalize_name(f"{prenom}{nom}")
+    """R43-D bis (2026-05-17) — Sid basé sur le NOM seul (sans prénom).
+    Évite la duplication d'acteur quand certaines sources n'exposent
+    pas le prénom (CSV amdt Sénat). Le risque d'homonymes côté Sénat
+    est marginal (~0-2 cas sur 348 sénateurs) et peut être traité via
+    override config si besoin.
+    """
+    return "SENAT::" + _normalize_name(nom)
 
 
 def _load_senat_slugs() -> dict:
@@ -771,6 +777,48 @@ def _load_yaml(path: Path) -> dict:
     except Exception as e:
         log.warning("YAML load %s : %s", path, e)
         return {}
+
+
+def apply_senat_backfill_2024(
+    counters: dict[str, CompteurActeur],
+    registry: dict[str, Acteur],
+    senat_slugs: dict,
+) -> dict[str, int]:
+    """R43-E (2026-05-17) — Backfill manuel des questions Sénat sport
+    juillet 2024 → avril 2025. Lit `config/sport_backfill_senat_2024.yml`
+    et ajoute les compteurs `qe / qosd / qag` aux acteurs concernés.
+
+    Le fichier est saisi manuellement (le scraping web Sénat des
+    questions par sénateur retourne du HTML dynamique non parseable
+    sans session). Vide par défaut → no-op.
+    """
+    cfg = _load_yaml(ROOT / "config" / "sport_backfill_senat_2024.yml")
+    items = cfg.get("items") or []
+    stats: dict[str, int] = defaultdict(int)
+    for entry in items:
+        if not isinstance(entry, dict):
+            continue
+        sen = entry.get("senateur") or {}
+        prenom = (sen.get("prenom") or "").strip()
+        nom = (sen.get("nom") or "").strip()
+        if not nom:
+            continue
+        sid = _ensure_senat_acteur(prenom, nom, registry, senat_slugs)
+        c = counters[sid]
+        c.acteur_ref = sid
+        c.chambre = "Senat"
+        qe = int(entry.get("qe") or 0)
+        qosd = int(entry.get("qosd") or 0)
+        qag = int(entry.get("qag") or 0)
+        c.qe += qe
+        c.qosd += qosd
+        c.qag += qag
+        stats["qe"] += qe
+        stats["qosd"] += qosd
+        stats["qag"] += qag
+    if stats:
+        log.info("Backfill Sénat 2024 (questions) : %s", dict(stats))
+    return dict(stats)
 
 
 def scan_manual_reports(
@@ -898,8 +946,8 @@ def _ensure_senat_acteur(
     « M. SAVIN » à côté de « Michel SAVIN »).
     """
     # Dédup par NOM seul si prénom absent
+    nom_norm = _normalize_name(nom) if nom else ""
     if not prenom and nom:
-        nom_norm = _normalize_name(nom)
         for ref, acteur in registry.items():
             if acteur.chambre != "Senat":
                 continue
@@ -909,8 +957,42 @@ def _ensure_senat_acteur(
     # Normalisation du NOM en casse mixte pour l'affichage
     nom_display = _titlecase_nom(nom)
     prenom_display = prenom.strip() if prenom else ""
+    # Dédup symétrique : si on insère avec prénom mais qu'un acteur SANS
+    # prénom (créé via CSV amdt qui n'expose que le NOM) a déjà été
+    # enregistré avec le même NOM, on ENRICHIT l'acteur existant avec le
+    # prénom plutôt que de créer un doublon. Le sid de l'acteur existant
+    # est conservé pour ne pas casser les compteurs déjà incrémentés.
+    if prenom and nom and sid not in registry:
+        for ref, acteur in registry.items():
+            if acteur.chambre != "Senat":
+                continue
+            if not acteur.prenom and _normalize_name(acteur.nom) == nom_norm:
+                acteur.prenom = prenom_display
+                if civ and not acteur.civ:
+                    acteur.civ = civ
+                if groupe and not acteur.groupe_abrege:
+                    acteur.groupe_abrege = groupe
+                # Enrichit aussi photo/fiche depuis slugs si non posés
+                if not acteur.photo_url:
+                    photo, fiche = _senat_meta_from_slugs(
+                        prenom, nom, senat_slugs,
+                    )
+                    if photo:
+                        acteur.photo_url = photo
+                    if fiche:
+                        acteur.fiche_url = fiche
+                return ref
     if sid not in registry:
         photo, fiche = _senat_meta_from_slugs(prenom, nom, senat_slugs)
+        # R43-D bis : si prénom absent, tenter de le récupérer depuis
+        # senat_slugs.json (qui expose `prenom_usuel`). Évite les noms
+        # bruts type « Kern » / « Folliot » dans le top final.
+        if not prenom_display:
+            slug_entry = senat_slugs.get(nom_norm)
+            if isinstance(slug_entry, dict):
+                p_usuel = (slug_entry.get("prenom_usuel") or "").strip()
+                if p_usuel:
+                    prenom_display = p_usuel
         registry[sid] = Acteur(
             acteur_ref=sid, chambre="Senat",
             civ=civ, prenom=prenom_display, nom=nom_display,
@@ -1053,15 +1135,15 @@ def _parse_senat_signataires(show_as: str) -> list[tuple[str, str, str]]:
 
 
 def _fetch_senat_amdt_csv_urls_from_dl(slug: str) -> list[str]:
-    """R43-D (2026-05-17) — Extrait les URLs vers les CSV d'amendements
-    (commission + séance) depuis la page dossier législatif Sénat.
+    """R43-D / R43-E (2026-05-17) — Extrait les URLs CSV d'amendements
+    (commission + séance + CMP) depuis la page dossier législatif Sénat.
 
-    Pattern observé sur senat.fr :
-      - Commission :
-        `/amendements/commissions/<session>/<num>/jeu_complet_commission_<session>_<num>.csv`
-      - Séance publique :
-        `/amendements/<session>/<num>/jeu_complet_<session>_<num>.csv`
-    Les URLs sont relatives ; on les absolutise.
+    Stratégie : parser tous les liens vers `accueil.html` d'amendements
+    et dériver l'URL CSV correspondante. Le `accueil.html` indique le
+    contexte (commission/2024-2025/630/ vs /2024-2025/734/ pour séance,
+    /2025-2026/307/ pour CMP). À partir du chemin on construit l'URL
+    CSV (`jeu_complet_commission_<session>_<num>.csv` côté commission,
+    `jeu_complet_<session>_<num>.csv` côté séance/CMP).
     """
     if not slug:
         return []
@@ -1072,31 +1154,42 @@ def _fetch_senat_amdt_csv_urls_from_dl(slug: str) -> list[str]:
         h = local.read_text(encoding="utf-8", errors="ignore")
     except Exception:
         return []
-    urls: list[str] = []
+
+    urls: set[str] = set()
+
+    # Cas 1 : lien jeu_complet direct (existant dans la page)
     for m in re.finditer(r'href="([^"]*jeu_complet[^"]*\.csv)"', h):
         u = m.group(1)
         if not u.startswith("http"):
-            # Cas relatif : préfixer base senat.fr
             if u.startswith("/"):
                 u = "https://www.senat.fr" + u
             else:
-                # Lien relatif comme `jeu_complet_xxx.csv` ; le résoudre via
-                # le chemin du href courant dans la page (souvent à
-                # /amendements/.../accueil.html). On utilise un fallback
-                # simple : préfixer le path complet attendu.
-                # Pour les CSV par texte, le href intra-page est typiquement
-                # juste le nom de fichier → on ne peut pas le résoudre sans
-                # connaître le path parent. On le saute.
+                # Lien relatif (sans contexte path) → skip
                 continue
-        urls.append(u)
-    # Dédup en préservant l'ordre
-    seen: set[str] = set()
-    uniq: list[str] = []
-    for u in urls:
-        if u not in seen:
-            seen.add(u)
-            uniq.append(u)
-    return uniq
+        urls.add(u)
+
+    # Cas 2 : dériver depuis les `accueil.html` d'amendements
+    for m in re.finditer(
+        r'href="(/amendements/(?:commissions/)?(\d{4}-\d{4})/(\d+)/accueil\.html)"',
+        h,
+    ):
+        full_path = m.group(1)
+        session = m.group(2)
+        num = m.group(3)
+        is_commission = "/commissions/" in full_path
+        if is_commission:
+            csv_path = (
+                f"/amendements/commissions/{session}/{num}/"
+                f"jeu_complet_commission_{session}_{num}.csv"
+            )
+        else:
+            csv_path = (
+                f"/amendements/{session}/{num}/"
+                f"jeu_complet_{session}_{num}.csv"
+            )
+        urls.add(f"https://www.senat.fr{csv_path}")
+
+    return sorted(urls)
 
 
 def scan_senat_amdt_csv_for_dl(
@@ -1700,6 +1793,10 @@ def main():
 
     # 5c. Appartenances (commission Culture + groupe d'étude sport)
     apply_membership_credits(counters, registry, senat_slugs)
+
+    # 5d. Backfill manuel questions Sénat 2024-07 → 2025-04
+    # (période hors couverture open data `questions-depuis-un-an.csv`)
+    apply_senat_backfill_2024(counters, registry, senat_slugs)
 
     # 6. Output
     payload = render_outputs(counters, registry, top_n=args.top)

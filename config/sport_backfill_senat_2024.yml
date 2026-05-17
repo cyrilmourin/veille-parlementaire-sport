@@ -1,0 +1,25 @@
+# R43-E (2026-05-17) — Backfill manuel des questions Sénat sport pour la
+# période juillet 2024 → avril 2025 (NON couverte par l'open data CSV
+# `questions-depuis-un-an.csv` qui ne remonte qu'à mai 2025).
+#
+# Volume estimé : ~30-40 questions sport réparties entre ~10-20
+# sénateurs. Impact attendu sur le top : +2 à +20 pts par sénateur,
+# marginal pour le top 5, peut faire bouger #10-#20.
+#
+# Format : items.[ { senateur: { prenom, nom }, qe: N, qosd: N, qag: N } ]
+# Le script `scripts/parlementaires_sport.py` lit ce fichier (s'il
+# existe) et ajoute les compteurs aux acteurs Sénat correspondants
+# (dédoublonnage par NOM normalisé).
+#
+# Recense les questions UNE SEULE FOIS (saisie manuelle). Les questions
+# postérieures à mai 2025 sont déjà capturées via l'open data dynamique
+# du pipeline.
+#
+# Pour ajouter une entrée, exemple :
+#   items:
+#     - senateur: {prenom: "Jean-Jacques", nom: "LOZACH"}
+#       qe: 3
+#       qosd: 0
+#       qag: 1
+
+items: []
