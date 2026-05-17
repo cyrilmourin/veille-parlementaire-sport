@@ -1164,19 +1164,27 @@ def _fetch_senat_amdt_csv_urls_from_dl(slug: str) -> list[str]:
             if u.startswith("/"):
                 u = "https://www.senat.fr" + u
             else:
-                # Lien relatif (sans contexte path) → skip
                 continue
         urls.add(u)
 
-    # Cas 2 : dériver depuis les `accueil.html` d'amendements
+    # Cas 2 : R43-I (2026-05-17) — dériver depuis TOUT lien
+    # `/amendements/...` (la page DL ne pose pas toujours `accueil.html`
+    # pour la commission, parfois juste `liste_adoptes_ordre_discussion.html`
+    # ou `liste_alpha.html`). On capte donc tout chemin du type
+    # `/amendements/[commissions/]<session>/<num>/<anything>` et on
+    # déduplique sur (session, num, is_commission).
+    seen_keys: set[tuple[str, str, bool]] = set()
     for m in re.finditer(
-        r'href="(/amendements/(?:commissions/)?(\d{4}-\d{4})/(\d+)/accueil\.html)"',
+        r'href="/amendements/(commissions/)?(\d{4}-\d{4})/(\d+)/[^"]+"',
         h,
     ):
-        full_path = m.group(1)
+        is_commission = bool(m.group(1))
         session = m.group(2)
         num = m.group(3)
-        is_commission = "/commissions/" in full_path
+        key = (session, num, is_commission)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
         if is_commission:
             csv_path = (
                 f"/amendements/commissions/{session}/{num}/"
@@ -1260,19 +1268,41 @@ def scan_senat_amdt_csv_for_dl(
             sort = _col("Sort")
             if not auteur:
                 continue
-            # Format auteur : "M. SAVIN, rapporteur" / "M. KERN" / "Mme OLLIVIER"
+            # Format auteur Sénat (CSV par texte) :
+            #   « M. SAVIN, rapporteur »
+            #   « MM. Jean-Michel ARNAUD, sénateur, Christophe PROENÇA, député »
+            #   « Mme OLLIVIER »
+            # Le NOM est typiquement en MAJUSCULES, parfois précédé d'un
+            # prénom en casse mixte. Le suffixe « , rapporteur / sénateur /
+            # député » est ignoré.
             m_auth = re.match(
-                r"^(M\.|MM\.|Mme|Mmes)\s+([^,]+)(?:,.*)?$",
+                r"^(M\.|MM\.|Mme|Mmes)\s+(.+?)(?:,\s*(?:rapporteur|s[ée]nateur|d[ée]put[ée])e?.*)?$",
                 auteur,
             )
             if not m_auth:
                 continue
             full = m_auth.group(2).strip()
-            # Sénat : NOM en MAJUSCULES (le prénom n'est pas dans le CSV)
-            # On stocke nom seul, prénom vide.
-            nom = full
-            prenom = ""
-            if not nom or not any(c.isupper() for c in nom):
+            # R43-I (2026-05-17) — Découpe Prénom / NOM. Le NOM est
+            # composé de mots en MAJUSCULES (peuvent contenir tirets et
+            # accents). Le prénom le précède en casse mixte.
+            tokens = full.split()
+            nom_parts: list[str] = []
+            prenom_parts: list[str] = []
+            for t in tokens:
+                alpha = [c for c in t if c.isalpha()]
+                if alpha and all(c.isupper() for c in alpha):
+                    nom_parts.append(t)
+                else:
+                    if nom_parts:
+                        # Particule type "DE", "LE" intercalée → nom
+                        nom_parts.append(t)
+                    else:
+                        prenom_parts.append(t)
+            if not nom_parts:
+                continue
+            nom = " ".join(nom_parts)
+            prenom = " ".join(prenom_parts).strip()
+            if not any(c.isupper() for c in nom):
                 continue
             sid = _ensure_senat_acteur(prenom, nom, registry, senat_slugs)
             c = counters[sid]
