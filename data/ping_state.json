@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-16T17:06:14+00:00",
+  "last_run_at": "2026-05-17T06:57:02+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419604B1560P0D1N000001",
@@ -303,6 +303,15 @@
       "an_amendements::AMANR5L17PO419604B1560P0D1N000300",
       "an_amendements::AMANR5L17PO419604B1560P0D1N000301",
       "an_amendements::AMANR5L17PO419604B1560P0D1N000302",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000001",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000002",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000003",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000004",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000005",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000006",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000007",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000008",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000009",
       "an_amendements::AMANR5L17PO419865B2632P0D1N000492",
       "an_amendements::AMANR5L17PO419865B2632P0D1N000495",
       "an_amendements::AMANR5L17PO59051B2464P0D1N000024",
