@@ -889,7 +889,22 @@ def _ensure_senat_acteur(
     prenom: str, nom: str, registry: dict[str, Acteur],
     senat_slugs: dict, civ: str = "", groupe: str = "",
 ) -> str:
-    """Inscrit ou met à jour le sénateur dans le registre. Retourne son ID."""
+    """Inscrit ou met à jour le sénateur dans le registre. Retourne son ID.
+
+    R43-D (2026-05-17) — Dédup robuste : si `prenom` est vide (cas CSV
+    amendements Sénat où seul le NOM est exposé), on cherche d'abord
+    dans le registry existant un sénateur ayant le même NOM normalisé.
+    Si trouvé, on retourne SON id existant (évite la duplication
+    « M. SAVIN » à côté de « Michel SAVIN »).
+    """
+    # Dédup par NOM seul si prénom absent
+    if not prenom and nom:
+        nom_norm = _normalize_name(nom)
+        for ref, acteur in registry.items():
+            if acteur.chambre != "Senat":
+                continue
+            if _normalize_name(acteur.nom) == nom_norm:
+                return ref
     sid = _senat_id(prenom, nom)
     # Normalisation du NOM en casse mixte pour l'affichage
     nom_display = _titlecase_nom(nom)
@@ -1035,6 +1050,149 @@ def _parse_senat_signataires(show_as: str) -> list[tuple[str, str, str]]:
             nom = m_name.group("nom").strip()
             out.append((current_civ, prenom, nom))
     return out
+
+
+def _fetch_senat_amdt_csv_urls_from_dl(slug: str) -> list[str]:
+    """R43-D (2026-05-17) — Extrait les URLs vers les CSV d'amendements
+    (commission + séance) depuis la page dossier législatif Sénat.
+
+    Pattern observé sur senat.fr :
+      - Commission :
+        `/amendements/commissions/<session>/<num>/jeu_complet_commission_<session>_<num>.csv`
+      - Séance publique :
+        `/amendements/<session>/<num>/jeu_complet_<session>_<num>.csv`
+    Les URLs sont relatives ; on les absolutise.
+    """
+    if not slug:
+        return []
+    local = CACHE_DIR / "senat_dossiers_dl" / f"{slug}.html"
+    if not local.exists():
+        return []
+    try:
+        h = local.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return []
+    urls: list[str] = []
+    for m in re.finditer(r'href="([^"]*jeu_complet[^"]*\.csv)"', h):
+        u = m.group(1)
+        if not u.startswith("http"):
+            # Cas relatif : préfixer base senat.fr
+            if u.startswith("/"):
+                u = "https://www.senat.fr" + u
+            else:
+                # Lien relatif comme `jeu_complet_xxx.csv` ; le résoudre via
+                # le chemin du href courant dans la page (souvent à
+                # /amendements/.../accueil.html). On utilise un fallback
+                # simple : préfixer le path complet attendu.
+                # Pour les CSV par texte, le href intra-page est typiquement
+                # juste le nom de fichier → on ne peut pas le résoudre sans
+                # connaître le path parent. On le saute.
+                continue
+        urls.append(u)
+    # Dédup en préservant l'ordre
+    seen: set[str] = set()
+    uniq: list[str] = []
+    for u in urls:
+        if u not in seen:
+            seen.add(u)
+            uniq.append(u)
+    return uniq
+
+
+def scan_senat_amdt_csv_for_dl(
+    dl_slug: str,
+    counters: dict[str, CompteurActeur],
+    registry: dict[str, Acteur],
+    senat_slugs: dict,
+) -> dict[str, int]:
+    """R43-D (2026-05-17) — Scrape et parse les CSV d'amendements Sénat
+    pour un dossier législatif sport donné.
+
+    Couvre les amdt commission + séance. Format CSV particulier (1ère
+    ligne `sep=\\n`, puis TAB-separated, encodage latin-1).
+
+    Cyril 2026-05-17 : « Savin n'a pas encore tous ses amendements
+    comptés sur la PPL Sport pro ». Diagnostic : la DB veille ne couvre
+    que ~6 mois ; les amdt commission Sénat PPL 456 (mai 2025) sont
+    HORS périmètre. Ce scraping CSV par texte les ramène en intégralité.
+    """
+    import csv as _csv, io as _io
+    urls = _fetch_senat_amdt_csv_urls_from_dl(dl_slug)
+    stats: dict[str, int] = defaultdict(int)
+    if not urls:
+        # Fallback : on tente de construire les URLs standard à partir
+        # du slug (ex. ppl24-456 → session=2024-2025, num=456).
+        m = re.match(r"ppl(\d{2})-(\d+)", dl_slug)
+        if m:
+            yy = int(m.group(1))
+            num = m.group(2)
+            sess = f"20{yy}-20{yy + 1:02d}"
+            urls = [
+                f"https://www.senat.fr/amendements/commissions/{sess}/{num}/jeu_complet_commission_{sess}_{num}.csv",
+                f"https://www.senat.fr/amendements/{sess}/{num}/jeu_complet_{sess}_{num}.csv",
+            ]
+
+    for url in urls:
+        # Cache local
+        fname = url.rstrip("/").rsplit("/", 1)[-1]
+        local = CACHE_DIR / "senat_amdt_csv" / f"{dl_slug}__{fname}"
+        local.parent.mkdir(parents=True, exist_ok=True)
+        if not local.exists():
+            if not _fetch_via_curl(url, local, timeout=30):
+                continue
+        try:
+            raw = local.read_text(encoding="latin-1", errors="ignore")
+        except Exception:
+            continue
+        # Format Sénat : 1re ligne "sep=\n", puis TAB-separated
+        if raw.startswith("sep="):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else ""
+        if not raw.strip():
+            continue
+        reader = _csv.DictReader(_io.StringIO(raw), delimiter="\t")
+        for r in reader:
+            # Les noms de colonnes Sénat ont des espaces traînants
+            # (« Auteur », « Sort », etc.)
+            def _col(*candidates: str) -> str:
+                for c in candidates:
+                    for k in r.keys():
+                        if k is None:
+                            continue
+                        if str(k).strip() == c:
+                            val = r.get(k)
+                            return (val or "").strip()
+                return ""
+
+            auteur = _col("Auteur")
+            sort = _col("Sort")
+            if not auteur:
+                continue
+            # Format auteur : "M. SAVIN, rapporteur" / "M. KERN" / "Mme OLLIVIER"
+            m_auth = re.match(
+                r"^(M\.|MM\.|Mme|Mmes)\s+([^,]+)(?:,.*)?$",
+                auteur,
+            )
+            if not m_auth:
+                continue
+            full = m_auth.group(2).strip()
+            # Sénat : NOM en MAJUSCULES (le prénom n'est pas dans le CSV)
+            # On stocke nom seul, prénom vide.
+            nom = full
+            prenom = ""
+            if not nom or not any(c.isupper() for c in nom):
+                continue
+            sid = _ensure_senat_acteur(prenom, nom, registry, senat_slugs)
+            c = counters[sid]
+            c.acteur_ref = sid
+            c.chambre = "Senat"
+            c.amdt_depose += 1
+            stats["amdt_depose"] += 1
+            if "adopt" in sort.lower():
+                c.amdt_adopte += 1
+                stats["amdt_adopte"] += 1
+    if stats:
+        log.info("Sénat amdt CSV %s : %s", dl_slug, dict(stats))
+    return dict(stats)
 
 
 def _fetch_senat_rapporteurs_from_dl(slug: str) -> list[tuple[str, str]]:
@@ -1301,6 +1459,13 @@ def scan_senat_akn(
             c_r.chambre = "Senat"
             c_r.rapporteur_principal += 1
             stats["rapporteur_principal"] += 1
+
+        # 9) Amendements Sénat (commission + séance) via CSV par texte
+        # R43-D (2026-05-17) — APRÈS les rapporteurs (qui apportent le
+        # prénom complet) pour que le dédup `_ensure_senat_acteur`
+        # retrouve l'acteur existant quand le CSV ne porte que le NOM.
+        if dl_slug:
+            scan_senat_amdt_csv_for_dl(dl_slug, counters, registry, senat_slugs)
 
     log.info("AKN Sénat : %d textes scannés (≥ %s), %d sport-relevant",
              n_total, since, n_sport)
