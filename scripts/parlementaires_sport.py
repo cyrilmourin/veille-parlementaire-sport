@@ -1288,6 +1288,100 @@ def scan_senat_amdt_csv_for_dl(
     return dict(stats)
 
 
+def _fetch_senat_groupe_from_fiche(slug: str) -> tuple[str, str]:
+    """R43-F (2026-05-17) — Scrape la fiche sénateur pour extraire le
+    groupe politique (abrégé + nom complet).
+
+    Le AKN Sénat ne porte pas le groupe et les CSV (questions) ne le
+    contiennent que pour les sénateurs ayant posé une question récente.
+    Pour Lafon / Savin / Malhuret / Arnaud (tous actifs sport mais pas
+    sur les Q récentes), la fiche est la seule source.
+
+    Pattern observé : `<img src="/assets/images/partagees/groupes/<ABR>.webp"
+    alt="Groupe <Nom complet> au Sénat">`.
+
+    Retourne `("", "")` si pas de slug ou échec.
+    """
+    if not slug:
+        return "", ""
+    local = CACHE_DIR / "senat_fiches" / f"{slug}.html"
+    local.parent.mkdir(parents=True, exist_ok=True)
+    if not local.exists():
+        url = f"https://www.senat.fr/senateur/{slug}.html"
+        if not _fetch_via_curl(url, local, timeout=20):
+            return "", ""
+    try:
+        h = local.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return "", ""
+    # Pattern : src="/assets/images/partagees/groupes/<ABR>.webp" alt="Groupe <Nom> au Sénat"
+    m = re.search(
+        r'src="/assets/images/partagees/groupes/(?P<abr>[A-Z][A-Z0-9\-]+)\.webp"'
+        r'[^>]*alt="Groupe\s+(?P<nom>[^"]+?)\s+au\s+S[ée]nat"',
+        h,
+    )
+    # R43-G : map abrégé URL Sénat → abrégé d'affichage usuel.
+    # Le Sénat garde « UMP » dans le slug image pour Les Républicains
+    # (héritage historique), c'est trompeur côté lecteur.
+    _ABR_MAP = {"UMP": "LR"}
+    if m:
+        abr = _ABR_MAP.get(m.group("abr"), m.group("abr"))
+        return abr, m.group("nom")
+    # Fallback : juste le nom dans le alt (sans l'abrégé fiable)
+    m2 = re.search(r'alt="Groupe\s+([^"]+?)\s+au\s+S[ée]nat"', h)
+    if m2:
+        return "", m2.group(1)
+    return "", ""
+
+
+def _enrich_senat_groupes(
+    counters: dict[str, CompteurActeur],
+    registry: dict[str, Acteur],
+    senat_slugs: dict,
+    top_n: int = 50,
+) -> None:
+    """R43-F (2026-05-17) — Pour chaque sénateur dans le top N actuel
+    sans groupe politique posé, scrape sa fiche pour le récupérer.
+
+    Limité au top N pour ne pas saturer en fetches sur 348 sénateurs
+    quand seuls quelques-uns sont visibles côté UI. Cache local.
+    """
+    # Tri par score desc → top N
+    ranked = sorted(
+        [(ref, c.score()) for ref, c in counters.items()
+         if registry.get(ref) and registry[ref].chambre == "Senat"
+         and c.score() > 0],
+        key=lambda x: -x[1],
+    )[:top_n]
+    enriched = 0
+    for ref, _score in ranked:
+        acteur = registry[ref]
+        if acteur.groupe_abrege:
+            continue
+        nom_norm = _normalize_name(acteur.nom)
+        slug_entry = senat_slugs.get(nom_norm)
+        if not isinstance(slug_entry, dict):
+            # fallback : essai avec prenom+nom
+            slug_entry = senat_slugs.get(
+                _normalize_name(f"{acteur.prenom}{acteur.nom}")
+            )
+        if not isinstance(slug_entry, dict):
+            continue
+        slug = slug_entry.get("slug") or ""
+        if not slug:
+            continue
+        abr, nom_long = _fetch_senat_groupe_from_fiche(slug)
+        if abr:
+            acteur.groupe_abrege = abr
+            acteur.groupe_long = nom_long
+            enriched += 1
+        elif nom_long:
+            acteur.groupe_long = nom_long
+            enriched += 1
+    if enriched:
+        log.info("Enrichissement groupes Sénat : %d sénateurs", enriched)
+
+
 def _fetch_senat_rapporteurs_from_dl(slug: str) -> list[tuple[str, str]]:
     """R43-A ter (2026-05-17) — Scrape la page dossier législatif Sénat
     pour extraire les rapporteurs (sénateurs auteurs des rapports `r24-*`).
@@ -1797,6 +1891,11 @@ def main():
     # 5d. Backfill manuel questions Sénat 2024-07 → 2025-04
     # (période hors couverture open data `questions-depuis-un-an.csv`)
     apply_senat_backfill_2024(counters, registry, senat_slugs)
+
+    # 5e. R43-F : enrichir les groupes politiques Sénat manquants
+    # (Lafon / Savin / Malhuret n'ont pas posé de Q sport récente,
+    # leur groupe est seulement dans la fiche senateur HTML).
+    _enrich_senat_groupes(counters, registry, senat_slugs, top_n=50)
 
     # 6. Output
     payload = render_outputs(counters, registry, top_n=args.top)
