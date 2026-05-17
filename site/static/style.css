@@ -89,8 +89,12 @@ a:hover { text-decoration: underline; }
   min-width: 0;
 }
 .layout-side {
-  position: sticky;
-  top: 16px;
+  /* R43-H (2026-05-17) — Sidebar non-sticky : Cyril a remarqué que la
+     partie basse de la sidebar était cachée quand celle-ci dépassait la
+     hauteur du viewport (sticky au top + contenu trop long = bas
+     invisible jusqu'à atteindre le bas du main).
+     En non-sticky la sidebar scrolle naturellement avec le main, tout
+     son contenu est accessible. */
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -102,7 +106,6 @@ a:hover { text-decoration: underline; }
     gap: 18px;
   }
   .layout-side {
-    position: static;
     order: 2;
   }
 }
