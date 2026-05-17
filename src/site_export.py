@@ -2178,6 +2178,59 @@ def _filter_stale_agenda_items(
     return kept
 
 
+def _write_ppl_agenda_diag(rows: list[dict], out_path: Path) -> None:
+    """R42-DC (2026-05-17) — Snapshot diagnostique commité dans `data/`
+    pour comprendre pourquoi les items agenda 18/05 PPL Sport pro
+    restent visibles malgré R42-DC + R42-CZG.
+
+    Dump : tous les items agenda qui matchent la PPL Sport pro (via
+    `special_ppl.row_matches_special_ppl`), avec leurs champs clés
+    (uid, source_id, title, published_at, last_seen_at, raw.etat).
+    Permet de voir l'état renvoyé par AN sans accès direct DB.
+
+    Idempotent : écrit même si liste vide. Best-effort : erreur écrite
+    ne fait pas planter le pipeline (cf. caller try/except).
+    """
+    from .special_ppl import row_matches_special_ppl
+    health = _load_source_health()
+    diag = {
+        "generated_at": datetime.utcnow().isoformat(timespec="seconds"),
+        "source_health": {
+            sid: {"last_ok_at": (info or {}).get("last_ok_at")}
+            for sid, info in health.items()
+            if isinstance(info, dict) and sid.endswith("agenda")
+        },
+        "ppl_agenda_items": [],
+    }
+    now_iso = datetime.now().isoformat(timespec="seconds")
+    for r in rows:
+        if (r.get("category") or "").strip() != "agenda":
+            continue
+        try:
+            if not row_matches_special_ppl(r):
+                continue
+        except Exception:
+            continue
+        raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
+        published = (r.get("published_at") or "")
+        diag["ppl_agenda_items"].append({
+            "uid": r.get("uid"),
+            "source_id": r.get("source_id"),
+            "title": (r.get("title") or "")[:160],
+            "published_at": published,
+            "is_future": published > now_iso if published else False,
+            "last_seen_at": r.get("last_seen_at"),
+            "raw_etat": raw.get("etat") if isinstance(raw, dict) else None,
+            "raw_organe": raw.get("organe") if isinstance(raw, dict) else None,
+            "raw_xsi_type": raw.get("xsi_type") if isinstance(raw, dict) else None,
+        })
+    diag["ppl_agenda_items"].sort(key=lambda x: x.get("published_at") or "")
+    out_path.write_text(
+        json.dumps(diag, ensure_ascii=False, indent=2, default=str),
+        encoding="utf-8",
+    )
+
+
 def _mark_postponed(row: dict, reason: str) -> None:
     """R42-DC (2026-05-17) — Marque un row comme « postponed » dans
     son `raw` (côté in-memory, ne touche pas la DB).
@@ -3716,6 +3769,15 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # depuis config/blocklist.yml. Filtre à l'export uniquement, items
     # restent en DB → retirer une entrée les fait réapparaître au build.
     rows = _filter_blocklist(rows)
+    # R42-DC (2026-05-17) — diagnostic items agenda PPL Sport pro AVANT
+    # les filtres. Permet de comprendre pourquoi les items 18/05 restent
+    # visibles (etat reçu d'AN ? last_seen_at frais ?). Le snapshot est
+    # commité dans data/ via daily.yml step git add.
+    try:
+        _write_ppl_agenda_diag(rows, _PIPELINE_HEALTH_PATH.parent / "agenda_diag_ppl_sport_pro.json")
+    except Exception as _exc:
+        import logging as _lg
+        _lg.getLogger(__name__).warning("R42-DC diag KO : %s", _exc)
     # R42-CY (2026-05-16) → R42-DC (2026-05-17) : masque les items
     # agenda futurs qui n'ont pas été revus dans le dernier fetch
     # réussi de leur source (comparaison `last_seen_at` ↔
