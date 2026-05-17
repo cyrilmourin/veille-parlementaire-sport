@@ -97,6 +97,12 @@ blocklist:
   - url: https://france-paralympique.fr/actualites//region/provence-alpes-cote-dazur
     reason: "Page index régional CPSF (pas une actualité)"
 
+  # 2026-05-17 (Cyril) — Page institutionnelle « Comité Paralympique et
+  # Sportif Français » (page "à propos" du CPSF), exposée par le listing
+  # /actualites/ en tant que category page mais sans contenu événementiel.
+  - url: https://france-paralympique.fr/actualites/comite-paralympique-et-sportif-francais/
+    reason: "Page institutionnelle CPSF (pas une actualité)"
+
   # 2026-04-26 (R40-F) — Page statique de présentation du Comité de
   # déontologie du CNOSF, exposée par le sitemap en tant que ressource
   # mais sans valeur d'actualité pour la veille (pas de date, pas de
