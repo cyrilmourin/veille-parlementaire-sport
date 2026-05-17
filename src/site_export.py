@@ -4733,9 +4733,12 @@ def _write_category_indexes(items_dir: Path, by_cat: dict[str, list[dict]]):
         # `layouts/questions/list.html` (système onglets Question/Réponse).
         # Sans `type:` dans le frontmatter, Hugo dérive .Type = "items"
         # depuis le 1er segment sous content/ et retombe sur _default.
+        # R43-B (2026-05-17) — `amendements` ajouté pour que la sidebar
+        # palmares parlementaires (visible uniquement sur 4 catégories)
+        # se déclenche correctement.
         SPECIFIC_LAYOUT_CATS = {"agenda", "dossiers_legislatifs",
                                  "communiques", "comptes_rendus",
-                                 "questions"}
+                                 "questions", "amendements"}
         lines = [
             "---",
             f'title: "{label}"',

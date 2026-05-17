@@ -1,0 +1,52 @@
+# R43-B (2026-05-17) — Listes manuelles d'appartenance « sport-relevant ».
+#
+# Critères Cyril :
+# - Membre commission Culture (AN ou Sénat) : 5 pts
+# - Membre groupe d'étude sport / mission d'information sport / commission
+#   d'enquête sport : 5 pts (Sénat. Côté AN les groupes d'études ne
+#   sont plus visibles en ligne — on n'insiste pas, focus Sénat)
+#
+# Sources :
+# - https://www.senat.fr/commission/cult/index.html (membres commission
+#   Culture du Sénat)
+# - https://www.senat.fr/groupe-etude/etu_934.html (groupe d'étude
+#   « Pratiques sportives et grands événements sportifs » Sénat)
+#
+# Côté AN, la commission Culture est l'organe `PO420120` (Commission
+# des Affaires culturelles et éducation) — capturable via le dump AMO10
+# (mandats → organeRef). Si on le pose ici, c'est en override / cas
+# manuel uniquement.
+#
+# Format : on liste par nom (Sénat) ou acteurRef (AN).
+
+# === COMMISSION CULTURE SÉNAT ===
+# Source : https://www.senat.fr/commission/cult/index.html
+# Membres au 2026-05-17 (~57 sénateurs). À actualiser périodiquement.
+# Pour aller vite, on ne liste ici que les PRÉSIDENT/VICE-PRÉSIDENTS et
+# les sénateurs identifiés comme actifs sport. Les autres seront
+# détectés automatiquement via mandats AMO10 si disponibles.
+commission_culture_senat:
+  - {prenom: "Laurent", nom: "LAFON"}      # Président
+  - {prenom: "Michel", nom: "SAVIN"}        # Vice-Président
+  - {prenom: "Jean-Jacques", nom: "LOZACH"} # Sport
+  - {prenom: "Jean-Michel", nom: "ARNAUD"}  # Membre
+
+# === GROUPE D'ÉTUDE SPORT SÉNAT ===
+# Source : https://www.senat.fr/groupe-etude/etu_934.html
+# Pratiques sportives et grands événements sportifs.
+# Membres à actualiser périodiquement (la liste change selon les
+# renouvellements).
+groupe_etude_sport_senat:
+  - {prenom: "Michel", nom: "SAVIN"}        # Président groupe étude sport
+  - {prenom: "Jean-Jacques", nom: "LOZACH"}
+  - {prenom: "Laurent", nom: "LAFON"}
+
+# === COMMISSION CULTURE AN ===
+# Capturable automatiquement via AMO10 (organeRef = PO420120). Liste ici
+# pour override manuel uniquement si besoin (vide par défaut).
+commission_culture_an: []
+
+# === GROUPE D'ÉTUDE SPORT AN ===
+# Cyril : « il n'existe plus à l'assemblée, en tous les cas pas visible
+# dans la liste en ligne pour les groupes d'études donc on n'insiste pas »
+groupe_etude_sport_an: []

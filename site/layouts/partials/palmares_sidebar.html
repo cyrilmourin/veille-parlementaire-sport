@@ -1,0 +1,71 @@
+{{/*
+  R43-B (2026-05-17) — Version compacte sidebar du module top 3
+  parlementaires actifs sport. Pour les pages catégorie (dosleg,
+  questions, amdt, comptes rendus), affichage en dernier de la sidebar.
+  Visuel aligné sur les autres .side-card (fond bleu marine, kicker rouge).
+*/}}
+{{ with site.Data.parlementaires_sport_xvii }}
+{{ if ge (len .top) 3 }}
+<div class="side-card side-card--ppl side-card--palmares">
+  <div class="side-card--ppl__head">
+    <span class="side-card--ppl__kicker">CLASSEMENT</span>
+    <h3 class="side-title">🏆 Top parlementaires sport</h3>
+  </div>
+  <p class="side-caption">{{ .legislature }} législature</p>
+  <ul class="side-list">
+    {{ range $i, $p := first 3 .top }}
+      {{ $rank := add $i 1 }}
+      <li class="side-item palm-side-row palm-side-row--{{ $rank }}">
+        <div class="palm-side-rank">{{ $rank }}</div>
+        {{ if $p.photo_url }}
+          <img class="palm-side-photo" src="{{ $p.photo_url }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>
+        {{ else }}
+          <div class="palm-side-photo"></div>
+        {{ end }}
+        <div class="side-body palm-side-body">
+          <div class="palm-side-name">{{ $p.prenom }} {{ $p.nom }}</div>
+          <div class="palm-side-meta">
+            {{ with $p.groupe }}{{ . }} · {{ end }}{{ if eq $p.chambre "Senat" }}Sénat{{ else }}AN{{ end }}
+          </div>
+        </div>
+        <div class="palm-side-score">{{ $p.score }}<span class="palm-side-pts">pts</span></div>
+      </li>
+    {{ end }}
+  </ul>
+  <p class="side-more"><a href="/parlementaires-actifs-sport/">Voir le classement complet &rarr;</a></p>
+</div>
+<style>
+  .side-card--palmares .palm-side-row {
+    display: grid;
+    grid-template-columns: 22px 36px 1fr auto;
+    gap: 8px; align-items: center;
+    background: #fff; padding: 8px 10px;
+  }
+  .side-card--palmares .palm-side-rank {
+    font-weight: 800; color: #122549; font-size: 13px;
+    text-align: center;
+  }
+  .side-card--palmares .palm-side-row--1 .palm-side-rank { color: #d4a017; }
+  .side-card--palmares .palm-side-row--2 .palm-side-rank { color: #95a5a6; }
+  .side-card--palmares .palm-side-row--3 .palm-side-rank { color: #cd7f32; }
+  .side-card--palmares .palm-side-photo {
+    width: 32px; height: 32px; border-radius: 50%;
+    object-fit: cover; background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+  }
+  .side-card--palmares .palm-side-name {
+    font-size: 12px; font-weight: 700; color: #122549; line-height: 1.2;
+  }
+  .side-card--palmares .palm-side-meta {
+    font-size: 10px; color: #64748b; margin-top: 1px;
+  }
+  .side-card--palmares .palm-side-score {
+    font-size: 14px; font-weight: 800; color: #122549;
+    text-align: right;
+  }
+  .side-card--palmares .palm-side-pts {
+    font-size: 9px; color: #64748b; margin-left: 2px; font-weight: 500;
+  }
+</style>
+{{ end }}
+{{ end }}

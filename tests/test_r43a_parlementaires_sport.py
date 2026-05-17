@@ -37,50 +37,61 @@ def test_score_vide():
 
 
 def test_score_questions():
+    """R43-B : QE/QOSD = 2 pts, QAG = 5 pts."""
     c = CompteurActeur(qe=10, qag=2, qosd=3)
-    expected = 10 * 1 + 2 * 5 + 3 * 1
+    expected = 10 * 2 + 2 * 5 + 3 * 2  # 20 + 10 + 6 = 36
     assert c.score() == expected
 
 
 def test_score_amendements_auteur_principal_seul():
-    """Cosignataires n'ont pas de points (R43-A bis 2026-05-17) — vérifier
-    que `amdt_cosigne` ne contribue PAS au score."""
+    """R43-B : amdt_depose = 0.5, amdt_adopte = 2. Cosignataires = 0 pt."""
     c = CompteurActeur(amdt_depose=10, amdt_adopte=3, amdt_cosigne=50)
-    expected = 10 * SCORE["amdt_depose"] + 3 * SCORE["amdt_adopte"]
+    expected = 10 * 0.5 + 3 * 2  # 5 + 6 = 11
     assert c.score() == expected
 
 
 def test_score_textes_legislatifs():
+    """R43-B nouvelle pondération."""
     c = CompteurActeur(
-        ppl_premier_signataire=1,           # 15 pts
-        ppl_signataire=2,                   # 20 pts
-        texte_adopte_premier_signataire=1,  # 25 pts bonus
-        resolution_signataire=3,            # 15 pts
+        ppl_premier_signataire=1,           # 15
+        ppl_signataire=2,                   # 10 (2x5)
+        texte_adopte_premier_signataire=1,  # 10 bonus
+        resolution_signataire=3,            # 9 (3x3)
     )
-    expected = 15 + 20 + 25 + 15
+    expected = 15 + 10 + 10 + 9
     assert c.score() == expected
 
 
 def test_score_rapporteur():
+    """R43-B : rapporteur principal = 10, rapporteur avis/co = 5, rapport
+    parlementaire = 10."""
     c = CompteurActeur(
-        rapporteur_principal=1,             # 15 pts
-        rapporteur_avis_co=2,               # 20 pts
-        rapport_parlementaire_auteur=1,     # 15 pts
+        rapporteur_principal=1,             # 10
+        rapporteur_avis_co=2,               # 10 (2x5)
+        rapport_parlementaire_auteur=1,     # 10
     )
-    expected = 15 + 20 + 15
+    expected = 10 + 10 + 10
     assert c.score() == expected
 
 
-def test_score_composite_realiste():
-    """Simule un rapporteur PPL Sport pro actif type."""
+def test_score_appartenance():
+    """R43-B : nouveaux critères d'appartenance."""
     c = CompteurActeur(
-        qe=8, qag=2, qosd=1,                # 8+10+1 = 19
-        amdt_depose=12, amdt_adopte=5,      # 24+25 = 49
-        amdt_cosigne=80,                    # 0 (R43-A bis)
-        rapporteur_principal=1,             # 15
-        ppl_signataire=2,                   # 20
+        membre_commission_culture=1,         # 5
+        membre_groupe_etude_sport=1,         # 5
     )
-    expected = 19 + 49 + 15 + 20
+    assert c.score() == 10
+
+
+def test_score_composite_realiste_savin():
+    """Simule Michel Savin Sénat — pondération R43-B."""
+    c = CompteurActeur(
+        membre_commission_culture=1,         # 5
+        membre_groupe_etude_sport=1,         # 5
+        rapporteur_principal=1,              # 10 (PPL Sport pro)
+        rapport_parlementaire_auteur=1,      # 10 (Football-business)
+    )
+    expected = 5 + 5 + 10 + 10
     assert c.score() == expected
 
 

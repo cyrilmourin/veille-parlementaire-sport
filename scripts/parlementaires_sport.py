@@ -81,16 +81,29 @@ CACHE_DIR = ROOT / "data" / "parlementaires_cache"
 # Scoring
 # ---------------------------------------------------------------------------
 
-SCORE = {
-    "qe": 1, "qosd": 1, "qag": 5,
-    "amdt_depose": 2, "amdt_adopte": 5,    # adopte = bonus en plus du depose
-    "rapporteur_principal": 15,
-    "rapporteur_avis_co": 10,
+# R43-B (2026-05-17) — Nouvelle pondération validée par Cyril.
+# Choix structurants :
+# - amdt_depose réduit (0.5 vs 2) : un rapporteur dépose mécaniquement
+#   beaucoup, pas besoin de double-pondérer
+# - bonus texte_adopte_premier_signataire réduit (10 vs 25) ET appliqué
+#   uniquement si texte PROMULGUÉ (pas juste adopté en commission/séance)
+# - ajout 2 critères d'appartenance : commission Culture (5), groupe
+#   d'étude/mission d'info/commission d'enquête sport (5)
+# Tous les pts sont des int sauf amdt_depose (0.5) → on travaille en
+# float et arrondit à l'entier au rendu pour rester lisible.
+SCORE: dict[str, float] = {
+    "membre_commission_culture": 5,
+    "membre_groupe_etude_sport": 5,
+    "qe": 2, "qosd": 2, "qag": 5,
+    "amdt_depose": 0.5, "amdt_adopte": 2,
+    "rapporteur_principal": 10,
+    "rapporteur_avis_co": 5,
     "ppl_premier_signataire": 15,
-    "ppl_signataire": 10,
-    "texte_adopte_premier_signataire": 25,  # bonus en plus du « 1er signataire PPL »
-    "resolution_signataire": 5,
-    "rapport_parlementaire_auteur": 15,
+    "ppl_signataire": 5,
+    "texte_adopte_premier_signataire": 10,  # bonus, applicable SEULEMENT si
+                                             # texte promulgué (loi parue au JO)
+    "resolution_signataire": 3,
+    "rapport_parlementaire_auteur": 10,     # auteur OU co-auteur
 }
 
 # ---------------------------------------------------------------------------
@@ -109,6 +122,7 @@ class Acteur:
     circonscription: str = ""
     photo_url: str = ""
     fiche_url: str = ""
+    organes_refs: list[str] = field(default_factory=list)  # mandats actifs
 
     @property
     def label_court(self) -> str:
@@ -119,6 +133,9 @@ class Acteur:
 class CompteurActeur:
     acteur_ref: str = ""
     chambre: str = ""
+    # R43-B (2026-05-17) : critères d'appartenance (binaire, 0 ou 1)
+    membre_commission_culture: int = 0
+    membre_groupe_etude_sport: int = 0
     # Compteurs détaillés par type d'activité
     qe: int = 0
     qosd: int = 0
@@ -144,9 +161,11 @@ class CompteurActeur:
     # Activités tracées (pour affichage détaillé)
     activites: list[dict] = field(default_factory=list)
 
-    def score(self) -> int:
+    def score(self) -> float:
         return (
-            self.qe * SCORE["qe"]
+            self.membre_commission_culture * SCORE["membre_commission_culture"]
+            + self.membre_groupe_etude_sport * SCORE["membre_groupe_etude_sport"]
+            + self.qe * SCORE["qe"]
             + self.qosd * SCORE["qosd"]
             + self.qag * SCORE["qag"]
             + self.amdt_depose * SCORE["amdt_depose"]
@@ -290,8 +309,10 @@ def load_acteurs_an(zip_path: Path) -> dict[str, Acteur]:
                 continue
             ec = a.get("etatCivil") or {}
             ident = ec.get("ident") or {}
-            # Mandat actif → groupe + circonscription
+            # Mandat actif → groupe + circonscription + tous les organes
             grp_abr = grp_long = circo = ""
+            all_organes: list[str] = []  # R43-B : nécessaire pour
+                                          # détecter la commission Culture
             mandats = (a.get("mandats") or {}).get("mandat") or []
             if isinstance(mandats, dict):
                 mandats = [mandats]
@@ -302,15 +323,16 @@ def load_acteurs_an(zip_path: Path) -> dict[str, Acteur]:
                 date_fin = _text_of(m.get("dateFin"))
                 if date_fin:
                     continue  # mandat expiré
-                # Groupe : organeRef de type GP
+                # Tous les organeRef du mandat (groupe + commissions + délégations)
                 organes = m.get("organes") or {}
                 orgs = organes.get("organeRef") or []
                 if isinstance(orgs, str):
                     orgs = [orgs]
                 for oref in orgs:
-                    if oref in organe_to_groupe:
+                    if oref and oref not in all_organes:
+                        all_organes.append(oref)
+                    if oref in organe_to_groupe and not grp_abr:
                         grp_abr, grp_long = organe_to_groupe[oref]
-                        break
                 # Circonscription
                 lieu = (m.get("election") or {}).get("lieu") or {}
                 if isinstance(lieu, dict):
@@ -331,6 +353,7 @@ def load_acteurs_an(zip_path: Path) -> dict[str, Acteur]:
                 circonscription=circo,
                 photo_url=_build_an_photo_url(acteur_ref),
                 fiche_url=_build_an_fiche_url(acteur_ref),
+                organes_refs=all_organes,
             )
     log.info("Acteurs AN chargés : %d", len(registry))
     return registry
@@ -340,9 +363,26 @@ def load_acteurs_an(zip_path: Path) -> dict[str, Acteur]:
 # 2. Index dosleg sport (titre du dossier matche keyword sport)
 # ---------------------------------------------------------------------------
 
-def build_dosleg_sport_index(zip_path: Path, matcher: KeywordMatcher) -> set[str]:
-    """Retourne {dossierRef} (DLR5L17NXXXX) dont le titre matche sport."""
-    sport_doslegs: set[str] = set()
+def _detect_promulgated(dp: dict) -> bool:
+    """R43-B (2026-05-17) — Détecte si un dossierParlementaire AN porte
+    un acte « Promulgation_Type » dans `actesLegislatifs`.
+
+    Cyril : « n'est adopté qu'un texte promulgué » → critère strict.
+    """
+    raw_str = json.dumps(dp, ensure_ascii=False)
+    return (
+        "Promulgation_Type" in raw_str
+        or '"Promulgation de la loi"' in raw_str
+        or '"Promulgation d\'une loi"' in raw_str
+    )
+
+
+def build_dosleg_sport_index(zip_path: Path, matcher: KeywordMatcher) -> dict[str, bool]:
+    """R43-B (2026-05-17) — Retourne `{dossierRef: is_promulgated}` pour
+    les dossiers sport.
+    """
+    sport_doslegs: dict[str, bool] = {}
+    n_promulg = 0
     with zipfile.ZipFile(zip_path) as z:
         for name in z.namelist():
             if not name.startswith("json/dossierParlementaire/"):
@@ -359,8 +399,14 @@ def build_dosleg_sport_index(zip_path: Path, matcher: KeywordMatcher) -> set[str
             titre = _text_of(titre_node.get("titre"))
             matched, _fams = matcher.match(titre)
             if matched:
-                sport_doslegs.add(uid)
-    log.info("Dossiers législatifs sport indexés : %d", len(sport_doslegs))
+                is_prom = _detect_promulgated(dp)
+                sport_doslegs[uid] = is_prom
+                if is_prom:
+                    n_promulg += 1
+    log.info(
+        "Dossiers législatifs sport indexés : %d (dont %d promulgués)",
+        len(sport_doslegs), n_promulg,
+    )
     return sport_doslegs
 
 
@@ -570,7 +616,7 @@ def _document_auteurs(doc: dict) -> tuple[list[str], list[str], list[str]]:
 
 def scan_documents_an(
     zip_path: Path, matcher: KeywordMatcher, registry: dict[str, Acteur],
-    counters: dict[str, CompteurActeur], dosleg_sport: set[str],
+    counters: dict[str, CompteurActeur], dosleg_sport: dict[str, bool],
 ) -> dict[str, int]:
     """Parcourt les documents PIONAN/PNRE/RAPPAN/AVIS/RINF. Compte selon
     le type + lien avec un dosleg sport.
@@ -597,10 +643,11 @@ def scan_documents_an(
                 continue
 
             type_doc = _text_of((doc.get("classification") or {}).get("type", {}).get("code"))
-            # Adopté ? Présence d'un texte adopté côté dosleg parent — on utilise
-            # `statutAdoption` du document.
-            statut = _text_of((doc.get("classification") or {}).get("statutAdoption"))
-            is_adopte = "adopt" in (statut or "").lower()
+            # R43-B (2026-05-17) — « adopté » strict = promulgué (loi
+            # parue au JO). Cyril : « n'est adopté qu'un texte
+            # promulgué ». On lit le flag depuis le dossier parent
+            # (capté par `_detect_promulgated` dans `build_dosleg_sport_index`).
+            is_promulgated = dosleg_sport.get(dossier_ref, False)
 
             premiers, cosig, rapporteurs = _document_auteurs(doc)
 
@@ -609,7 +656,7 @@ def scan_documents_an(
                 for ref in premiers:
                     c = counters[ref]; c.acteur_ref = ref; c.chambre = "AN"
                     c.ppl_premier_signataire += 1
-                    if is_adopte:
+                    if is_promulgated:
                         c.texte_adopte_premier_signataire += 1
                 for ref in cosig:
                     c = counters[ref]; c.acteur_ref = ref; c.chambre = "AN"
@@ -713,6 +760,129 @@ def _titlecase_nom(nom: str) -> str:
         "-".join(part.capitalize() for part in word.split("-"))
         for word in nom.split()
     )
+
+
+def _load_yaml(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        import yaml
+        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception as e:
+        log.warning("YAML load %s : %s", path, e)
+        return {}
+
+
+def scan_manual_reports(
+    counters: dict[str, CompteurActeur],
+    registry: dict[str, Acteur],
+    senat_slugs: dict,
+) -> int:
+    """R43-B (2026-05-17) — Lit config/sport_reports_manual.yml et
+    crédite les auteurs/co-auteurs en `rapport_parlementaire_auteur`.
+
+    Permet de capter les rapports d'information Sénat (invisibles dans
+    le flux AKN) — typiquement le rapport « Football-business : stop ou
+    encore ? » de Lafon (président) + Savin (rapporteur).
+    """
+    cfg = _load_yaml(ROOT / "config" / "sport_reports_manual.yml")
+    items = cfg.get("items") or []
+    n = 0
+    for entry in items:
+        chamber = (entry.get("chamber") or "").strip()
+        date_str = (entry.get("date") or "").strip()
+        if date_str and date_str < LEGISLATURE_START:
+            continue
+        for a in entry.get("auteurs") or []:
+            if not isinstance(a, dict):
+                continue
+            prenom = (a.get("prenom") or "").strip()
+            nom = (a.get("nom") or "").strip()
+            if not (prenom or nom):
+                continue
+            if chamber == "Senat":
+                sid = _ensure_senat_acteur(prenom, nom, registry, senat_slugs)
+            else:
+                # AN : on tente match par acteurRef si présent, sinon
+                # on saute (les rapports AN passent déjà via le dump).
+                ref = (a.get("acteur_ref") or "").strip()
+                if ref and ref in registry:
+                    sid = ref
+                else:
+                    continue
+            c = counters[sid]
+            c.acteur_ref = sid
+            c.chambre = chamber if chamber else c.chambre
+            c.rapport_parlementaire_auteur += 1
+            n += 1
+    log.info("Rapports manuels sport : %d crédits", n)
+    return n
+
+
+def apply_membership_credits(
+    counters: dict[str, CompteurActeur],
+    registry: dict[str, Acteur],
+    senat_slugs: dict,
+    an_commission_culture_organe: str = "PO420120",
+) -> dict[str, int]:
+    """R43-B (2026-05-17) — Applique les crédits d'appartenance :
+    - Membre commission Culture (AN ou Sénat)
+    - Membre groupe d'étude sport / mission info sport (Sénat
+      uniquement, cf. Cyril)
+
+    Sources : YAML manuel + détection AN via mandats AMO10.
+    """
+    cfg = _load_yaml(ROOT / "config" / "sport_membership_manual.yml")
+    stats: dict[str, int] = defaultdict(int)
+
+    # 1. Commission Culture Sénat (YAML)
+    for m in cfg.get("commission_culture_senat") or []:
+        if not isinstance(m, dict):
+            continue
+        prenom = (m.get("prenom") or "").strip()
+        nom = (m.get("nom") or "").strip()
+        sid = _ensure_senat_acteur(prenom, nom, registry, senat_slugs)
+        counters[sid].acteur_ref = sid
+        counters[sid].chambre = "Senat"
+        counters[sid].membre_commission_culture = 1
+        stats["commission_culture_senat"] += 1
+
+    # 2. Groupe d'étude sport Sénat (YAML)
+    for m in cfg.get("groupe_etude_sport_senat") or []:
+        if not isinstance(m, dict):
+            continue
+        prenom = (m.get("prenom") or "").strip()
+        nom = (m.get("nom") or "").strip()
+        sid = _ensure_senat_acteur(prenom, nom, registry, senat_slugs)
+        counters[sid].acteur_ref = sid
+        counters[sid].chambre = "Senat"
+        counters[sid].membre_groupe_etude_sport = 1
+        stats["groupe_etude_sport_senat"] += 1
+
+    # 3. Commission Culture AN (détection automatique via mandats AMO10)
+    # `an_commission_culture_organe` = PO420120 par défaut. Tout député
+    # dont l'un des organeRef actifs est cette commission est crédité.
+    for ref, acteur in registry.items():
+        if acteur.chambre != "AN":
+            continue
+        if an_commission_culture_organe in (acteur.organes_refs or []):
+            counters[ref].acteur_ref = ref
+            counters[ref].chambre = "AN"
+            counters[ref].membre_commission_culture = 1
+            stats["commission_culture_an"] += 1
+
+    # 4. Overrides manuels AN (cas non détectés)
+    for m in cfg.get("commission_culture_an") or []:
+        if not isinstance(m, dict):
+            continue
+        ref = (m.get("acteur_ref") or "").strip()
+        if ref and ref in registry:
+            counters[ref].acteur_ref = ref
+            counters[ref].chambre = "AN"
+            counters[ref].membre_commission_culture = 1
+
+    log.info("Appartenances sport : %s", dict(stats))
+    return dict(stats)
 
 
 def _ensure_senat_acteur(
@@ -1047,6 +1217,18 @@ def scan_senat_akn(
         if dl_slug:
             dl_slugs_scored.add(dl_slug)
 
+        # Pré-fetch la page dossier législatif Sénat (utilisé pour
+        # détection promulgation + extraction rapporteurs). Idempotent
+        # (cache local).
+        if dl_slug:
+            dl_html_path = CACHE_DIR / "senat_dossiers_dl" / f"{dl_slug}.html"
+            dl_html_path.parent.mkdir(parents=True, exist_ok=True)
+            if not dl_html_path.exists():
+                _fetch_via_curl(
+                    f"https://www.senat.fr/dossier-legislatif/{dl_slug}.html",
+                    dl_html_path, timeout=20,
+                )
+
         # 5) Signataires
         # Le ref auteur est sur FRBRauthor as=#auteur, pointe vers un TLCPerson eId
         author_eid = ""
@@ -1063,13 +1245,26 @@ def scan_senat_akn(
                 signataires = _parse_senat_signataires(show_as)
                 break
 
-        # 6) Adopté ? Vérifie workflow steps pour "adopté"
-        is_adopte = False
+        # 6) Promulgué ? Critère strict Cyril : « n'est adopté qu'un
+        # texte promulgué ». On vérifie via le workflow AKN ET via la
+        # page dossier législatif Sénat (qui mentionne "Loi n° XXXX" si
+        # promulguée).
+        is_promulgated = False
         for step in akn_root.iter("{http://docs.oasis-open.org/legaldocml/ns/akn/3.0}step"):
             outcome = (step.get("outcome") or "").lower()
-            if "adopté" in outcome or "promulguée" in outcome:
-                is_adopte = True
+            if "promulguée" in outcome or "promulgu" in outcome:
+                is_promulgated = True
                 break
+        # Fallback : la page HTML dossier mentionne la promulgation
+        if not is_promulgated and dl_slug:
+            dl_html = CACHE_DIR / "senat_dossiers_dl" / f"{dl_slug}.html"
+            if dl_html.exists():
+                try:
+                    h = dl_html.read_text(encoding="utf-8", errors="ignore")
+                    if re.search(r"Loi\s+n\s*°\s*\d+", h, re.I) or "promulgu" in h.lower():
+                        is_promulgated = True
+                except Exception:
+                    pass
 
         # 7) Scoring
         for i, (civ, prenom, nom) in enumerate(signataires):
@@ -1084,7 +1279,7 @@ def scan_senat_akn(
                 if is_first:
                     c.ppl_premier_signataire += 1
                     stats["ppl_premier_signataire"] += 1
-                    if is_adopte:
+                    if is_promulgated:
                         c.texte_adopte_premier_signataire += 1
                         stats["texte_adopte_premier_signataire"] += 1
                 else:
@@ -1214,8 +1409,10 @@ def render_outputs(
             "circonscription": acteur.circonscription,
             "photo_url": acteur.photo_url,
             "fiche_url": acteur.fiche_url,
-            "score": c.score(),
+            "score": round(c.score(), 1),
             "stats": {
+                "membre_commission_culture": c.membre_commission_culture,
+                "membre_groupe_etude_sport": c.membre_groupe_etude_sport,
                 "qe": c.qe, "qosd": c.qosd, "qag": c.qag,
                 "amdt_depose": c.amdt_depose, "amdt_adopte": c.amdt_adopte,
                 "amdt_cosigne": c.amdt_cosigne,
@@ -1332,6 +1529,12 @@ def main():
     if "AKN_DEPOTS" in paths:
         scan_senat_akn(paths["AKN_DEPOTS"], matcher, counters, registry, senat_slugs)
     scan_senat_amdt_db(matcher, counters, registry, senat_slugs)
+
+    # 5b. Rapports manuels (Sénat — rapports d'info absents AKN)
+    scan_manual_reports(counters, registry, senat_slugs)
+
+    # 5c. Appartenances (commission Culture + groupe d'étude sport)
+    apply_membership_credits(counters, registry, senat_slugs)
 
     # 6. Output
     payload = render_outputs(counters, registry, top_n=args.top)

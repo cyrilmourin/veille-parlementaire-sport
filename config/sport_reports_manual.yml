@@ -1,0 +1,25 @@
+# R43-B (2026-05-17) — Liste manuelle des rapports parlementaires sport.
+#
+# Les rapports d'information ET les rapports législatifs côté Sénat ne
+# sont PAS exposés dans le flux Akoma Ntoso (`depots.xml` ne liste que
+# les textes déposés PPL/PPR/PJL). Pour capturer ces rapports
+# importants côté scoring (10 pts par auteur/co-auteur), on les saisit
+# ici manuellement.
+#
+# Côté AN, les rapports d'information sont déjà capturés via le dump
+# `Dossiers_Legislatifs.json.zip` (type "RINF") — ils restent ici à
+# titre indicatif si besoin de surcharger.
+#
+# Format : items.[{title, chamber, date, number, auteurs[], chambre}].
+# Chaque entrée doit avoir au moins un acteur identifiable (nom Sénat
+# en clair ou acteurRef AN). La date n'est utilisée que pour info ; le
+# filtre de période (>= 2024-07-01) s'applique automatiquement.
+
+items:
+  - title: "Football-business : stop ou encore ?"
+    chamber: Senat
+    date: "2024-10-29"
+    number: "r24-87"
+    auteurs:
+      - {prenom: "Michel", nom: "SAVIN", role: "rapporteur"}
+      - {prenom: "Laurent", nom: "LAFON", role: "president"}

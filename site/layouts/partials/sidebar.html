@@ -133,3 +133,12 @@
   </div>
   {{ end }}
 {{ end }}
+
+{{/* R43-B (2026-05-17) — Top 3 parlementaires actifs sport (version
+     compacte). Visible UNIQUEMENT sur les pages catégorie dosleg /
+     questions / amendements / comptes rendus, en dernier de la sidebar.
+     La page d'accueil porte la version « large » dans le main, et la
+     page dédiée a son propre rendu plein écran. */}}
+{{ if in (slice "dossiers_legislatifs" "questions" "amendements" "comptes_rendus") .Type }}
+  {{ partial "palmares_sidebar.html" . }}
+{{ end }}
