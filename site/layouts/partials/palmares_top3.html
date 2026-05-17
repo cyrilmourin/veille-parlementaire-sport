@@ -68,7 +68,7 @@
           <div class="palm3__photo"></div>
         {{ end }}
         <div class="palm3__name">{{ $p.prenom }} {{ $p.nom }}</div>
-        <div class="palm3__group">{{ $p.groupe }} · {{ $p.chambre }}</div>
+        <div class="palm3__group">{{ with $p.groupe }}{{ . }} · {{ end }}{{ if eq $p.chambre "Senat" }}Sénat{{ else }}AN{{ end }}</div>
         <div class="palm3__score">{{ $p.score }}</div>
         <div class="palm3__score-sub">points</div>
       </div>

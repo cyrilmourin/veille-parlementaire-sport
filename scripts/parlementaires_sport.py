@@ -61,6 +61,20 @@ AN_DUMPS = {
     "DOSLEG": "https://data.assemblee-nationale.fr/static/openData/repository/17/loi/dossiers_legislatifs/Dossiers_Legislatifs.json.zip",
 }
 
+# R43-A bis (2026-05-17) — Sources Sénat. Le Sénat ne fonctionne pas par
+# législature mais par renouvellement triennal partiel ; pour cohérence
+# temporelle avec l'AN, on filtre toutes les activités Sénat à partir du
+# début de la XVIIe législature AN (1er juillet 2024, élections
+# anticipées 2024).
+SENAT_DUMPS = {
+    "AKN_DEPOTS":    "https://www.senat.fr/akomantoso/depots.xml",
+    "AKN_ADOPTIONS": "https://www.senat.fr/akomantoso/adoptions.xml",
+    "Q1AN":          "https://data.senat.fr/data/questions/questions-depuis-un-an.csv",
+    "QG_SENAT":      "https://data.senat.fr/data/questions/qg.csv",
+}
+
+LEGISLATURE_START = "2024-07-01"  # Début XVIIe législature AN
+
 CACHE_DIR = ROOT / "data" / "parlementaires_cache"
 
 # ---------------------------------------------------------------------------
@@ -156,20 +170,38 @@ class CompteurActeur:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _fetch_cached(url: str, name: str, *, force: bool = False) -> Path:
+def _fetch_via_curl(url: str, out_path: Path, *, timeout: int = 180) -> bool:
+    """Délègue à curl (système) pour contourner les problèmes de truststore
+    urllib qui bloque certains certs.gouv.fr."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["curl", "-sL", "--max-time", str(timeout),
+             "-A", "Mozilla/5.0",
+             url, "-o", str(out_path)],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            log.warning("curl fetch fail (rc=%d) for %s : %s",
+                        result.returncode, url, result.stderr[:200])
+            return False
+        return out_path.exists() and out_path.stat().st_size > 0
+    except Exception as e:
+        log.warning("curl exception %s : %s", url, e)
+        return False
+
+
+def _fetch_cached(url: str, name: str, *, force: bool = False, ext: str = ".zip") -> Path:
     """Télécharge un dump et le met en cache local. Skip si déjà cached."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    path = CACHE_DIR / f"{name}.zip"
+    path = CACHE_DIR / f"{name}{ext}"
     if path.exists() and not force:
-        log.info("Cache HIT %s (%d MB)", name, path.stat().st_size / 1_000_000)
+        log.info("Cache HIT %s (%d KB)", name, path.stat().st_size // 1024)
         return path
     log.info("Fetch %s …", name)
-    import urllib.request
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        data = resp.read()
-    path.write_bytes(data)
-    log.info("  → %d MB", len(data) / 1_000_000)
+    if not _fetch_via_curl(url, path):
+        raise RuntimeError(f"Fetch failed for {name}")
+    log.info("  → %d KB", path.stat().st_size // 1024)
     return path
 
 
@@ -620,112 +652,425 @@ def scan_documents_an(
 # 4. Sénat — depuis la DB veille existante
 # ---------------------------------------------------------------------------
 
-def scan_senat_from_db(
+def _normalize_name(s: str) -> str:
+    """Normalise un nom (sans accents, sans casse, sans espaces) pour
+    indexation."""
+    import unicodedata
+    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "", s.lower())
+
+
+def _senat_id(prenom: str, nom: str) -> str:
+    return "SENAT::" + _normalize_name(f"{prenom}{nom}")
+
+
+def _load_senat_slugs() -> dict:
+    """Charge data/senat_slugs.json et l'indexe par nom normalisé.
+
+    Format source : {"entries": [{slug, nom_usuel, prenom_usuel, key,
+    photo_url, fiche_url}, ...]}. On construit un index par
+    `_normalize_name(prenom + nom)`.
+    """
+    slugs_path = ROOT / "data" / "senat_slugs.json"
+    if not slugs_path.exists():
+        return {}
+    raw = json.loads(slugs_path.read_text())
+    indexed: dict[str, dict] = {}
+    entries = raw.get("entries") if isinstance(raw, dict) else None
+    if entries:
+        for e in entries:
+            if not isinstance(e, dict):
+                continue
+            nom = e.get("nom_usuel") or ""
+            prenom = e.get("prenom_usuel") or ""
+            key = _normalize_name(f"{prenom}{nom}")
+            if key:
+                indexed[key] = e
+            # Index aussi sur nom seul (fallback désambiguïsation imparfaite)
+            indexed.setdefault(_normalize_name(nom), e)
+    return indexed
+
+
+def _senat_meta_from_slugs(prenom: str, nom: str, senat_slugs: dict) -> tuple[str, str]:
+    """Retourne (photo_url, fiche_url)."""
+    key = _normalize_name(f"{prenom}{nom}")
+    entry = senat_slugs.get(key) or senat_slugs.get(_normalize_name(nom))
+    if isinstance(entry, dict):
+        return entry.get("photo_url", ""), entry.get("fiche_url", "")
+    return "", ""
+
+
+def _titlecase_nom(nom: str) -> str:
+    """Normalise un NOM en casse mixte (« LAFON » → « Lafon », « LE GAC »
+    → « Le Gac »). Préserve les NOM-NOM (« FIRMIN-LE BODO » →
+    « Firmin-Le Bodo »)."""
+    if not nom:
+        return ""
+    # Si déjà casse mixte, on ne touche pas
+    if any(c.islower() for c in nom):
+        return nom
+    return " ".join(
+        "-".join(part.capitalize() for part in word.split("-"))
+        for word in nom.split()
+    )
+
+
+def _ensure_senat_acteur(
+    prenom: str, nom: str, registry: dict[str, Acteur],
+    senat_slugs: dict, civ: str = "", groupe: str = "",
+) -> str:
+    """Inscrit ou met à jour le sénateur dans le registre. Retourne son ID."""
+    sid = _senat_id(prenom, nom)
+    # Normalisation du NOM en casse mixte pour l'affichage
+    nom_display = _titlecase_nom(nom)
+    prenom_display = prenom.strip() if prenom else ""
+    if sid not in registry:
+        photo, fiche = _senat_meta_from_slugs(prenom, nom, senat_slugs)
+        registry[sid] = Acteur(
+            acteur_ref=sid, chambre="Senat",
+            civ=civ, prenom=prenom_display, nom=nom_display,
+            groupe_abrege=groupe, photo_url=photo, fiche_url=fiche,
+        )
+    else:
+        # Compléter les champs manquants
+        a = registry[sid]
+        if not a.groupe_abrege and groupe:
+            a.groupe_abrege = groupe
+        if not a.civ and civ:
+            a.civ = civ
+        if not a.prenom and prenom_display:
+            a.prenom = prenom_display
+        # Préfère le NOM en casse mixte si nouveau plus propre
+        if a.nom.isupper() and not nom_display.isupper():
+            a.nom = nom_display
+    return sid
+
+
+# ---------------------------------------------------------------------------
+# 4a. Sénat — questions via CSV
+# ---------------------------------------------------------------------------
+
+def scan_senat_questions_csv(
+    csv_path: Path, matcher: KeywordMatcher,
+    counters: dict[str, CompteurActeur],
+    registry: dict[str, Acteur],
+    senat_slugs: dict,
+    since: str = LEGISLATURE_START,
+) -> int:
+    """Parse `questions-depuis-un-an.csv` ou `qg.csv` Sénat.
+
+    Filtre : date publication JO ≥ `since`. Match sport sur titre + thème.
+    """
+    import csv as _csv
+    n = 0
+    # CSV Sénat encodé ISO-8859-1 / Latin-1 historiquement
+    with open(csv_path, encoding="latin-1") as f:
+        reader = _csv.DictReader(f, delimiter=";")
+        for r in reader:
+            date_jo = (r.get("Date de publication JO") or "")[:10]
+            if not date_jo or date_jo < since:
+                continue
+            hay_parts = [
+                r.get("Titre") or "",
+                r.get("Thème(s)") or "",
+                r.get("Thème QC") or "",
+                r.get("Ministère de réponse") or "",
+            ]
+            matched, _ = matcher.match(" ".join(hay_parts))
+            if not matched:
+                continue
+            nom = (r.get("Nom") or "").strip()
+            prenom = (r.get("Prénom") or "").strip()
+            if not (nom and prenom):
+                continue
+            nature = (r.get("Nature") or "QE").upper()
+            sid = _ensure_senat_acteur(
+                prenom, nom, registry, senat_slugs,
+                civ=(r.get("Civilité") or ""),
+                groupe=(r.get("Groupe") or ""),
+            )
+            c = counters[sid]
+            c.acteur_ref = sid
+            c.chambre = "Senat"
+            if nature == "QG":
+                c.qag += 1
+            elif nature == "QOSD":
+                c.qosd += 1
+            else:
+                c.qe += 1
+            n += 1
+    log.info("Questions Sénat sport (≥ %s, %s) : %d",
+             since, csv_path.name, n)
+    return n
+
+
+# ---------------------------------------------------------------------------
+# 4b. Sénat — PPL / PPR / PJL via Akoma Ntoso
+# ---------------------------------------------------------------------------
+
+# Regex de découpe d'un showAs Sénat type :
+#   "Par Mme Agnès FIRMIN-LE BODO, MM. Philippe BONNECARRERE, Alain DAVID, ...,
+#    Mmes Sandrine LE FEUR, Liliane TANGUY, ..., et M. Vincent CAURE,
+#    Députés"
+# Pattern : <civilité> <prénom-éventuel> <NOM_EN_MAJUSCULES>
+# La civilité distribue sur les noms qui suivent jusqu'au prochain titre.
+_SENAT_SIGNATAIRE_RE = re.compile(
+    r"(?:^|,|\s+et\s+)\s*"
+    r"(?P<civ>Mme|MM\.|M\.|Mmes)\s+"
+    r"(?P<rest>[^,]+?)"
+    r"(?=,|\s+et\s+|\s+(?:Mme|MM\.|M\.|Mmes)\s+|$)",
+    re.IGNORECASE,
+)
+
+
+def _parse_senat_signataires(show_as: str) -> list[tuple[str, str, str]]:
+    """Extrait [(civ, prenom, NOM)] depuis un showAs AKN Sénat.
+
+    Heuristique : civilité (M./Mme/MM./Mmes) suivie d'un ou plusieurs
+    noms séparés par virgules. Le NOM est en MAJUSCULES (convention
+    Sénat AKN), le prénom le précède en casse mixte. Si le bloc commence
+    sans prénom (cas « MM. BONNECARRERE, DAVID, ... »), le prénom est
+    vide.
+    """
+    if not show_as:
+        return []
+    # Strip "Par " initial et terminaison "Députés"/"Sénateurs"
+    txt = re.sub(r"^Par\s+", "", show_as.strip())
+    txt = re.sub(r",\s*(D[ée]put[ée]s|S[ée]nateurs).*$", "", txt)
+
+    out: list[tuple[str, str, str]] = []
+    current_civ = ""
+    # Tokenize par virgules ou " et "
+    parts = re.split(r"\s*(?:,|\s+et\s+)\s*", txt)
+    for p in parts:
+        p = p.strip()
+        if not p:
+            continue
+        # Détecte une civilité en tête
+        m_civ = re.match(r"^(Mmes|Mme|MM\.|M\.)\s+(.+)$", p)
+        if m_civ:
+            current_civ = m_civ.group(1)
+            rest = m_civ.group(2)
+        else:
+            rest = p
+        # Tente de découper Prénom NOM
+        # NOM = séquence de mots en majuscules (avec accents possibles, tirets)
+        m_name = re.match(
+            r"^(?P<prenom>[A-ZÉÈÊËÀÂÄÎÏÔÖÙÛÜÇŒ][a-zéèêëàâäîïôöùûüçœ\-']+(?:\s+[A-ZÉÈÊËÀÂÄÎÏÔÖÙÛÜÇŒ][a-zéèêëàâäîïôöùûüçœ\-']+)*)?\s*"
+            r"(?P<nom>[A-ZÉÈÊËÀÂÄÎÏÔÖÙÛÜÇŒ\-']+(?:\s+[A-ZÉÈÊËÀÂÄÎÏÔÖÙÛÜÇŒ\-']+)*)$",
+            rest,
+        )
+        if m_name:
+            prenom = (m_name.group("prenom") or "").strip()
+            nom = m_name.group("nom").strip()
+            out.append((current_civ, prenom, nom))
+    return out
+
+
+def scan_senat_akn(
+    akn_index_path: Path, matcher: KeywordMatcher,
+    counters: dict[str, CompteurActeur],
+    registry: dict[str, Acteur],
+    senat_slugs: dict,
+    since: str = LEGISLATURE_START,
+) -> dict[str, int]:
+    """Parse l'index Akoma Ntoso Sénat (`depots.xml`) puis pour chaque
+    texte récent dépose les signataires.
+
+    Une PPL/PPR Sénat liste tous ses signataires dans `TLCPerson.showAs`
+    sous forme libre. Le premier nommé est le 1er signataire (premiers
+    pts) ; les autres sont cosignataires.
+    """
+    from xml.etree import ElementTree as ET
+
+    stats: dict[str, int] = defaultdict(int)
+    # Parse index
+    try:
+        tree = ET.parse(akn_index_path)
+    except Exception as e:
+        log.warning("AKN index parse error : %s", e)
+        return {}
+    root = tree.getroot()
+
+    # Cache des fichiers .akn.xml individuels
+    akn_files_dir = CACHE_DIR / "senat_akn_files"
+    akn_files_dir.mkdir(parents=True, exist_ok=True)
+
+    # Fetch chaque texte de l'index (filtré par date)
+    n_total = 0
+    n_sport = 0
+    for txt_node in root.findall(".//{*}text") + root.findall("text"):
+        url_node = txt_node.find("{*}url") or txt_node.find("url")
+        date_node = txt_node.find("{*}lastModifiedDateTime") or txt_node.find("lastModifiedDateTime")
+        if url_node is None or date_node is None:
+            continue
+        url = url_node.text or ""
+        date_str = (date_node.text or "")[:10]
+        # Filtre brut : on prend tous les textes, le vrai date dépot est dans le .akn.xml
+        # mais on peut pré-filtrer sur lastModified (≥ since)
+        if date_str < since:
+            continue
+        # Nom de fichier court pour cache
+        local_name = url.split("/")[-1]
+        local_path = akn_files_dir / local_name
+        if not local_path.exists():
+            if not _fetch_via_curl(url, local_path, timeout=30):
+                continue
+        n_total += 1
+        # Parse le fichier individuel
+        try:
+            akn_tree = ET.parse(local_path)
+        except Exception:
+            continue
+        akn_root = akn_tree.getroot()
+        # Namespace AKN 3.0
+        NS = {"akn": "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"}
+
+        # 1) Titre/alias
+        titre_alias = ""
+        for fra in akn_root.iter("{http://docs.oasis-open.org/legaldocml/ns/akn/3.0}FRBRalias"):
+            if fra.get("name") == "intitule-court":
+                titre_alias = fra.get("value", "")
+                break
+        # 2) Date dépôt
+        depot_date = ""
+        for d in akn_root.iter("{http://docs.oasis-open.org/legaldocml/ns/akn/3.0}FRBRdate"):
+            if d.get("name") == "#presentation":
+                depot_date = d.get("date", "")
+                break
+        if depot_date and depot_date < since:
+            continue
+        # 3) Type (ppl/ppr/pjl/...)
+        type_doc = ""
+        for bill in akn_root.iter("{http://docs.oasis-open.org/legaldocml/ns/akn/3.0}bill"):
+            type_doc = bill.get("name", "")
+            break
+
+        # 4) Sport ? Titre matche
+        matched, _ = matcher.match(titre_alias)
+        if not matched:
+            continue
+        n_sport += 1
+
+        # 5) Signataires
+        # Le ref auteur est sur FRBRauthor as=#auteur, pointe vers un TLCPerson eId
+        author_eid = ""
+        for fa in akn_root.iter("{http://docs.oasis-open.org/legaldocml/ns/akn/3.0}FRBRauthor"):
+            if fa.get("as") == "#auteur":
+                href = fa.get("href", "")
+                author_eid = href.lstrip("#")
+                break
+        # Cherche le TLCPerson correspondant
+        signataires: list[tuple[str, str, str]] = []
+        for tlc in akn_root.iter("{http://docs.oasis-open.org/legaldocml/ns/akn/3.0}TLCPerson"):
+            if tlc.get("eId") == author_eid:
+                show_as = tlc.get("showAs", "")
+                signataires = _parse_senat_signataires(show_as)
+                break
+
+        # 6) Adopté ? Vérifie workflow steps pour "adopté"
+        is_adopte = False
+        for step in akn_root.iter("{http://docs.oasis-open.org/legaldocml/ns/akn/3.0}step"):
+            outcome = (step.get("outcome") or "").lower()
+            if "adopté" in outcome or "promulguée" in outcome:
+                is_adopte = True
+                break
+
+        # 7) Scoring
+        for i, (civ, prenom, nom) in enumerate(signataires):
+            if not nom:
+                continue
+            sid = _ensure_senat_acteur(prenom, nom, registry, senat_slugs, civ=civ)
+            c = counters[sid]
+            c.acteur_ref = sid
+            c.chambre = "Senat"
+            is_first = (i == 0)
+            if type_doc == "ppl":
+                if is_first:
+                    c.ppl_premier_signataire += 1
+                    stats["ppl_premier_signataire"] += 1
+                    if is_adopte:
+                        c.texte_adopte_premier_signataire += 1
+                        stats["texte_adopte_premier_signataire"] += 1
+                else:
+                    c.ppl_signataire += 1
+                    stats["ppl_signataire"] += 1
+            elif type_doc in ("ppr", "pre"):  # proposition de résolution
+                c.resolution_signataire += 1
+                stats["resolution_signataire"] += 1
+            # pjl : initiative gouv, on ne crédite pas de pts au sénateur
+
+    log.info("AKN Sénat : %d textes scannés (≥ %s), %d sport-relevant",
+             n_total, since, n_sport)
+    log.info("AKN Sénat scoring : %s", dict(stats))
+    return dict(stats)
+
+
+# ---------------------------------------------------------------------------
+# 4c. Sénat — amendements via DB veille (faute de dump consolidé)
+# ---------------------------------------------------------------------------
+
+def scan_senat_amdt_db(
     matcher: KeywordMatcher,
     counters: dict[str, CompteurActeur],
     registry: dict[str, Acteur],
+    senat_slugs: dict,
+    since: str = LEGISLATURE_START,
 ) -> dict[str, int]:
-    """Lit data/veille.sqlite3 pour récupérer les items Sénat sport déjà
-    filtrés par le pipeline daily.
+    """Lit data/veille.sqlite3 pour les amdt Sénat sport déjà ingérés.
 
-    Sources Sénat couvertes :
-      - senat_questions_1an / senat_qg → QE / QAG / QOSD
-      - senat_amendements_*           → amdt (déposé + adopté)
-      - dossiers_legislatifs Sénat    → PPL / résolutions (auteur en clair)
-
-    Limites : les CSV Sénat n'ont pas d'acteurRef stable → on indexe par
-    `nom + prénom` normalisés. Photos via data/senat_slugs.json.
+    LIMITATION : le pipeline daily n'a pas vocation à conserver des amdt
+    Sénat anciens en DB. Coverage = ~6 mois glissants. Le sénateur très
+    actif fin 2024 sur PPL Sport pro peut être sous-représenté.
     """
     import sqlite3
     db_path = ROOT / "data" / "veille.sqlite3"
     if not db_path.exists():
-        log.warning("DB veille.sqlite3 absente — Sénat skip")
         return {}
-
-    # Photos sénateurs
-    slugs_path = ROOT / "data" / "senat_slugs.json"
-    senat_slugs: dict[str, str] = {}
-    if slugs_path.exists():
-        senat_slugs = json.loads(slugs_path.read_text())
-
-    def _normalize_name(s: str) -> str:
-        import unicodedata
-        s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode()
-        return re.sub(r"[^a-z0-9]+", "", s.lower())
-
-    def _senat_id(prenom: str, nom: str) -> str:
-        return "SENAT::" + _normalize_name(f"{prenom}{nom}")
 
     stats: dict[str, int] = defaultdict(int)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cur = conn.execute(
-        "SELECT * FROM items WHERE chamber='Senat' "
+        "SELECT * FROM items WHERE chamber='Senat' AND category='amendements' "
         "AND matched_keywords != '[]'"
     )
     for row in cur:
-        cat = row["category"]
+        pub = (row["published_at"] or "")[:10]
+        if pub and pub < since:
+            continue
         try:
             raw = json.loads(row["raw"] or "{}")
         except Exception:
             raw = {}
-        nom = (raw.get("nom") or raw.get("Nom") or "").strip()
-        prenom = (raw.get("prenom") or raw.get("Prénom") or raw.get("Prenom") or "").strip()
-        if not (nom and prenom):
-            # Auteur en clair texte parfois
-            auteur = raw.get("auteur") or ""
-            m = re.match(r"^(M\.|Mme|MM\.|Mme\.)?\s*([^,]+)$", auteur)
-            if m:
-                full = m.group(2).strip()
-                # Heuristique : « Prénom NOM » avec NOM en majuscule
-                parts = full.split()
-                if len(parts) >= 2:
-                    prenom = parts[0]
-                    nom = " ".join(p for p in parts[1:] if p.isupper() or p[:1].isupper())
-        if not (nom and prenom):
+        # Auteur en clair texte
+        auteur = (raw.get("auteur") or "").strip()
+        if not auteur:
             continue
-        sid = _senat_id(prenom, nom)
+        # Heuristique parsing Prénom NOM (le NOM est typiquement en majuscules dans amdt Sénat)
+        m = re.match(
+            r"^(M\.|Mme)\s*"
+            r"(?P<prenom>[^,]+?)\s+"
+            r"(?P<nom>[A-ZÉÈÊËÀÂÄÎÏÔÖÙÛÜÇŒ\-' ]+?)$",
+            auteur,
+        )
+        if not m:
+            continue
+        prenom = m.group("prenom").strip()
+        nom = m.group("nom").strip()
+        sid = _ensure_senat_acteur(prenom, nom, registry, senat_slugs,
+                                    civ=(raw.get("civ") or ""),
+                                    groupe=(raw.get("groupe") or ""))
         c = counters[sid]
-        c.acteur_ref = sid
-        c.chambre = "Senat"
-
-        groupe = (raw.get("groupe") or raw.get("Groupe") or "").strip()
-        if sid not in registry:
-            registry[sid] = Acteur(
-                acteur_ref=sid, chambre="Senat",
-                civ=(raw.get("Civilité") or raw.get("civilite") or ""),
-                prenom=prenom, nom=nom, groupe_abrege=groupe,
-                photo_url=(senat_slugs.get(_normalize_name(f"{prenom}{nom}"), {}) or {}).get("photo_url", ""),
-                fiche_url=(senat_slugs.get(_normalize_name(f"{prenom}{nom}"), {}) or {}).get("fiche_url", ""),
-            )
-
-        # Catégorisation
-        if cat == "questions":
-            nature = (raw.get("Nature") or raw.get("nature") or "").upper()
-            if nature == "QG":
-                c.qag += 1; stats["qag"] += 1
-            elif nature == "QOSD":
-                c.qosd += 1; stats["qosd"] += 1
-            else:
-                c.qe += 1; stats["qe"] += 1
-        elif cat == "amendements":
-            c.amdt_depose += 1; stats["amdt_depose"] += 1
-            sort_label = (raw.get("sort") or raw.get("etat") or "").lower()
-            if "adopt" in sort_label:
-                c.amdt_adopte += 1; stats["amdt_adopte"] += 1
-        elif cat == "dossiers_legislatifs":
-            # Heuristique : titre commence par "Proposition de résolution" → résolution
-            titre = (row["title"] or "").lower()
-            if titre.startswith("proposition de résolution"):
-                c.resolution_signataire += 1; stats["resolution_signataire"] += 1
-            elif titre.startswith("proposition de loi"):
-                c.ppl_premier_signataire += 1; stats["ppl_premier_signataire"] += 1
-                statut = (raw.get("statut") or row["status_label"] or "").lower()
-                if "promulg" in statut or "adopt" in statut:
-                    c.texte_adopte_premier_signataire += 1
-                    stats["texte_adopte_premier_signataire"] += 1
+        c.acteur_ref = sid; c.chambre = "Senat"
+        c.amdt_depose += 1
+        stats["amdt_depose"] += 1
+        sort_label = (raw.get("sort") or raw.get("etat") or "").lower()
+        if "adopt" in sort_label:
+            c.amdt_adopte += 1
+            stats["amdt_adopte"] += 1
     conn.close()
-    log.info("Sénat (DB veille) : %s", dict(stats))
+    log.info("Sénat amdt (DB veille, ≥ %s) : %s", since, dict(stats))
     return dict(stats)
 
 
@@ -738,7 +1083,13 @@ def render_outputs(
     registry: dict[str, Acteur],
     top_n: int = 20,
 ) -> dict:
-    """Construit le payload JSON consommé par Hugo."""
+    """Construit le payload JSON consommé par Hugo.
+
+    R43-A bis (2026-05-17) — Classements séparés AN et Sénat (Cyril :
+    le Sénat n'a pas une approche par législature mais par
+    renouvellement triennal partiel ; on garde un score identique pour
+    comparaison mais on classe séparément).
+    """
     enriched = []
     for ref, c in counters.items():
         if c.score() <= 0:
@@ -772,12 +1123,19 @@ def render_outputs(
             "taux_adoption_amdt": c.taux_adoption_amdt(),
         })
     enriched.sort(key=lambda x: (-x["score"], x["nom"], x["prenom"]))
+    top_an = [x for x in enriched if x["chambre"] == "AN"][:top_n]
+    top_senat = [x for x in enriched if x["chambre"] == "Senat"][:top_n]
     return {
         "generated_at": datetime.utcnow().isoformat(timespec="seconds"),
         "legislature": "XVIIe",
+        "legislature_start": LEGISLATURE_START,
         "scoring": SCORE,
-        "top": enriched[:top_n],
+        "top": enriched[:top_n],  # mixte, conservé pour rétrocompat
+        "top_an": top_an,
+        "top_senat": top_senat,
         "total_parlementaires_actifs": len(enriched),
+        "total_an": sum(1 for x in enriched if x["chambre"] == "AN"),
+        "total_senat": sum(1 for x in enriched if x["chambre"] == "Senat"),
     }
 
 
@@ -830,20 +1188,28 @@ def main():
     log.info("Matcher chargé : %d familles, %d termes",
              len(matcher.families), len(matcher.index))
 
-    # 1. Fetch (ou cache)
+    # 1. Fetch AN (ou cache)
     t0 = time.time()
     paths = {}
     for name, url in AN_DUMPS.items():
         paths[name] = _fetch_cached(url, name)
+    # Sénat
+    for name, url in SENAT_DUMPS.items():
+        ext = ".xml" if "AKN" in name else ".csv"
+        try:
+            paths[name] = _fetch_cached(url, name, ext=ext)
+        except Exception as e:
+            log.warning("Sénat fetch fail %s : %s", name, e)
     log.info("Fetch/cache terminé en %.1fs", time.time() - t0)
 
-    # 2. Référentiel acteurs
+    # 2. Référentiel acteurs AN
     registry = load_acteurs_an(paths["AMO10"])
+    senat_slugs = _load_senat_slugs()
 
-    # 3. Index dosleg sport
+    # 3. Index dosleg sport AN
     dosleg_sport = build_dosleg_sport_index(paths["DOSLEG"], matcher)
 
-    # 4. Scanners
+    # 4. Scanners AN
     counters: dict[str, CompteurActeur] = defaultdict(CompteurActeur)
     scan_questions_an(paths["QE"], matcher, registry, counters, "qe")
     scan_questions_an(paths["QAG"], matcher, registry, counters, "qag")
@@ -851,24 +1217,34 @@ def main():
     scan_documents_an(paths["DOSLEG"], matcher, registry, counters, dosleg_sport)
     scan_amendements_an(paths["AMDT"], matcher, registry, counters, dosleg_sport)
 
-    # 5. Sénat depuis DB veille
-    scan_senat_from_db(matcher, counters, registry)
+    # 5. Sénat (CSV + Akoma Ntoso + DB veille pour amdt)
+    if "Q1AN" in paths:
+        scan_senat_questions_csv(paths["Q1AN"], matcher, counters, registry, senat_slugs)
+    if "QG_SENAT" in paths:
+        scan_senat_questions_csv(paths["QG_SENAT"], matcher, counters, registry, senat_slugs)
+    if "AKN_DEPOTS" in paths:
+        scan_senat_akn(paths["AKN_DEPOTS"], matcher, counters, registry, senat_slugs)
+    scan_senat_amdt_db(matcher, counters, registry, senat_slugs)
 
     # 6. Output
     payload = render_outputs(counters, registry, top_n=args.top)
-    log.info("Top %d parlementaires sur %d actifs",
-             len(payload["top"]), payload["total_parlementaires_actifs"])
+    log.info(
+        "Total actifs : %d (AN: %d, Sénat: %d)",
+        payload["total_parlementaires_actifs"],
+        payload["total_an"], payload["total_senat"],
+    )
     write_data_json(payload)
     write_hugo_content(payload)
 
-    # Affichage console pour validation manuelle
-    log.info("== Top affiché ==")
-    for i, p in enumerate(payload["top"], 1):
-        log.info(
-            "  #%2d  %-30s %5d pts  [%s] %s",
-            i, f"{p['prenom']} {p['nom']}"[:30], p["score"],
-            p["chambre"], p["groupe"] or "—",
-        )
+    # Affichage console
+    log.info("== Top AN ==")
+    for i, p in enumerate(payload["top_an"], 1):
+        log.info("  #%2d  %-30s %5d pts  [AN] %s",
+                 i, f"{p['prenom']} {p['nom']}"[:30], p["score"], p["groupe"] or "—")
+    log.info("== Top Sénat ==")
+    for i, p in enumerate(payload["top_senat"], 1):
+        log.info("  #%2d  %-30s %5d pts  [Sénat] %s",
+                 i, f"{p['prenom']} {p['nom']}"[:30], p["score"], p["groupe"] or "—")
 
 
 if __name__ == "__main__":
