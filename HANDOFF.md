@@ -126,7 +126,7 @@ Environ **45 000 items ingérés** / run reset_db. Matchés sport : questions ~1
 
 ### Priorité haute
 
-- **Pruning des items disparus du dump (agenda surtout)** — R42-CI (today) écrase `published_at` quand AN repose `timeStampDebut=NULL`, R42-CX skippe les réunions avec `raw.etat ∈ {reportée, annulée}`. Reste le cas où AN supprime carrément l'item du dump zip — la DB conserve la réunion morte indéfiniment et `_boost_dosleg_with_agenda` continue de tirer la date périmée. Solution : `store.prune_missing(source_id, seen_uids)` appelé après chaque ingestion AN agenda (et possiblement Sénat agenda). Garde-fou : ne purger QUE si le fetch a renvoyé un volume « plausible » (≥ 50% du dernier count) pour éviter de wiper la base sur un fetch dégradé.
+- ~~**Pruning des items disparus du dump (agenda surtout)**~~ — Couvert par R42-DC (2026-05-17) : le filtre `_filter_stale_agenda_items` compare désormais `items.last_seen_at` ↔ `pipeline_health.sources.<sid>.last_ok_at` (au lieu du buffer `now - 2j`). Items agenda futurs absents du dernier fetch réussi de leur source masqués immédiatement, sans modification DB. R42-CI (écrase `timeStampDebut=NULL`), R42-CX (skip `etat ∈ {reportée, annulée}`) et R42-CZG (skip Eventuel) restent en place comme défense en profondeur.
 
 
 ### Priorité moyenne
@@ -270,6 +270,25 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 ---
 
 ## Historique
+
+- 2026-05-17 (matin, retour Cyril) : **R42-DC — Filtre agenda orphan strict (last_seen_at ↔ source.last_ok_at) + badge « REP » carte accueil PPL**.
+
+  Cyril 2026-05-17 : « la date du 18 mai apparaît toujours pour la séance plénière de la PPL Sport pro. Désormais un événement qui n'est plus présent dans l'agenda futur (et futur uniquement) doit être mis en invisibilité sur le site jusqu'à ce qu'à nouvelle date apparaisse. Donc à chaque run les occurrences agenda présentent en base doivent être vérifiés pour l'avenir ». Diagnostic : R42-CY (buffer `now - 2j`) laissait passer un item disparu du dump moins de 48h avant.
+
+  **Refonte de `_filter_stale_agenda_items`** dans `src/site_export.py` :
+  - Nouveau helper `_load_source_health()` charge `data/pipeline_health.json::sources`.
+  - Pour chaque item agenda futur (`published_at > now`) : on compare `last_seen_at` (DB, posé par `store.upsert_many`) au `last_ok_at` (pipeline_health, posé par `monitoring.compute_state_and_alerts`). Si `last_seen_at < last_ok_at` → l'item n'était pas dans le dernier fetch réussi de sa source → masqué.
+  - Pas de buffer jour : masquage immédiat.
+  - Safe-fallbacks : pas de `last_seen_at` (pré-R42-CY) / pas de `last_ok_at` (source jamais réussi) / pipeline_health illisible → tous conservés.
+  - Timing OK car `monitoring.update` (qui pose `last_ok_at`) tourne AVANT `store.upsert_many` (qui pose `last_seen_at`) — un item présent au run N aura `last_seen_at > last_ok_at`.
+
+  **Carte accueil PPL — badge « REP »** (`_render_special_ppl_card`) :
+  - Les filtres orphan + provisional acceptent désormais un param `out_dropped` qui collecte les items masqués (marqués `raw._postponed = True` + `raw._postponed_reason`).
+  - `special_ppl.export` / `collect_special_ppl` acceptent `postponed_agenda` et le réinjectent dans le bucket `agenda` (visible UNIQUEMENT pour la carte accueil — la page `/items/agenda/` ne les voit pas, ils ont été filtrés en amont).
+  - `_row_to_payload` expose `is_postponed: bool` et `postponed_reason: str`.
+  - Si `next_event.is_postponed` : le badge date rouge JJ/MM est remplacé par un badge gris « REP » (CSS `.date-pill--postponed`). Cyril : « chacun comprendra que ça veut dire reporté ».
+
+  **Tests** : `tests/test_r42cy_agenda_orphan_detection.py` réécrit pour le nouveau comportement strict (9 tests, dont cas réel PPL Sport pro 18/05/2026). `tests/test_r42dc_postponed_rep_badge.py` ajouté (12 tests : `_mark_postponed`, réinjection postponed dans bucket, flag `is_postponed` dans payload, rendu badge REP HTML). Suite locale : 1353 tests passants (3 échecs préexistants liés à l'env de test : HTTP 403 anj.fr live + `_cffi_backend` manquant). `SYSTEM_VERSION_LABEL` : pas bumpé (cycle R42 toujours en cours).
 
 - 2026-05-16 (matin, retour Cyril) : **R42-DB — Protection de `main` + auto-delete head branches** (opération GitHub, pas de code modifié).
 

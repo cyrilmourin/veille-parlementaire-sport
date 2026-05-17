@@ -2061,36 +2061,84 @@ def _filter_disabled_sources(rows: list[dict]) -> list[dict]:
     return [r for r in rows if (r.get("source_id") or "").strip() not in disabled]
 
 
-# R42-CY (2026-05-16) — Délai d'orphelinat agenda. Un item agenda dont
-# `last_seen_at` est plus ancien que ce seuil ET dont la date est dans
-# le futur proche est considéré comme « plus présent dans le dump AN/
-# Sénat » (la séance a été reportée ou supprimée côté source). Seuil
-# défensif : 2 jours pour absorber 1 daily run raté (timeout AN, parsing
-# KO) sans masquer à tort un item encore valide.
-_AGENDA_ORPHAN_DAYS = 2
+# R42-DC (2026-05-17) — Filtre orphan agenda strict, basé sur le
+# `last_ok_at` par source de `data/pipeline_health.json`. Remplace le
+# buffer défensif `now - 2j` de R42-CY qui laissait des items reportés
+# visibles pendant 48h après leur disparition du dump AN.
+#
+# Logique : à chaque run réussi, monitoring.update pose
+# `pipeline_health.sources.<sid>.last_ok_at = T_mon` AVANT que
+# `store.upsert_many` ne pose `items.last_seen_at = T_store`
+# (T_store > T_mon de quelques secondes). Conséquence :
+# - Item présent au run N : last_seen_at(T_store_N) > last_ok_at(T_mon_N) → conservé
+# - Item disparu au run N : last_seen_at reste = T_store_{N-1}, last_ok_at = T_mon_N
+#   → last_seen_at < last_ok_at → masqué immédiatement
+# - Source en erreur au run N : last_ok_at NON mis à jour, last_seen_at NON mis à jour
+#   → comparaison équivalente au run N-1 → pas de masquage abusif
+_PIPELINE_HEALTH_PATH = (
+    Path(__file__).resolve().parent.parent / "data" / "pipeline_health.json"
+)
 
 
-def _filter_stale_agenda_items(rows: list[dict]) -> list[dict]:
-    """R42-CY (2026-05-16) — Masque les items agenda futurs qui n'ont
-    pas été revus dans le dump source depuis `_AGENDA_ORPHAN_DAYS` jours.
+def _load_source_health() -> dict:
+    """Charge `data/pipeline_health.json`. Retourne le dict `sources` ou
+    `{}` si le fichier est absent / illisible.
 
-    Cyril 2026-05-16 : « il y a toujours le problème des dates qui ne
-    sont plus à l'agenda AN (18 mai) ». Cas que R42-CI ne traitait pas :
-    AN supprime totalement l'item du dump Agenda.json.zip (vs juste
-    mettre `timeStampDebut=NULL`). Sans cet item dans le batch
-    d'ingestion, `upsert_many` n'est jamais appelé pour lui →
-    `last_seen_at` ne se met plus à jour → on peut le masquer.
-
-    Filtre limité aux items futurs (`published_at > now`) car :
-    - Les items passés sont attendus à disparaître naturellement de
-      l'agenda (cycle normal AN : agenda glissant J-30 → J+90).
-    - L'utilisateur a besoin de voir l'historique récent même si la
-      source n'expose plus les items passés.
+    Lazy load — pas de cache, le fichier est petit (~20 ko) et lu une
+    fois par export. Robuste aux erreurs : tout problème de parsing →
+    `{}` (l'absence de health info fait que le filtre conserve tous
+    les items, ce qui est le comportement safe-fallback voulu).
     """
-    now = datetime.now()
-    cutoff = now - timedelta(days=_AGENDA_ORPHAN_DAYS)
-    cutoff_iso = cutoff.isoformat(timespec="seconds")
-    now_iso = now.isoformat(timespec="seconds")
+    try:
+        data = json.loads(_PIPELINE_HEALTH_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    sources = data.get("sources") if isinstance(data, dict) else None
+    return sources if isinstance(sources, dict) else {}
+
+
+def _filter_stale_agenda_items(
+    rows: list[dict],
+    out_dropped: list[dict] | None = None,
+    source_health: dict | None = None,
+) -> list[dict]:
+    """R42-DC (2026-05-17) — Masque les items agenda futurs qui n'ont
+    pas été revus dans le dernier fetch réussi de leur source.
+
+    Cyril 2026-05-17 : « Désormais un événement qui n'est plus présent
+    dans l'agenda futur (et futur uniquement) doit être mis en
+    invisibilité sur le site jusqu'à ce qu'à nouvelle date apparaisse.
+    Donc à chaque run les occurrences agenda présentes en base doivent
+    être vérifiés pour l'avenir ».
+
+    Stratégie : strict — pour chaque item, on compare son
+    `last_seen_at` (DB, posé par `store.upsert_many`) au `last_ok_at`
+    de sa source (`pipeline_health.json`, posé par
+    `monitoring.compute_state_and_alerts`). Si `last_seen_at <
+    last_ok_at`, l'item n'était pas dans le dernier fetch réussi de
+    la source → masqué. Aucun buffer jour : le comportement est
+    immédiat dès la disparition.
+
+    Filtre limité aux items futurs (`published_at > now`) — les items
+    passés disparaissent naturellement de l'agenda glissant et on garde
+    l'historique récent pour la veille.
+
+    Safe-fallbacks (conservation) :
+    - Item sans `last_seen_at` (pré-R42-CY) → conservé
+    - Source absente de `pipeline_health.json` → conservé
+    - Source sans `last_ok_at` (jamais réussi) → conservé
+    - `data/pipeline_health.json` illisible → tous conservés
+
+    :param rows: liste des rows à filtrer
+    :param out_dropped: si fourni, les items masqués y sont **appendés**
+        (avec un marqueur `raw._postponed_reason = "stale"`) pour que
+        le module `special_ppl` puisse les ressurfacer avec un badge
+        « REP » côté carte accueil.
+    :param source_health: override pour les tests, sinon chargé du disque.
+    """
+    if source_health is None:
+        source_health = _load_source_health()
+    now_iso = datetime.now().isoformat(timespec="seconds")
     kept: list[dict] = []
     dropped = 0
     for r in rows:
@@ -2099,23 +2147,53 @@ def _filter_stale_agenda_items(rows: list[dict]) -> list[dict]:
             continue
         last_seen = (r.get("last_seen_at") or "").strip()
         published = (r.get("published_at") or "").strip()
-        # Items sans last_seen_at (pré-R42-CY) ou sans date → laisse passer
-        # (compatible legacy + safe-fallback).
+        # Items sans last_seen_at ou sans date → laisse passer (legacy).
         if not last_seen or not published:
             kept.append(r)
             continue
-        # Items futurs ET non revus récemment → orphelins probables
-        if published > now_iso and last_seen < cutoff_iso:
+        # Items passés → laisse passer (historique normal).
+        if published <= now_iso:
+            kept.append(r)
+            continue
+        source_id = (r.get("source_id") or "").strip()
+        src_info = source_health.get(source_id) or {}
+        last_ok = (src_info.get("last_ok_at") or "").strip() if isinstance(src_info, dict) else ""
+        # Pas de health info exploitable → conserve (safe fallback).
+        if not last_ok:
+            kept.append(r)
+            continue
+        if last_seen < last_ok:
+            if out_dropped is not None:
+                _mark_postponed(r, reason="stale")
+                out_dropped.append(r)
             dropped += 1
             continue
         kept.append(r)
     if dropped:
         import logging
         logging.getLogger(__name__).info(
-            "R42-CY : %d items agenda orphelins masqués (last_seen_at < %s, futurs)",
-            dropped, cutoff.date().isoformat(),
+            "R42-DC : %d items agenda orphelins masqués (last_seen_at < source.last_ok_at)",
+            dropped,
         )
     return kept
+
+
+def _mark_postponed(row: dict, reason: str) -> None:
+    """R42-DC (2026-05-17) — Marque un row comme « postponed » dans
+    son `raw` (côté in-memory, ne touche pas la DB).
+
+    Permet au module `special_ppl` de reconnaître les items que le
+    filtre orphan/etat a masqué pour les ressurfacer côté carte
+    accueil avec un badge « REP » à la place de la date.
+
+    Idempotent : ré-appel sans effet si déjà marqué.
+    """
+    raw = row.get("raw")
+    if not isinstance(raw, dict):
+        raw = {}
+        row["raw"] = raw
+    raw["_postponed"] = True
+    raw["_postponed_reason"] = reason
 
 
 # R42-CZG (2026-05-16) — États de réunion AN considérés comme non
@@ -2130,7 +2208,10 @@ def _filter_stale_agenda_items(rows: list[dict]) -> list[dict]:
 _AGENDA_NON_CONFIRMED_ETATS = ("eventuel", "report", "annul")
 
 
-def _filter_provisional_agenda_items(rows: list[dict]) -> list[dict]:
+def _filter_provisional_agenda_items(
+    rows: list[dict],
+    out_dropped: list[dict] | None = None,
+) -> list[dict]:
     """R42-CZG (2026-05-16) — Masque les items agenda dont l'AN ne
     confirme pas la tenue (`raw.etat ∈ {Eventuel, Reportée, Annulée}`).
 
@@ -2145,6 +2226,11 @@ def _filter_provisional_agenda_items(rows: list[dict]) -> list[dict]:
     `assemblee._normalize_agenda` (R42-CX) et complète orthogonale de
     `_filter_stale_agenda_items` (R42-CY) : l'un se base sur le
     timing, l'autre sur l'état déclaré.
+
+    R42-DC (2026-05-17) — param `out_dropped` ajouté : si fourni, les
+    items masqués y sont appendés (marqués `raw._postponed_reason =
+    "etat:<libellé>"`) pour ressurfacer côté carte accueil PPL avec un
+    badge « REP » à la place de la date.
     """
     kept: list[dict] = []
     dropped = 0
@@ -2155,6 +2241,9 @@ def _filter_provisional_agenda_items(rows: list[dict]) -> list[dict]:
         raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
         etat = (raw.get("etat") or "").strip().lower() if isinstance(raw, dict) else ""
         if etat and any(s in etat for s in _AGENDA_NON_CONFIRMED_ETATS):
+            if out_dropped is not None:
+                _mark_postponed(r, reason=f"etat:{etat}")
+                out_dropped.append(r)
             dropped += 1
             continue
         kept.append(r)
@@ -3627,16 +3716,21 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # depuis config/blocklist.yml. Filtre à l'export uniquement, items
     # restent en DB → retirer une entrée les fait réapparaître au build.
     rows = _filter_blocklist(rows)
-    # R42-CY (2026-05-16) : masque les items agenda futurs qui n'ont
-    # pas été revus dans le dump source depuis 2 jours. Couvre le cas
-    # où AN supprime totalement l'item (vs juste mettre date à NULL,
-    # déjà traité par R42-CI).
-    rows = _filter_stale_agenda_items(rows)
+    # R42-CY (2026-05-16) → R42-DC (2026-05-17) : masque les items
+    # agenda futurs qui n'ont pas été revus dans le dernier fetch
+    # réussi de leur source (comparaison `last_seen_at` ↔
+    # `pipeline_health.last_ok_at`, voir docstring). Pas de buffer
+    # défensif — comportement immédiat dès que la source ne ressort
+    # plus l'item. Les items masqués sont collectés dans
+    # `postponed_agenda` pour ressurfacer côté carte accueil avec
+    # un badge « REP ».
+    postponed_agenda: list[dict] = []
+    rows = _filter_stale_agenda_items(rows, out_dropped=postponed_agenda)
     # R42-CZG (2026-05-16) : masque les items agenda non confirmés par AN
     # (raw.etat ∈ {Eventuel, Reportée, Annulée}). Complète orthogonale du
-    # filtre stale R42-CY pour le cas où AN garde l'item dans le dump
+    # filtre stale R42-DC pour le cas où AN garde l'item dans le dump
     # mais avec un statut non confirmé (ex. PPL Sport pro 18/05/2026).
-    rows = _filter_provisional_agenda_items(rows)
+    rows = _filter_provisional_agenda_items(rows, out_dropped=postponed_agenda)
     # R42-BS (2026-05-13) : applique rétroactivement les patterns
     # `url_filter_exclude` du YAML aux items déjà en DB (un ajout de
     # pattern post-ingestion ne purgeait pas les anciens items — Cyril a
@@ -3876,7 +3970,11 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     #   - la carte accueil à droite du module 24h (layout home)
     #   - la page dédiée /ppl-sport-professionnel/ (layout ppl-sport-pro)
     #   - le bloc sidebar « 5 derniers amendements » sur accueil + dosleg + amdt
-    special_ppl.export(rows, root)
+    # R42-DC (2026-05-17) — `postponed_agenda` : items agenda masqués par
+    # les filtres orphan/etat, ressurfacés ici avec un badge « REP » sur
+    # la carte accueil (demande Cyril : « remplacé manuellement 18/05
+    # par REP, chacun comprendra que ça veut dire reporté »).
+    special_ppl.export(rows, root, postponed_agenda=postponed_agenda)
     # R42-CS (2026-05-15) — Page spéciale PPL Équipements sportifs
     # (dossier AN DLR5L17N54138, PPL n° 2667). Génère :
     #   - site/data/special_ppl_equip.json
@@ -3918,7 +4016,11 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # Page d'accueil
     recent = _recent(rows, hours=RECENT_HOURS)
     # R41-M : payload Spécial PPL pour la carte accueil (à droite du 24h)
-    special_ppl_buckets = special_ppl.collect_special_ppl(rows)
+    # R42-DC : `postponed_agenda` injecté dans le bucket agenda pour
+    # afficher un badge « REP » à la place de la date sur la carte.
+    special_ppl_buckets = special_ppl.collect_special_ppl(
+        rows, postponed_agenda=postponed_agenda,
+    )
     special_ppl_payload = special_ppl.build_payload(special_ppl_buckets)
     _write_home(content, rows, by_cat, recent, special_ppl_payload)
 
@@ -4235,10 +4337,23 @@ def _render_special_ppl_card(payload: dict) -> list[str]:
                 ).strftime("%d/%m")
             except ValueError:
                 date_short = date_iso[:10]
-        date_pill = (
-            f'<span class="date-pill">{_escape(date_short)}</span>'
-            if date_short else ''
-        )
+        # R42-DC (2026-05-17) — Si l'item agenda a été masqué par les
+        # filtres orphan/etat (raw._postponed posé en amont,
+        # `is_postponed` dans le payload), on substitue le badge date
+        # par un badge « REP » (= reporté). Cyril : « remplacé
+        # manuellement 18/05 par REP, chacun comprendra que ça veut
+        # dire reporté ». La ligne reste visible pour signaler que
+        # la prochaine étape attend une nouvelle date.
+        if next_event.get("is_postponed"):
+            date_pill = (
+                '<span class="date-pill date-pill--postponed" '
+                'title="Événement reporté — nouvelle date à venir">REP</span>'
+            )
+        else:
+            date_pill = (
+                f'<span class="date-pill">{_escape(date_short)}</span>'
+                if date_short else ''
+            )
         kind_slug = ""
         if kind == "Séance publique":
             kind_slug = "seance"

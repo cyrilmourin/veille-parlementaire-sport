@@ -247,7 +247,10 @@ def row_matches_special_ppl(row: dict) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def collect_special_ppl(rows: list[dict]) -> dict:
+def collect_special_ppl(
+    rows: list[dict],
+    postponed_agenda: list[dict] | None = None,
+) -> dict:
     """Filtre et range les rows liés à la PPL en buckets exploitables.
 
     Retourne :
@@ -261,6 +264,11 @@ def collect_special_ppl(rows: list[dict]) -> dict:
         "questions": [...],
       }
     Chaque bucket est trié par date desc.
+
+    R42-DC (2026-05-17) — `postponed_agenda` : items agenda déjà masqués
+    par les filtres orphan/etat de site_export. Réinjectés dans le bucket
+    `agenda` avec `raw._postponed = True` posé, ce qui fait que la carte
+    accueil substitue un badge « REP » à la date d'affichage.
     """
     out: dict[str, list[dict]] = {
         "dosleg": [], "agenda": [],
@@ -308,6 +316,19 @@ def collect_special_ppl(rows: list[dict]) -> dict:
             out["communiques"].append(r)
         elif cat == "questions":
             out["questions"].append(r)
+    # R42-DC (2026-05-17) — réinjection des items agenda postponed
+    # (déjà masqués par les filtres site_export R42-DC + R42-CZG).
+    # Ils restent visibles SEULEMENT sur la carte accueil PPL où la
+    # date est remplacée par un badge « REP ». Pas réinjectés ailleurs
+    # — Hugo ne les voit pas dans `/items/agenda/` ni dans le payload
+    # global d'index (déjà filtrés en amont).
+    if postponed_agenda:
+        for r in postponed_agenda:
+            if not row_matches_special_ppl(r):
+                continue
+            if (r.get("category") or "").strip() != "agenda":
+                continue
+            out["agenda"].append(r)
     # Tri date desc dans chaque bucket
     def _date_of(r):
         return r.get("published_at") or ""
@@ -582,6 +603,13 @@ def _row_to_payload(r: dict, max_title: int = 220) -> dict:
         # R41-Q : article ciblé par l'amdt (« ARTICLE 5 », « ARTICLE 1ER A »,
         # « ARTICLE 2 BIS »...). Vide pour les autres types d'items.
         "article": _extract_article_label(r.get("title") or ""),
+        # R42-DC (2026-05-17) — flag « postponed » utilisé par
+        # `_render_special_ppl_card` pour substituer un badge « REP »
+        # à la date du badge `date-pill`. Posé par les filtres
+        # `_filter_stale_agenda_items` / `_filter_provisional_agenda_items`
+        # via `_mark_postponed` (raw._postponed = True).
+        "is_postponed": bool(raw.get("_postponed")),
+        "postponed_reason": raw.get("_postponed_reason") or "",
     }
 
 
@@ -1102,10 +1130,20 @@ def write_articles_data_file(site_data_dir: Path,
     )
 
 
-def export(rows: list[dict], site_root: Path) -> dict:
+def export(
+    rows: list[dict],
+    site_root: Path,
+    postponed_agenda: list[dict] | None = None,
+) -> dict:
     """Point d'entrée appelé depuis `site_export.export()`. Génère le
-    fichier de données + la page stub. Retourne le payload pour debug."""
-    buckets = collect_special_ppl(rows)
+    fichier de données + la page stub. Retourne le payload pour debug.
+
+    R42-DC (2026-05-17) — `postponed_agenda` : items agenda masqués par
+    les filtres orphan/etat de `site_export`, réinjectés dans le bucket
+    `agenda` du payload PPL pour permettre l'affichage d'un badge « REP »
+    côté carte accueil.
+    """
+    buckets = collect_special_ppl(rows, postponed_agenda=postponed_agenda)
     payload = build_payload(buckets)
     site_root = Path(site_root)
     write_data_file(site_root / "data", payload)

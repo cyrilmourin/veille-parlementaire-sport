@@ -2402,6 +2402,14 @@ a:hover { text-decoration: underline; }
   font-variant-numeric: tabular-nums;
   letter-spacing: .3px;
 }
+/* R42-DC (2026-05-17) — Badge « REP » (Reporté) substitué à la date
+   quand l'item agenda a été masqué par les filtres orphan/etat
+   (raw._postponed). Gris foncé pour distinguer du badge rouge JJ/MM
+   normal — signal que l'événement n'a plus de date confirmée. */
+.special-ppl-card__item--next .val .date-pill--postponed {
+  background: #6c757d;
+  letter-spacing: .5px;
+}
 .special-ppl-card__item--next .val .kind-prefix {
   display: inline-block;
   font-weight: 700;
