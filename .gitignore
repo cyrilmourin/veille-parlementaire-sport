@@ -60,3 +60,7 @@ reset_*.command
 # R42-CH : dossiers d'assets téléchargés avec les fixtures HTML
 # ("Save Page As" complete) — pas nécessaires aux tests, lourds (3 Mo+).
 tests/*_files/
+
+# R43-A : cache local des dumps open data AN (350 MB total) — généré par
+# scripts/parlementaires_sport.py, ne doit pas vivre dans git.
+data/parlementaires_cache/

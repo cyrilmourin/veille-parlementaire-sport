@@ -1,0 +1,79 @@
+{{/*
+  R43-A (2026-05-17) — Module compact « Top 3 parlementaires actifs sport ».
+  Réutilisable sur n'importe quelle page (rendu compact, hauteur fixe).
+  Données : site/data/parlementaires_sport_xvii.json (script
+  scripts/parlementaires_sport.py).
+*/}}
+{{ with site.Data.parlementaires_sport_xvii }}
+{{ if ge (len .top) 3 }}
+<style>
+  .palm3 {
+    background: linear-gradient(135deg, #122549 0%, #1b3b6f 100%);
+    color: white; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(18, 37, 73, 0.10);
+  }
+  .palm3__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .palm3__kicker { font-size: 10px; font-weight: 800; letter-spacing: 1.5px; color: #d4a017; }
+  .palm3__title { font-size: 16px; font-weight: 800; margin: 2px 0 0; }
+  .palm3__more a { font-size: 11px; color: #fdf6e3; text-decoration: none; opacity: 0.85; }
+  .palm3__more a:hover { text-decoration: underline; opacity: 1; }
+
+  .palm3__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .palm3__card {
+    background: rgba(255,255,255,0.07); border-radius: 8px;
+    padding: 12px 10px; text-align: center; position: relative;
+    border: 1px solid rgba(255,255,255,0.10);
+  }
+  .palm3__card--1 { border-color: #d4a017; background: rgba(212, 160, 23, 0.15); }
+  .palm3__rank {
+    position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+    width: 24px; height: 24px; border-radius: 50%; background: white; color: #122549;
+    font-weight: 800; font-size: 12px; display: flex; align-items: center;
+    justify-content: center;
+  }
+  .palm3__card--1 .palm3__rank { background: #d4a017; color: white; }
+  .palm3__card--2 .palm3__rank { background: #95a5a6; color: white; }
+  .palm3__card--3 .palm3__rank { background: #cd7f32; color: white; }
+  .palm3__photo {
+    width: 56px; height: 56px; border-radius: 50%; object-fit: cover;
+    background: rgba(255,255,255,0.10); margin: 6px auto 8px; display: block;
+    border: 2px solid rgba(255,255,255,0.30);
+  }
+  .palm3__card--1 .palm3__photo { border-color: #d4a017; }
+  .palm3__name { font-size: 12px; font-weight: 800; line-height: 1.2; margin-bottom: 3px; }
+  .palm3__group { font-size: 9px; opacity: 0.7; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .palm3__score { font-size: 18px; font-weight: 900; color: #fdf6e3; }
+  .palm3__score-sub { font-size: 9px; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  @media (max-width: 600px) {
+    .palm3__grid { grid-template-columns: 1fr; }
+  }
+</style>
+<div class="palm3">
+  <div class="palm3__head">
+    <div>
+      <div class="palm3__kicker">CLASSEMENT — {{ .legislature }} LÉGISLATURE</div>
+      <h3 class="palm3__title">🏆 Top 3 parlementaires sport</h3>
+    </div>
+    <div class="palm3__more"><a href="/parlementaires-actifs-sport/">Voir le classement complet &rarr;</a></div>
+  </div>
+  <div class="palm3__grid">
+    {{ range $i, $p := first 3 .top }}
+      {{ $rank := add $i 1 }}
+      <div class="palm3__card palm3__card--{{ $rank }}">
+        <div class="palm3__rank">{{ $rank }}</div>
+        {{ if $p.photo_url }}
+          <img class="palm3__photo" src="{{ $p.photo_url }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>
+        {{ else }}
+          <div class="palm3__photo"></div>
+        {{ end }}
+        <div class="palm3__name">{{ $p.prenom }} {{ $p.nom }}</div>
+        <div class="palm3__group">{{ $p.groupe }} · {{ $p.chambre }}</div>
+        <div class="palm3__score">{{ $p.score }}</div>
+        <div class="palm3__score-sub">points</div>
+      </div>
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+{{ end }}
