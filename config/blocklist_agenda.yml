@@ -1,0 +1,33 @@
+# R42-DD (2026-05-17) — Blocklist agenda manuelle par UID.
+#
+# Cyril 2026-05-17 : « Désormais un événement qui n'est plus présent
+# dans l'agenda futur doit être mis en invisibilité sur le site
+# jusqu'à ce qu'une nouvelle date apparaisse. »
+#
+# Le mécanisme automatique R42-CY (last_seen_at) + R42-DC
+# (last_seen_at vs last_ok_at) + R42-CZG (etat=Eventuel/Reportée) ne
+# couvre PAS le cas où :
+#   - L'item est encore dans Agenda.json.zip
+#   - ET son `cycleDeVie.etat` est encore "Confirmé"
+#   - MAIS la séance a en réalité été reportée (open data AN non
+#     synchronisé avec l'agenda web public AN)
+#
+# Cette blocklist permet de masquer ces items individuellement et de
+# les ressurfacer côté carte accueil avec un badge « REP » (= reporté).
+#
+# Format YAML : liste de { uid: <UID AN/Sénat>, reason: <texte court> }.
+# L'UID est celui posé par `assemblee._normalize_agenda` (RUANR…).
+#
+# Maintenance : une fois qu'une nouvelle date est publiée par AN,
+# retirer l'entrée. Sinon l'item restera masqué indéfiniment.
+
+items:
+  # PPL Sport pro (n° 1560) — séances 18/05/2026 reportées. AN garde
+  # les 3 réunions dans le dump avec etat="Confirmé" pour 2 d'entre
+  # elles (la 3e est en "Eventuel" et filtrée par R42-CZG).
+  - uid: RUANR5L17S2026IDS30598
+    reason: "PPL Sport pro — séance 18/05 15h00 reportée (open data AN non synchronisé)"
+  - uid: RUANR5L17S2026IDS30599
+    reason: "PPL Sport pro — séance 18/05 21h30 reportée (open data AN non synchronisé)"
+  - uid: RUANR5L17S2026IDC460094
+    reason: "PPL Sport pro — examen commission 18/05 14h45 reporté"

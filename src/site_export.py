@@ -2231,6 +2231,71 @@ def _write_ppl_agenda_diag(rows: list[dict], out_path: Path) -> None:
     )
 
 
+# R42-DD (2026-05-17) — Blocklist agenda manuelle. Liste d'UIDs d'items
+# agenda à invisibiliser quand l'automatique (R42-DC last_seen_at,
+# R42-CZG etat) ne déclenche pas — cas où AN garde l'item Confirmé dans
+# le dump open data alors qu'il est reporté dans la réalité.
+_AGENDA_BLOCKLIST_PATH = (
+    Path(__file__).resolve().parent.parent / "config" / "blocklist_agenda.yml"
+)
+
+
+def _load_agenda_blocklist() -> dict[str, str]:
+    """Retourne {uid: reason} depuis config/blocklist_agenda.yml. Vide si
+    fichier absent ou invalide (best-effort)."""
+    if not _AGENDA_BLOCKLIST_PATH.exists():
+        return {}
+    try:
+        import yaml
+        data = yaml.safe_load(_AGENDA_BLOCKLIST_PATH.read_text(encoding="utf-8")) or {}
+        items = data.get("items") or []
+        out: dict[str, str] = {}
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            uid = (it.get("uid") or "").strip()
+            if uid:
+                out[uid] = (it.get("reason") or "blocklisted").strip()
+        return out
+    except Exception:
+        return {}
+
+
+def _filter_agenda_blocklist(
+    rows: list[dict],
+    out_dropped: list[dict] | None = None,
+) -> list[dict]:
+    """R42-DD (2026-05-17) — Masque les items agenda dont l'`uid` figure
+    dans `config/blocklist_agenda.yml`. Complémentaire de R42-CZG et
+    R42-DC pour les cas où AN garde l'item Confirmé alors qu'il est
+    reporté en réalité.
+    """
+    blocklist = _load_agenda_blocklist()
+    if not blocklist:
+        return rows
+    kept: list[dict] = []
+    dropped = 0
+    for r in rows:
+        if (r.get("category") or "").strip() != "agenda":
+            kept.append(r)
+            continue
+        uid = (r.get("uid") or "").strip()
+        if uid in blocklist:
+            if out_dropped is not None:
+                _mark_postponed(r, reason=f"blocklist:{blocklist[uid][:60]}")
+                out_dropped.append(r)
+            dropped += 1
+            continue
+        kept.append(r)
+    if dropped:
+        import logging
+        logging.getLogger(__name__).info(
+            "R42-DD : %d items agenda masqués via blocklist_agenda.yml",
+            dropped,
+        )
+    return kept
+
+
 def _mark_postponed(row: dict, reason: str) -> None:
     """R42-DC (2026-05-17) — Marque un row comme « postponed » dans
     son `raw` (côté in-memory, ne touche pas la DB).
@@ -3793,6 +3858,12 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # filtre stale R42-DC pour le cas où AN garde l'item dans le dump
     # mais avec un statut non confirmé (ex. PPL Sport pro 18/05/2026).
     rows = _filter_provisional_agenda_items(rows, out_dropped=postponed_agenda)
+    # R42-DD (2026-05-17) : blocklist agenda manuelle (config/blocklist_agenda.yml).
+    # Couvre le cas où AN garde l'item Confirmé dans le dump open data
+    # alors qu'il est reporté dans la réalité (cas PPL Sport pro 18/05 :
+    # 2 séances avec etat=Confirmé toujours présentes dans le dump après
+    # report).
+    rows = _filter_agenda_blocklist(rows, out_dropped=postponed_agenda)
     # R42-BS (2026-05-13) : applique rétroactivement les patterns
     # `url_filter_exclude` du YAML aux items déjà en DB (un ajout de
     # pattern post-ingestion ne purgeait pas les anciens items — Cyril a
