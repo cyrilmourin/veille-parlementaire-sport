@@ -1200,6 +1200,141 @@ def _fetch_senat_amdt_csv_urls_from_dl(slug: str) -> list[str]:
     return sorted(urls)
 
 
+# R43-J (2026-05-17) — Slugs Sénat des PLF à scanner pour les amdt
+# crédits sport. À enrichir d'année en année (pjlf2025, pjlf2024,
+# pjlf2027…). Le PLF n'est pas un « dossier sport » au sens du titre,
+# mais une partie de ses amdt concernent les crédits Mission Sport.
+SENAT_PLF_SLUGS = ["pjlf2026"]
+
+# Regex sport ÉLARGIE pour le contenu PLF (Subdivision + Dispositif +
+# Objet). Plus permissive que le KeywordMatcher (qui exige des
+# expressions composées), car le langage budgétaire est codé (« mission
+# Sport », « programme 219 », etc.).
+_PLF_SPORT_RE = re.compile(
+    r"\b(sport(?:if|ive)?s?|olympique|paralympique|jop?\b|jeunesse"
+    r"|f[ée]d[ée]r(?:ation|al).{0,30}sport|associations?\s+sport|club\s+sport"
+    r"|ans[\s.,]|cnosf|cpsf|inj[eé]p|insep|crep[s]?|sport[\s-]sant[ée]"
+    r"|sportifs?\s+(?:de\s+)?haut\s+niveau|mission\s+sport"
+    r"|programme\s+(?:219|350|163)\b)",
+    re.IGNORECASE,
+)
+
+
+def scan_senat_plf_amdt(
+    plf_slug: str,
+    counters: dict[str, CompteurActeur],
+    registry: dict[str, Acteur],
+    senat_slugs: dict,
+) -> dict[str, int]:
+    """R43-J (2026-05-17) — Scan les amdt PLF avec filtre STRICT sport.
+
+    Cyril : « je doute également que tous les amendements déposés au
+    PLF 2026 sur les crédits sports aient été comptabilisés ».
+
+    Le PLF n'est pas un dossier sport globalement (titre = « Budget
+    2026 »), donc le scope élargi (= compter tous les amdt du dosleg)
+    serait trompeur. On filtre amdt par amdt sur Subdivision +
+    Dispositif + Objet via `_PLF_SPORT_RE`.
+
+    Volume observé PLF 2026 séance Sénat : 5156 amdt total, ~560
+    sport-relevant. Dédupliqué par auteur via `_ensure_senat_acteur`.
+    """
+    import csv as _csv, io as _io
+    # R43-J : pré-fetch la page DL Sénat (le PLF n'est pas traité par
+    # `scan_senat_akn` donc sa page DL n'est pas en cache local).
+    dl_html_path = CACHE_DIR / "senat_dossiers_dl" / f"{plf_slug}.html"
+    dl_html_path.parent.mkdir(parents=True, exist_ok=True)
+    if not dl_html_path.exists():
+        _fetch_via_curl(
+            f"https://www.senat.fr/dossier-legislatif/{plf_slug}.html",
+            dl_html_path, timeout=30,
+        )
+    urls = _fetch_senat_amdt_csv_urls_from_dl(plf_slug)
+    if not urls:
+        log.info("Sénat PLF %s : aucun CSV trouvé", plf_slug)
+        return {}
+    stats: dict[str, int] = defaultdict(int)
+    n_total = 0
+    n_sport = 0
+    for url in urls:
+        fname = url.rstrip("/").rsplit("/", 1)[-1]
+        local = CACHE_DIR / "senat_amdt_csv" / f"{plf_slug}__{fname}"
+        local.parent.mkdir(parents=True, exist_ok=True)
+        if not local.exists():
+            if not _fetch_via_curl(url, local, timeout=60):
+                continue
+        try:
+            raw = local.read_text(encoding="latin-1", errors="ignore")
+        except Exception:
+            continue
+        if raw.startswith("sep="):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else ""
+        reader = _csv.DictReader(_io.StringIO(raw), delimiter="\t")
+        for r in reader:
+            n_total += 1
+            # Filtre sport sur Subdivision + Dispositif + Objet
+            def _col(*candidates: str) -> str:
+                for c in candidates:
+                    for k in r.keys():
+                        if k is None:
+                            continue
+                        if str(k).strip() == c:
+                            return (r.get(k) or "").strip()
+                return ""
+
+            subdiv = _col("Subdivision")
+            dispo = _col("Dispositif")
+            objet = _col("Objet")
+            haystack = f"{subdiv} {dispo} {objet}"
+            if not _PLF_SPORT_RE.search(haystack):
+                continue
+            n_sport += 1
+            auteur = _col("Auteur")
+            sort = _col("Sort")
+            if not auteur:
+                continue
+            # Format auteur (idem que CSV PPL)
+            m_auth = re.match(
+                r"^(M\.|MM\.|Mme|Mmes)\s+(.+?)(?:,\s*(?:rapporteur|s[ée]nateur|d[ée]put[ée])e?.*)?$",
+                auteur,
+            )
+            if not m_auth:
+                continue
+            full = m_auth.group(2).strip()
+            tokens = full.split()
+            nom_parts: list[str] = []
+            prenom_parts: list[str] = []
+            for t in tokens:
+                alpha = [c for c in t if c.isalpha()]
+                if alpha and all(c.isupper() for c in alpha):
+                    nom_parts.append(t)
+                else:
+                    if nom_parts:
+                        nom_parts.append(t)
+                    else:
+                        prenom_parts.append(t)
+            if not nom_parts:
+                continue
+            nom = " ".join(nom_parts)
+            prenom = " ".join(prenom_parts).strip()
+            if not any(c.isupper() for c in nom):
+                continue
+            sid = _ensure_senat_acteur(prenom, nom, registry, senat_slugs)
+            c = counters[sid]
+            c.acteur_ref = sid
+            c.chambre = "Senat"
+            c.amdt_depose += 1
+            stats["amdt_depose"] += 1
+            if "adopt" in sort.lower():
+                c.amdt_adopte += 1
+                stats["amdt_adopte"] += 1
+    log.info(
+        "Sénat PLF %s : %d amdt scannés, %d sport-relevant (%s)",
+        plf_slug, n_total, n_sport, dict(stats),
+    )
+    return dict(stats)
+
+
 def scan_senat_amdt_csv_for_dl(
     dl_slug: str,
     counters: dict[str, CompteurActeur],
@@ -1921,6 +2056,12 @@ def main():
     # 5d. Backfill manuel questions Sénat 2024-07 → 2025-04
     # (période hors couverture open data `questions-depuis-un-an.csv`)
     apply_senat_backfill_2024(counters, registry, senat_slugs)
+
+    # 5d-bis. R43-J : scan amdt PLF sport (filtre strict).
+    # Le PLF n'est pas un dossier sport (titre = « Budget 2026 »),
+    # mais une partie de ses amdt concernent les crédits Mission Sport.
+    for plf_slug in SENAT_PLF_SLUGS:
+        scan_senat_plf_amdt(plf_slug, counters, registry, senat_slugs)
 
     # 5e. R43-F : enrichir les groupes politiques Sénat manquants
     # (Lafon / Savin / Malhuret n'ont pas posé de Q sport récente,

@@ -953,15 +953,23 @@ def _chamber(domain: str) -> str:
 # ne pas tripler le volume de requêtes des sources qui marchent déjà).
 # Borne `fetch_meta_limit` (défaut 60) : on enrichit les N premiers items
 # du listing (les plus récents) pour capper le coût réseau par run.
+# R43-J (2026-05-17) — Fix : le `[^"\']+` capturait jusqu'à la PREMIÈRE
+# apostrophe / guillemet rencontré, même interne au content. Cas concret
+# CNOSF : `content="En Europe, le sport n'est pas..."` capturait juste
+# « En Europe, le sport n » (s'arrêtait sur l'apostrophe ASCII de n'est).
+# On utilise des regex DUAL : double-quote → uniquement ", simple-quote
+# → uniquement '. Variante REV idem.
 _META_DESC_RE = re.compile(
-    r'<meta[^>]+(?:name|property)=["\'](?:description|og:description|twitter:description)'
-    r'["\'][^>]+content=["\']([^"\']+)["\']',
+    r'<meta[^>]+(?:name|property)=(?:"(?:description|og:description|twitter:description)"'
+    r'|\'(?:description|og:description|twitter:description)\')'
+    r'[^>]+content=(?:"([^"]+)"|\'([^\']+)\')',
     re.IGNORECASE,
 )
 # Certains sites mettent l'attribut `content` avant `name` → regex symétrique.
 _META_DESC_RE_REV = re.compile(
-    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:name|property)=["\']'
-    r'(?:description|og:description|twitter:description)["\']',
+    r'<meta[^>]+content=(?:"([^"]+)"|\'([^\']+)\')'
+    r'[^>]+(?:name|property)=(?:"(?:description|og:description|twitter:description)"'
+    r'|\'(?:description|og:description|twitter:description)\')',
     re.IGNORECASE,
 )
 
@@ -976,7 +984,9 @@ def _extract_meta_description(html: str) -> str:
     for rx in (_META_DESC_RE, _META_DESC_RE_REV):
         m = rx.search(html)
         if m:
-            desc = m.group(1).strip()
+            # R43-J : le pattern a 2 groupes alternatifs (double-quote
+            # ou simple-quote), on prend celui qui matche.
+            desc = (m.group(1) or m.group(2) or "").strip()
             # Décode les entités HTML basiques (&amp; &#x27; …)
             import html as _html_lib
             desc = _html_lib.unescape(desc)
