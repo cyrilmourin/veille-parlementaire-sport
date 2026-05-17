@@ -867,6 +867,81 @@ def _parse_senat_signataires(show_as: str) -> list[tuple[str, str, str]]:
     return out
 
 
+def _fetch_senat_rapporteurs_from_dl(slug: str) -> list[tuple[str, str]]:
+    """R43-A ter (2026-05-17) — Scrape la page dossier législatif Sénat
+    pour extraire les rapporteurs (sénateurs auteurs des rapports `r24-*`).
+
+    Le AKN Sénat (`depots.xml`) liste les **textes déposés** (PPL/PPR/PJL)
+    mais PAS les rapports. Les rapporteurs sont donc invisibles depuis
+    le flux AKN. Pour les récupérer, on fetch la page HTML du dossier
+    législatif (forme stable depuis des années) et on parse les blocs
+    `<a href='/rap/...'>Rapport</a> ... de M. <a href="/senateur/<slug>">
+    Prénom NOM</a>`.
+
+    Cyril 2026-05-17 : « pourtant il s'agit de Savin et Lafon, surtout
+    le premier ». Cas concret PPL Sport pro (ppl24-456) : Lafon est
+    1er signataire (capté via AKN) mais Savin est rapporteur — invisible
+    sans ce scraping.
+
+    Retourne `[(prenom, nom)]` (peut être vide si pas de rapport).
+    """
+    if not slug:
+        return []
+    url = f"https://www.senat.fr/dossier-legislatif/{slug}.html"
+    local = CACHE_DIR / "senat_dossiers_dl" / f"{slug}.html"
+    local.parent.mkdir(parents=True, exist_ok=True)
+    if not local.exists():
+        if not _fetch_via_curl(url, local, timeout=20):
+            return []
+    try:
+        h = local.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return []
+    out: list[tuple[str, str]] = []
+    pattern = re.compile(
+        r'<a\s+href=["\']/rap/[^"\']+["\'][^>]*>\s*Rapport\s*</a>'
+        r'.{0,400}?<a\s+href="/senateur/[^"]+"\s*>([^<]+)</a>',
+        re.S,
+    )
+    for m in pattern.finditer(h):
+        label = m.group(1).strip()
+        # Format type : "Prénom NOM" ou "Prénom-Composé NOM"
+        # Le NOM est en MAJUSCULES (convention Sénat), le prénom en
+        # casse mixte. On découpe au 1er token MAJUSCULES.
+        parts = label.split()
+        prenom_parts: list[str] = []
+        nom_parts: list[str] = []
+        for p in parts:
+            # Considère MAJUSCULES si tous caractères alpha sont majuscules
+            alpha = [c for c in p if c.isalpha()]
+            if alpha and all(c.isupper() for c in alpha):
+                nom_parts.append(p)
+            else:
+                if nom_parts:
+                    # On a déjà rencontré du NOM, mais ce token n'est pas
+                    # majuscule → probablement un nom composé partiel
+                    # ("DE", "LE", etc.). On l'ajoute aux nom_parts.
+                    nom_parts.append(p)
+                else:
+                    prenom_parts.append(p)
+        if not nom_parts:
+            continue
+        prenom = " ".join(prenom_parts).strip()
+        nom = " ".join(nom_parts).strip()
+        if nom:
+            out.append((prenom, nom))
+    # Dédup
+    seen = set()
+    uniq = []
+    for prenom, nom in out:
+        key = (prenom.lower(), nom.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append((prenom, nom))
+    return uniq
+
+
 def scan_senat_akn(
     akn_index_path: Path, matcher: KeywordMatcher,
     counters: dict[str, CompteurActeur],
@@ -895,6 +970,13 @@ def scan_senat_akn(
     # Cache des fichiers .akn.xml individuels
     akn_files_dir = CACHE_DIR / "senat_akn_files"
     akn_files_dir.mkdir(parents=True, exist_ok=True)
+
+    # R43-A ter (2026-05-17) — Dédoublonnage par dossier législatif Sénat.
+    # Un même dossier (ex. PJL JO 2030 = pjl24-630) apparaît dans plusieurs
+    # fichiers AKN (étapes successives : dépôt 1re lecture, retour navette,
+    # CMP, etc.). Sans dédup, Arnaud (rapporteur 1 fois sur pjl24-630)
+    # serait crédité 4× (= nb d'étapes capturées).
+    dl_slugs_scored: set[str] = set()
 
     # Fetch chaque texte de l'index (filtré par date)
     n_total = 0
@@ -952,6 +1034,19 @@ def scan_senat_akn(
             continue
         n_sport += 1
 
+        # Slug dossier législatif Sénat (utilisé pour scraping rapporteurs
+        # ET pour dédupliquer le scoring par dossier)
+        dl_slug = ""
+        for fra in akn_root.iter("{http://docs.oasis-open.org/legaldocml/ns/akn/3.0}FRBRalias"):
+            if fra.get("name") == "signet-dossier-legislatif-senat":
+                dl_slug = fra.get("value", "")
+                break
+        # Dédup par dl_slug : on ne score qu'une fois par dossier législatif
+        if dl_slug and dl_slug in dl_slugs_scored:
+            continue
+        if dl_slug:
+            dl_slugs_scored.add(dl_slug)
+
         # 5) Signataires
         # Le ref auteur est sur FRBRauthor as=#auteur, pointe vers un TLCPerson eId
         author_eid = ""
@@ -999,6 +1094,18 @@ def scan_senat_akn(
                 c.resolution_signataire += 1
                 stats["resolution_signataire"] += 1
             # pjl : initiative gouv, on ne crédite pas de pts au sénateur
+
+        # 8) Rapporteurs Sénat (depuis la page dossier législatif)
+        # R43-A ter (2026-05-17) : Cyril a fait remarquer que Savin
+        # (rapporteur PPL Sport pro Sénat) était absent du top. Le AKN
+        # ne porte pas les rapports, on les récupère par scraping HTML.
+        for prenom_r, nom_r in _fetch_senat_rapporteurs_from_dl(dl_slug):
+            sid_r = _ensure_senat_acteur(prenom_r, nom_r, registry, senat_slugs)
+            c_r = counters[sid_r]
+            c_r.acteur_ref = sid_r
+            c_r.chambre = "Senat"
+            c_r.rapporteur_principal += 1
+            stats["rapporteur_principal"] += 1
 
     log.info("AKN Sénat : %d textes scannés (≥ %s), %d sport-relevant",
              n_total, since, n_sport)
