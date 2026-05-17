@@ -1,7 +1,6 @@
 {
-  "stage": "ok",
-  "ts": "2026-05-17T17:07:49+00:00",
-  "agenda_url": "https://www.sports.gouv.fr/agenda-previsionnel-de-marina-ferrari-1787",
-  "week_start": "2026-05-11",
-  "items_count": 10
+  "stage": "fetch_home_ko",
+  "ts": "2026-05-17T19:59:47+00:00",
+  "landing_url": "https://www.sports.gouv.fr/",
+  "error": "RetryError[<Future at 0x7f3054493810 state=finished raised ReadTimeout>]"
 }
