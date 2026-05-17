@@ -491,36 +491,55 @@ def scan_amendements_an(
 ) -> int:
     """Parcourt le dump amendements AN XVII (270 MB, ~110k fichiers).
 
-    R43-A bis (2026-05-17) — Structure réelle découverte :
-    - Path du zip : `json/<DLR5L17NXXXX>/<TEXTE_REF>/AMANR...json`
-      → le 1er segment après "json/" est le `dossierRef` parent. **Filtre
-      élargi pur path-based** : on compte l'amendement si son dosleg
-      parent est sport, sans relire le texte de l'amdt.
+    R43-A bis (2026-05-17) — Structure réelle :
+    - Path : `json/<DLR5L17NXXXX>/<TEXTE_REF>/AMANR...json`
     - `signataires.auteur.acteurRef` : auteur principal (dict singleton)
-    - `signataires.cosignataires.acteurRef` : liste cosignataires (ou
-      singleton str)
-    - `cycleDeVie.sort` : string directe ("Adopté", "Rejeté", "Tombé",
-      "Retiré"). Pas un dict avec libelle.
+    - `signataires.cosignataires.acteurRef` : liste cosignataires
+    - `cycleDeVie.sort` : « Adopté » / « Rejeté » / « Tombé » / « Retiré »
+    - `corps.contenuAuteur.dispositif` + `exposeSommaire` : contenu
+
+    R43-K (2026-05-17) — Cyril : « tous les amendements sports, y
+    compris sur d'autres textes ». 2 passes :
+    1. PATH-BASED (scope élargi) : dosleg parent matche sport → on
+       compte d'office tous ses amdt.
+    2. CONTENT-BASED (filtre strict) : amdt sur dossier non-sport →
+       on lit dispositif + exposeSommaire, on matche sport. Compte
+       si match.
+    Coût : ~110k fichiers JSON lus en ~30-40s.
     """
-    n_match = 0
+    n_path = 0
+    n_content = 0
     n_adopte = 0
     with zipfile.ZipFile(zip_path) as z:
         for name in z.namelist():
             if not name.endswith(".json"):
                 continue
-            # Path-based dosleg filter (gros gain perf : on n'ouvre que ~3%
-            # des fichiers du zip).
             parts = name.split("/")
             if len(parts) < 2:
                 continue
             dossier_ref = parts[1]
-            if dossier_ref not in dosleg_sport:
-                continue
+            via_path = dossier_ref in dosleg_sport
             try:
                 d = json.loads(z.read(name))
             except Exception:
                 continue
             amdt = d.get("amendement", d) if isinstance(d, dict) else {}
+
+            # R43-K : si pas sur dosleg sport, match content-based
+            via_content = False
+            if not via_path:
+                corps = amdt.get("corps") or {}
+                ca = corps.get("contenuAuteur") if isinstance(corps, dict) else None
+                hay_parts = []
+                if isinstance(ca, dict):
+                    hay_parts.append(_strip_html(_text_of(ca.get("dispositif"))))
+                    hay_parts.append(_strip_html(_text_of(ca.get("exposeSommaire"))))
+                hay = " ".join(p for p in hay_parts if p)[:5000]
+                if hay and matcher.match(hay)[0]:
+                    via_content = True
+                else:
+                    continue
+
             signataires = amdt.get("signataires") or {}
 
             # Auteur principal
@@ -547,7 +566,10 @@ def scan_amendements_an(
             sort_label = _text_of(sort_raw) if not isinstance(sort_raw, dict) else _text_of(sort_raw.get("libelle"))
             is_adopte = "adopt" in (sort_label or "").lower()
 
-            n_match += 1
+            if via_path:
+                n_path += 1
+            else:
+                n_content += 1
             if is_adopte:
                 n_adopte += 1
             # R43-A bis : seul l'auteur principal touche les points
@@ -568,10 +590,10 @@ def scan_amendements_an(
                 c.chambre = "AN"
                 c.amdt_cosigne += 1
     log.info(
-        "Amendements AN sport (path-based via dosleg) : %d total, %d adoptés",
-        n_match, n_adopte,
+        "Amendements AN sport : %d via dosleg + %d via contenu = %d total (%d adoptés)",
+        n_path, n_content, n_path + n_content, n_adopte,
     )
-    return n_match
+    return n_path + n_content
 
 
 def _document_auteurs(doc: dict) -> tuple[list[str], list[str], list[str]]:
@@ -1206,6 +1228,87 @@ def _fetch_senat_amdt_csv_urls_from_dl(slug: str) -> list[str]:
 # mais une partie de ses amdt concernent les crédits Mission Sport.
 SENAT_PLF_SLUGS = ["pjlf2026"]
 
+
+def scan_senat_all_pjl_amdt(
+    akn_index_path: Path | None,
+    counters: dict[str, CompteurActeur],
+    registry: dict[str, Acteur],
+    senat_slugs: dict,
+    since: str = LEGISLATURE_START,
+    exclude_slugs: set[str] | None = None,
+) -> dict[str, int]:
+    """R43-K (2026-05-17) — Scanne TOUS les PJL Sénat depuis 2024-07
+    pour capter les amdt sport-relevant, même sur textes non-sport.
+
+    Cyril : « tous les amendements sports, y compris sur d'autres
+    textes ». Couvre par exemple un amdt sport déposé sur la PJL
+    Sécurité civile, qui ne serait pas capté par le scope élargi
+    dosleg (le dosleg sécurité civile ne matche pas sport).
+
+    Approche : lister les PJL via AKN, fetch leur page DL Sénat, puis
+    scanner les CSV amdt avec filtre strict (`_PLF_SPORT_RE`). Coût :
+    ~173 PJL × 2-3 CSV moyens = ~400 fetches. Cache local idempotent.
+    """
+    if not akn_index_path or not akn_index_path.exists():
+        return {}
+    from xml.etree import ElementTree as ET
+    try:
+        tree = ET.parse(akn_index_path)
+    except Exception:
+        return {}
+    root = tree.getroot()
+    pjl_slugs: set[str] = set()
+    for txt_node in root.findall("text"):
+        url_node = txt_node.find("url")
+        date_node = txt_node.find("lastModifiedDateTime")
+        if url_node is None or date_node is None:
+            continue
+        if (date_node.text or "")[:10] < since:
+            continue
+        fname = (url_node.text or "").split("/")[-1]
+        # On garde uniquement les PJL (= projets de loi). Les PPL/PPR
+        # sport sont déjà couvertes via scope élargi.
+        if not fname.startswith("pjl"):
+            continue
+        # Récupère le signet dl-senat depuis le fichier AKN
+        local_akn = CACHE_DIR / "senat_akn_files" / fname
+        if not local_akn.exists():
+            continue
+        try:
+            akn_tree = ET.parse(local_akn)
+        except Exception:
+            continue
+        NS = "{http://docs.oasis-open.org/legaldocml/ns/akn/3.0}"
+        dl_slug = ""
+        for fra in akn_tree.iter(f"{NS}FRBRalias"):
+            if fra.get("name") == "signet-dossier-legislatif-senat":
+                dl_slug = fra.get("value", "")
+                break
+        if dl_slug:
+            pjl_slugs.add(dl_slug)
+
+    # Exclure les slugs déjà couverts (PLF, dosleg sport scope élargi)
+    skip = set(SENAT_PLF_SLUGS)
+    if exclude_slugs:
+        skip |= exclude_slugs
+    pjl_slugs -= skip
+    if not pjl_slugs:
+        return {}
+
+    total_stats: dict[str, int] = defaultdict(int)
+    n_scanned = 0
+    for slug in sorted(pjl_slugs):
+        before = dict(total_stats)
+        s = scan_senat_plf_amdt(slug, counters, registry, senat_slugs)
+        for k, v in s.items():
+            total_stats[k] += v
+        n_scanned += 1
+    log.info(
+        "Sénat : %d PJL scannés (content-based sport) : %s",
+        n_scanned, dict(total_stats),
+    )
+    return dict(total_stats)
+
 # Regex sport ÉLARGIE pour le contenu PLF (Subdivision + Dispositif +
 # Objet). Plus permissive que le KeywordMatcher (qui exige des
 # expressions composées), car le langage budgétaire est codé (« mission
@@ -1240,6 +1343,12 @@ def scan_senat_plf_amdt(
     sport-relevant. Dédupliqué par auteur via `_ensure_senat_acteur`.
     """
     import csv as _csv, io as _io
+    # R43-K : certains amdt Sénat ont un dispositif > 131k chars
+    # (default csv field limit) → bump explicit.
+    try:
+        _csv.field_size_limit(10 * 1024 * 1024)  # 10 MB
+    except OverflowError:
+        pass
     # R43-J : pré-fetch la page DL Sénat (le PLF n'est pas traité par
     # `scan_senat_akn` donc sa page DL n'est pas en cache local).
     dl_html_path = CACHE_DIR / "senat_dossiers_dl" / f"{plf_slug}.html"
@@ -1353,6 +1462,10 @@ def scan_senat_amdt_csv_for_dl(
     HORS périmètre. Ce scraping CSV par texte les ramène en intégralité.
     """
     import csv as _csv, io as _io
+    try:
+        _csv.field_size_limit(10 * 1024 * 1024)
+    except OverflowError:
+        pass
     urls = _fetch_senat_amdt_csv_urls_from_dl(dl_slug)
     stats: dict[str, int] = defaultdict(int)
     if not urls:
@@ -1628,6 +1741,7 @@ def scan_senat_akn(
     registry: dict[str, Acteur],
     senat_slugs: dict,
     since: str = LEGISLATURE_START,
+    dl_slugs_scope_elargi_out: set[str] | None = None,
 ) -> dict[str, int]:
     """Parse l'index Akoma Ntoso Sénat (`depots.xml`) puis pour chaque
     texte récent dépose les signataires.
@@ -1726,6 +1840,8 @@ def scan_senat_akn(
             continue
         if dl_slug:
             dl_slugs_scored.add(dl_slug)
+            if dl_slugs_scope_elargi_out is not None:
+                dl_slugs_scope_elargi_out.add(dl_slug)
 
         # Pré-fetch la page dossier législatif Sénat (utilisé pour
         # détection promulgation + extraction rapporteurs). Idempotent
@@ -2043,8 +2159,12 @@ def main():
         scan_senat_questions_csv(paths["Q1AN"], matcher, counters, registry, senat_slugs)
     if "QG_SENAT" in paths:
         scan_senat_questions_csv(paths["QG_SENAT"], matcher, counters, registry, senat_slugs)
+    senat_dl_scope_elargi: set[str] = set()
     if "AKN_DEPOTS" in paths:
-        scan_senat_akn(paths["AKN_DEPOTS"], matcher, counters, registry, senat_slugs)
+        scan_senat_akn(
+            paths["AKN_DEPOTS"], matcher, counters, registry, senat_slugs,
+            dl_slugs_scope_elargi_out=senat_dl_scope_elargi,
+        )
     scan_senat_amdt_db(matcher, counters, registry, senat_slugs)
 
     # 5b. Rapports manuels (Sénat — rapports d'info absents AKN)
@@ -2058,10 +2178,20 @@ def main():
     apply_senat_backfill_2024(counters, registry, senat_slugs)
 
     # 5d-bis. R43-J : scan amdt PLF sport (filtre strict).
-    # Le PLF n'est pas un dossier sport (titre = « Budget 2026 »),
-    # mais une partie de ses amdt concernent les crédits Mission Sport.
     for plf_slug in SENAT_PLF_SLUGS:
         scan_senat_plf_amdt(plf_slug, counters, registry, senat_slugs)
+
+    # 5d-ter. R43-K (2026-05-17) — Cyril : « tous les amendements sports,
+    # y compris sur d'autres textes ». Côté Sénat, on scanne tous les
+    # PJL (Projets de Loi) déposés depuis 2024-07 avec filtre matcher
+    # strict sport. Volume estimé : ~173 PJL × 2 CSV moyens = ~350
+    # fetches. Cache local : runs suivants quasi instantanés.
+    # Les PPL et PPR sport sont déjà couverts via le scope élargi
+    # `scan_senat_amdt_csv_for_dl`.
+    scan_senat_all_pjl_amdt(
+        paths.get("AKN_DEPOTS"), counters, registry, senat_slugs,
+        exclude_slugs=senat_dl_scope_elargi,
+    )
 
     # 5e. R43-F : enrichir les groupes politiques Sénat manquants
     # (Lafon / Savin / Malhuret n'ont pas posé de Q sport récente,
