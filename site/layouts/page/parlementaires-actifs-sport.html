@@ -241,7 +241,7 @@
         <h2 class="palm-col__title">🏛️ Sénat</h2>
         <span class="palm-col__count">{{ $d.total_senat }} actifs · top {{ len $d.top_senat }}</span>
       </div>
-      <p class="palm-col__note">Périmètre temporel calé sur le début de la {{ $d.legislature }} législature AN ({{ dateFormat "02/01/2006" (time.AsTime $d.legislature_start) }}). Couverture des <strong>questions limitée aux ~12 derniers mois</strong> (open data Sénat 1 an glissant). PPL/résolutions complètes via Akoma Ntoso.</p>
+      <p class="palm-col__note">Périmètre temporel calé sur le début de la {{ $d.legislature }} législature AN ({{ dateFormat "02/01/2006" (time.AsTime $d.legislature_start) }}). Couverture des <strong>questions limitée aux ~12 derniers mois</strong>. Propositions de loi et résolutions complètes sur la période.</p>
 
       {{ if ge (len $d.top_senat) 3 }}
       <div class="palm-podium">
@@ -316,7 +316,7 @@
   {{/* MÉTHODOLOGIE */}}
   <div class="palm-meta-box">
     <h3>Méthodologie</h3>
-    <p><strong>Périmètre temporel :</strong> {{ $d.legislature }} législature de l'AN (depuis le {{ dateFormat "02/01/2006" (time.AsTime $d.legislature_start) }}, soit les élections législatives anticipées de juin/juillet 2024). Le Sénat fonctionnant par renouvellement triennal partiel (et non par législature), son périmètre est calé sur la même date de début, à la limite près que <em>les questions Sénat ne sont publiées en open data que sur une fenêtre glissante d'~1 an</em> (vs ~10 mois manquants entre juillet 2024 et mai 2025 dans l'open data Sénat actuel). Les PPL/résolutions Sénat sont en revanche complètes via Akoma Ntoso.</p>
+    <p><strong>Périmètre temporel :</strong> {{ $d.legislature }} législature de l'AN (depuis le {{ dateFormat "02/01/2006" (time.AsTime $d.legislature_start) }}, soit les élections législatives anticipées de juin/juillet 2024). Le Sénat fonctionnant par renouvellement triennal partiel (et non par législature), son périmètre est calé sur la même date de début, à la limite près que <em>les questions Sénat ne sont publiées en open data que sur une fenêtre glissante d'~1 an</em> (~10 mois manquants entre juillet 2024 et mai 2025). Les propositions de loi et résolutions Sénat sont en revanche complètes sur la période.</p>
     <p><strong>Filtre « sport » :</strong> mode élargi — une activité est créditée si son contenu matche un mot-clé sport, <em>ou</em> si elle est rattachée à un dossier législatif sport (un amendement déposé sur la PPL Sport pro compte, même si son texte propre ne contient pas le mot « sport »).</p>
     <p><strong>Pondération du score :</strong></p>
     <ul>
@@ -333,7 +333,7 @@
       <li>Auteur d'un rapport parlementaire sport : <strong>15 pts</strong></li>
     </ul>
     <p><em>Note sur la cosignature d'amendements : seul l'<strong>auteur principal</strong> est crédité de points. Les cosignatures collectives en groupe politique sont conservées en statistique séparée mais ne génèrent pas de points (sinon le top serait artificiellement dominé par les groupes qui cosignent en bloc).</em></p>
-    <p style="margin-top: 12px;"><strong>Mise à jour :</strong> ce classement est recalculé manuellement, tous les 3 mois environ, via le script <code>scripts/parlementaires_sport.py</code>. Données affichées : générées le {{ dateFormat "02/01/2006" (time.AsTime $d.generated_at) }}.</p>
+    <p style="margin-top: 12px;"><strong>Mise à jour :</strong> classement recalculé manuellement tous les 3 mois environ. Dernière mise à jour : {{ dateFormat "02/01/2006" (time.AsTime $d.generated_at) }}.</p>
   </div>
 
 </div>

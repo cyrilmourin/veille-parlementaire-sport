@@ -640,6 +640,17 @@ def _from_sitemap_generic(src: dict) -> list[Item]:
             raw={"path": "sitemap_generic", "loc": loc,
                  "lastmod": str(last) if last else ""},
         ))
+    # R43-C (2026-05-17) — Tri par lastmod DESC avant fetch_meta. Sans
+    # ce tri, un sitemap non-trié comme CNOSF (1150 URLs dans l'ordre
+    # d'apparition Drupal, pas par date) laisse les articles RÉCENTS en
+    # queue de liste et hors de la limite `fetch_meta_limit` (=60 par
+    # défaut). Conséquence : l'article récent reste avec summary vide,
+    # le matcher ne voit que le titre reconstitué du slug (pas
+    # d'expression composée → no match), l'item est droppé.
+    # Cas concret : CNOSF "journee-de-leurope-2026..." du 7/05 était
+    # en position 1149/1150 → jamais enrichi → jamais matché.
+    out.sort(key=lambda it: it.published_at or datetime.min, reverse=True)
+
     log.info("%s : %d items sitemap (cutoff %dj)", src["id"], len(out),
              _RSS_SITEMAP_CUTOFF_DAYS)
     # R22e-2 : enrichissement meta description (opt-in par source).
@@ -793,6 +804,47 @@ def _extract_date(a, url: str) -> datetime | None:
                 return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
             except ValueError:
                 pass
+    # 5. R43-C (2026-05-17) — Dates relatives françaises (« Il y a N
+    # heures / jours / semaines / mois »). Cas concret : CPSF
+    # (france-paralympique.fr) affiche la date des articles récents
+    # sous forme « Il y a 7 heures » dans <time class="date"> sans
+    # attribut datetime ISO. Sans ce fallback, l'item est créé avec
+    # published_at=None et droppé par STRICT_DATED_CATEGORIES (côté
+    # site_export.py).
+    # Patterns supportés (case-insensitive) :
+    #   - "Il y a N heure(s)"     → now - N heures
+    #   - "Il y a N jour(s)"      → now - N jours
+    #   - "Il y a N semaine(s)"   → now - N*7 jours
+    #   - "Il y a N mois"         → now - N*30 jours (approximation)
+    #   - "Il y a une heure"      → now - 1 heure (variante texte)
+    #   - "Hier"                  → now - 1 jour
+    #   - "Aujourd'hui"           → now
+    _UNIT_TO_HOURS = {
+        "heure": 1, "heures": 1,
+        "jour": 24, "jours": 24,
+        "semaine": 24 * 7, "semaines": 24 * 7,
+        "mois": 24 * 30,  # approximation 30 jours
+    }
+    for text in texts:
+        low = (text or "").lower()
+        if "aujourd" in low:  # « aujourd'hui »
+            return datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        if "hier" in low and "il y a" not in low:
+            return (datetime.now() - timedelta(days=1)).replace(
+                hour=0, minute=0, second=0, microsecond=0,
+            )
+        # « Il y a N <unité> » (N numérique ou écrit en lettres simples)
+        m = re.search(
+            r"il\s+y\s+a\s+(?:(\d+)|une?)\s+(heures?|jours?|semaines?|mois)",
+            low,
+        )
+        if m:
+            n_str = m.group(1)
+            n = int(n_str) if n_str else 1
+            unit = m.group(2)
+            hours = n * _UNIT_TO_HOURS.get(unit, 0)
+            if hours:
+                return datetime.now() - timedelta(hours=hours)
     return None
 
 
