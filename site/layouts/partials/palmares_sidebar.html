@@ -22,7 +22,7 @@
         <li class="side-item palm-side-row palm-side-row--{{ $rank }}">
           <div class="palm-side-rank">{{ $rank }}</div>
           {{ if $p.photo_url }}
-            <img class="palm-side-photo" src="{{ $p.photo_url }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>
+            <img class="palm-side-photo" src="{{ $p.photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"/>
           {{ else }}<div class="palm-side-photo"></div>{{ end }}
           <div class="side-body palm-side-body">
             <div class="palm-side-name">{{ $p.prenom }} {{ $p.nom }}</div>
@@ -43,7 +43,7 @@
         <li class="side-item palm-side-row palm-side-row--{{ $rank }}">
           <div class="palm-side-rank">{{ $rank }}</div>
           {{ if $p.photo_url }}
-            <img class="palm-side-photo" src="{{ $p.photo_url }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>
+            <img class="palm-side-photo" src="{{ $p.photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"/>
           {{ else }}<div class="palm-side-photo"></div>{{ end }}
           <div class="side-body palm-side-body">
             <div class="palm-side-name">{{ $p.prenom }} {{ $p.nom }}</div>

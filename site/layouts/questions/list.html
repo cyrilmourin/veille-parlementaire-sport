@@ -28,7 +28,7 @@
       <li class="listing-item"{{ with $anchor }} id="{{ . }}"{{ end }}{{ with .Params.family_source }} data-family-source="{{ . }}"{{ end }}>
         {{ with .Params.auteur_photo_url }}
           <div class="listing-item__photo" aria-hidden="true">
-            <img class="auteur-photo" src="{{ . }}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.style.display='none'" width="56" height="56">
+            <img class="auteur-photo" src="{{ . }}" alt="" loading="lazy" referrerpolicy="no-referrer" decoding="async" onerror="this.parentElement.style.display='none'" width="56" height="56">
           </div>
         {{ end }}
         <div class="listing-item__body">

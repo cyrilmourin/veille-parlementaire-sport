@@ -321,7 +321,7 @@
       {{ range . }}
       <a class="ppl-v3-rapporteur" href="{{ .fiche_url }}" target="_blank" rel="noopener">
         <img class="ppl-v3-rapporteur__photo" src="{{ .photo_url }}"
-             alt="Photo {{ .prenom }} {{ .nom }}" loading="lazy"
+             alt="Photo {{ .prenom }} {{ .nom }}" loading="lazy" referrerpolicy="no-referrer"
              onerror="this.style.visibility='hidden';this.style.background='#e2e8f0';"/>
         <div class="ppl-v3-rapporteur__info">
           <div class="ppl-v3-rapporteur__name">{{ .prenom }} {{ .nom }}</div>

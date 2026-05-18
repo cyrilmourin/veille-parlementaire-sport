@@ -174,7 +174,7 @@
         {{ with index $d.top_an 1 }}
         <div class="palm-podium__step palm-podium__step--2">
           <div class="palm-podium__rank">2</div>
-          {{ if .photo_url }}<img class="palm-podium__photo" src="{{ .photo_url }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-podium__photo"></div>{{ end }}
+          {{ if .photo_url }}<img class="palm-podium__photo" src="{{ .photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-podium__photo"></div>{{ end }}
           <div class="palm-podium__name">{{ .prenom }} {{ .nom }}</div>
           <div class="palm-podium__meta"><span class="palm-podium__groupe">{{ .groupe }}</span></div>
           <div class="palm-podium__score">{{ .score }}</div>
@@ -185,7 +185,7 @@
         {{ with index $d.top_an 0 }}
         <div class="palm-podium__step palm-podium__step--1">
           <div class="palm-podium__rank">1</div>
-          {{ if .photo_url }}<img class="palm-podium__photo" src="{{ .photo_url }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-podium__photo"></div>{{ end }}
+          {{ if .photo_url }}<img class="palm-podium__photo" src="{{ .photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-podium__photo"></div>{{ end }}
           <div class="palm-podium__name">{{ .prenom }} {{ .nom }}</div>
           <div class="palm-podium__meta"><span class="palm-podium__groupe">{{ .groupe }}</span></div>
           <div class="palm-podium__score">{{ .score }}</div>
@@ -196,7 +196,7 @@
         {{ with index $d.top_an 2 }}
         <div class="palm-podium__step palm-podium__step--3">
           <div class="palm-podium__rank">3</div>
-          {{ if .photo_url }}<img class="palm-podium__photo" src="{{ .photo_url }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-podium__photo"></div>{{ end }}
+          {{ if .photo_url }}<img class="palm-podium__photo" src="{{ .photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-podium__photo"></div>{{ end }}
           <div class="palm-podium__name">{{ .prenom }} {{ .nom }}</div>
           <div class="palm-podium__meta"><span class="palm-podium__groupe">{{ .groupe }}</span></div>
           <div class="palm-podium__score">{{ .score }}</div>
@@ -212,7 +212,7 @@
         {{ $rank := add $i 1 }}
         <div class="palm-row">
           <div class="palm-row__rank">#{{ $rank }}</div>
-          {{ if $p.photo_url }}<img class="palm-row__photo" src="{{ $p.photo_url }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-row__photo"></div>{{ end }}
+          {{ if $p.photo_url }}<img class="palm-row__photo" src="{{ $p.photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-row__photo"></div>{{ end }}
           <div class="palm-row__id">
             <div class="palm-row__name">{{ $p.prenom }} {{ $p.nom }}</div>
             <div class="palm-row__circo">{{ $p.circonscription }}</div>
@@ -260,7 +260,7 @@
         {{ with index $d.top_senat 1 }}
         <div class="palm-podium__step palm-podium__step--2">
           <div class="palm-podium__rank">2</div>
-          {{ if .photo_url }}<img class="palm-podium__photo" src="{{ .photo_url }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-podium__photo"></div>{{ end }}
+          {{ if .photo_url }}<img class="palm-podium__photo" src="{{ .photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-podium__photo"></div>{{ end }}
           <div class="palm-podium__name">{{ .prenom }} {{ .nom }}</div>
           <div class="palm-podium__meta">{{ with .groupe }}<span class="palm-podium__groupe">{{ . }}</span>{{ end }}</div>
           <div class="palm-podium__score">{{ .score }}</div>
@@ -270,7 +270,7 @@
         {{ with index $d.top_senat 0 }}
         <div class="palm-podium__step palm-podium__step--1">
           <div class="palm-podium__rank">1</div>
-          {{ if .photo_url }}<img class="palm-podium__photo" src="{{ .photo_url }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-podium__photo"></div>{{ end }}
+          {{ if .photo_url }}<img class="palm-podium__photo" src="{{ .photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-podium__photo"></div>{{ end }}
           <div class="palm-podium__name">{{ .prenom }} {{ .nom }}</div>
           <div class="palm-podium__meta">{{ with .groupe }}<span class="palm-podium__groupe">{{ . }}</span>{{ end }}</div>
           <div class="palm-podium__score">{{ .score }}</div>
@@ -280,7 +280,7 @@
         {{ with index $d.top_senat 2 }}
         <div class="palm-podium__step palm-podium__step--3">
           <div class="palm-podium__rank">3</div>
-          {{ if .photo_url }}<img class="palm-podium__photo" src="{{ .photo_url }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-podium__photo"></div>{{ end }}
+          {{ if .photo_url }}<img class="palm-podium__photo" src="{{ .photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-podium__photo"></div>{{ end }}
           <div class="palm-podium__name">{{ .prenom }} {{ .nom }}</div>
           <div class="palm-podium__meta">{{ with .groupe }}<span class="palm-podium__groupe">{{ . }}</span>{{ end }}</div>
           <div class="palm-podium__score">{{ .score }}</div>
@@ -294,7 +294,7 @@
         {{ $rank := add $i 1 }}
         <div class="palm-row">
           <div class="palm-row__rank">#{{ $rank }}</div>
-          {{ if $p.photo_url }}<img class="palm-row__photo" src="{{ $p.photo_url }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-row__photo"></div>{{ end }}
+          {{ if $p.photo_url }}<img class="palm-row__photo" src="{{ $p.photo_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"/>{{ else }}<div class="palm-row__photo"></div>{{ end }}
           <div class="palm-row__id">
             <div class="palm-row__name">{{ $p.prenom }} {{ $p.nom }}</div>
             {{ with $p.groupe }}<span class="palm-row__group">{{ . }}</span>{{ end }}
