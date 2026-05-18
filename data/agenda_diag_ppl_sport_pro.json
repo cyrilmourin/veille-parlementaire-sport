@@ -1,20 +1,20 @@
 {
-  "generated_at": "2026-05-17T22:31:10",
+  "generated_at": "2026-05-18T07:59:23",
   "source_health": {
     "an_agenda": {
-      "last_ok_at": "2026-05-17T22:23:19"
+      "last_ok_at": "2026-05-18T07:49:38"
     },
     "elysee_agenda": {
-      "last_ok_at": "2026-05-17T22:23:19"
+      "last_ok_at": "2026-05-18T07:49:38"
     },
     "min_educ_agenda": {
-      "last_ok_at": "2026-05-17T22:23:19"
+      "last_ok_at": "2026-05-18T07:49:38"
     },
     "min_esr_agenda": {
-      "last_ok_at": "2026-05-17T22:23:19"
+      "last_ok_at": "2026-05-18T07:49:38"
     },
     "min_sports_agenda": {
-      "last_ok_at": "2026-05-17T22:23:19"
+      "last_ok_at": "2026-05-18T07:49:38"
     }
   },
   "ppl_agenda_items": [
@@ -35,7 +35,7 @@
       "title": "Examen de la proposition de loi, adoptée par le Sénat après engagement de la procédure accélérée, relative à l’organisation, à la gestion et au financement du s",
       "published_at": "2026-05-12T14:30:00",
       "is_future": false,
-      "last_seen_at": "2026-05-17T22:30:57",
+      "last_seen_at": "2026-05-18T07:59:07",
       "raw_etat": "Confirmé",
       "raw_organe": "PO419604",
       "raw_xsi_type": "reunioncommission_type"
@@ -46,7 +46,7 @@
       "title": "MinSports — 21h00 — Examen en commission de la proposition de loi relative à l'organisation, à la gestion et au financement du sport professionnel",
       "published_at": "2026-05-12T21:00:00",
       "is_future": false,
-      "last_seen_at": "2026-05-17T21:48:49",
+      "last_seen_at": "2026-05-18T07:34:40",
       "raw_etat": null,
       "raw_organe": null,
       "raw_xsi_type": null
@@ -57,7 +57,7 @@
       "title": "Éventuellement, suite de l’examen de la proposition de loi, adoptée par le Sénat après engagement de la procédure accélérée, relative à l’organisation, à la ges",
       "published_at": "2026-05-13T07:30:00",
       "is_future": false,
-      "last_seen_at": "2026-05-17T22:30:57",
+      "last_seen_at": "2026-05-18T07:59:07",
       "raw_etat": "Confirmé",
       "raw_organe": "PO419604",
       "raw_xsi_type": "reunioncommission_type"
@@ -68,7 +68,7 @@
       "title": "Discussion de la proposition de loi, adoptée par le Sénat, relative à l’organisation, à la gestion et au financement du sport professionnel",
       "published_at": "2026-05-18T13:00:00",
       "is_future": true,
-      "last_seen_at": "2026-05-17T22:30:57",
+      "last_seen_at": "2026-05-18T07:59:07",
       "raw_etat": "Confirmé",
       "raw_organe": "PO838901",
       "raw_xsi_type": "seance_type"
@@ -79,7 +79,7 @@
       "title": "Suite de la discussion de la proposition de loi, adoptée par le Sénat, relative à l’organisation, à la gestion et au financement du sport professionnel",
       "published_at": "2026-05-18T19:30:00",
       "is_future": true,
-      "last_seen_at": "2026-05-17T22:30:57",
+      "last_seen_at": "2026-05-18T07:59:07",
       "raw_etat": "Confirmé",
       "raw_organe": "PO838901",
       "raw_xsi_type": "seance_type"
