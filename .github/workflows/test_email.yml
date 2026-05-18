@@ -1,0 +1,78 @@
+name: Test email delivery (no fetch)
+
+# R43-Q (2026-05-18) — Mini-workflow dédié au test SMTP/email, sans
+# refetch ni matching. ~30 sec par run vs ~25 min côté daily.yml.
+#
+# Cyril 2026-05-18 : « pourquoi on doit refaire à chaque fois un run
+# de 30 min qui reprend tout alors qu'il s'agit ici juste de tester un
+# email ». Bonne question — voici le workflow qui résout ça.
+#
+# Usage :
+#   gh workflow run test_email.yml
+#
+# Effet : envoie un email statique de diagnostic via la même chaîne
+# `send_email()` que le digest réel, en lisant tous les secrets SMTP
+# habituels (SMTP_HOST/USER/PASS/FROM, DIGEST_TO, DIGEST_BCC). Commit
+# `data/email_status.json` comme témoin du test (stage, bcc_count,
+# etc.) — exploitable pour confirmer un changement de SMTP_HOST sans
+# attendre le run quotidien.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# R43-Q : pas de `concurrency` partagée avec daily.yml — un test email
+# peut tourner en parallèle d'un run quotidien (cibles différentes :
+# `email_status.json` ne touche pas la DB ni l'export Hugo).
+
+jobs:
+  send-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install minimal deps (jinja2 + pydantic)
+        # R43-Q : on n'installe PAS tout le package (`pip install -e .`)
+        # qui pèse ~50 deps. send_email n'a besoin que de jinja2 (importé
+        # en tête de src/digest.py) et pydantic (Item, transitive via
+        # quelques imports). Install ciblé → ~5 sec.
+        run: |
+          python -m pip install --upgrade pip --quiet
+          pip install --quiet jinja2 pydantic
+
+      - name: Run SMTP test
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          DIGEST_TO: ${{ secrets.DIGEST_TO }}
+          DIGEST_BCC: ${{ secrets.DIGEST_BCC }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          mkdir -p data
+          python -m src.test_email_cli
+
+      - name: Commit email_status.json
+        run: |
+          git config user.email "veille-bot@sideline-conseil.fr"
+          git config user.name "veille-bot (test_email)"
+          if [ -f data/email_status.json ]; then
+            git add data/email_status.json
+            git diff --staged --quiet || git commit -m "test-email: snapshot $(date -u +%FT%TZ)"
+            git push || echo "push KO (probable conflit avec daily.yml en // — non bloquant)"
+          else
+            echo "Pas de email_status.json à commiter (test_email_cli n'a rien écrit)"
+          fi
