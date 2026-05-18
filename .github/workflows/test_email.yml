@@ -41,16 +41,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install minimal deps (jinja2 + pydantic)
-        # R43-Q : on n'installe PAS tout le package (`pip install -e .`)
-        # qui pèse ~50 deps. send_email n'a besoin que de jinja2 (importé
-        # en tête de src/digest.py) et pydantic (Item, transitive via
-        # quelques imports). Install ciblé → ~5 sec.
-        run: |
-          python -m pip install --upgrade pip --quiet
-          pip install --quiet jinja2 pydantic
-
       - name: Run SMTP test
+        # R43-Q.b (2026-05-18) — Zéro dépendance externe : test_email_cli
+        # n'utilise que la stdlib (smtplib, email.mime.*, datetime, json).
+        # Pas de jinja2 ni pydantic à installer.
         env:
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
@@ -59,6 +53,11 @@ jobs:
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
           DIGEST_TO: ${{ secrets.DIGEST_TO }}
           DIGEST_BCC: ${{ secrets.DIGEST_BCC }}
+          # R43-Q.b : timeout court pour ne pas bloquer 2h si un host
+          # SMTP refuse de répondre (cas vécu : mail.ovh.net:587 n'a
+          # jamais répondu en SMTP authentifié et a bloqué le run jusqu'à
+          # cancel manuel).
+          SMTP_TEST_TIMEOUT: '15'
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
