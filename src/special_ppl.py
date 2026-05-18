@@ -876,11 +876,127 @@ def build_payload(buckets: dict) -> dict:
     # les amendements adoptés en commission puis en séance. Pas d'IA
     # dans le pipeline — texte figé jusqu'à édition manuelle.
     payload["analysis"] = load_analysis(payload["meta"]["key"])
+
+    # R43-M (2026-05-18) — Onglet « Séance Sénat » sur la PPL Sport pro :
+    # Cyril veut voir les amdt par article + lien texte voté Sénat.
+    # On fetch + parse le CSV séance Sénat PPL 670 (= texte issu de la
+    # commission Culture Sénat le 28 mai 2025, voté en séance 10 juin
+    # 2025 → TAS-137).
+    if payload["meta"]["key"] == PPL_KEY:
+        senat_seance = _load_amdt_senat_seance_csv(
+            "https://www.senat.fr/amendements/2024-2025/670/jeu_complet_2024-2025_670.csv",
+            cache_path="data/special_ppl_cache/amdt_seance_senat_ppl670.csv",
+        )
+        payload["amdt_seance_senat"] = senat_seance
+        payload["amdt_seance_senat_by_article"] = _group_amdt_by_article(
+            senat_seance
+        )
+        payload["sort_stats_seance_senat"] = _build_sort_stats(senat_seance)
+        payload["counts"]["amdt_seance_senat"] = len(senat_seance)
+        payload["meta"]["senat_texte_adopte_url"] = (
+            "https://www.senat.fr/leg/tas24-137.html"
+        )
+        payload["meta"]["senat_texte_adopte_num"] = "TAS 137"
+        payload["meta"]["senat_texte_adopte_date"] = "10 juin 2025"
+
     # R43-L (2026-05-18) — Votes finaux sur le texte (séance publique).
     # Cyril : « faire apparaître un camembert qui décrit la répartition
     # des votes sur le texte final ». Lit `config/special_ppl_votes_finaux.yml`.
     payload["votes_finaux"] = load_votes_finaux(payload["meta"]["key"])
     return payload
+
+
+def _load_amdt_senat_seance_csv(url: str, cache_path: str) -> list[dict]:
+    """R43-M (2026-05-18) — Fetch + parse CSV séance Sénat (PPL 670)
+    et retourne la liste au format payload (compatible avec
+    `_group_amdt_by_article` et `_build_sort_stats`).
+
+    Format CSV Sénat : 1ère ligne `sep=` puis TAB-separated, latin-1.
+    Colonnes utilisées : Nature, Numéro, Subdivision, Auteur, Au nom
+    de, Date de dépôt, Dispositif, Objet, Sort, Url amendement.
+    """
+    import csv as _csv
+    import io as _io
+    import os as _os
+    import subprocess as _sp
+    cache = Path(cache_path)
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    if not cache.exists():
+        # Fetch via curl (truststore urllib bloque parfois senat.fr)
+        try:
+            _sp.run(
+                ["curl", "-sL", "--max-time", "60",
+                 "-A", "Mozilla/5.0",
+                 url, "-o", str(cache)],
+                check=False, capture_output=True,
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                "R43-M : fetch CSV Sénat KO : %s", e
+            )
+            return []
+        if not cache.exists() or cache.stat().st_size < 100:
+            return []
+    try:
+        # csv.field_size_limit pour les longs dispositifs
+        _csv.field_size_limit(10 * 1024 * 1024)
+    except OverflowError:
+        pass
+    try:
+        raw = cache.read_text(encoding="latin-1", errors="ignore")
+    except Exception:
+        return []
+    if raw.startswith("sep="):
+        raw = raw.split("\n", 1)[1] if "\n" in raw else ""
+    if not raw.strip():
+        return []
+    reader = _csv.DictReader(_io.StringIO(raw), delimiter="\t")
+
+    def _col(r: dict, *names: str) -> str:
+        for n in names:
+            for k in r.keys():
+                if k is None:
+                    continue
+                if str(k).strip() == n:
+                    return (r.get(k) or "").strip()
+        return ""
+
+    out: list[dict] = []
+    for r in reader:
+        numero = _col(r, "Numéro", "Numero")
+        if not numero:
+            continue
+        subdiv = _col(r, "Subdivision")
+        # Normaliser format "Article 1er" → "ARTICLE 1ER" pour cohérence
+        # avec `_group_amdt_by_article` qui groupe sur cette clé.
+        article = (subdiv or "Sans article").upper().strip()
+        auteur = _col(r, "Auteur")
+        sort = _col(r, "Sort")
+        date_dep = _col(r, "Date de dépôt", "Date de depot")[:10]
+        dispositif = _col(r, "Dispositif")
+        objet = _col(r, "Objet")
+        url = _col(r, "Url amendement", "URL Amendement")
+        if url and not url.startswith("http"):
+            url = "https://www.senat.fr" + url
+        # Concat dispositif + objet, max 1500 chars (l'objet est souvent
+        # plus parlant pour le grand public)
+        import re as _re
+        body = (objet or "") + ("\n\n" + dispositif if dispositif else "")
+        body = _re.sub(r"<[^>]+>", " ", body)
+        body = _re.sub(r"\s+", " ", body)
+        body = body.strip()[:1500]
+        out.append({
+            "title": f"Amdt n°{numero}",
+            "auteur": auteur,
+            "groupe": "",  # pas dans le CSV Sénat
+            "article": article,
+            "sort": sort or "En traitement",
+            "date": date_dep,
+            "url": url,
+            "texte_complet": body,
+        })
+    return out
 
 
 def load_votes_finaux(

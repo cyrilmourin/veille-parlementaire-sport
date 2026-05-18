@@ -64,3 +64,6 @@ tests/*_files/
 # R43-A : cache local des dumps open data AN (350 MB total) — généré par
 # scripts/parlementaires_sport.py, ne doit pas vivre dans git.
 data/parlementaires_cache/
+
+# R43-M : cache local CSV séance Sénat pour la page PPL spéciale
+data/special_ppl_cache/

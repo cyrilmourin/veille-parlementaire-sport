@@ -347,13 +347,19 @@
       <div class="ppl-v3-step ppl-v3-step--future"><div class="ppl-v3-step__label">Promulgation</div><div class="ppl-v3-step__date">—</div></div>
     </div>
 
-    <div class="ppl-v3-tabs">
-      <button class="ppl-v3-tab ppl-v3-tab--active">
+    {{ $senat_count := index $d.counts "amdt_seance_senat" | default 0 }}
+    <div class="ppl-v3-tabs" data-ppl-tabs>
+      <button class="ppl-v3-tab ppl-v3-tab--active" data-tab-target="commission">
         Commission AN <span class="ppl-v3-tab__badge">{{ index $d.counts "amdt_commission" }}</span>
       </button>
+      {{ if gt $senat_count 0 }}
+      <button class="ppl-v3-tab" data-tab-target="seance-senat">
+        Séance Sénat <span class="ppl-v3-tab__badge">{{ $senat_count }}</span>
+      </button>
+      {{ end }}
       {{ $seance_count := index $d.counts "amdt_seance" }}
       <button class="ppl-v3-tab">
-        Séance publique
+        Séance publique AN
         {{ if gt $seance_count 0 }}
           <span class="ppl-v3-tab__badge">{{ $seance_count }}</span>
         {{ else }}
@@ -366,8 +372,8 @@
     </div>
   </div>
 
-  {{/* ---------- Panel actif : Commission ---------- */}}
-  <div class="ppl-v3-panel">
+  {{/* ---------- Panel actif : Commission AN ---------- */}}
+  <div class="ppl-v3-panel" data-panel="commission">
 
     {{/* R42-CV (2026-05-15) — Cartouche analyse manuelle Commission.
          Affichée uniquement si `analysis.commission.texte` non vide
@@ -807,6 +813,168 @@
     {{ end }}
 
   </div>
+
+  {{/* ---------- Panel : Séance Sénat (R43-M) ---------- */}}
+  {{ if gt $senat_count 0 }}
+  <div class="ppl-v3-panel" data-panel="seance-senat" hidden>
+    <div class="ppl-v3-actions">
+      {{ with $d.meta.senat_texte_adopte_url }}
+      <a class="ppl-v3-btn ppl-v3-btn--primary" href="{{ . }}" target="_blank" rel="noopener">
+        <span class="ppl-v3-btn__icon">📄</span>
+        <span>Texte voté par le Sénat<span class="ppl-v3-btn__hint">{{ $d.meta.senat_texte_adopte_num }} · {{ $d.meta.senat_texte_adopte_date }}</span></span>
+      </a>
+      {{ end }}
+      <a class="ppl-v3-btn" href="https://www.senat.fr/dossier-legislatif/ppl24-456.html" target="_blank" rel="noopener">
+        <span class="ppl-v3-btn__icon">📥</span>
+        <span>Dossier législatif Sénat<span class="ppl-v3-btn__hint">ppl24-456 · {{ $senat_count }} amdt</span></span>
+      </a>
+    </div>
+
+    {{ $sort_s := $d.sort_stats_seance_senat }}
+    {{ $vote_s := index ($d.votes_finaux | default dict) "seance_senat" }}
+    {{ $has_vote_s := and $vote_s $vote_s.pour }}
+    {{ if $sort_s }}
+    <div class="ppl-v3-grid{{ if $has_vote_s }} ppl-v3-grid--3{{ end }}">
+      <div class="ppl-v3-card">
+        <div class="ppl-v3-section-title">Sort des amendements</div>
+        <div class="ppl-v3-stats">
+          {{ $color_map := dict
+              "adopte" "#22c55e"
+              "rejete" "#ef4444"
+              "retire" "#f59e0b"
+              "tombe"  "#94a3b8"
+              "traitement" "#1b3b6f"
+              "autre"  "#cbd5e1"
+          }}
+          {{ $stops := slice }}
+          {{ $acc := 0.0 }}
+          {{ range $sort_s.buckets }}
+            {{ $next := add $acc .pct }}
+            {{ $col := index $color_map .class }}
+            {{ $stops = $stops | append (printf "%s %d%% %d%%" $col (int $acc) (int $next)) }}
+            {{ $acc = $next }}
+          {{ end }}
+          {{ $gradient := printf "background: conic-gradient(%s);" (delimit $stops ", ") }}
+          <div class="ppl-v3-pie" style="{{ $gradient | safeCSS }}"></div>
+          <div class="ppl-v3-legend">
+            <div class="ppl-v3-pie-total"><strong>{{ $sort_s.total }}</strong> amendements déposés</div>
+            {{ range $sort_s.buckets }}
+            <div class="ppl-v3-legend-row">
+              <span class="ppl-v3-legend-dot" style="background:{{ index $color_map .class }}"></span>
+              <span class="ppl-v3-legend-label">{{ .label }}</span>
+              <span class="ppl-v3-legend-val">{{ .count }}</span>
+              <span class="ppl-v3-legend-pct">({{ .pct }}%)</span>
+            </div>
+            {{ end }}
+          </div>
+        </div>
+      </div>
+
+      {{/* Note : pas de stats groupes politiques côté CSV Sénat (pas
+           de mapping nom→groupe direct). Bloc omis sur cet onglet. */}}
+
+      {{ if $has_vote_s }}
+      <div class="ppl-v3-card">
+        <div class="ppl-v3-section-title">Vote sur le texte final</div>
+        <div class="ppl-v3-stats">
+          {{ $pour := int $vote_s.pour }}
+          {{ $contre := int (default 0 $vote_s.contre) }}
+          {{ $abst := int (default 0 $vote_s.abstention) }}
+          {{ $total := add $pour (add $contre $abst) }}
+          {{ $pct_pour := 0 }}{{ $pct_contre := 0 }}{{ $pct_abst := 0 }}
+          {{ if gt $total 0 }}
+            {{ $pct_pour = div (mul $pour 100) $total }}
+            {{ $pct_contre = div (mul $contre 100) $total }}
+            {{ $pct_abst = sub 100 (add $pct_pour $pct_contre) }}
+          {{ end }}
+          {{ $stops := slice }}{{ $acc := 0 }}
+          {{ if gt $pct_pour 0 }}{{ $next := add $acc $pct_pour }}{{ $stops = $stops | append (printf "#22c55e %d%% %d%%" (int $acc) (int $next)) }}{{ $acc = $next }}{{ end }}
+          {{ if gt $pct_contre 0 }}{{ $next := add $acc $pct_contre }}{{ $stops = $stops | append (printf "#ef4444 %d%% %d%%" (int $acc) (int $next)) }}{{ $acc = $next }}{{ end }}
+          {{ if gt $pct_abst 0 }}{{ $next := add $acc $pct_abst }}{{ $stops = $stops | append (printf "#94a3b8 %d%% %d%%" (int $acc) (int $next)) }}{{ end }}
+          {{ $gradient := printf "background: conic-gradient(%s);" (delimit $stops ", ") }}
+          <div class="ppl-v3-pie" style="{{ $gradient | safeCSS }}"></div>
+          <div class="ppl-v3-legend">
+            <div class="ppl-v3-pie-total"><strong>{{ $total }}</strong> votants</div>
+            <div class="ppl-v3-legend-row"><span class="ppl-v3-legend-dot" style="background:#22c55e"></span><span class="ppl-v3-legend-label">Pour</span><span class="ppl-v3-legend-val">{{ $pour }}</span><span class="ppl-v3-legend-pct">({{ $pct_pour }}%)</span></div>
+            <div class="ppl-v3-legend-row"><span class="ppl-v3-legend-dot" style="background:#ef4444"></span><span class="ppl-v3-legend-label">Contre</span><span class="ppl-v3-legend-val">{{ $contre }}</span><span class="ppl-v3-legend-pct">({{ $pct_contre }}%)</span></div>
+            {{ if gt $pct_abst 0 }}<div class="ppl-v3-legend-row"><span class="ppl-v3-legend-dot" style="background:#94a3b8"></span><span class="ppl-v3-legend-label">Abstention</span><span class="ppl-v3-legend-val">{{ $abst }}</span><span class="ppl-v3-legend-pct">({{ $pct_abst }}%)</span></div>{{ end }}
+            {{ with $vote_s.date }}<div style="font-size:10px;color:#64748b;margin-top:6px;">Scrutin du {{ . }}</div>{{ end }}
+          </div>
+        </div>
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+
+    {{/* Liste amdt Sénat par article (compact) */}}
+    {{ with $d.amdt_seance_senat_by_article }}
+    <div class="ppl-v3-articles">
+      <div class="ppl-v3-section-title">📑 Amendements Sénat par article</div>
+      <p class="ppl-v3-articles__hint">
+        Amendements examinés en séance publique au Sénat. Cliquer pour ouvrir
+        le détail (dispositif + objet) et le lien vers la fiche officielle.
+      </p>
+      {{ range . }}
+      <details class="ppl-v3-article-row">
+        <summary>
+          <span class="ppl-v3-article-row__num">{{ .article }}</span>
+          <span></span>
+          <span class="ppl-v3-article-row__chip">{{ len .items }} amdt</span>
+          <span class="ppl-v3-article-row__toggle" aria-hidden="true"></span>
+        </summary>
+        <div class="ppl-v3-article-row__body">
+          {{ range .items }}
+            {{ $sort_low := lower .sort }}
+            {{ $sort_class := "traitement" }}
+            {{ if in $sort_low "adopt" }}{{ $sort_class = "adopte" }}{{ end }}
+            {{ if or (in $sort_low "rejet") (in $sort_low "irrecev") }}{{ $sort_class = "rejete" }}{{ end }}
+            {{ if in $sort_low "retir" }}{{ $sort_class = "retire" }}{{ end }}
+            {{ if or (in $sort_low "tomb") (in $sort_low "non examin") (in $sort_low "non soutenu") }}{{ $sort_class = "tombe" }}{{ end }}
+          <details class="ppl-v3-amdt-mini ppl-v3-amdt-mini--{{ $sort_class }}">
+            <summary>
+              <span class="ppl-v3-amdt-mini__num">{{ .title | replaceRE "^Amdt n°" "" }}</span>
+              <span class="ppl-v3-amdt-mini__author">{{ .auteur }}</span>
+              <span class="ppl-v3-amdt-mini__sort ppl-v3-sort--{{ $sort_class }}">{{ .sort | default "En traitement" }}</span>
+              <span class="ppl-v3-amdt-mini__toggle" aria-hidden="true"></span>
+            </summary>
+            <div class="ppl-v3-amdt-mini__body">
+              {{ with .texte_complet }}<p>{{ . }}</p>{{ end }}
+              {{ with .url }}<a class="ppl-v3-amdt-mini__link" href="{{ . }}" target="_blank" rel="noopener noreferrer">Voir l'amendement sur Sénat ↗</a>{{ end }}
+            </div>
+          </details>
+          {{ end }}
+        </div>
+      </details>
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+
+  {{/* JS switching onglets (R43-M) */}}
+  <script>
+  (function(){
+    var tabs = document.querySelectorAll('[data-ppl-tabs] .ppl-v3-tab[data-tab-target]');
+    if (!tabs.length) return;
+    tabs.forEach(function(tab){
+      tab.addEventListener('click', function(ev){
+        ev.preventDefault();
+        var target = tab.getAttribute('data-tab-target');
+        // Toggle bouton actif
+        tabs.forEach(function(t){ t.classList.remove('ppl-v3-tab--active'); });
+        tab.classList.add('ppl-v3-tab--active');
+        // Show / hide panels
+        document.querySelectorAll('[data-panel]').forEach(function(p){
+          if (p.getAttribute('data-panel') === target) {
+            p.hidden = false;
+          } else {
+            p.hidden = true;
+          }
+        });
+      });
+    });
+  })();
+  </script>
 
   {{/* R42-CV (2026-05-15) — Cartouche analyse manuelle Séance publique.
        Affichée uniquement si `analysis.seance.texte` non vide. Tant que
