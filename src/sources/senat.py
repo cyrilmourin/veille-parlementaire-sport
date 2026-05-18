@@ -513,6 +513,65 @@ def fetch_source(src: dict) -> list[Item]:
 _DEFAULT_DEBATS_SINCE_DAYS = 30
 
 
+# R43-V (2026-05-18) — State files incrémentaux pour les zips debats/CRI.
+# Chaque run du pipeline doit décoder + créer un Item pour chaque entrée
+# du zip qui tombe dans la fenêtre de date. CRI = 2810 fichiers HTML/XML
+# sur 15j → ~8 min de décodage à chaque run alors que la quasi-totalité
+# est déjà en DB (UID = sha1 du nom, donc upsert_many = no-op).
+# Le state mémorise les `name` déjà traités. Au run N, on skip le
+# décodage pour les `name` connus et on retourne uniquement les NEW.
+# Le state se renouvelle automatiquement à chaque run en ne conservant
+# que les noms vus pendant CE run → auto-éviction des entrées sorties
+# de la fenêtre de date.
+_DEBATS_STATE_PATHS = {
+    "senat_cri": Path("data/senat_cri_state.json"),
+    "senat_debats": Path("data/senat_debats_state.json"),
+}
+
+
+def _load_debats_state(sid: str) -> set[str]:
+    """R43-V — Charge la liste des `name` (zip member) déjà parsés.
+    Retourne un set vide si le state est absent ou illisible (premier
+    run, ou state corrompu → reset = comportement legacy = re-parse tout).
+    """
+    path = _DEBATS_STATE_PATHS.get(sid)
+    if path is None or not path.exists():
+        return set()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        processed = data.get("processed_members") or []
+        return set(processed) if isinstance(processed, list) else set()
+    except Exception as e:
+        log.warning(
+            "R43-V : state %s illisible (%s), reset (re-parse tout au prochain run)",
+            path.name, e,
+        )
+        return set()
+
+
+def _save_debats_state(sid: str, seen_members: list[str]) -> None:
+    """R43-V — Sauve l'état post-run. `seen_members` = TOUS les noms vus
+    pendant ce run (skip OU décodés), ordre = ordre de parcours du zip.
+    """
+    path = _DEBATS_STATE_PATHS.get(sid)
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Dédup + tri pour diff git lisible. La taille reste compacte
+    # (~2810 chemins de ~50 chars = ~140 ko).
+    payload = {
+        "schema_version": 1,
+        "source_id": sid,
+        "last_run_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "count": len(set(seen_members)),
+        "processed_members": sorted(set(seen_members)),
+    }
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
 def _fetch_debats_zip(src: dict) -> list[Item]:
     """Fetch + normalise un zip de comptes rendus Sénat (debats / cri).
 
@@ -542,18 +601,38 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
         yaml_full = 0
     since_days = window_days(nominal=15, full=max(yaml_full, 730))
     since = datetime.utcnow() - timedelta(days=since_days)
+    # R43-V (2026-05-18) — Charge le state incrémental : les noms de zip
+    # member déjà traités lors des runs précédents. En RUN_MODE=full on
+    # repart de zéro (le helper window_days a déjà élargi la fenêtre, et
+    # un reset complet veut dire re-créer tous les items).
+    from ..run_mode import is_full_mode as _is_full_mode
+    if _is_full_mode():
+        processed_members: set[str] = set()
+        log.info("Sénat %s : RUN_MODE=full → state incrémental ignoré (re-parse complet)", sid)
+    else:
+        processed_members = _load_debats_state(sid)
     log.info(
-        "Sénat %s : fetch zip + filtre date >= %s (fenêtre %d jours)",
-        sid, since.date().isoformat(), since_days,
+        "Sénat %s : fetch zip + filtre date >= %s (fenêtre %d jours, %d entries en cache state)",
+        sid, since.date().isoformat(), since_days, len(processed_members),
     )
     # CRI.zip = 537 Mo, debats.zip = 33 Mo : retry lourd + read 120s.
     data = fetch_bytes_heavy(src["url"])
     items: list[Item] = []
     ext_counts: dict[str, int] = {}
+    seen_members_this_run: list[str] = []
+    skipped_count = 0
 
     for name, dt, payload in unzip_members_since(data, since=since):
         ext = os.path.splitext(name)[1].lower().lstrip(".") or "no-ext"
         ext_counts[ext] = ext_counts.get(ext, 0) + 1
+        seen_members_this_run.append(name)
+        # R43-V — Skip décodage si déjà traité lors d'un run précédent.
+        # L'item est déjà en DB (UID = sha1(sid:name) déterministe →
+        # upsert_many no-op). Pour le matcher, c'est OK aussi : ses
+        # `matched_keywords` sont déjà persistés en DB.
+        if name in processed_members:
+            skipped_count += 1
+            continue
 
         # Décode le contenu en texte (cp1252 fréquent côté Sénat)
         text, _enc = _decode_payload(payload)
@@ -667,10 +746,17 @@ def _fetch_debats_zip(src: dict) -> list[Item]:
             },
         ))
 
+    # R43-V (2026-05-18) — Sauvegarde du state incrémental.
+    # `seen_members_this_run` contient TOUS les noms vus dans la fenêtre
+    # (skip OU décodés). En sauvant ce set, le prochain run skip ces
+    # mêmes noms. Le state se renouvelle naturellement : les noms
+    # sortis de la fenêtre 15j disparaissent du nouveau snapshot.
+    _save_debats_state(sid, seen_members_this_run)
     log.info(
-        "Sénat %s : %d items produits (extensions : %s)",
+        "Sénat %s : %d items produits (extensions : %s) — R43-V : %d skip cache, %d total parcourus",
         sid, len(items),
         ", ".join(f"{k}={v}" for k, v in sorted(ext_counts.items())) or "aucun",
+        skipped_count, len(seen_members_this_run),
     )
     return items
 

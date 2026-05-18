@@ -138,20 +138,32 @@ def _purge_incremental_state(category: str, source_id: str | None) -> None:
     """Purge les state files des scrapers incrémentaux concernés par la
     catégorie. Aujourd'hui :
       - `data/an_cr_state.json` pour les CR AN
+      - `data/senat_cri_state.json` + `data/senat_debats_state.json` pour
+        les CR Sénat (R43-V : skip décodage des entrées zip déjà vues).
       - table SQLite `dosleg_text_cache` pour les dossiers législatifs
         (R42-AI : cache HTML `/dyn/opendata/` + `/leg/`).
     Idempotent : si le fichier/table n'existe pas, no-op."""
-    if category == "comptes_rendus" and (
-        not source_id or source_id == "an_cr_commissions"
-    ):
-        state_path = ROOT / "data" / "an_cr_state.json"
-        if state_path.exists():
-            try:
-                state_path.unlink()
-                print(f"State file purgé : {state_path}")
-            except OSError as exc:
-                print(f"Échec purge state {state_path} : {exc}",
-                      file=sys.stderr)
+    if category == "comptes_rendus":
+        # Liste des state files à considérer selon le source_id ciblé.
+        # Si pas de source_id (purge globale de la catégorie), on purge tout.
+        state_targets: list[tuple[str, Path]] = []
+        if not source_id or source_id == "an_cr_commissions":
+            state_targets.append(
+                ("an_cr_commissions", ROOT / "data" / "an_cr_state.json"),
+            )
+        # R43-V (2026-05-18) — state files Sénat. Même règle : purge si
+        # pas de source_id ou si source_id correspond.
+        for sid in ("senat_cri", "senat_debats"):
+            if not source_id or source_id == sid:
+                state_targets.append((sid, ROOT / "data" / f"{sid}_state.json"))
+        for sid, state_path in state_targets:
+            if state_path.exists():
+                try:
+                    state_path.unlink()
+                    print(f"State file purgé ({sid}) : {state_path}")
+                except OSError as exc:
+                    print(f"Échec purge state {state_path} : {exc}",
+                          file=sys.stderr)
     if category == "dossiers_legislatifs":
         # R42-AI : si on reset les dosleg, on vide aussi le cache HTML
         # texte intégral pour forcer un re-fetch propre. Sinon les items
