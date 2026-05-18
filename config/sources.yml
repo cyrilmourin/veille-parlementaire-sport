@@ -363,20 +363,14 @@ senat:
       commission_organe: PO211493
 
     # R41-AY (2026-05-10) — Vidéothèque commission culture/sport Sénat.
-    # Source complémentaire au bloc « Réunions passées » de R41-AX :
-    # videos.senat.fr expose chaque audition une fois publiée avec date
-    # complète (année incluse) + URL du player vidéo. Ne fetch que p1
-    # (10 dernières publications) pour rester ciblé sur le récent.
-    # Limité à la commission culture (AFCL) tant que le scraper n'a pas
-    # été validé en prod — les autres commissions (lois, finances,
-    # affaires étrangères) pourront être ajoutées par duplication YAML
-    # comme pour R40-B/C si le besoin est confirmé.
-    - id: senat_videos_culture
-      category: agenda
-      url: https://videos.senat.fr/commission.AFCL.p1
-      format: senat_videos_commission_html
-      commission_label: Commission culture/éducation/communication/sport
-      commission_organe: PO211490
+    # R43-P (2026-05-18) — SUPPRIMÉ. Source à 0 items sur ≥ 11/15 runs
+    # analysés (mai 2026) : videos.senat.fr ne ré-expose plus la liste
+    # des publications sur `commission.AFCL.p1` (page accessible mais
+    # parsing à vide, sans erreur HTTP). Cyril (revue logs R43, 18/05) :
+    # « On supprime vidéos culture du sénat ». Le scraper
+    # `src/sources/senat_videos_commission.py` reste en place (réutilisable
+    # si on veut tenter une autre commission ou si Sénat ré-expose la
+    # vidéothèque dans un format compatible). Tests R41-AY conservés.
 
     # R37-A (2026-04-24) — Comptes rendus hebdomadaires commission culture
     # Sénat. Le Sénat ne publie pas de dump JSON/XML pour les CR de
@@ -576,6 +570,13 @@ executif:
     # flux reprend (visible via l'alerte "0 items sans erreur" du
     # dispatcher). On laisse enabled pour détecter automatiquement la
     # reprise.
+    # R43-P (2026-05-18) — DÉSACTIVÉE. Le dataset OpenDataSoft
+    # `fr-esr-agenda-ministre` n'est plus alimenté côté ministère ESR
+    # depuis octobre 2025 (dernier dtstart = 2025-10-22 sur 4788
+    # entrées). Constat revue logs R43, 18/05 : `0 items` sur ≥ 11/15
+    # runs. La source répond en HTTP 200 (pas un problème réseau), elle
+    # est juste figée. Conservée en config pour mémoire — réactiver en
+    # retirant `enabled: false` si le ministère reprend la mise à jour.
     - id: min_esr_agenda
       category: agenda
       url: https://data.enseignementsup-recherche.gouv.fr/api/explore/v2.1/catalog/datasets/fr-esr-agenda-ministre/exports/json
@@ -585,6 +586,7 @@ executif:
       chamber: MinESR
       since_days: 90
       title_prefix: "MinESR —"
+      enabled: false
 
 ministeres:
   # Scraping des espaces presse / listings actualités (RSS non disponible partout)
@@ -861,6 +863,19 @@ autorites:
       format: ans_rss
       chamber: ANS
       impersonate: true
+      # R43-P (2026-05-18) — Activation du proxy Cloudflare. Constat revue
+      # logs 15 derniers runs : `Connection timed out after 30001 ms`
+      # depuis IPs GHA sur 11/15 runs, alors que l'URL répond < 1 s en
+      # local. Blocage IP côté agencedusport.fr, pas latence. Cyril 18/05
+      # « pour les autres fix à faire (je croyais qu'on avait réglé le
+      # problème pour ANS) » → R42-BG (bascule HTML→RSS) résolvait le
+      # parsing, mais le timeout réseau persistait.
+      # ⚠ Nécessite : ajout de `www.agencedusport.fr` à `ALLOWED_HOSTS`
+      # côté worker (`scripts/cloudflare_worker.js` mis à jour en R43-P)
+      # ET redéploiement manuel du worker côté Cloudflare dashboard.
+      # Sans redéploiement, le worker retourne 403 et la source reste
+      # à 0 items (soft-fail, pas de crash pipeline).
+      proxy: cloudflare
       poids: 3
 
     # R15 (2026-04-22) — AFLD : passage en RSS officiel (WordPress).
@@ -956,10 +971,18 @@ autorites:
       # Bascule sur le scraping HTML direct du listing /fr/actualites
       # avec curl_cffi + TLS Chrome 120 — répond 200 depuis poste local.
       # Pari : ça marche aussi depuis IPs GHA. Si non, soft-fail (0 items).
+      # R43-P (2026-05-18) — Pari perdu. Constat revue logs R43, 18/05 :
+      # HTTP 418 sur 11/15 runs côté GHA — l'INSEP détecte aussi les IPs
+      # GHA via curl_cffi direct. Source désactivée pour ne plus polluer
+      # le log d'erreurs (vs garder un soft-fail récurrent). À réactiver
+      # quand on aura un proxy résidentiel / ScrapingBee, ou si l'INSEP
+      # cesse son anti-bot. Le scraper `_from_insep_actualites_html`
+      # reste fonctionnel pour test local.
       url: https://www.insep.fr/fr/actualites
       format: insep_actualites_html
       impersonate: true
       poids: 3
+      enabled: false
 
     # R23-J (2026-04-23) — Fondation du Sport Français (reconnue d'utilité
     # publique, adossée au CNOSF, promeut le sport comme vecteur de lien

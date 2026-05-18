@@ -178,7 +178,14 @@ def test_r23ij_insep_fdsf_present(cfg):
         "fdsf doit rester en format rss (?format=rss est le feed Squarespace "
         "natif, pas besoin de scrape HTML du listing rendu en JS)"
     )
-    assert insep.get("enabled", True) is not False, "insep désactivé"
+    # R43-P (2026-05-18) — INSEP désactivé : le serveur répond HTTP 418
+    # « I'm a teapot » sur les IPs GitHub Actions ET sur les IPs Cloudflare
+    # Worker (anti-bot agressif). Conservé en config pour mémoire mais
+    # `enabled: false`. Le scraper reste fonctionnel pour test local.
+    # Décision Cyril revue logs R43, 18/05/2026.
+    assert insep.get("enabled") is False, (
+        "R43-P : insep doit être désactivé (anti-bot HTTP 418 récurrent)"
+    )
     assert fdsf.get("enabled", True) is not False, "fdsf désactivé"
     # L'URL INSEP doit pointer sur le listing HTML /fr/actualites (sans .xml).
     assert insep["url"].rstrip("/").endswith("/fr/actualites"), (

@@ -429,10 +429,23 @@ def _from_ans_rss(src: dict) -> list[Item]:
     remplace via R42-BG). Le filtre cutoff RSS standard
     (_RSS_SITEMAP_CUTOFF_DAYS) reste appliqué pour cohérence avec les
     autres flux RSS.
+
+    R43-P (2026-05-18) — Support `proxy: cloudflare` ajouté. Constat
+    revue logs 15 derniers runs : `Connection timed out after 30001 ms`
+    sur 11/15 runs depuis les IPs GitHub Actions, alors que l'URL répond
+    en < 1 s depuis un poste local. Blocage IP côté agencedusport.fr,
+    pas une latence : retry / bump timeout n'aident pas. Solution
+    cohérente avec ce qui a été fait pour info.gouv / education.gouv /
+    insep en R42-BO : passer via le worker Cloudflare. Nécessite ajout
+    de `www.agencedusport.fr` à la whitelist `ALLOWED_HOSTS` côté worker
+    (`scripts/cloudflare_worker.js`) ET redéploiement par Cyril.
     """
     impersonate = bool(src.get("impersonate", False))
+    via_proxy = (src.get("proxy") or "").lower() == "cloudflare"
     try:
-        payload = fetch_bytes(src["url"], impersonate=impersonate)
+        payload = fetch_bytes(
+            src["url"], impersonate=impersonate, via_proxy=via_proxy
+        )
     except Exception as e:
         log.warning("RSS KO %s : %s", src["id"], e)
         return []
@@ -660,7 +673,10 @@ def _from_sitemap_generic(src: dict) -> list[Item]:
     if src.get("fetch_meta"):
         limit = int(src.get("fetch_meta_limit", 60))
         impersonate = bool(src.get("impersonate", False))
-        _enrich_with_meta(out, impersonate=impersonate, limit=limit)
+        via_proxy = (src.get("proxy") or "").lower() == "cloudflare"
+        _enrich_with_meta(
+            out, impersonate=impersonate, via_proxy=via_proxy, limit=limit
+        )
     return out
 
 
@@ -995,9 +1011,18 @@ def _extract_meta_description(html: str) -> str:
     return ""
 
 
-def _enrich_with_meta(items: list[Item], *, impersonate: bool, limit: int = 60) -> None:
+def _enrich_with_meta(items: list[Item], *, impersonate: bool,
+                       via_proxy: bool = False, limit: int = 60) -> None:
     """Enrichit `item.summary` in-place pour les N premiers items sans
     summary, via un fetch ciblé de la page article + extraction meta.
+
+    R43-P (2026-05-18) — Propagation du flag `via_proxy` côté page
+    article. Avant, le fetch racine (`/presse`) passait par le worker
+    Cloudflare quand `proxy: cloudflare` était configuré, mais
+    l'enrichissement meta sur les pages d'articles (`/espace-presse`,
+    URLs par article) repassait en `impersonate` direct → HTTP 403
+    quand le WAF de la source bloque les IPs GHA en `curl_cffi` direct.
+    Cas concret : `min_education` (cf. revue logs R43, 18/05).
     """
     fetched = 0
     for it in items:
@@ -1006,7 +1031,9 @@ def _enrich_with_meta(items: list[Item], *, impersonate: bool, limit: int = 60) 
         if it.summary:
             continue
         try:
-            page = fetch_text(it.url, impersonate=impersonate)
+            page = fetch_text(
+                it.url, impersonate=impersonate, via_proxy=via_proxy
+            )
         except Exception as e:
             log.debug("fetch_meta KO %s : %s", it.url, e)
             continue
@@ -1093,7 +1120,11 @@ def fetch_source(src: dict) -> list[Item]:
             ))
     log.info("%s : %d items", src["id"], len(out))
     # R22e-2 : enrichissement meta description (opt-in par source).
+    # R43-P (2026-05-18) : `via_proxy` propagé pour éviter HTTP 403 côté
+    # pages d'articles quand le WAF bloque les IPs GHA en direct.
     if src.get("fetch_meta"):
         limit = int(src.get("fetch_meta_limit", 60))
-        _enrich_with_meta(out, impersonate=impersonate, limit=limit)
+        _enrich_with_meta(
+            out, impersonate=impersonate, via_proxy=via_proxy, limit=limit
+        )
     return out

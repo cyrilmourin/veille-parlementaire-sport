@@ -42,6 +42,14 @@ const ALLOWED_HOSTS = new Set([
   "www.insep.fr",
   "injep.fr",
   "www.ccomptes.fr",
+  // R43-P (2026-05-18) — Agence nationale du Sport. Auparavant routée
+  // en direct via curl_cffi, mais `Connection timed out` chronique côté
+  // IPs GitHub Actions (constat revue logs 15 runs, 18/05). Whitelist
+  // ajoutée pour permettre le passage proxy. Côté pipeline : `ans`
+  // passe à `proxy: cloudflare` dans config/sources.yml.
+  // ⚠ Redéploiement du worker côté Cloudflare dashboard requis pour
+  // que cet ajout soit effectif en prod.
+  "www.agencedusport.fr",
 ]);
 
 const FORWARD_HEADERS = {
