@@ -258,43 +258,125 @@ def test_err_persist_resets_on_success():
 # ---------------------------------------------------------------------------
 
 
-def test_format_drift_triggers_when_count_collapses():
-    """Passage ≥ 5 items → 0 SANS erreur HTTP déclenche FORMAT_DRIFT."""
-    previous = {
+def test_format_drift_triggers_after_consecutive_zero_runs():
+    """R43-T (2026-05-18) — Mis à jour : FORMAT_DRIFT fire APRÈS N runs
+    consécutifs à 0 (THRESHOLD_FORMAT_DRIFT_CONSEC_RUNS=3), pas dès le
+    1er. Simule la transition 12 → 0 → 0 → 0 et vérifie l'alerte au 3e
+    run consécutif à 0.
+    """
+    # Run J-2 : 12 items
+    state = {
         "sources": {
             "an_rapports": {
                 "last_fetched": 12, "last_error": None,
                 "consecutive_errors": 0,
                 "last_ok_at": "2026-04-23T06:00:00",
                 "last_max_published_at": "2026-04-22T10:00:00",
+                "last_nonzero_fetched": 12,
+                "consecutive_zero_runs": 0,
+                "format_drift_alerted": False,
             }
         }
     }
-    fetch_stats = {"an_rapports": {"fetched": 0, "error": None}}
-    _, alerts = monitoring.compute_state_and_alerts(
-        previous, fetch_stats, [], now=_NOW,
+    # Run J-1 : 0 items — pas d'alerte (1 seul run à 0)
+    state, alerts = monitoring.compute_state_and_alerts(
+        state, {"an_rapports": {"fetched": 0, "error": None}}, [], now=_NOW,
+    )
+    assert "FORMAT_DRIFT" not in [a.kind for a in alerts], (
+        "Pas d'alerte après 1 seul run à 0 (R43-T)"
+    )
+    assert state["sources"]["an_rapports"]["consecutive_zero_runs"] == 1
+    assert state["sources"]["an_rapports"]["last_nonzero_fetched"] == 12
+    # Run J : 0 items — toujours pas d'alerte (2 runs)
+    state, alerts = monitoring.compute_state_and_alerts(
+        state, {"an_rapports": {"fetched": 0, "error": None}}, [], now=_NOW,
+    )
+    assert "FORMAT_DRIFT" not in [a.kind for a in alerts]
+    assert state["sources"]["an_rapports"]["consecutive_zero_runs"] == 2
+    # Run J+1 : 0 items — 3e run consécutif → alerte fire
+    state, alerts = monitoring.compute_state_and_alerts(
+        state, {"an_rapports": {"fetched": 0, "error": None}}, [], now=_NOW,
     )
     drift = [a for a in alerts if a.kind == "FORMAT_DRIFT"]
-    assert len(drift) == 1
+    assert len(drift) == 1, "FORMAT_DRIFT doit fire au 3e run consécutif à 0"
     assert drift[0].source_id == "an_rapports"
+    # Le message mentionne le compteur de runs ET la dernière valeur non-zéro
+    assert "3 runs" in drift[0].message
     assert "12" in drift[0].message
+    assert state["sources"]["an_rapports"]["format_drift_alerted"] is True
+
+
+def test_format_drift_not_re_alerted_while_still_zero():
+    """R43-T — Le drapeau `format_drift_alerted` empêche de re-fire à
+    chaque run suivant tant que la source reste à 0. Sinon le digest
+    quotidien serait pollué par la même alerte chaque jour."""
+    # State : 3 runs à 0 consécutifs, déjà alerté
+    state = {
+        "sources": {
+            "an_rapports": {
+                "last_fetched": 0, "last_error": None,
+                "consecutive_errors": 0,
+                "last_ok_at": "2026-04-23T06:00:00",
+                "last_max_published_at": None,
+                "last_nonzero_fetched": 12,
+                "consecutive_zero_runs": 3,
+                "format_drift_alerted": True,
+            }
+        }
+    }
+    # Run J+2 : encore 0 — pas de re-alerte
+    state, alerts = monitoring.compute_state_and_alerts(
+        state, {"an_rapports": {"fetched": 0, "error": None}}, [], now=_NOW,
+    )
+    assert "FORMAT_DRIFT" not in [a.kind for a in alerts]
+    assert state["sources"]["an_rapports"]["consecutive_zero_runs"] == 4
+    assert state["sources"]["an_rapports"]["format_drift_alerted"] is True
+
+
+def test_format_drift_resets_on_recovery():
+    """R43-T — Quand fetched > 0 à nouveau, reset compteur + drapeau.
+    Permet à une future bascule à 0 de réalerter."""
+    state = {
+        "sources": {
+            "an_rapports": {
+                "last_fetched": 0, "last_error": None,
+                "consecutive_errors": 0,
+                "last_ok_at": "2026-04-23T06:00:00",
+                "last_max_published_at": None,
+                "last_nonzero_fetched": 12,
+                "consecutive_zero_runs": 5,
+                "format_drift_alerted": True,
+            }
+        }
+    }
+    state, _ = monitoring.compute_state_and_alerts(
+        state, {"an_rapports": {"fetched": 8, "error": None}}, [], now=_NOW,
+    )
+    entry = state["sources"]["an_rapports"]
+    assert entry["consecutive_zero_runs"] == 0
+    assert entry["last_nonzero_fetched"] == 8
+    assert entry["format_drift_alerted"] is False
 
 
 def test_format_drift_not_triggered_below_min_prev_count():
-    """Scope réduit : si J-1 avait < MIN_PREV_COUNT (5), pas d'alerte."""
-    previous = {
+    """Scope réduit : si la dernière valeur non-zéro était < MIN_PREV_COUNT
+    (5), pas d'alerte même après N runs à 0 (queue longue normale)."""
+    # State : 3 runs à 0 consécutifs MAIS last_nonzero = 2 (< 5)
+    state = {
         "sources": {
             "cnosf": {
-                "last_fetched": 2, "last_error": None,
+                "last_fetched": 0, "last_error": None,
                 "consecutive_errors": 0,
                 "last_ok_at": "2026-04-23T06:00:00",
-                "last_max_published_at": "2026-04-22T10:00:00",
+                "last_max_published_at": None,
+                "last_nonzero_fetched": 2,
+                "consecutive_zero_runs": 2,
+                "format_drift_alerted": False,
             }
         }
     }
-    fetch_stats = {"cnosf": {"fetched": 0, "error": None}}
-    _, alerts = monitoring.compute_state_and_alerts(
-        previous, fetch_stats, [], now=_NOW,
+    state, alerts = monitoring.compute_state_and_alerts(
+        state, {"cnosf": {"fetched": 0, "error": None}}, [], now=_NOW,
     )
     assert "FORMAT_DRIFT" not in [a.kind for a in alerts]
 

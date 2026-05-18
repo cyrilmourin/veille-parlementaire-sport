@@ -51,6 +51,14 @@ SCHEMA_VERSION = 2  # R34 : ajout volumetry_history
 # un run J-1 s'avère trop faux-positif (et noter dans HANDOFF).
 THRESHOLD_ERR_PERSIST_RUNS = 3
 THRESHOLD_FORMAT_DRIFT_MIN_PREV_COUNT = 5
+# R43-T (2026-05-18) — Nombre de runs CONSÉCUTIFS à 0 items avant de
+# fire l'alerte FORMAT_DRIFT. Cyril 18/05 (revue digest reçu via Brevo,
+# 11 alertes Sénat sur 1 seul run) : « Pas la peine de m'alerter quand
+# une recherche donne 0, ce n'est pas un format cassé ». 1 run à 0 peut
+# être un blip réseau côté source / session calme / maintenance. On
+# n'alerte qu'à partir de 3 runs consécutifs à 0 alors que la source
+# remontait ≥ MIN_PREV_COUNT items au dernier run non-zéro.
+THRESHOLD_FORMAT_DRIFT_CONSEC_RUNS = 3
 THRESHOLD_FEED_STALE_DAYS = 60
 
 # R34 (2026-04-24) — Volumétrie : garde un historique des 30 derniers
@@ -209,6 +217,19 @@ def compute_state_and_alerts(
         prev_errors: int = int(prev.get("consecutive_errors") or 0)
         prev_max_pub = _parse_iso_naive(prev.get("last_max_published_at"))
         prev_had_err = bool(prev.get("last_error"))
+        # R43-T (2026-05-18) — Compteur de runs consécutifs à 0 items et
+        # mémorisation de la dernière valeur non-zéro. Permet de fire
+        # FORMAT_DRIFT seulement après N runs consécutifs à 0 (pas dès
+        # le premier blip).
+        prev_zero_runs: int = int(prev.get("consecutive_zero_runs") or 0)
+        # `last_nonzero_fetched` : la dernière valeur > 0 vue. Préservée
+        # tant que fetched == 0, pour pouvoir comparer au volume habituel.
+        # Fallback `prev_fetched` si pas encore dans le state (legacy).
+        prev_last_nonzero = int(
+            prev.get("last_nonzero_fetched")
+            or (prev_fetched if prev_fetched > 0 else 0)
+        )
+        prev_drift_alerted = bool(prev.get("format_drift_alerted"))
 
         # État J pour cette source
         max_pub = _max_published_at(items_by_sid.get(sid, []))
@@ -224,6 +245,20 @@ def compute_state_and_alerts(
             consec_err = 0
             last_ok_at = now.isoformat(timespec="seconds")
 
+        # R43-T : mise à jour compteur zéros + mémorisation last_nonzero
+        if error:
+            # Erreur réseau → on ne touche pas au compteur "format" (c'est
+            # ERR_PERSIST qui gère). On garde `last_nonzero_fetched` figé.
+            new_zero_runs = prev_zero_runs
+            new_last_nonzero = prev_last_nonzero
+        elif fetched == 0:
+            new_zero_runs = prev_zero_runs + 1
+            new_last_nonzero = prev_last_nonzero  # figé tant qu'à 0
+        else:
+            # fetched > 0 → reset compteur + maj last_nonzero
+            new_zero_runs = 0
+            new_last_nonzero = fetched
+
         # Drapeau « déjà alerté pour feed figé » — porté d'un run à l'autre
         # pour éviter de spammer quotidiennement quand un feed reste figé.
         # Reset à False dès que la fraîcheur repasse sous le seuil.
@@ -238,6 +273,12 @@ def compute_state_and_alerts(
                 max_pub.isoformat(timespec="seconds") if max_pub else None
             ),
             "stale_alerted": prev_stale_alerted,
+            # R43-T (2026-05-18)
+            "consecutive_zero_runs": new_zero_runs,
+            "last_nonzero_fetched": new_last_nonzero,
+            "format_drift_alerted": (
+                False if fetched > 0 else prev_drift_alerted
+            ),
         }
         new_sources[sid] = new_entry
 
@@ -254,26 +295,36 @@ def compute_state_and_alerts(
                 ),
             ))
 
-        # Alerte 2 — FORMAT_DRIFT : le parser ne retourne plus rien alors
-        # qu'il remontait N items hier, SANS erreur réseau côté HTTP.
+        # Alerte 2 — FORMAT_DRIFT : le parser ne retourne plus rien sur
+        # plusieurs runs consécutifs alors qu'il remontait des items
+        # avant, SANS erreur réseau côté HTTP.
         # Pas déclenchée si erreur (c'est ERR_PERSIST qui s'en charge).
-        # Pas déclenchée si J-1 avait déjà < MIN_PREV_COUNT items (pour
-        # ne pas alerter sur des sources de queue longue normalement ~1/sem).
+        # Pas déclenchée si la dernière valeur > 0 était < MIN_PREV_COUNT
+        # (pour ne pas alerter sur des sources de queue longue ~1/sem).
+        # R43-T (2026-05-18) — Cyril : « Pas la peine de m'alerter quand
+        # une recherche donne 0, ce n'est pas un format cassé ». Auparavant
+        # FORMAT_DRIFT firait dès le 1er run à 0 → 11 alertes Sénat sur
+        # le digest du 18/05 alors que c'était un simple blip. Maintenant
+        # on attend N runs consécutifs à 0 (THRESHOLD_..._CONSEC_RUNS) AVANT
+        # de fire, et drapeau `format_drift_alerted` pour ne pas refire
+        # à chaque run suivant tant que la source reste à 0.
         if (
             not error
             and fetched == 0
-            and prev_fetched >= THRESHOLD_FORMAT_DRIFT_MIN_PREV_COUNT
-            and not prev_had_err
+            and new_last_nonzero >= THRESHOLD_FORMAT_DRIFT_MIN_PREV_COUNT
+            and new_zero_runs >= THRESHOLD_FORMAT_DRIFT_CONSEC_RUNS
+            and not prev_drift_alerted
         ):
             alerts.append(Alert(
                 kind="FORMAT_DRIFT",
                 source_id=sid,
                 message=(
-                    f"{sid} : 0 items aujourd'hui alors que {prev_fetched} "
-                    f"au run précédent, HTTP OK — probable changement "
-                    f"de format côté source"
+                    f"{sid} : 0 items sur {new_zero_runs} runs consécutifs "
+                    f"(dernier volume non-zéro : {new_last_nonzero}), HTTP OK "
+                    f"— probable changement de format côté source"
                 ),
             ))
+            new_entry["format_drift_alerted"] = True
 
         # Alerte 3 — FEED_STALE : la fraîcheur de la source dépasse le
         # seuil (60 jours par défaut). On utilise un drapeau persistant
