@@ -271,6 +271,28 @@ Coût estimé : 30-45 min de bascule, ~ 20 min de re-ingestion, 5 min de vérif 
 
 ## Historique
 
+- 2026-05-18 (après-midi, retour Cyril) : **R43-N — PPL Sport pro · onglet « Séance Sénat » aligné sur l'onglet AN**.
+
+  Cyril 2026-05-18 (screen-shot comparatif à l'appui) : « D'abord sur les onglets, affiche le dernier actif par défaut (commission AN), mais respecte l'ordre historique (onglet sénat à la gauche de l'onglet AN). Ensuite reprend l'affichage de l'onglet AN pour l'onglet sénat : sur les modules, il en manque un (le top par groupe). Sur les articles, le texte (initial pour le sénat) n'apparait pas, et le contenu des amendements n'est pas néttoyé. Par ailleurs, il semble que la taille de police soit différente. »
+
+  **Changements layout `site/layouts/page/ppl-sport-pro.html`** :
+  - Ordre onglets : `Séance Sénat` est désormais à gauche de `Commission AN` (ordre historique : Sénat adopté le 10 juin 2025, AN en cours), mais `Commission AN` reste actif par défaut (`ppl-v3-tab--active`) car c'est la dernière étape réellement aboutie.
+  - Module « Top groupes politiques (dépôts) » ajouté sur le panel `seance-senat` (`$grp_s := $d.groupe_stats_seance_senat`). Grille à 3 colonnes activée si vote final OU groupes présents.
+  - Bloc « Texte initial Sénat (n° 456) » affiché en haut de chaque article (full-width, classe `ppl-v3-article-row__body--single`), même structure CSS que l'AN → font-size, padding, line-height alignés.
+  - Bloc amendements wrappé dans `ppl-v3-article-row__amdt-mini` (font-size: 11px, padding cohérent) — c'était `ppl-v3-article-row__body` avant, ce qui produisait un rendu typographique différent.
+  - Affichage `{auteur} ({groupe})` sur chaque amdt-mini du Sénat (idem AN).
+
+  **Changements pipeline `src/special_ppl.py`** :
+  - `_load_amdt_senat_seance_csv` décode désormais les entités HTML (`html.unescape` après strip des balises) → plus de `&#233;`, `&#8217;`, `&amp;` bruts dans `texte_complet` (Cyril : « le contenu des amendements n'est pas néttoyé »).
+  - Nouvelle fonction `_build_senat_nom_to_groupe()` : croise `data/senat_slugs.json` (snapshot nom_usuel → slug) avec les fiches sénateurs en cache (`data/parlementaires_cache/senat_fiches/<slug>.html`), parse `src="/assets/images/partagees/groupes/<ABR>.webp"`, alias `UMP→LR`. Fetch curl + cache disque si la fiche n'est pas encore présente. Couverture mesurée : 110/115 amdt → groupe identifié (rate ≥ 96 %). Cas spécial `LE GOUVERNEMENT → GOUVT`.
+  - `_load_amdt_senat_seance_csv` injecte le `groupe` résolu dans chaque amdt (nom extrait via heuristique « dernier token ALL-CAPS »).
+  - `build_payload` ajoute `payload["groupe_stats_seance_senat"] = _build_groupe_stats(senat_seance)`.
+  - Nouvelle fonction `fetch_senat_text_articles()` : parse l'AKN officiel `data/parlementaires_cache/senat_akn_files/ppl24-456.akn.xml` (déjà téléchargé par `parlementaires_sport.py`), itère sur les `<article>` AKN, extrait `<num>` (label) + `<p>` descendants (corps), retourne `{LABEL_NORMALISÉ: html}`. Format identique à `fetch_an_text_articles` (compat clé `_extract_article_label`).
+  - `write_articles_data_file` accepte un 4e param `articles_senat` exposé sous la clé `senat_initial` du JSON.
+  - `export()` enchaîne `fetch_an_text_articles` + `fetch_an_commission_text_articles` + `fetch_senat_text_articles` (best-effort, écrit le fichier si au moins un des 3 a réussi).
+
+  **Tests** : `tests/test_r43n_senat_seance_enrichments.py` (3 tests : HTML entities décodées, ≥ 85 % des amdt avec groupe résolu + cas GOUVT, AKN parser produit des clés `ARTICLE …` UPPER avec `<p>…</p>`). Suite locale : 1420 tests passants. Hugo build OK (`hugo --buildFuture` produit `public/ppl-sport-professionnel/index.html` avec les 3 modules, 12 articles Sénat, 8 groupes top). `SYSTEM_VERSION_LABEL` non bumpé (cycle R43 toujours en cours).
+
 - 2026-05-17 (matin, retour Cyril) : **R42-DC — Filtre agenda orphan strict (last_seen_at ↔ source.last_ok_at) + badge « REP » carte accueil PPL**.
 
   Cyril 2026-05-17 : « la date du 18 mai apparaît toujours pour la séance plénière de la PPL Sport pro. Désormais un événement qui n'est plus présent dans l'agenda futur (et futur uniquement) doit être mis en invisibilité sur le site jusqu'à ce qu'à nouvelle date apparaisse. Donc à chaque run les occurrences agenda présentent en base doivent être vérifiés pour l'avenir ». Diagnostic : R42-CY (buffer `now - 2j`) laissait passer un item disparu du dump moins de 48h avant.

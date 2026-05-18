@@ -892,6 +892,12 @@ def build_payload(buckets: dict) -> dict:
             senat_seance
         )
         payload["sort_stats_seance_senat"] = _build_sort_stats(senat_seance)
+        # R43-N (2026-05-18) — Top groupes politiques pour l'onglet Sénat.
+        # Le champ `groupe` est désormais alimenté via la résolution
+        # nom_usuel → fiche sénateur dans `_load_amdt_senat_seance_csv`.
+        payload["groupe_stats_seance_senat"] = _build_groupe_stats(
+            senat_seance
+        )
         payload["counts"]["amdt_seance_senat"] = len(senat_seance)
         payload["meta"]["senat_texte_adopte_url"] = (
             "https://www.senat.fr/leg/tas24-137.html"
@@ -906,6 +912,73 @@ def build_payload(buckets: dict) -> dict:
     return payload
 
 
+def _build_senat_nom_to_groupe() -> dict[str, str]:
+    """R43-N (2026-05-18) — Construit nom_normalisé → groupe_abrégé pour
+    les sénateurs, en croisant :
+    - `data/senat_slugs.json` (slug officiel par nom)
+    - `data/parlementaires_cache/senat_fiches/<slug>.html` (groupe via
+      pattern `alt="Groupe <Nom> au Sénat"`)
+
+    Si une fiche n'est pas en cache, on essaie un fetch direct (curl)
+    et on cache. Volume : ~30 sénateurs auteurs amdt PPL Sport pro
+    Sénat. Idempotent grâce au cache.
+    """
+    import re
+    import subprocess
+    import unicodedata as _ud
+
+    def _norm(s: str) -> str:
+        s = _ud.normalize("NFKD", s or "").encode("ascii", "ignore").decode()
+        return re.sub(r"[^a-z0-9]+", "", s.lower())
+
+    slugs_path = Path("data/senat_slugs.json")
+    if not slugs_path.exists():
+        return {}
+    import json as _json
+    raw = _json.loads(slugs_path.read_text())
+    entries = raw.get("entries", []) if isinstance(raw, dict) else []
+
+    cache_dir = Path("data/parlementaires_cache/senat_fiches")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    out: dict[str, str] = {}
+    _ABR_MAP = {"UMP": "LR"}  # alias Sénat
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        nom = e.get("nom_usuel") or ""
+        slug = e.get("slug") or ""
+        if not (nom and slug):
+            continue
+        key = _norm(nom)
+        local = cache_dir / f"{slug}.html"
+        if not local.exists():
+            try:
+                subprocess.run(
+                    ["curl", "-sL", "--max-time", "15",
+                     "-A", "Mozilla/5.0",
+                     f"https://www.senat.fr/senateur/{slug}.html",
+                     "-o", str(local)],
+                    capture_output=True, timeout=20,
+                )
+            except Exception:
+                continue
+        if not local.exists() or local.stat().st_size < 500:
+            continue
+        try:
+            h = local.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+        m = re.search(
+            r'src="/assets/images/partagees/groupes/([A-Z0-9\-]+)\.webp"',
+            h,
+        )
+        if m:
+            abr = _ABR_MAP.get(m.group(1), m.group(1))
+            out[key] = abr
+    return out
+
+
 def _load_amdt_senat_seance_csv(url: str, cache_path: str) -> list[dict]:
     """R43-M (2026-05-18) — Fetch + parse CSV séance Sénat (PPL 670)
     et retourne la liste au format payload (compatible avec
@@ -914,11 +987,36 @@ def _load_amdt_senat_seance_csv(url: str, cache_path: str) -> list[dict]:
     Format CSV Sénat : 1ère ligne `sep=` puis TAB-separated, latin-1.
     Colonnes utilisées : Nature, Numéro, Subdivision, Auteur, Au nom
     de, Date de dépôt, Dispositif, Objet, Sort, Url amendement.
+
+    R43-N (2026-05-18) — Le `groupe` est désormais résolu via le mapping
+    `_build_senat_nom_to_groupe()` (croisement nom_usuel→fiche sénateur
+    pour récupérer l'abréviation politique). Permet d'alimenter le
+    module « Top groupes politiques » côté layout, à l'identique
+    de l'onglet Commission AN.
     """
     import csv as _csv
     import io as _io
-    import os as _os
+    import re as _re
+    import html as _html
+    import unicodedata as _ud
     import subprocess as _sp
+
+    def _norm_nom(s: str) -> str:
+        s = _ud.normalize("NFKD", s or "").encode("ascii", "ignore").decode()
+        return _re.sub(r"[^a-z0-9]+", "", s.lower())
+
+    def _extract_nom(au: str) -> str:
+        """`'M. Paul VIDAL'` → `'VIDAL'`. `'Mme BILLON'` → `'BILLON'`.
+        On dépouille la civilité puis on garde les tokens ALL-CAPS
+        (≥ 2 caractères) — c'est l'usage Sénat pour les noms d'auteur.
+        """
+        if not au:
+            return ""
+        au = _re.sub(r"^(M\.|MM\.|Mme|Mmes|Mlle)\s+", "", au.strip())
+        toks = au.split()
+        nom_toks = [t for t in toks if t.isupper() and len(t) > 1]
+        return " ".join(nom_toks) if nom_toks else au
+
     cache = Path(cache_path)
     cache.parent.mkdir(parents=True, exist_ok=True)
     if not cache.exists():
@@ -953,6 +1051,9 @@ def _load_amdt_senat_seance_csv(url: str, cache_path: str) -> list[dict]:
         return []
     reader = _csv.DictReader(_io.StringIO(raw), delimiter="\t")
 
+    # R43-N : mapping nom_normalisé → groupe (best-effort, cache disque)
+    nom_to_groupe = _build_senat_nom_to_groupe()
+
     def _col(r: dict, *names: str) -> str:
         for n in names:
             for k in r.keys():
@@ -979,17 +1080,23 @@ def _load_amdt_senat_seance_csv(url: str, cache_path: str) -> list[dict]:
         url = _col(r, "Url amendement", "URL Amendement")
         if url and not url.startswith("http"):
             url = "https://www.senat.fr" + url
-        # Concat dispositif + objet, max 1500 chars (l'objet est souvent
-        # plus parlant pour le grand public)
-        import re as _re
+        # R43-N : groupe via dernier token ALL-CAPS de l'auteur Sénat
+        nom = _extract_nom(auteur)
+        groupe = nom_to_groupe.get(_norm_nom(nom), "")
+        # Cas spécial : "LE GOUVERNEMENT" → groupe "GOUVT"
+        if auteur.strip().upper() == "LE GOUVERNEMENT":
+            groupe = "GOUVT"
+        # Concat dispositif + objet (l'objet souvent plus parlant)
+        # R43-N : décoder les entités HTML (&#233; → é, &#8217; → ')
         body = (objet or "") + ("\n\n" + dispositif if dispositif else "")
         body = _re.sub(r"<[^>]+>", " ", body)
+        body = _html.unescape(body)
         body = _re.sub(r"\s+", " ", body)
         body = body.strip()[:1500]
         out.append({
             "title": f"Amdt n°{numero}",
             "auteur": auteur,
-            "groupe": "",  # pas dans le CSV Sénat
+            "groupe": groupe,
             "article": article,
             "sort": sort or "En traitement",
             "date": date_dep,
@@ -1262,9 +1369,76 @@ def fetch_an_commission_text_articles(
     return out
 
 
+def fetch_senat_text_articles(
+    akn_path: str = "data/parlementaires_cache/senat_akn_files/ppl24-456.akn.xml",
+) -> dict[str, str]:
+    """R43-N (2026-05-18) — Texte initial Sénat (PPL 456) découpé par
+    article, à l'identique de `fetch_an_text_articles` pour l'AN. La
+    source est l'export Akoma Ntoso officiel du Sénat (déjà téléchargé
+    par `parlementaires_sport.py` quand le DL contient un lien AKN).
+
+    Retourne `{label_normalisé: html_du_corps}`. Le label est mis en
+    majuscules sans parenthèses (« Article 1er » → « ARTICLE 1ER »)
+    pour matcher la clé `_extract_article_label` appliquée aux titres
+    d'amendements (cf. `_group_amdt_by_article`).
+
+    Retourne `{}` si le fichier est absent ou non parsable.
+    """
+    p = Path(akn_path)
+    if not p.exists() or p.stat().st_size < 200:
+        return {}
+    try:
+        from xml.etree import ElementTree as _ET
+        tree = _ET.parse(str(p))
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            "R43-N : AKN Sénat illisible (%s)", e
+        )
+        return {}
+    NS = "{http://docs.oasis-open.org/legaldocml/ns/akn/3.0}"
+    root = tree.getroot()
+    out: dict[str, str] = {}
+    for art in root.iter(NS + "article"):
+        # Premier <num> direct = numéro article (ex. « Article 1er »)
+        num_el = None
+        for ch in list(art):
+            if ch.tag == NS + "num":
+                num_el = ch
+                break
+        if num_el is None:
+            continue
+        label_raw = "".join(num_el.itertext()).strip()
+        # Nettoyage cohérent avec _extract_article_label côté AN :
+        # « Article 1er AA » → « ARTICLE 1ER AA », pas de parenthèses
+        label_clean = re.sub(r"\([^)]*\)", "", label_raw).strip()
+        label_clean = re.sub(
+            r"(\d+)\s+(ER|ERE|ÈRE)\b",
+            r"\1\2",
+            label_clean,
+            flags=re.IGNORECASE,
+        )
+        label_clean = re.sub(r"\s+", " ", label_clean).strip()
+        label_norm = label_clean.upper()
+        if not label_norm.startswith("ARTICLE"):
+            continue
+        # Corps : on parcourt tous les <p> descendants et on concatène
+        # leur texte (incluant les sous-éléments). On préserve la
+        # structure visuelle de l'AKN (un alinéa = un <p>).
+        body_parts: list[str] = []
+        for para in art.iter(NS + "p"):
+            txt = "".join(para.itertext()).strip()
+            if txt:
+                body_parts.append(f"<p>{txt}</p>")
+        if body_parts:
+            out[label_norm] = "\n".join(body_parts)
+    return out
+
+
 def write_articles_data_file(site_data_dir: Path,
                               articles_initial: dict[str, str],
-                              articles_commission: dict[str, str] | None = None) -> None:
+                              articles_commission: dict[str, str] | None = None,
+                              articles_senat: dict[str, str] | None = None) -> None:
     """Écrit `site/data/special_ppl_articles.json` consommé par le layout
     Hugo via `site.Data.special_ppl_articles`.
 
@@ -1275,6 +1449,11 @@ def write_articles_data_file(site_data_dir: Path,
         "initial":   {"ARTICLE 1ER": "<html>", ...},
         "commission": {"ARTICLE 1ER": "<html>", ...} | {}
       }
+
+    R43-N (2026-05-18) — Ajout d'une clé `senat_initial` (texte original
+    de la PPL 456 déposée au Sénat). Permet d'afficher le texte initial
+    côté onglet « Séance Sénat » à droite des amendements, sur le même
+    modèle que l'AN.
     """
     site_data_dir.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -1282,6 +1461,7 @@ def write_articles_data_file(site_data_dir: Path,
         "articles": articles_initial,  # rétrocompat layout d'origine
         "initial": articles_initial,
         "commission": articles_commission or {},
+        "senat_initial": articles_senat or {},
     }
     (site_data_dir / "special_ppl_articles.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
@@ -1310,10 +1490,16 @@ def export(
     # R41-X + R42-BY : fetch + découpage du texte de la PPL (initial +
     # commission). Best-effort (réseau, timeout 20s). Le fichier est
     # toujours écrit si au moins le texte initial est dispo.
+    # R43-N (2026-05-18) — Ajout du texte initial Sénat (PPL 456) lu
+    # depuis l'AKN officiel déjà en cache.
     articles_initial = fetch_an_text_articles()
     articles_commission = fetch_an_commission_text_articles()
-    if articles_initial or articles_commission:
+    articles_senat = fetch_senat_text_articles()
+    if articles_initial or articles_commission or articles_senat:
         write_articles_data_file(
-            site_root / "data", articles_initial, articles_commission,
+            site_root / "data",
+            articles_initial,
+            articles_commission,
+            articles_senat,
         )
     return payload

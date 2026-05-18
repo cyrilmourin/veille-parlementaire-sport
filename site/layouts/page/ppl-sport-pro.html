@@ -348,15 +348,19 @@
     </div>
 
     {{ $senat_count := index $d.counts "amdt_seance_senat" | default 0 }}
+    {{/* R43-N (2026-05-18) — Ordre historique : Séance Sénat (1re lecture
+         Sénat juin 2025) → Commission AN (mai 2026) → Séance AN (à venir)
+         → CMP. Actif par défaut = Commission AN (dernier stade actif,
+         la séance AN étant reportée). */}}
     <div class="ppl-v3-tabs" data-ppl-tabs>
-      <button class="ppl-v3-tab ppl-v3-tab--active" data-tab-target="commission">
-        Commission AN <span class="ppl-v3-tab__badge">{{ index $d.counts "amdt_commission" }}</span>
-      </button>
       {{ if gt $senat_count 0 }}
       <button class="ppl-v3-tab" data-tab-target="seance-senat">
         Séance Sénat <span class="ppl-v3-tab__badge">{{ $senat_count }}</span>
       </button>
       {{ end }}
+      <button class="ppl-v3-tab ppl-v3-tab--active" data-tab-target="commission">
+        Commission AN <span class="ppl-v3-tab__badge">{{ index $d.counts "amdt_commission" }}</span>
+      </button>
       {{ $seance_count := index $d.counts "amdt_seance" }}
       <button class="ppl-v3-tab">
         Séance publique AN
@@ -831,10 +835,15 @@
     </div>
 
     {{ $sort_s := $d.sort_stats_seance_senat }}
+    {{ $grp_s := $d.groupe_stats_seance_senat }}
     {{ $vote_s := index ($d.votes_finaux | default dict) "seance_senat" }}
     {{ $has_vote_s := and $vote_s $vote_s.pour }}
+    {{/* R43-N (2026-05-18) — Grille à 3 colonnes si on a un vote final
+         OU s'il y a des stats groupes politiques (alignement avec
+         l'onglet Commission AN). */}}
+    {{ $sen_three := or $has_vote_s (gt (len $grp_s) 0) }}
     {{ if $sort_s }}
-    <div class="ppl-v3-grid{{ if $has_vote_s }} ppl-v3-grid--3{{ end }}">
+    <div class="ppl-v3-grid{{ if $sen_three }} ppl-v3-grid--3{{ end }}">
       <div class="ppl-v3-card">
         <div class="ppl-v3-section-title">Sort des amendements</div>
         <div class="ppl-v3-stats">
@@ -870,8 +879,24 @@
         </div>
       </div>
 
-      {{/* Note : pas de stats groupes politiques côté CSV Sénat (pas
-           de mapping nom→groupe direct). Bloc omis sur cet onglet. */}}
+      {{/* R43-N (2026-05-18) — Top groupes politiques (dépôts) côté
+           Sénat. Le mapping nom→groupe est calculé côté pipeline via
+           `_build_senat_nom_to_groupe()` (croisement nom_usuel ↔
+           fiche sénateur). */}}
+      {{ if $grp_s }}
+      <div class="ppl-v3-card">
+        <div class="ppl-v3-section-title">Top groupes politiques (dépôts)</div>
+        <div class="ppl-v3-groupes">
+          {{ range $grp_s }}
+          <div class="ppl-v3-groupe">
+            <span>{{ .groupe }}</span>
+            <div class="ppl-v3-groupe__bar"><div class="ppl-v3-groupe__fill" style="width:{{ .pct_max }}%"></div></div>
+            <span class="ppl-v3-groupe__num">{{ .count }}</span>
+          </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
 
       {{ if $has_vote_s }}
       <div class="ppl-v3-card">
@@ -906,23 +931,48 @@
     </div>
     {{ end }}
 
-    {{/* Liste amdt Sénat par article (compact) */}}
+    {{/* R43-N (2026-05-18) — Liste amdt Sénat par article ALIGNÉE sur
+         le format AN : texte initial du Sénat (PPL 456) affiché au-dessus
+         des amendements, dans la même structure typographique (police,
+         spacing, classes CSS). Source : AKN officiel du Sénat. */}}
     {{ with $d.amdt_seance_senat_by_article }}
     <div class="ppl-v3-articles">
-      <div class="ppl-v3-section-title">📑 Amendements Sénat par article</div>
+      <div class="ppl-v3-section-title">📑 Articles du texte — cliquer pour voir les amendements et le contenu</div>
       <p class="ppl-v3-articles__hint">
-        Amendements examinés en séance publique au Sénat. Cliquer pour ouvrir
-        le détail (dispositif + objet) et le lien vers la fiche officielle.
+        Chaque article s'ouvre INLINE. Le texte initial Sénat (n° 456) est
+        affiché en haut, suivi des amendements examinés en séance publique
+        au Sénat. Cliquer sur un amendement pour ouvrir son détail.
       </p>
+
+      {{ $articles_data := $.Site.Data.special_ppl_articles }}
+      {{ $senat_initial := dict }}
+      {{ if $articles_data }}
+        {{ $senat_initial = $articles_data.senat_initial | default dict }}
+      {{ end }}
+
       {{ range . }}
+      {{ $article_key := .article }}
+      {{ $count := len .items }}
+      {{ $senat_text := index $senat_initial $article_key }}
       <details class="ppl-v3-article-row">
         <summary>
           <span class="ppl-v3-article-row__num">{{ .article }}</span>
           <span></span>
-          <span class="ppl-v3-article-row__chip">{{ len .items }} amdt</span>
-          <span class="ppl-v3-article-row__toggle" aria-hidden="true"></span>
+          <span class="ppl-v3-article-row__chip">{{ $count }} amdt</span>
+          <span class="ppl-v3-article-row__toggle">Ouvrir</span>
         </summary>
-        <div class="ppl-v3-article-row__body">
+        {{ if $senat_text }}
+        <div class="ppl-v3-article-row__body ppl-v3-article-row__body--single">
+          <div class="ppl-v3-article-row__col">
+            <div class="ppl-v3-article-row__col-title">Texte initial Sénat (n° 456)</div>
+            {{ $senat_text | safeHTML }}
+          </div>
+        </div>
+        {{ end }}
+        <div class="ppl-v3-article-row__amdt-mini" style="padding: 14px 18px;">
+          <div class="ppl-v3-article-row__col-title" style="margin-bottom:8px;">
+            Amendements ayant porté sur {{ .article }} ({{ $count }}) — cliquer pour déplier
+          </div>
           {{ range .items }}
             {{ $sort_low := lower .sort }}
             {{ $sort_class := "traitement" }}
@@ -933,12 +983,16 @@
           <details class="ppl-v3-amdt-mini ppl-v3-amdt-mini--{{ $sort_class }}">
             <summary>
               <span class="ppl-v3-amdt-mini__num">{{ .title | replaceRE "^Amdt n°" "" }}</span>
-              <span class="ppl-v3-amdt-mini__author">{{ .auteur }}</span>
+              <span class="ppl-v3-amdt-mini__author">{{ .auteur }}{{ with .groupe }} ({{ . }}){{ end }}</span>
               <span class="ppl-v3-amdt-mini__sort ppl-v3-sort--{{ $sort_class }}">{{ .sort | default "En traitement" }}</span>
               <span class="ppl-v3-amdt-mini__toggle" aria-hidden="true"></span>
             </summary>
             <div class="ppl-v3-amdt-mini__body">
-              {{ with .texte_complet }}<p>{{ . }}</p>{{ end }}
+              {{ with .texte_complet }}
+                <p>{{ . }}</p>
+              {{ else }}
+                <p><em>Texte intégral non disponible dans le dump open data (extrait possible côté source).</em></p>
+              {{ end }}
               {{ with .url }}<a class="ppl-v3-amdt-mini__link" href="{{ . }}" target="_blank" rel="noopener noreferrer">Voir l'amendement sur Sénat ↗</a>{{ end }}
             </div>
           </details>
