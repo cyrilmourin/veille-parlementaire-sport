@@ -328,23 +328,30 @@
   {{/* MÉTHODOLOGIE */}}
   <div class="palm-meta-box">
     <h3>Méthodologie</h3>
-    <p><strong>Périmètre temporel :</strong> {{ $d.legislature }} législature de l'AN (depuis le {{ dateFormat "02/01/2006" (time.AsTime $d.legislature_start) }}, soit les élections législatives anticipées de juin/juillet 2024). Le Sénat fonctionnant par renouvellement triennal partiel (et non par législature), son périmètre est calé sur la même date de début, à la limite près que <em>les questions Sénat ne sont publiées en open data que sur une fenêtre glissante d'~1 an</em> (~10 mois manquants entre juillet 2024 et mai 2025). Les propositions de loi et résolutions Sénat sont en revanche complètes sur la période.</p>
-    <p><strong>Filtre « sport » :</strong> mode élargi — une activité est créditée si son contenu matche un mot-clé sport, <em>ou</em> si elle est rattachée à un dossier législatif sport (un amendement déposé sur la PPL Sport pro compte, même si son texte propre ne contient pas le mot « sport »).</p>
+    <p><strong>Périmètre temporel :</strong> {{ $d.legislature }} législature de l'Assemblée nationale (depuis le {{ dateFormat "02/01/2006" (time.AsTime $d.legislature_start) }}, élections législatives anticipées de juin/juillet 2024). Le Sénat fonctionnant par renouvellement triennal partiel et non par législature, son périmètre est calé sur la même date de début. Les amendements (commission, séance, CMP), les propositions de loi, projets de loi et résolutions Sénat sont couverts intégralement sur la période. Les questions Sénat sont couvertes sur les 12 derniers mois glissants (limite open data Sénat ; les 10 mois antérieurs peuvent être renseignés manuellement via une saisie dédiée pour les sénateurs concernés).</p>
+    <p><strong>Filtre « sport » — double approche :</strong></p>
+    <ul>
+      <li><strong>Scope élargi par dossier législatif :</strong> tout amendement, signataire ou rapporteur d'un texte dont le titre matche un mot-clé sport (PPL Sport pro, PJL JO 2030, PPL Sport-santé, etc.) est crédité, même si son contenu propre ne mentionne pas explicitement le sport.</li>
+      <li><strong>Filtre strict par contenu pour les autres textes :</strong> pour les amendements déposés sur des textes qui ne sont pas globalement sport (PLF, PJL Sécurité, etc.), on lit le dispositif et l'exposé sommaire de chaque amendement et on crédite uniquement s'il matche un mot-clé sport. Ainsi un amendement sport « caché » dans une loi de finances ou un texte de sécurité est capté.</li>
+      <li><strong>Questions :</strong> matching sur titre, thème, rubrique et corps de la question (côté AN, le corps est dans l'open data ; côté Sénat seuls les métadonnées sont fournies).</li>
+    </ul>
     <p><strong>Pondération du score :</strong></p>
     <ul>
-      <li>Question écrite / question orale sans débat : <strong>1 pt</strong></li>
+      <li>Membre de la commission Culture (AN ou Sénat) : <strong>5 pts</strong></li>
+      <li>Membre d'un groupe d'étude sport, mission d'information ou commission d'enquête sport au Sénat : <strong>5 pts</strong></li>
+      <li>Question écrite / question orale sans débat : <strong>2 pts</strong></li>
       <li>Question au Gouvernement (QAG) : <strong>5 pts</strong></li>
-      <li>Amendement déposé (en tant qu'auteur principal) : <strong>2 pts</strong></li>
-      <li>Amendement adopté : <strong>+5 pts bonus</strong></li>
-      <li>Rapporteur principal d'un texte sport / rapporteur budget sport : <strong>15 pts</strong></li>
-      <li>Rapporteur pour avis ou co-rapporteur : <strong>10 pts</strong></li>
+      <li>Amendement déposé (en tant qu'auteur principal) : <strong>0,5 pt</strong></li>
+      <li>Amendement adopté : <strong>+2 pts bonus</strong></li>
+      <li>Rapporteur principal d'un texte sport / rapporteur budget sport : <strong>10 pts</strong></li>
+      <li>Rapporteur pour avis ou co-rapporteur sport : <strong>5 pts</strong></li>
       <li>Premier signataire d'une PPL sport déposée : <strong>15 pts</strong></li>
-      <li>Signataire d'une PPL sport : <strong>10 pts</strong></li>
-      <li>Premier signataire d'un texte sport <strong>adopté</strong> : <strong>+25 pts bonus</strong></li>
-      <li>Premier signataire ou signataire d'une résolution sport : <strong>5 pts</strong></li>
-      <li>Auteur d'un rapport parlementaire sport : <strong>15 pts</strong></li>
+      <li>Signataire d'une PPL sport : <strong>5 pts</strong></li>
+      <li>Premier signataire d'un texte sport <strong>promulgué</strong> (loi parue au JO) : <strong>+10 pts bonus</strong></li>
+      <li>Premier signataire ou signataire d'une résolution sport : <strong>3 pts</strong></li>
+      <li>Auteur ou co-auteur d'un rapport parlementaire sport : <strong>10 pts</strong></li>
     </ul>
-    <p><em>Note sur la cosignature d'amendements : seul l'<strong>auteur principal</strong> est crédité de points. Les cosignatures collectives en groupe politique sont conservées en statistique séparée mais ne génèrent pas de points (sinon le top serait artificiellement dominé par les groupes qui cosignent en bloc).</em></p>
+    <p><em>Note sur la cosignature d'amendements : seul l'<strong>auteur principal</strong> d'un amendement est crédité de points. Les cosignatures collectives en groupe politique sont conservées en statistique séparée mais ne génèrent pas de points (sinon le top serait artificiellement dominé par les groupes qui cosignent en bloc).</em></p>
     <p style="margin-top: 12px;"><strong>Mise à jour :</strong> classement recalculé manuellement tous les 3 mois environ. Dernière mise à jour : {{ dateFormat "02/01/2006" (time.AsTime $d.generated_at) }}.</p>
   </div>
 

@@ -876,7 +876,50 @@ def build_payload(buckets: dict) -> dict:
     # les amendements adoptés en commission puis en séance. Pas d'IA
     # dans le pipeline — texte figé jusqu'à édition manuelle.
     payload["analysis"] = load_analysis(payload["meta"]["key"])
+    # R43-L (2026-05-18) — Votes finaux sur le texte (séance publique).
+    # Cyril : « faire apparaître un camembert qui décrit la répartition
+    # des votes sur le texte final ». Lit `config/special_ppl_votes_finaux.yml`.
+    payload["votes_finaux"] = load_votes_finaux(payload["meta"]["key"])
     return payload
+
+
+def load_votes_finaux(
+    payload_key: str,
+    config_path: str = "config/special_ppl_votes_finaux.yml",
+) -> dict:
+    """R43-L (2026-05-18) — Charge les votes finaux pour `payload_key`.
+
+    Retourne `{commission_an, seance_an, seance_senat}`. Chaque bloc
+    a `pour, contre, abstention, votants, date`. Si `pour` est null
+    ou bloc absent → bloc retourné vide (le layout n'affiche rien).
+    """
+    SECTION_BY_KEY = {
+        PPL_KEY: "special_ppl",
+        "ppl-partenariats-equipements-sportifs": "special_ppl_equip",
+    }
+    section = SECTION_BY_KEY.get(payload_key, payload_key)
+    empty = {"commission_an": {}, "seance_an": {}, "seance_senat": {}}
+    try:
+        import yaml
+        with open(config_path, "r", encoding="utf-8") as fp:
+            cfg = yaml.safe_load(fp) or {}
+    except FileNotFoundError:
+        return empty
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            "R43-L : votes finaux illisibles (%s)", e
+        )
+        return empty
+    block = cfg.get(section) or {}
+    if not isinstance(block, dict):
+        return empty
+    out = dict(empty)
+    for k in ("commission_an", "seance_an", "seance_senat"):
+        b = block.get(k)
+        if isinstance(b, dict) and b.get("pour") is not None:
+            out[k] = b
+    return out
 
 
 def load_analysis(

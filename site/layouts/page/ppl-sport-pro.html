@@ -189,6 +189,8 @@
   .ppl-v3-amdt-flat__body p:last-child { margin-bottom: 6px; }
 
   .ppl-v3-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  /* R43-L (2026-05-18) — 3 colonnes quand le vote final est dispo */
+  .ppl-v3-grid--3 { grid-template-columns: 1fr 1fr 1fr; }
   .ppl-v3-card { background: #fafbfc; border-radius: 9px; padding: 16px; }
   .ppl-v3-stats { display: flex; gap: 16px; align-items: center; }
   /* R42-CZB (2026-05-16) — donut → camembert plein (pas de trou central).
@@ -438,8 +440,15 @@
     {{/* Stats sort + groupes (vraies données du payload) */}}
     {{ $sort := $d.sort_stats_commission }}
     {{ $grp := $d.groupe_stats_commission }}
+    {{/* R43-L (2026-05-18) — 3e module conditionnel : vote final sur
+         le texte (séance publique). Pour la PPL Sport pro côté
+         AN, on lit `votes_finaux.commission_an` sur cet onglet
+         Commission. Si vide → 2 modules en 50/50, sinon 3 en
+         33/33/33. */}}
+    {{ $vote := index ($d.votes_finaux | default dict) "commission_an" }}
+    {{ $has_vote := and $vote $vote.pour }}
     {{ if $sort }}
-    <div class="ppl-v3-grid">
+    <div class="ppl-v3-grid{{ if $has_vote }} ppl-v3-grid--3{{ end }}">
       <div class="ppl-v3-card">
         <div class="ppl-v3-section-title">Sort des amendements</div>
         <div class="ppl-v3-stats">
@@ -502,6 +511,73 @@
             <span class="ppl-v3-groupe__num">{{ .count }}</span>
           </div>
           {{ end }}
+        </div>
+      </div>
+      {{ end }}
+
+      {{/* R43-L (2026-05-18) — 3e card : vote final sur le texte
+           (Pour/Contre/Abstention). Affichée uniquement si la donnée
+           est disponible pour l'onglet courant. Gradient camembert
+           vert/rouge/gris. */}}
+      {{ if $has_vote }}
+      <div class="ppl-v3-card">
+        <div class="ppl-v3-section-title">Vote sur le texte final</div>
+        <div class="ppl-v3-stats">
+          {{ $pour := int $vote.pour }}
+          {{ $contre := int (default 0 $vote.contre) }}
+          {{ $abst := int (default 0 $vote.abstention) }}
+          {{ $exp := add $pour $contre }}
+          {{ $total := add $exp $abst }}
+          {{ $pct_pour := 0 }}
+          {{ $pct_contre := 0 }}
+          {{ $pct_abst := 0 }}
+          {{ if gt $total 0 }}
+            {{ $pct_pour = div (mul $pour 100) $total }}
+            {{ $pct_contre = div (mul $contre 100) $total }}
+            {{ $pct_abst = sub 100 (add $pct_pour $pct_contre) }}
+          {{ end }}
+          {{ $stops := slice }}
+          {{ $acc := 0 }}
+          {{ if gt $pct_pour 0 }}
+            {{ $next := add $acc $pct_pour }}
+            {{ $stops = $stops | append (printf "#22c55e %d%% %d%%" (int $acc) (int $next)) }}
+            {{ $acc = $next }}
+          {{ end }}
+          {{ if gt $pct_contre 0 }}
+            {{ $next := add $acc $pct_contre }}
+            {{ $stops = $stops | append (printf "#ef4444 %d%% %d%%" (int $acc) (int $next)) }}
+            {{ $acc = $next }}
+          {{ end }}
+          {{ if gt $pct_abst 0 }}
+            {{ $next := add $acc $pct_abst }}
+            {{ $stops = $stops | append (printf "#94a3b8 %d%% %d%%" (int $acc) (int $next)) }}
+          {{ end }}
+          {{ $gradient := printf "background: conic-gradient(%s);" (delimit $stops ", ") }}
+          <div class="ppl-v3-pie" style="{{ $gradient | safeCSS }}"></div>
+          <div class="ppl-v3-legend">
+            <div class="ppl-v3-pie-total"><strong>{{ $total }}</strong> votants</div>
+            <div class="ppl-v3-legend-row">
+              <span class="ppl-v3-legend-dot" style="background:#22c55e"></span>
+              <span class="ppl-v3-legend-label">Pour</span>
+              <span class="ppl-v3-legend-val">{{ $pour }}</span>
+              <span class="ppl-v3-legend-pct">({{ $pct_pour }}%)</span>
+            </div>
+            <div class="ppl-v3-legend-row">
+              <span class="ppl-v3-legend-dot" style="background:#ef4444"></span>
+              <span class="ppl-v3-legend-label">Contre</span>
+              <span class="ppl-v3-legend-val">{{ $contre }}</span>
+              <span class="ppl-v3-legend-pct">({{ $pct_contre }}%)</span>
+            </div>
+            {{ if gt $pct_abst 0 }}
+            <div class="ppl-v3-legend-row">
+              <span class="ppl-v3-legend-dot" style="background:#94a3b8"></span>
+              <span class="ppl-v3-legend-label">Abstention</span>
+              <span class="ppl-v3-legend-val">{{ $abst }}</span>
+              <span class="ppl-v3-legend-pct">({{ $pct_abst }}%)</span>
+            </div>
+            {{ end }}
+            {{ with $vote.date }}<div style="font-size:10px;color:#64748b;margin-top:6px;">{{ . }}</div>{{ end }}
+          </div>
         </div>
       </div>
       {{ end }}

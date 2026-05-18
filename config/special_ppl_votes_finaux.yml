@@ -1,0 +1,50 @@
+# R43-L (2026-05-18) — Votes finaux sur le texte (séance publique).
+#
+# Cyril : « si cette donnée existe (ce n'est sans doute pas le cas en
+# commission car vote à main levée, et qu'on a pas encore le compte
+# rendu), faire apparaître un camembert qui décrit la répartition des
+# votes sur le texte final ».
+#
+# Affichage côté layout `ppl-sport-pro.html` :
+#  - Onglet « Commission AN » → lit `<payload_key>.commission_an`. En
+#    pratique vote à main levée → généralement null.
+#  - Onglet « Séance publique AN » → lit `<payload_key>.seance_an`.
+#  - 3e camembert affiché à côté de « Sort des amendements » et « Top
+#    groupes politiques (dépôts) » SI la donnée existe pour l'onglet
+#    courant. Sinon les 2 autres modules se partagent l'espace 50/50.
+#
+# Format par PPL :
+#   <payload_key>:
+#     commission_an: {pour, contre, abstention, votants, date}
+#     seance_an:     {pour, contre, abstention, votants, date}
+#     seance_senat:  {pour, contre, abstention, votants, date}
+#
+# Chacun peut être `null` ou absent → pas d'affichage.
+# Source officielle :
+#   - AN  : https://www2.assemblee-nationale.fr/scrutins/
+#   - Sénat : https://www.senat.fr/scrutin-public/
+
+special_ppl:
+  # PPL Sport pro — n° 1560 (AN), n° 456 (Sénat)
+  commission_an:
+    # Vote en commission Culture AN les 12-13 mai 2026 :
+    # vote à main levée selon usage, pas de scrutin public.
+    pour: null
+  seance_an:
+    # Séance plénière AN initialement prévue 18 mai 2026 → reportée.
+    # À renseigner quand le scrutin public sera disponible.
+    pour: null
+  seance_senat:
+    # Scrutin n° 306 du 10 juin 2025 — adoption à quasi-unanimité.
+    pour: 338
+    contre: 1
+    abstention: 1
+    votants: 340
+    date: "2025-06-10"
+
+special_ppl_equip:
+  # PPL Partenariats équipements sportifs — n° 2667 (AN)
+  commission_an:
+    pour: null
+  seance_an:
+    pour: null
