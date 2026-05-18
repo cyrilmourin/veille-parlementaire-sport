@@ -196,6 +196,19 @@ def send_email(html: str, subject: str, to: str) -> bool:
     user = os.environ.get("SMTP_USER")
     pwd = os.environ.get("SMTP_PASS")
     sender = os.environ.get("SMTP_FROM", user or "veille@sideline-conseil.fr")
+    # R43-O (2026-05-18) — BCC optionnel via secret GHA `DIGEST_BCC`. Cyril
+    # ne reçoit plus le digest sur `cyrilmourin@sideline-conseil.fr` depuis
+    # plusieurs semaines alors que `s.sendmail` retourne sans exception
+    # (cf. data/email_status.json : 10+ envois consécutifs en `stage=ok`).
+    # Hypothèses : DMARC strict OVH, filtre anti-spam OVH ou boîte saturée.
+    # Le BCC permet de comparer la livraison OVH vs Gmail SANS modifier
+    # `DIGEST_TO` (donc sans toucher au flux email existant). Le destinataire
+    # BCC est ajouté UNIQUEMENT dans l'enveloppe SMTP (`sendmail()` 2e arg)
+    # — il n'apparaît pas dans les headers `To:` / `Cc:` du message visible.
+    # Si `DIGEST_BCC` est vide, comportement strictement inchangé.
+    bcc_raw = (os.environ.get("DIGEST_BCC") or "").strip()
+    # Support multi-destinataires séparés par virgule (futur-proof).
+    bcc_list = [b.strip() for b in bcc_raw.split(",") if b.strip()] if bcc_raw else []
     # Bool de présence par secret — diag ciblé sans jamais exposer la valeur.
     missing = [
         name for name, val in (
@@ -211,6 +224,7 @@ def send_email(html: str, subject: str, to: str) -> bool:
             to=to or "",
             host=host or "",
             sender=sender or "",
+            bcc_count=len(bcc_list),
         )
         return False
     try:
@@ -219,10 +233,11 @@ def send_email(html: str, subject: str, to: str) -> bool:
         msg["From"] = sender
         msg["To"] = to
         msg.attach(MIMEText(html, "html", "utf-8"))
+        envelope_recipients = [to] + bcc_list
         with smtplib.SMTP(host, port) as s:
             s.starttls()
             s.login(user, pwd)
-            s.sendmail(sender, [to], msg.as_string())
+            s.sendmail(sender, envelope_recipients, msg.as_string())
     except Exception as e:
         # On capture, on diagnostique, on relève — le run échoue, GHA notifie
         # « workflow failed » et Cyril sait qu'il y a un problème SMTP.
@@ -235,6 +250,7 @@ def send_email(html: str, subject: str, to: str) -> bool:
             to=to or "",
             host=host or "",
             sender=sender or "",
+            bcc_count=len(bcc_list),
         )
         raise
     _write_email_status(
@@ -244,6 +260,7 @@ def send_email(html: str, subject: str, to: str) -> bool:
         sender=sender or "",
         subject_len=len(subject or ""),
         html_len=len(html or ""),
+        bcc_count=len(bcc_list),
     )
     return True
 

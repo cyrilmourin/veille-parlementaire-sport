@@ -149,6 +149,12 @@ jobs:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
           DIGEST_TO: ${{ secrets.DIGEST_TO }}
+          # R43-O (2026-05-18) — BCC optionnel. Cyril ne reçoit plus les
+          # mails sur cyrilmourin@sideline-conseil.fr alors que le pipeline
+          # confirme `stage=ok`. On ajoute Gmail en BCC pour comparer la
+          # livraison OVH vs Gmail sans toucher au flux DIGEST_TO. Si le
+          # secret n'est pas défini, comportement inchangé (BCC vide).
+          DIGEST_BCC: ${{ secrets.DIGEST_BCC }}
           SITE_URL: "https://veille.sideline-conseil.fr"
           # R42-BO (2026-05-12) — proxy Cloudflare pour les sources dont les
           # serveurs blacklistent les IPs GHA (info.gouv, education, intérieur,
