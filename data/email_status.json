@@ -1,10 +1,11 @@
 {
-  "ts": "2026-05-18T13:39:06Z",
+  "ts": "2026-05-18T14:12:37Z",
   "stage": "ok",
   "to": "cyrilmourin@sideline-conseil.fr",
   "host": "ssl0.ovh.net",
   "sender": "Sideline Veille <veille@sideline-conseil.fr>",
-  "subject_len": 55,
-  "html_len": 53982,
-  "bcc_count": 1
+  "subject_len": 48,
+  "html_len": 1609,
+  "bcc_count": 1,
+  "timeout_sec": 15.0
 }
