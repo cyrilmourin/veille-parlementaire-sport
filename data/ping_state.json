@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-18T10:44:37+00:00",
+  "last_run_at": "2026-05-18T13:44:36+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419604B1560P0D1N000001",
@@ -357,6 +357,7 @@
       "senat_amendements::43486c2bacaf35b2",
       "senat_amendements::457a17336478455d",
       "senat_amendements::47ad5d17f76efe0d",
+      "senat_amendements::5e34c1e9ca0ff0e2",
       "senat_amendements::61411fb202323110",
       "senat_amendements::628da2fecccb172d",
       "senat_amendements::63541f8ed6f8c741",
@@ -366,6 +367,7 @@
       "senat_amendements::8829ada814245d42",
       "senat_amendements::8ab4a7c66e716c2d",
       "senat_amendements::8e410efd465639f5",
+      "senat_amendements::92f7b2a4ee8f3b74",
       "senat_amendements::97e7bed55de11e7b",
       "senat_amendements::9945cf3dfc2f7463",
       "senat_amendements::9ae6af67f6024f42",
@@ -384,6 +386,8 @@
       "senat_amendements::ebbb31dc5631a32d",
       "senat_amendements::ed00f42db8747755",
       "senat_amendements::ed317d38b53bbb20",
+      "senat_amendements::eeb657ac7f824782",
+      "senat_amendements::f04ff87ba4b4a94e",
       "senat_amendements::f3b00b35bd8f55b2",
       "senat_amendements::f82dbdf3be94f978",
       "senat_amendements::fdc4aeeb693f0384"
