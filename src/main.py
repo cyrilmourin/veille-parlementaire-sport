@@ -211,13 +211,43 @@ def run(since_days: int = 1, send: bool = True, verbose: bool = False) -> int:
     inserted = store.upsert_many(items)
     log.info("Store : %d nouveaux items insérés", inserted)
 
-    # 4. Récupère les items à inclure dans le digest et l'export (matched uniquement)
-    # `replace(tzinfo=None)` car fetch_matched_since compare à des `published_at` naïfs stockés en DB.
-    since = (datetime.now(timezone.utc) - timedelta(days=since_days)).replace(tzinfo=None)
-    digest_rows = store.fetch_matched_since(since, only_matched=True)
-    log.info("Digest : %d items matchés sur les %d derniers jours", len(digest_rows), since_days)
+    # 4. Export site statique d'ABORD — applique TOUTE la chaîne de filtres
+    # publication (blocklist, _filter_window, R41-H/I, R42-BI/BS/BF/CZG/DC/DD,
+    # _normalize_and_dedup_nominations, dédup, etc.) et retourne la liste
+    # `filtered_rows` finale dans son summary.
+    # R43-S (2026-05-18) — Cyril : « il faut juste designer le mail à
+    # l'issue, de la même manière que le site se construit sur la base des
+    # résultats, le mail se design avec les (mêmes) résultats ». Donc on
+    # inverse l'ordre site_export ↔ digest : le digest consomme désormais
+    # la liste filtrée par site_export, pas un fetch DB direct. Évite
+    # qu'un item écarté du site (vieux JORF hors window, blocklist, doublon
+    # sémantique…) apparaisse quand même dans le mail.
+    all_matched = store.fetch_matched_since(datetime(1970, 1, 1), only_matched=True)
+    summary = site_export.export(all_matched, SITE_ROOT)
+    publishable_rows = summary.pop("filtered_rows", [])  # pop pour log lisible
+    log.info("Site statique exporté : %s", summary)
 
-    # 5. Email HTML — avec le bloc « Santé du pipeline » R29 en tête
+    # 5. Digest = sous-ensemble RÉCENT de la liste publiable.
+    # Filtre temporel sur `inserted_at` (date d'arrivée en DB) : un item
+    # apparu dans le dernier dump open data passe le filtre, peu importe
+    # sa `published_at`. Note : `published_at` ancien (ex. vieux décret
+    # JORF) est déjà filtré par `_filter_window` côté site_export — un
+    # item dans `publishable_rows` est nécessairement dans la fenêtre
+    # publication de sa catégorie (90j pour JORF/nominations, 30j agenda,
+    # etc.). Donc le digest ne peut plus contenir d'item hors délai.
+    since = (datetime.now(timezone.utc) - timedelta(days=since_days)).replace(tzinfo=None)
+    since_iso = since.isoformat(timespec="seconds")
+    digest_rows = [
+        r for r in publishable_rows
+        if (r.get("inserted_at") or "") >= since_iso
+    ]
+    log.info(
+        "Digest : %d items matchés sur les %d derniers jours "
+        "(filtrés post-export publication)",
+        len(digest_rows), since_days,
+    )
+
+    # 6. Email HTML — avec le bloc « Santé du pipeline » R29 en tête
     # (rendu vide si health_alerts est vide : pas de spam quotidien).
     health_block = monitoring.render_digest_block(health_alerts)
     html, total = digest.build_html(
@@ -246,11 +276,6 @@ def run(since_days: int = 1, send: bool = True, verbose: bool = False) -> int:
             )
     else:
         log.info("Envoi désactivé (--no-email)")
-
-    # 6. Export site statique — tous les items matchés (pas juste depuis `since`)
-    all_matched = store.fetch_matched_since(datetime(1970, 1, 1), only_matched=True)
-    summary = site_export.export(all_matched, SITE_ROOT)
-    log.info("Site statique exporté : %s", summary)
 
     # 7. R24 (2026-04-23) — snapshot ping : sauvegarde des hash_keys matchés des
     # 4 catégories chaudes (dossiers, amendements, questions, CR) pour que le
@@ -340,6 +365,9 @@ def export_only(verbose: bool = False) -> int:
         all_matched = store.fetch_matched_since(datetime(1970, 1, 1), only_matched=True)
         log.info("DB : %d items matchés à exporter", len(all_matched))
         summary = site_export.export(all_matched, SITE_ROOT)
+        # R43-S (2026-05-18) — `filtered_rows` (~1000+ items) inutile en
+        # mode export-only ; on le pop pour garder le log lisible.
+        summary.pop("filtered_rows", None)
         log.info("Site statique exporté : %s", summary)
     finally:
         store.close()

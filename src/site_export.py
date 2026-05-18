@@ -4164,12 +4164,26 @@ def export(rows: list[dict], site_root: str | Path) -> dict:
     # Une page par item matché
     _write_item_pages(items_dir, rows)
 
+    # R43-S (2026-05-18) — Expose la liste `rows` finale (post toute la
+    # chaîne de filtres : blocklist, _filter_window, R41-H/I, R42-BI/BS/BF,
+    # _filter_stale_agenda, _filter_provisional_agenda, dédup, etc.) pour
+    # que `main.run()` puisse construire le digest sur EXACTEMENT le même
+    # set d'items que celui publié sur le site. Évite que le mail contienne
+    # des items que le site a écartés (vieux JORF, blocklist, format
+    # comparatif, etc.). Cyril 18/05 : « il faut juste designer le mail à
+    # l'issue, de la même manière que le site se construit sur la base des
+    # résultats, le mail se design avec les (mêmes) résultats ».
+    # Note logs : `main.run()` doit retirer cette clé avant de logger le
+    # summary (1000+ rows = log illisible). Le contrat est : tout consommateur
+    # de cette clé doit faire `summary.pop("filtered_rows", None)` avant
+    # log/sérialisation, ou ne logger que `summary["total"]` & co.
     return {
         "total": len(rows),
         "par_categorie": {k: len(v) for k, v in by_cat.items()},
         "par_chambre": {k: len(v) for k, v in by_cham.items()},
         "recent_24h": len(recent),
         "window_days": WINDOW_DAYS,
+        "filtered_rows": rows,
     }
 
 
