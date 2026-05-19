@@ -1,10 +1,10 @@
 {
-  "ts": "2026-05-19T07:25:12Z",
+  "ts": "2026-05-19T10:55:53Z",
   "stage": "ok",
   "to": "cyrilmourin@sideline-conseil.fr",
   "host": "smtp-relay.brevo.com",
   "sender": "Sideline Veille <veille@sideline-conseil.fr>",
   "subject_len": 55,
-  "html_len": 30872,
+  "html_len": 34564,
   "bcc_count": 1
 }
