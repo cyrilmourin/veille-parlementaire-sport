@@ -1,6 +1,6 @@
 {
   "last_ping_at": null,
-  "last_run_at": "2026-05-19T18:19:04+00:00",
+  "last_run_at": "2026-05-19T23:52:39+00:00",
   "pinged_uids": {
     "amendements": [
       "an_amendements::AMANR5L17PO419604B1560P0D1N000001",
@@ -312,6 +312,11 @@
       "an_amendements::AMANR5L17PO419604B2667P0D1N000007",
       "an_amendements::AMANR5L17PO419604B2667P0D1N000008",
       "an_amendements::AMANR5L17PO419604B2667P0D1N000009",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000010",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000011",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000012",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000014",
+      "an_amendements::AMANR5L17PO419604B2667P0D1N000015",
       "an_amendements::AMANR5L17PO419865B2632P0D1N000492",
       "an_amendements::AMANR5L17PO419865B2632P0D1N000495",
       "an_amendements::AMANR5L17PO59051B2464P0D1N000024",
@@ -334,7 +339,6 @@
       "an_amendements::AMANR5L17PO838901BTC2755P0D1N000125",
       "an_amendements::AMANR5L17PO838901BTC2755P0D1N000138",
       "an_amendements::AMANR5L17PO838901BTC2755P0D1N000149",
-      "an_amendements::AMANR5L17PO838901BTC2765P0D1N000246",
       "an_amendements::AMANR5L17PO838901BTC2765P0D1N000254",
       "an_amendements::AMANR5L17PO838901BTC2765P0D1N000255",
       "senat_amendements::011f0d2a0689fdc0",
@@ -471,6 +475,7 @@
       "an_cr_commissions::an-cr-cion-soc-2526-059",
       "an_cr_commissions::an-cr-cion-soc-2526-061",
       "an_cr_commissions::an-cr-cion-soc-2526-068",
+      "an_cr_commissions::an-cr-cion-soc-2526-073",
       "an_syceron::00215237407b6223",
       "an_syceron::008b19da4a0cd6f2",
       "an_syceron::00c12618e8f1c31c",
