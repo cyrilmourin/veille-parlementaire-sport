@@ -114,14 +114,41 @@ def build_html(
 
     buckets: dict[str, list[dict]] = {}
     for r in rows:
-        matched = json.loads(r.get("matched_keywords") or "[]")
+        # R43-S.b (2026-05-19) — Tolérance str JSON vs list Python déjà
+        # parsée. Avant R43-S, `rows` venait de `store.fetch_matched_since`
+        # qui retournait des rows SQLite avec `matched_keywords` en TEXT
+        # (string JSON). Depuis R43-S, `rows` vient de
+        # `site_export.filtered_rows` qui passe par `_load(rows)` →
+        # `matched_keywords` est désormais une liste Python parsée.
+        # Crash du run daily 18/05 21:14 : `TypeError: the JSON object
+        # must be str, bytes or bytearray, not list`. Le `digest.build_html`
+        # doit accepter les 2 formats pour absorber proprement la
+        # transition d'architecture sans coupler `digest` à `site_export`.
+        mk = r.get("matched_keywords")
+        if isinstance(mk, list):
+            matched = mk
+        elif mk:
+            try:
+                matched = json.loads(mk)
+            except (TypeError, json.JSONDecodeError):
+                matched = []
+        else:
+            matched = []
         if not matched:
             continue
         # Statut procédural (dossiers législatifs) — extrait de raw, alimenté
         # par assemblee._normalize_dosleg.
-        try:
-            raw = json.loads(r.get("raw") or "{}")
-        except Exception:
+        # R43-S.b — Idem `raw` peut être dict déjà parsé (post-site_export)
+        # ou string JSON (legacy/DB direct). Défense double.
+        raw_in = r.get("raw")
+        if isinstance(raw_in, dict):
+            raw = raw_in
+        elif raw_in:
+            try:
+                raw = json.loads(raw_in)
+            except Exception:
+                raw = {}
+        else:
             raw = {}
         status_label = (raw.get("status_label") or "").strip()
         # On retire le préfixe d'institution redondant avec le badge chambre
