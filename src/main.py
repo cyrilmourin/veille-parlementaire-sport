@@ -23,6 +23,30 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+# R43-W (2026-05-19) — Bascule du SSL Python sur le truststore système
+# (Ubuntu /etc/ssl/certs/ca-certificates.crt, macOS Keychain) au lieu du
+# bundle `certifi` embarqué. Doit être appelé AVANT le premier import de
+# `httpx`, `ssl`, `urllib`, etc. — sinon le contexte SSL par défaut est
+# déjà figé sur certifi.
+#
+# Contexte : 18/05/2026 17:39 UTC → toutes les sources Sénat tombent à
+# 0 items avec `SSL: CERTIFICATE_VERIFY_FAILED, unable to get local
+# issuer certificate`. Diag : Sénat a rotaté son cert SSL vers
+# `Gandi SAS, CN=GandiCert`, une chaîne pas incluse dans le `certifi`
+# des runners GHA. Le truststore système Ubuntu (auto-update via paquet
+# `ca-certificates`) inclut bien cette racine → bascule = fix durable.
+#
+# Bénéfice secondaire : on n'aura plus à courir derrière chaque rotation
+# de cert côté serveurs gouvernementaux (AN, ministères, AAI…) — le
+# truststore système les couvre tous.
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except ImportError:
+    # Fallback silencieux si truststore absent : Python utilise certifi
+    # par défaut, comportement legacy. Pas bloquant pour le démarrage.
+    pass
+
 from . import digest, monitoring, normalize, ping_state, site_export
 from . import ping as ping_mod
 from .assemblee_organes import BYPASS_ORGANE_LABEL, is_sport_relevant_organe

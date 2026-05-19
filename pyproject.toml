@@ -27,6 +27,17 @@ dependencies = [
   # avoir à installer libpoppler. Rendu best-effort : si l'extraction
   # échoue, le matcher retombe sur le titre seul.
   "pypdf>=4.0",
+  # R43-W (2026-05-19) : truststore Python utilise le CA store du système
+  # (Ubuntu /etc/ssl/certs/ca-certificates.crt) au lieu du paquet `certifi`
+  # embarqué. Suite au renouvellement du cert SSL de www.senat.fr (chaîne
+  # `Gandi SAS, CN=GandiCert` non incluse dans la version certifi des
+  # runners GHA), TOUTES les sources Sénat tombaient à 0 avec
+  # `SSL: CERTIFICATE_VERIFY_FAILED`. Le truststore système se met à
+  # jour automatiquement via le paquet `ca-certificates` Debian/Ubuntu,
+  # donc on n'aura plus à courir derrière chaque rotation de cert
+  # côté serveurs gouvernementaux. Activé via
+  # `truststore.inject_into_ssl()` au démarrage de `src/main.py`.
+  "truststore>=0.10",
 ]
 
 [project.optional-dependencies]
