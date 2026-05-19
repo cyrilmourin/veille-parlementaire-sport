@@ -59,6 +59,11 @@
   .ppl-v3-step--current { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); color: #122549; box-shadow: 0 0 0 2px #1b3b6f; }
   .ppl-v3-step--future { background: #f1f5f9; color: #64748b; opacity: 0.7; }
   .ppl-v3-step--conditional { background: repeating-linear-gradient(45deg, #fef3c7, #fef3c7 5px, #fef9e7 5px, #fef9e7 10px); color: #78350f; }
+  /* R43-Z (2026-05-19) — Variante "reportée" pour la step current quand la
+     séance prévue a été annulée et reste à reprogrammer. Fond orange/rouge
+     pâle + bordure ; badge REP dans le label (cf. .ppl-v3-step__rep). */
+  .ppl-v3-step--postponed { background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); color: #7f1d1d; box-shadow: 0 0 0 2px #dc2626; }
+  .ppl-v3-step__rep { display: inline-block; margin-left: 4px; padding: 1px 5px; background: #dc2626; color: white; border-radius: 3px; font-size: 9px; font-weight: 800; letter-spacing: 0.5px; vertical-align: middle; }
   .ppl-v3-step--conditional .ppl-v3-step__cond { display: inline-block; padding: 1px 4px; background: #f59e0b; color: white; border-radius: 3px; font-size: 9px; font-weight: 800; letter-spacing: 0.5px; margin-left: 3px; }
   .ppl-v3-step__label { font-weight: 600; font-size: 11px; }
   .ppl-v3-step__date { font-size: 10px; opacity: 0.8; margin-top: 2px; }
@@ -340,7 +345,14 @@
       <div class="ppl-v3-step ppl-v3-step--done"><div class="ppl-v3-step__label"><span class="ppl-v3-step__check">✓</span> Dépôt Sénat</div><div class="ppl-v3-step__date">18 mars 2025</div></div>
       <div class="ppl-v3-step ppl-v3-step--done"><div class="ppl-v3-step__label"><span class="ppl-v3-step__check">✓</span> Adoption Sénat 1L</div><div class="ppl-v3-step__date">10 juin 2025</div></div>
       <div class="ppl-v3-step ppl-v3-step--done"><div class="ppl-v3-step__label"><span class="ppl-v3-step__check">✓</span> Commission AN</div><div class="ppl-v3-step__date">12-13 mai · TC 2797</div></div>
-      <div class="ppl-v3-step ppl-v3-step--current"><div class="ppl-v3-step__label">⏵ Séance publique AN</div><div class="ppl-v3-step__date">à programmer</div></div>
+      <!-- R43-Z (2026-05-19) — La séance publique AN initialement prévue
+           le 18/05/2026 a été reportée. On garde la step visible comme
+           prochaine étape avec un badge REP rouge, plutôt que de la masquer
+           (Cyril 19/05 : « on remet puisque ça n'apparait plus la séance
+           publique comme prochaine étape de la PPL en REP »). Date « à
+           reprogrammer » pour signaler qu'aucune nouvelle date n'est encore
+           fixée par la conférence des présidents AN. -->
+      <div class="ppl-v3-step ppl-v3-step--postponed"><div class="ppl-v3-step__label">⏵ Séance publique AN<span class="ppl-v3-step__rep">REP</span></div><div class="ppl-v3-step__date">à reprogrammer</div></div>
       <div class="ppl-v3-step ppl-v3-step--conditional"><div class="ppl-v3-step__label">CMP <span class="ppl-v3-step__cond">SI ÉCART</span></div><div class="ppl-v3-step__date">commission mixte</div></div>
       <div class="ppl-v3-step ppl-v3-step--conditional"><div class="ppl-v3-step__label">2L <span class="ppl-v3-step__cond">SI ÉCHEC CMP</span></div><div class="ppl-v3-step__date">nouvelle lecture</div></div>
       <div class="ppl-v3-step ppl-v3-step--future"><div class="ppl-v3-step__label">Conseil constit.</div><div class="ppl-v3-step__date">si saisine</div></div>

@@ -4437,10 +4437,24 @@ def _render_special_ppl_card(payload: dict) -> list[str]:
         return []
     meta = payload.get("meta") or {}
     agenda = (payload.get("agenda") or [])
-    # Prochaine échéance = 1er agenda > today
+    # Prochaine échéance = 1er agenda > today, OU 1er agenda postponed
+    # (R43-Z 2026-05-19 — Cyril : la séance publique AN du 18/05 reportée
+    # disparaissait de la carte dès le passage du 18/05 → today, parce
+    # que le filtre `date >= today_iso` excluait les items au passé. Or
+    # un item reporté A par essence sa date obsolète : on doit le garder
+    # visible avec son badge REP tant qu'aucune nouvelle date n'est
+    # publiée. Solution : inclure les items `is_postponed=True` même
+    # avec une date passée).
     today_iso = datetime.now().date().isoformat()
-    upcoming = [a for a in agenda if a.get("date", "") >= today_iso]
-    # Tri agenda asc pour avoir la prochaine d'abord
+    upcoming = [
+        a for a in agenda
+        if a.get("date", "") >= today_iso or a.get("is_postponed")
+    ]
+    # Tri agenda asc pour avoir la prochaine d'abord. Les items postponed
+    # restent triés sur leur date (qui est leur dernière date connue),
+    # donc le 18/05 reporté reste devant un futur 25/05 confirmé — c'est
+    # logique éditorialement : on signale d'abord ce qui est en attente
+    # de reprogrammation avant ce qui a une vraie date.
     upcoming.sort(key=lambda a: a.get("date", ""))
     next_event = upcoming[0] if upcoming else None
     nb_commission = counts.get("amdt_commission", 0)
