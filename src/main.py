@@ -124,6 +124,99 @@ BYPASS_KEYWORDS_SOURCES: set[str] = {
 }
 BYPASS_KEYWORD_LABEL = "(flux complet)"
 
+# R43-X (2026-05-19) — Bypass keyword pour les AMENDEMENTS qui portent sur
+# un dossier législatif déjà identifié comme sport (PPL Sport pro, PPL
+# équipements, et plus tard d'autres si on ajoute des `special_*`).
+#
+# Pourquoi : la PPL équipements (AN n°2667, dossier DLR5L17N54138) avait
+# 14 amendements en commission (constat Cyril 19/05) dont 0 remonté en DB.
+# Cause : un amdt « Suppression de l'article 5 » sur cette PPL n'a aucun
+# mot-clé sport dans son titre, donc le keyword matcher le rejette. Or le
+# dossier parent EST sport — on perd les amdt techniques (suppression,
+# rédactionnel, alinéa) qui touchent à un texte sport identifié.
+#
+# Le bypass injecte le pseudo-keyword "(dossier sport)" sur les amdt
+# dont `raw.texte_ref` ∈ whitelist. Symétrique au bypass source R25-H
+# mais avec scope catégorie strictement = "amendements" (pas de
+# contamination CR/agenda/publications).
+#
+# Scope volontairement étroit : seuls les `texte_ref` des `special_*`
+# (special_ppl.py, special_equipements.py) sont whitelistés. Pour
+# élargir, créer un nouveau special_* avec ses propres texte_refs et
+# l'ajouter au `_load_sport_dosleg_texte_refs()` ci-dessous.
+BYPASS_DOSLEG_AMDT_LABEL = "(dossier sport)"
+
+
+def _load_sport_dosleg_texte_refs() -> frozenset[str]:
+    """R43-X — Whitelist des `texte_ref` des dossiers législatifs
+    identifiés sport. Source : union des constantes `ALL_TEXTE_REFS`
+    exposées par chaque module `special_*`. Si un nouveau dossier
+    spécial est ajouté (ex. JO 2030), il suffit de définir son module
+    `special_jo2030.py` avec sa propre `ALL_TEXTE_REFS` et de l'ajouter
+    ici — pas de duplication de liste.
+    """
+    refs: set[str] = set()
+    # Imports paresseux pour éviter une dépendance circulaire avec
+    # site_export → special_ppl → main (si jamais ça arrivait).
+    try:
+        from .special_ppl import ALL_TEXTE_REFS as PPL_REFS
+        refs |= set(PPL_REFS)
+    except Exception:
+        pass
+    try:
+        from .special_equipements import ALL_TEXTE_REFS as EQUIP_REFS
+        refs |= set(EQUIP_REFS)
+    except Exception:
+        pass
+    return frozenset(refs)
+
+
+SPORT_DOSLEG_TEXTE_REFS = _load_sport_dosleg_texte_refs()
+
+
+def _apply_dosleg_amdt_bypass(items) -> int:
+    """R43-X (2026-05-19) : injecte le pseudo-keyword `(dossier sport)`
+    sur les AMENDEMENTS qui portent sur un dossier identifié sport
+    (whitelist `SPORT_DOSLEG_TEXTE_REFS`), même si leur titre/summary
+    ne contient aucun keyword sport.
+
+    Cas concret (constat Cyril 19/05) : la PPL équipements n°2667 a 14
+    amendements en commission visibles côté AN (`amendement-count="14"`),
+    dont 0 remonté en DB parce qu'aucun titre amdt n'a "sport" dedans
+    ("Suppression de l'article 5", "Modifier l'alinéa 3"…). Le dossier
+    parent (DLR5L17N54138) EST sport, donc tous ses amdt doivent
+    remonter — y compris les techniques.
+
+    Scope strict : catégorie `amendements` UNIQUEMENT. Pas de
+    contamination CR / agenda / questions / publications.
+    Critère : `raw.texte_ref` ∈ `SPORT_DOSLEG_TEXTE_REFS` OU
+    `raw.dossier_id` ∈ `SPORT_DOSLEG_TEXTE_REFS` (couvre les 2 conventions
+    d'ingestion AN / Sénat).
+
+    Opère in-place. Retourne le nombre d'items enrichis."""
+    if not SPORT_DOSLEG_TEXTE_REFS:
+        return 0  # No-op si aucun dosleg sport déclaré (rare, mais safe)
+    enriched = 0
+    for it in items:
+        if getattr(it, "matched_keywords", None):
+            continue  # Déjà matché par le keyword matcher standard
+        category = (getattr(it, "category", "") or "").strip().lower()
+        if category != "amendements":
+            continue  # Scope strict
+        raw = getattr(it, "raw", None) or {}
+        if not isinstance(raw, dict):
+            continue
+        # Check les 2 conventions (texte_ref AN, dossier_id Sénat/AN)
+        for k in ("texte_ref", "dossier_id"):
+            v = raw.get(k)
+            if isinstance(v, str) and v in SPORT_DOSLEG_TEXTE_REFS:
+                it.matched_keywords = [BYPASS_DOSLEG_AMDT_LABEL]
+                # keyword_families reste vide : ce n'est pas un match
+                # thématique direct, c'est un bypass par contexte parent.
+                enriched += 1
+                break
+    return enriched
+
 
 def _apply_source_bypass(items) -> int:
     """R25-H : injecte le pseudo-keyword sur items de sources bypass sans match.
@@ -224,10 +317,17 @@ def run(since_days: int = 1, send: bool = True, verbose: bool = False) -> int:
     # (commissions culture/sociales, missions d'info JOP, CE fédérations).
     # Voir `src/assemblee_organes.py`.
     bypassed_organe = _apply_organe_bypass(items)
+    # R43-X (2026-05-19) — bypass keyword pour les AMENDEMENTS d'un dossier
+    # identifié sport (PPL Sport pro, PPL équipements...). Permet de
+    # remonter les amdt techniques (suppression, alinéa) qui n'ont pas
+    # "sport" dans leur titre mais portent sur un dossier sport identifié.
+    bypassed_dosleg = _apply_dosleg_amdt_bypass(items)
     matched = [it for it in items if it.matched_keywords]
     log.info(
-        "Matching : %d items matchés sur %d (dont %d via bypass source, %d via bypass organe)",
-        len(matched), len(items), bypassed_source, bypassed_organe,
+        "Matching : %d items matchés sur %d (dont %d via bypass source, "
+        "%d via bypass organe, %d via bypass dosleg amdt)",
+        len(matched), len(items),
+        bypassed_source, bypassed_organe, bypassed_dosleg,
     )
 
     # 3. Persist
