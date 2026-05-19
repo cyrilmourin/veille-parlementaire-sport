@@ -92,8 +92,10 @@ def test_proxy_no_retry_on_418(cf_env):
     assert call_count["n"] == 1
 
 
-def test_proxy_retry_gives_up_after_3_attempts(cf_env):
-    """Si 522 persistent sur les 3 tentatives, on lève l'erreur."""
+def test_proxy_retry_gives_up_after_5_attempts(cf_env):
+    """R43-U (2026-05-19) — Bumpé 3 → 5 essais. Si 522 persistent sur
+    les 5 tentatives, on lève l'erreur. Test mis à jour de
+    `test_proxy_retry_gives_up_after_3_attempts` (R42-BQ)."""
     call_count = {"n": 0}
 
     class FakeClient:
@@ -107,7 +109,9 @@ def test_proxy_retry_gives_up_after_3_attempts(cf_env):
     with patch("src.sources._common._client", FakeClient):
         with pytest.raises(tenacity.RetryError):
             _fetch_bytes_via_proxy("https://www.ccomptes.fr/rss/publications")
-    assert call_count["n"] == 3
+    assert call_count["n"] == 5, (
+        f"R43-U : 5 essais attendus, obtenu {call_count['n']}"
+    )
 
 
 # ---------------------------------------------------------------------------

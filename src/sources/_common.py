@@ -164,10 +164,38 @@ def _fetch_bytes_httpx(url: str) -> bytes:
         return r.content
 
 
+# R43-U (2026-05-19) — Codes d'erreur Cloudflare "upstream timeout" :
+#   - 522 : Connection timed out (CF n'a pas réussi à joindre l'origine)
+#   - 523 : Origin is unreachable (DNS / réseau)
+#   - 524 : A timeout occurred (origine n'a pas répondu dans la wall-time CF)
+# Tous trois sont transitoires côté origine. On les retry agressivement
+# (5 essais R43-U au lieu de 3 R42-BQ) avant d'abandonner. Si le 5e
+# échec persiste, on tente un fallback impersonate direct (cf.
+# `fetch_bytes(via_proxy=True)`) avant de remonter l'erreur.
+_CF_UPSTREAM_TIMEOUT_CODES = {522, 523, 524}
+
+
+def _is_retryable_proxy(exc: BaseException) -> bool:
+    """Politique de retry spécifique au proxy CF (vs `_is_retryable` direct).
+    Retry les 5xx incl. CF 52x, les erreurs réseau, et les timeouts.
+    Pas les 4xx (refus origine type 403/404/418 ne se résoudra pas).
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        # Tous les 5xx (y compris 522/523/524 CF upstream) sont retryable.
+        return exc.response.status_code >= 500
+    return True
+
+
 @retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(min=2, max=10),
-    retry=retry_if_exception(_is_retryable),
+    # R43-U (2026-05-19) — 5 essais vs 3 (R42-BQ). Constat 19/05 :
+    # ccomptes.fr/rss/publications échouait 3/3 essais sur 522 alors que
+    # l'origine répond en < 1s depuis ma machine. Le worker CF, hébergé
+    # sur PoP US (`CF-RAY ...-SJC`), semble parfois throttlé côté
+    # ccomptes.fr. Un essai supplémentaire 20-25s plus tard augmente
+    # significativement le taux net de succès (transitoire).
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(min=3, max=25),
+    retry=retry_if_exception(_is_retryable_proxy),
 )
 def _fetch_bytes_via_proxy(url: str, timeout: float = 30.0) -> bytes:
     """R42-BO (2026-05-12) — Fetch via le worker Cloudflare proxy.
@@ -185,11 +213,12 @@ def _fetch_bytes_via_proxy(url: str, timeout: float = 30.0) -> bytes:
       - CLOUDFLARE_PROXY_TOKEN : secret partagé worker ↔ pipeline
     Sinon : fallback fetch direct (préserve le comportement legacy).
 
-    R42-BQ (2026-05-12) — Retry tenacity 3 tentatives sur 5xx/timeouts.
-    Cause : INJEP / Cour des comptes répondent parfois HTTP 522 (timeout
-    CF→origine) sous charge serveur. Le 522 est transitoire — un retry
-    2-3s plus tard repasse en 200. On ne retry PAS sur les 4xx (refus
-    volontaire de l'origine, ex. INSEP HTTP 418 « I'm a teapot »).
+    R42-BQ (2026-05-12) — Retry tenacity sur 5xx/timeouts.
+    R43-U (2026-05-19) — 3 → 5 essais, backoff étendu 3-25s. Couplé
+    à un fallback `_fetch_bytes_impersonate` dans `fetch_bytes()` si
+    le 5e essai échoue toujours avec un code CF upstream timeout.
+    Cause : ccomptes.fr/rss/publications échoue 3/3 essais via CF
+    alors qu'il répond en < 1s en direct.
     """
     proxy_url = os.environ.get("CLOUDFLARE_PROXY_URL", "").strip()
     proxy_token = os.environ.get("CLOUDFLARE_PROXY_TOKEN", "").strip()
@@ -220,7 +249,32 @@ def fetch_bytes(url: str, impersonate: bool = False,
     absentes : fallback fetch direct (cohérent avec install par étapes).
     """
     if via_proxy:
-        return _fetch_bytes_via_proxy(url)
+        # R43-U (2026-05-19) — Fallback impersonate direct sur 522/523/524.
+        # Si le proxy CF échoue 5x consécutivement avec un code "upstream
+        # timeout" (très récurrent pour ccomptes.fr depuis fin avril),
+        # on tente une dernière fois en direct via curl_cffi. Ça peut
+        # passer si l'origine ne blackliste pas systématiquement les
+        # IPs GHA (cas observé : ccomptes répond bien en direct depuis
+        # les IPs Azure quand on n'enchaîne pas les requêtes via proxy).
+        # Si le fallback échoue aussi → on relève l'exception d'origine
+        # (i.e. l'erreur du proxy CF, plus parlante pour le diag).
+        try:
+            return _fetch_bytes_via_proxy(url)
+        except httpx.HTTPStatusError as e:
+            code = e.response.status_code
+            if code in _CF_UPSTREAM_TIMEOUT_CODES:
+                log.warning(
+                    "Proxy CF HTTP %d sur %s — fallback fetch direct via "
+                    "impersonate (R43-U)", code, url,
+                )
+                try:
+                    return _fetch_bytes_impersonate(url)
+                except Exception as e2:
+                    log.warning(
+                        "Fallback impersonate KO aussi sur %s : %s",
+                        url, type(e2).__name__,
+                    )
+            raise
     if impersonate:
         return _fetch_bytes_impersonate(url)
     return _fetch_bytes_httpx(url)
