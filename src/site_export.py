@@ -4416,6 +4416,138 @@ def _escape(s: str) -> str:
             .replace(">", "&gt;"))
 
 
+def _render_home_recent_module(recent: list[dict]) -> list[str]:
+    """R43-Y (2026-05-19) — Module « Actualité des dernières 24 h » pour
+    la page d'accueil, en format card (3 modules tiers).
+
+    5 premiers items visibles, le reste (jusqu'à 5 max → 10 total)
+    replié dans un `<details>`. Symétrique avec
+    `_render_home_publications_module` pour visual consistency.
+
+    Différence avec l'ancienne implémentation (block markdown
+    `## Actualité…` + `<div class="recent-24">`) : ici on rend un
+    `<section class="home-tier-card">` qui s'aligne en grid avec les
+    2 autres modules tiers (Publications + PPL).
+    """
+    VISIBLE = 5
+    EXTRA = 5  # total max affichable = 10
+    head = recent[:VISIBLE]
+    tail = recent[VISIBLE:VISIBLE + EXTRA]
+    lines: list[str] = []
+    lines.append('<section class="home-tier-card home-tier-card--recent" aria-label="Actualité des dernières 24 heures">')
+    lines.append('<div class="home-tier-card__head">')
+    lines.append('<span class="home-tier-card__kicker">24 H</span>')
+    lines.append(
+        f'<h3 class="home-tier-card__title">Actualité des dernières 24 h</h3>'
+    )
+    lines.append(
+        f'<div class="home-tier-card__sub">{len(recent)} nouveauté'
+        f'{"s" if len(recent) > 1 else ""} aujourd\'hui</div>'
+    )
+    lines.append('</div>')
+    if not recent:
+        lines.append('<p class="home-tier-card__empty">Aucune nouveauté depuis 24 h.</p>')
+    else:
+        lines.append('<ul class="home-tier-card__items">')
+        for it in head:
+            lines.extend(_render_home_tier_item(it))
+        lines.append('</ul>')
+        if tail:
+            lines.append(
+                f'<details class="home-tier-card__fold">'
+                f'<summary>Voir les {len(tail)} suivante'
+                f'{"s" if len(tail) > 1 else ""}</summary>'
+            )
+            lines.append('<ul class="home-tier-card__items">')
+            for it in tail:
+                lines.extend(_render_home_tier_item(it))
+            lines.append('</ul>')
+            lines.append('</details>')
+    lines.append('</section>')
+    return lines
+
+
+def _render_home_tier_item(it: dict) -> list[str]:
+    """R43-Y — Rendu d'un item dans un module tier home (24h ou Publications).
+    Format compact : chambre + lien titre. Pas de date (ils sont tous
+    récents par construction)."""
+    chamber = _escape((it.get("chamber") or "").strip())
+    title = _escape((it.get("title") or "").strip())[:160]
+    url = (it.get("url") or "").strip()
+    if not url or not title:
+        return []
+    chamber_html = (
+        f'<span class="chamber" data-chamber="{chamber}">{chamber}</span>'
+        if chamber else ''
+    )
+    return [
+        '<li class="home-tier-card__item">',
+        f'<div class="home-tier-card__meta">{chamber_html}</div>',
+        f'<a href="{url}" target="_blank" rel="noopener" title="{title}">{title}</a>',
+        '</li>',
+    ]
+
+
+def _render_home_publications_module(by_cat: dict[str, list[dict]]) -> list[str]:
+    """R43-Y (2026-05-19) — Module « Dernières publications » pour la
+    page d'accueil. Sort de la sidebar pour aller dans le main, à côté
+    du module 24h et de la carte PPL Sport pro.
+
+    Cyril 19/05 : « à coté on place les dernières publications (qui
+    sort, pour la page d'accueil, de la colonne de droite) ».
+
+    Affiche les 5 premières publications (catégorie `communiques`)
+    triées par date desc, avec dropdown jusqu'à 5 autres. Source = même
+    bucket que la sidebar (cohérence : si Cyril voit 5 publications dans
+    la sidebar d'une autre page, il voit les 5 mêmes dans le module
+    home — pas 5 différentes).
+
+    Visible UNIQUEMENT sur la home. La sidebar continue d'afficher
+    « Dernières publications » sur les autres pages (via le partial
+    `sidebar.html` avec test `{{ if ne .Type "communiques" }}` côté Hugo,
+    auquel R43-Y ajoute `{{ if not .IsHome }}`).
+    """
+    VISIBLE = 5
+    EXTRA = 5
+    pub = _sort_by_date_desc(by_cat.get("communiques", []))
+    head = pub[:VISIBLE]
+    tail = pub[VISIBLE:VISIBLE + EXTRA]
+    lines: list[str] = []
+    lines.append('<section class="home-tier-card home-tier-card--publications" aria-label="Dernières publications">')
+    lines.append('<div class="home-tier-card__head">')
+    lines.append('<span class="home-tier-card__kicker">VEILLE</span>')
+    lines.append('<h3 class="home-tier-card__title">Dernières publications</h3>')
+    lines.append(
+        '<div class="home-tier-card__sub">5 dernières entrées de la rubrique</div>'
+    )
+    lines.append('</div>')
+    if not pub:
+        lines.append('<p class="home-tier-card__empty">Pas de publication récente.</p>')
+    else:
+        lines.append('<ul class="home-tier-card__items">')
+        for it in head:
+            lines.extend(_render_home_tier_item(it))
+        lines.append('</ul>')
+        if tail:
+            lines.append(
+                f'<details class="home-tier-card__fold">'
+                f'<summary>Voir les {len(tail)} suivante'
+                f'{"s" if len(tail) > 1 else ""}</summary>'
+            )
+            lines.append('<ul class="home-tier-card__items">')
+            for it in tail:
+                lines.extend(_render_home_tier_item(it))
+            lines.append('</ul>')
+            lines.append('</details>')
+    lines.append(
+        '<p class="home-tier-card__more">'
+        '<a href="/items/communiques/">Voir toutes les publications →</a>'
+        '</p>'
+    )
+    lines.append('</section>')
+    return lines
+
+
 def _render_special_ppl_card(payload: dict) -> list[str]:
     """R41-M (2026-05-07) — Carte HTML « Spécial PPL Sport professionnel »
     affichée à droite du module 24 h sur la page d'accueil.
@@ -4586,68 +4718,43 @@ def _write_home(content_dir: Path, rows: list[dict], by_cat: dict[str, list[dict
         "",
     ]
 
-    # -------- Section top : 24 h + carte « Spécial PPL » côte à côte ----
-    # Bloc compact (padding réduit, pas de tags) — cf. demande utilisateur
-    # pour densifier le haut de page. Les tags restent dans les sections
-    # par thématique en dessous, qui servent à la lecture exploratoire.
-    # R41-J (2026-05-07) : titre « Actualité des dernières 24 h », badge
-    # chambre AVANT le titre, pas de date, liens en nouvel onglet, et
-    # repli au-delà des 5 premières occurrences.
-    # R41-M (2026-05-07) : layout 2 colonnes en flexbox dans le main —
-    # 24h à gauche (~66%), carte « Spécial PPL Sport professionnel » à
-    # droite (~33%). En dessous de 720px les colonnes empilent (CSS).
-    # R41-N : si aucune carte spéciale (payload vide), 24 h prend 100%.
+    # -------- Section top R43-Y : 3 modules tiers harmonisés ----------
+    # R43-Y (2026-05-19) — Cyril : « Les actualités des 24 dernières
+    # heures sur la page d'accueil (uniquement) prennent la forme d'un
+    # module, comme celui fait pour les dernières publications, sur un
+    # tiers du main. À côté on place les dernières publications (qui
+    # sort, pour la page d'accueil, de la colonne de droite), et il y a
+    # déjà pour le 3ème tiers le module spécial PPL Sport pro. Essaie
+    # d'harmoniser les hauteurs : ils sont tous la hauteur du plus haut
+    # des 3 ».
+    #
+    # 3 modules dans un grid CSS `1fr 1fr 1fr` avec `align-items: stretch` :
+    #   - Tier 1 : Actualité des dernières 24 h
+    #   - Tier 2 : Dernières publications (déplacé de la sidebar pour la
+    #              home uniquement ; la sidebar continue de l'afficher sur
+    #              les autres pages — cf. `site/layouts/partials/sidebar.html`)
+    #   - Tier 3 : Carte spéciale PPL Sport pro (existante)
+    #
+    # Repli identique sur les 3 modules : 5 items visibles, dropdown
+    # `<details>` pour 5 autres max (10 total). Cyril : « limités à 5,
+    # avec menu déroulant possible jusqu'à 5 autres max ».
+    #
+    # Si pas de carte PPL (cas rare : payload vide), le grid passe à 2
+    # colonnes au lieu de 3 via CSS responsive (et la PPL ne s'émet pas).
     special_card_lines = (
         _render_special_ppl_card(special_ppl_payload)
         if special_ppl_payload else []
     )
     has_special_card = bool(special_card_lines)
+    lines.append('<div class="home-top-tier">')
+    # Tier 1 : 24 h
+    lines.extend(_render_home_recent_module(recent))
+    # Tier 2 : Publications
+    lines.extend(_render_home_publications_module(by_cat))
+    # Tier 3 : PPL Sport pro (si disponible)
     if has_special_card:
-        lines.append('<div class="home-row-top home-row-top--with-special">')
-        lines.append('<section class="home-col-recent">')
-        # En contexte HTML brut, Markdown ne réinterprète pas `## ...` sans
-        # ligne vide → on rend le titre directement en HTML pour préserver
-        # le style `.home .content h2` (border-left rouge, marge top etc.).
-        lines.append(
-            f'<h2>Actualité des dernières 24 h ({len(recent)})</h2>'
-        )
-    else:
-        lines.append(f"## Actualité des dernières 24 h ({len(recent)})")
-    lines.append("")
-    lines.append('<div class="recent-24">')
-    lines.append("")
-    if recent:
-        VISIBLE = 5
-        head = recent[:VISIBLE]
-        tail = recent[VISIBLE:30]
-        for it in head:
-            lines.append(_fmt_item_line(
-                it, with_tags=False, chamber_first=True,
-                with_date=False, target_blank=True,
-            ))
-        if tail:
-            lines.append("")
-            lines.append(
-                f'<details class="recent-24-fold">'
-                f'<summary>Voir les {len(tail)} suivante'
-                f'{"s" if len(tail) > 1 else ""}</summary>'
-            )
-            lines.append("")
-            for it in tail:
-                lines.append(_fmt_item_line(
-                    it, with_tags=False, chamber_first=True,
-                    with_date=False, target_blank=True,
-                ))
-            lines.append("")
-            lines.append("</details>")
-    else:
-        lines.append("_Aucune nouveauté depuis 24h._")
-    lines.append("")
-    lines.append("</div>")  # /.recent-24
-    if has_special_card:
-        lines.append("</section>")  # /.home-col-recent
-        lines.extend(special_card_lines)  # Carte Spécial PPL à droite
-        lines.append("</div>")  # /.home-row-top
+        lines.extend(special_card_lines)
+    lines.append('</div>')  # /.home-top-tier
     lines.append("")
 
     # -------- Sections par catégorie (fenêtre par catégorie) ----------

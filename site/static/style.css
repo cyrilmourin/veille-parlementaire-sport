@@ -2276,6 +2276,186 @@ a:hover { text-decoration: underline; }
   }
 }
 
+/* ============================================================================
+   R43-Y (2026-05-19) — Home : 3 modules tiers harmonisés
+   ============================================================================
+   Demande Cyril : « Les actualités des 24 dernières heures sur la page
+   d'accueil (uniquement) prennent la forme d'un module […] sur un tiers
+   du main. À côté on place les dernières publications (qui sort, pour la
+   page d'accueil, de la colonne de droite), et il y a déjà pour le 3ème
+   tiers le module spécial PPL Sport pro. Essaie d'harmoniser les hauteurs :
+   ils sont tous la hauteur du plus haut des 3. »
+
+   Implémentation : CSS grid `1fr 1fr 1fr` + `align-items: stretch` (la
+   hauteur de la rangée s'aligne sur le contenu du plus haut). Les 2 modules
+   "Actualité 24h" et "Dernières publications" héritent du style visuel
+   `.home-tier-card` (fond blanc, bordure top rouge), le 3e module
+   (`.special-ppl-card`) garde son style bleu marine signature mais reçoit
+   le même comportement flex pour s'aligner sur les 2 autres.
+
+   Responsive :
+   - > 1100px : 3 colonnes
+   - 720-1100px : 2 colonnes (PPL passe ligne suivante, occupe largeur full)
+   - < 720px : 1 colonne (stack vertical)
+   ============================================================================ */
+.home .content > .home-top-tier {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 18px;
+  align-items: stretch;  /* hauteurs égales — c'est la clé */
+  margin: 0 0 24px;
+}
+.home-top-tier > * {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 1100px) {
+  .home .content > .home-top-tier {
+    grid-template-columns: 1fr 1fr;
+  }
+  .home-top-tier > .special-ppl-card {
+    grid-column: 1 / -1;  /* PPL prend toute la largeur ligne 2 */
+  }
+}
+@media (max-width: 720px) {
+  .home .content > .home-top-tier {
+    grid-template-columns: 1fr;
+  }
+  .home-top-tier > .special-ppl-card { grid-column: auto; }
+}
+
+/* Style commun des cards "Actualité 24h" et "Dernières publications"
+   (le 3e module .special-ppl-card a son style propre, déjà défini plus
+   bas, mais reçoit display:flex via .home-top-tier > *). */
+.home-tier-card {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 16px 18px 14px;
+  border-top: 3px solid var(--sl-red);
+  box-shadow: 0 2px 10px rgba(18, 37, 73, .08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.home-tier-card__head {
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+}
+.home-tier-card__kicker {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  background: var(--sl-red);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 3px;
+  margin-bottom: 6px;
+}
+/* Override .home .content h3 (couleur var(--sl-blue), border-bottom)
+   pour les titres de modules tiers : on supprime la border et on garde
+   la couleur bleue propre. */
+.home .content .home-tier-card .home-tier-card__title,
+.home-tier-card__title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--sl-blue);
+  margin: 0;
+  font-family: var(--font-title);
+  letter-spacing: -0.3px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.home-tier-card__sub {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+  font-weight: 400;
+}
+.home-tier-card__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;  /* prend l'espace dispo pour aligner les "voir tout" en bas */
+}
+.home .content .home-tier-card .home-tier-card__item,
+.home-tier-card .home-tier-card__item {
+  background: #f9fafb;
+  border-radius: 6px;
+  padding: 8px 10px;
+  border-bottom: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.home-tier-card__item a {
+  color: var(--sl-blue);
+  text-decoration: none;
+  font-weight: 600;
+}
+.home-tier-card__item a:hover { text-decoration: underline; }
+.home-tier-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #6b7280;
+}
+.home-tier-card__meta .chamber {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #e5e7eb;
+  color: #374151;
+  font-weight: 700;
+}
+.home-tier-card__more {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+.home-tier-card__more a {
+  color: var(--sl-red);
+  text-decoration: none;
+  font-weight: 700;
+}
+.home-tier-card__more a:hover { text-decoration: underline; }
+.home-tier-card__fold {
+  margin-top: 4px;
+}
+.home-tier-card__fold > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--sl-blue);
+  padding: 6px 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.home-tier-card__fold > summary:hover { background: #e5e7eb; }
+.home-tier-card__fold[open] > summary { margin-bottom: 6px; }
+.home-tier-card__empty {
+  font-size: 13px;
+  color: #6b7280;
+  font-style: italic;
+  margin: 8px 0;
+}
+
+/* R43-Y : la carte PPL existante (.special-ppl-card) reçoit le comportement
+   flex via .home-top-tier > *, mais on neutralise son `flex: 0 1 38%` legacy
+   et son `min-width: 280px` (ne s'appliquent plus dans le grid). */
+.home-top-tier > .special-ppl-card {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 /* ---------- Carte « Spécial PPL » (accueil) -------------------------------- */
 .special-ppl-card {
   flex: 0 1 38%;

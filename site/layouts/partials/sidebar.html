@@ -101,11 +101,16 @@
 {{/* R42-CZF (2026-05-16) — Module « Dernières publications ».
      Toujours les 5 derniers items category=communiques (= rubrique
      "Publications"), et lui uniquement (pas contextuel à la page).
-     Visible partout SAUF sur la page Publications elle-même
-     (.Type == "communiques") : doublon avec la liste centrale.
+     Visible partout SAUF :
+       - sur la page Publications elle-même (.Type == "communiques") :
+         doublon avec la liste centrale.
+       - R43-Y (2026-05-19) sur la page d'accueil (.IsHome) : les
+         dernières publications sont rendues comme module tier dans
+         le main (cf. `_render_home_publications_module` côté
+         `src/site_export.py`). Sinon doublon visible/main.
      Visuel repris de l'ex-special_ppl_sidebar.html : fond bleu marine,
      kicker rouge "VEILLE", items en cartes blanches. */}}
-{{ if ne .Type "communiques" }}
+{{ if and (ne .Type "communiques") (not .IsHome) }}
   {{ with site.Data.sidebar_publications }}
   <div class="side-card side-card--ppl side-card--pub">
     <div class="side-card--ppl__head">
